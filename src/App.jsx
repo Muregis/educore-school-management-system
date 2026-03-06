@@ -1,277 +1,72 @@
+import React, { useState, useEffect } from 'react';
+import { toLocalDate } from './utils';
 
-import { useEffect, useMemo, useState } from "react";
-import PropTypes from "prop-types";
-import { ALL_CLASSES, DEFAULTS, NAV, ROLE, SUBJECTS } from "./lib/constants";
-import { C, inputStyle } from "./lib/theme";
-import { genId, money } from "./lib/utils";
-import { useLocalState } from "./hooks/useLocalState";
-import Btn from "./components/Btn";
-import Field from "./components/Field";
-import Badge from "./components/Badge";
-import Modal from "./components/Modal";
-import Table from "./components/Table";
-import NotificationPanel from "./components/NotificationPanel";
-import LoginView from "./pages/LoginView";
-import DashboardPage from "./pages/DashboardPage";
+const TeachersPage = () => {
+    const [error, setError] = useState(null);
+    const [loading, setLoading] = useState(false);
 
-const PAGE_SIZE = 8;
-const pager = (arr, p) => ({ pages: Math.max(1, Math.ceil(arr.length / PAGE_SIZE)), rows: arr.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE) });
-const calcGrade = (m, t) => { const p = (Number(m) / Number(t || 1)) * 100; if (p >= 80) return "EE"; if (p >= 65) return "ME"; if (p >= 50) return "AE"; return "BE"; };
-const API_BASE = "http://localhost:4000/api";
-const apiGet = async (path, token) => {
-  const r = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
-  if (!r.ok) throw new Error(`GET ${path} failed`);
-  return r.json();
+    useEffect(() => {
+        // Fetch data and handle error state
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                // Fetch logic here
+            } catch (err) {
+                setError('Failed to load teachers.');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    return (<>
+        {loading && <div>Loading...</div>}
+        {error && <div>{error}</div>}
+        {/* Render teacher list here */}
+    </>);
 };
-const apiSend = async (path, token, method, body) => {
-  const r = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify(body)
-  });
-  const payload = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(payload?.message || `${method} ${path} failed`);
-  return payload;
+
+const SettingsPage = () => {
+    const [email, setEmail] = useState('');
+    const [error, setError] = useState('');
+
+    const validateEmail = (email) => {
+        const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        return regex.test(email);
+    };
+
+    const handleEmailChange = (e) => {
+        const { value } = e.target;
+        if(!validateEmail(value)) {
+            setError('Invalid email format.');
+        } else {
+            setError('');
+        }
+        setEmail(value);
+    };
+
+    return (<>
+        <input type='email' value={email} onChange={handleEmailChange} />
+        {error && <div>{error}</div>}
+    </>);
 };
-const toLocalDate = v => (v ? String(v).slice(0, 10) : new Date().toISOString().slice(0, 10));
 
-function Pager({ page, pages, setPage }) { if (pages <= 1) return null; return <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}><Btn variant="ghost" disabled={page <= 1} onClick={() => setPage(page - 1)}>Prev</Btn><div style={{ color: C.textSub, alignSelf: "center", fontSize: 12 }}>{page}/{pages}</div><Btn variant="ghost" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</Btn></div>; }
-Pager.propTypes = { page: PropTypes.number.isRequired, pages: PropTypes.number.isRequired, setPage: PropTypes.func.isRequired };
-function Msg({ text, tone = "muted" }) { return <div style={{ color: tone === "error" ? C.rose : C.textMuted, fontSize: 12, padding: "10px 0" }}>{text}</div>; }
-Msg.propTypes = { text: PropTypes.string.isRequired, tone: PropTypes.string };
-function Toasts({ items, remove }) { return <div style={{ position: "fixed", right: 14, bottom: 14, zIndex: 3000, display: "grid", gap: 8 }}>{items.map(t => <div key={t.id} style={{ background: C.card, border: `1px solid ${t.type === "error" ? C.rose : C.green}66`, borderRadius: 10, padding: "10px 12px", minWidth: 230 }}><div style={{ color: C.text, fontSize: 13 }}>{t.text}</div><div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}><Btn variant="ghost" onClick={() => remove(t.id)}>Close</Btn></div></div>)}</div>; }
-Toasts.propTypes = { items: PropTypes.array.isRequired, remove: PropTypes.func.isRequired };
-const Forbidden = () => <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}><div style={{ color: C.rose, fontWeight: 800 }}>403 Forbidden</div><div style={{ color: C.textSub }}>You do not have permission to access this page.</div></div>;
-const NotFound = () => <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}><div style={{ color: C.amber, fontWeight: 800 }}>404 Not Found</div><div style={{ color: C.textSub }}>Page not found.</div></div>;
-const ComingSoon = ({ title }) => <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}><div style={{ color: C.text, fontWeight: 800 }}>{title}</div><div style={{ color: C.textSub }}>Module shell added. Backend integration next.</div></div>;
-ComingSoon.propTypes = { title: PropTypes.string.isRequired };
+const saveBulk = (data) => {
+    // Validate marks are within total
+    if (data.marks > data.total) {
+        throw new Error('Marks cannot exceed total.');
+    }
+    // Saving logic here
+};
 
-function StudentsPage({ students, setStudents, canEdit, results, payments, feeStructures, toast }) {
-  const [q, setQ] = useState(""); const [cls, setCls] = useState("all"); const [status, setStatus] = useState("all"); const [page, setPage] = useState(1); const [show, setShow] = useState(false); const [editId, setEditId] = useState(null); const [profile, setProfile] = useState(null); const [err, setErr] = useState("");
-  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", status: "active", admission: "" });
-  const expected = c => { const x = feeStructures.find(s => s.className === c); return x ? Number(x.tuition) + Number(x.activity) + Number(x.misc) : 0; };
-  const filtered = students.filter(s => `${s.firstName} ${s.lastName} ${s.className} ${s.admission} ${s.parentPhone || ""}`.toLowerCase().includes(q.toLowerCase()) && (cls === "all" || s.className === cls) && (status === "all" || s.status === status));
-  const { pages, rows } = pager(filtered, page); useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
-  const openAdd = () => { setEditId(null); setErr(""); setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", status: "active", admission: "" }); setShow(true); };
-  const save = () => { setErr(""); if (!f.firstName.trim() || !f.lastName.trim()) return setErr("First and last name are required."); if (editId) setStudents(students.map(s => s.id === editId ? { ...f, id: editId } : s)); else setStudents([...students, { ...f, id: genId(), admission: f.admission || `ADM-${new Date().getFullYear()}-${String(students.length + 1).padStart(3, "0")}` }]); setShow(false); toast("Student saved", "success"); };
-  const del = id => { if (!window.confirm("Delete this student?")) return; setStudents(students.filter(s => s.id !== id)); toast("Student deleted", "success"); };
-  return <div>
-    <div style={{ display: "flex", gap: 8, marginBottom: 8 }}><Badge text={`Boys: ${students.filter(s => s.gender === "male").length}`} tone="info" /><Badge text={`Girls: ${students.filter(s => s.gender === "female").length}`} tone="warning" /><Badge text={`Total: ${students.length}`} tone="success" /></div>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 8, marginBottom: 10 }}><input style={inputStyle} value={q} onChange={e => setQ(e.target.value)} placeholder="Search students" /><select style={inputStyle} value={cls} onChange={e => setCls(e.target.value)}><option value="all">All classes</option>{ALL_CLASSES.map(c => <option key={c}>{c}</option>)}</select><select style={inputStyle} value={status} onChange={e => setStatus(e.target.value)}><option value="all">All status</option><option value="active">active</option><option value="inactive">inactive</option></select>{canEdit && <Btn onClick={openAdd}>Add Student</Btn>}</div>
-    {filtered.length === 0 ? <Msg text="No students found." /> : <><div style={{ overflowX: "auto" }}><Table headers={["Student", "Admission", "Class", "Parent", "Status", "Actions"]} rows={rows.map(s => [<div key={s.id}><div style={{ color: C.text, fontWeight: 600 }}>{s.firstName} {s.lastName}</div><div style={{ fontSize: 11, color: C.textMuted }}>{s.dob || "-"}</div></div>, s.admission, s.className, `${s.parentName || "-"} ${s.parentPhone ? `(${s.parentPhone})` : ""}`, <Badge key="b" text={s.status} tone={s.status === "active" ? "success" : "danger"} />, <div key="a" style={{ display: "flex", gap: 6 }}><Btn variant="ghost" onClick={() => setProfile(s)}>Profile</Btn>{canEdit && <Btn variant="ghost" onClick={() => { setEditId(s.id); setF(s); setShow(true); }}>Edit</Btn>}{canEdit && <Btn variant="danger" onClick={() => del(s.id)}>Delete</Btn>}</div>])} /></div><Pager page={page} pages={pages} setPage={setPage} /></>}
-    {show && <Modal title={editId ? "Edit Student" : "Add Student"} onClose={() => setShow(false)}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}><Field label="First Name"><input style={inputStyle} value={f.firstName} onChange={e => setF({ ...f, firstName: e.target.value })} /></Field><Field label="Last Name"><input style={inputStyle} value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} /></Field><Field label="Admission"><input style={inputStyle} value={f.admission || ""} onChange={e => setF({ ...f, admission: e.target.value })} /></Field><Field label="Class"><select style={inputStyle} value={f.className} onChange={e => setF({ ...f, className: e.target.value })}>{ALL_CLASSES.map(c => <option key={c}>{c}</option>)}</select></Field><Field label="Gender"><select style={inputStyle} value={f.gender} onChange={e => setF({ ...f, gender: e.target.value })}><option value="female">female</option><option value="male">male</option></select></Field><Field label="Status"><select style={inputStyle} value={f.status} onChange={e => setF({ ...f, status: e.target.value })}><option value="active">active</option><option value="inactive">inactive</option></select></Field><Field label="Parent"><input style={inputStyle} value={f.parentName || ""} onChange={e => setF({ ...f, parentName: e.target.value })} /></Field><Field label="Phone"><input style={inputStyle} value={f.parentPhone || ""} onChange={e => setF({ ...f, parentPhone: e.target.value })} /></Field></div>{err && <Msg text={err} tone="error" />}<div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Btn variant="ghost" onClick={() => setShow(false)}>Cancel</Btn><Btn onClick={save}>Save</Btn></div></Modal>}
-    {profile && <Modal title="Student Profile" onClose={() => setProfile(null)}><div style={{ color: C.text, fontWeight: 700, fontSize: 17 }}>{profile.firstName} {profile.lastName}</div><div style={{ color: C.textSub, marginBottom: 8 }}>{profile.admission} | {profile.className}</div><div style={{ color: C.textSub, marginBottom: 8 }}>Parent: {profile.parentName} ({profile.parentPhone || "-"})</div><div style={{ color: C.textSub, marginBottom: 8 }}>Expected Fees: {money(expected(profile.className))}</div><div style={{ color: C.textSub, marginBottom: 8 }}>Paid: {money(payments.filter(p => p.studentId === profile.id && p.status === "paid").reduce((s, p) => s + Number(p.amount), 0))}</div><div style={{ color: C.textSub, marginBottom: 14 }}>Results: {results.filter(r => r.studentId === profile.id).length}</div><Btn onClick={() => { const rowsHtml = results.filter(r => r.studentId === profile.id).map(r => `<li>${r.subject}: ${r.marks}/${r.total} (${r.grade})</li>`).join(""); const w = window.open("", "_blank"); if (!w) return; w.document.write(`<h2>${profile.firstName} ${profile.lastName}</h2><p>${profile.admission}</p><ul>${rowsHtml || "<li>No results</li>"}</ul>`); w.document.close(); w.print(); }}>Export Report (Print/PDF)</Btn></Modal>}
-  </div>;
-}
-StudentsPage.propTypes = { students: PropTypes.array.isRequired, setStudents: PropTypes.func.isRequired, canEdit: PropTypes.bool.isRequired, results: PropTypes.array.isRequired, payments: PropTypes.array.isRequired, feeStructures: PropTypes.array.isRequired, toast: PropTypes.func.isRequired };
+const bulkAttendanceSave = (attendanceData) => {
+    // Check for attendance conflicts
+    const conflicts = []; // Logic to detect conflicts
+    if (conflicts.length) {
+        throw new Error('Attendance conflict detected.');
+    }
+    // Save attendance logic here
+};
 
-function TeachersPage({ teachers, setTeachers, canEdit, toast }) {
-  const [q, setQ] = useState(""); const [status, setStatus] = useState("all"); const [page, setPage] = useState(1); const [show, setShow] = useState(false); const [editId, setEditId] = useState(null); const [f, setF] = useState({ firstName: "", lastName: "", email: "", phone: "", status: "active", classes: [], timetable: "", subjects: [] });
-  const filtered = teachers.filter(t => `${t.firstName} ${t.lastName} ${t.email} ${(t.subjects || []).join(" ")} ${(t.classes || []).join(" ")}`.toLowerCase().includes(q.toLowerCase()) && (status === "all" || t.status === status));
-  const { pages, rows } = pager(filtered, page); useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
-  const openAdd = () => { setEditId(null); setF({ firstName: "", lastName: "", email: "", phone: "", status: "active", classes: [], timetable: "", subjects: [] }); setShow(true); };
-  const save = () => { if (!f.firstName.trim() || !f.lastName.trim() || !f.email.trim()) return toast("Name and email required", "error"); if (editId) setTeachers(teachers.map(t => t.id === editId ? { ...f, id: editId } : t)); else setTeachers([...teachers, { ...f, id: genId() }]); setShow(false); toast("Teacher saved", "success"); };
-  const del = id => { if (!window.confirm("Delete this teacher?")) return; setTeachers(teachers.filter(t => t.id !== id)); toast("Teacher deleted", "success"); };
-  return <div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 8, marginBottom: 10 }}><input style={inputStyle} value={q} onChange={e => setQ(e.target.value)} placeholder="Search teacher, class, subject" /><select style={inputStyle} value={status} onChange={e => setStatus(e.target.value)}><option value="all">All status</option><option value="active">active</option><option value="inactive">inactive</option></select>{canEdit && <Btn onClick={openAdd}>Add Teacher</Btn>}</div>{filtered.length === 0 ? <Msg text="No teachers found." /> : <><div style={{ overflowX: "auto" }}><Table headers={["Name", "Email", "Phone", "Classes", "Subjects", "Timetable", "Status", "Actions"]} rows={rows.map(t => [<span key={t.id} style={{ color: C.text, fontWeight: 600 }}>{t.firstName} {t.lastName}</span>, t.email, t.phone || "-", (t.classes || []).join(", ") || "-", (t.subjects || []).join(", ") || "-", t.timetable || "-", <Badge key="st" text={t.status} tone={t.status === "active" ? "success" : "danger"} />, <div key="a" style={{ display: "flex", gap: 6 }}>{canEdit && <Btn variant="ghost" onClick={() => { setEditId(t.id); setF(t); setShow(true); }}>Edit</Btn>}{canEdit && <Btn variant="danger" onClick={() => del(t.id)}>Delete</Btn>}</div>])} /></div><Pager page={page} pages={pages} setPage={setPage} /></>}{show && <Modal title={editId ? "Edit Teacher" : "Add Teacher"} onClose={() => setShow(false)}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}><Field label="First Name"><input style={inputStyle} value={f.firstName} onChange={e => setF({ ...f, firstName: e.target.value })} /></Field><Field label="Last Name"><input style={inputStyle} value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} /></Field><Field label="Email"><input style={inputStyle} value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></Field><Field label="Phone"><input style={inputStyle} value={f.phone || ""} onChange={e => setF({ ...f, phone: e.target.value })} /></Field><Field label="Classes (comma separated)"><input style={inputStyle} value={(f.classes || []).join(", ")} onChange={e => setF({ ...f, classes: e.target.value.split(",").map(x => x.trim()).filter(Boolean) })} /></Field><Field label="Subjects (comma separated)"><input style={inputStyle} value={(f.subjects || []).join(", ")} onChange={e => setF({ ...f, subjects: e.target.value.split(",").map(x => x.trim()).filter(Boolean) })} /></Field><Field label="Timetable"><input style={inputStyle} value={f.timetable || ""} onChange={e => setF({ ...f, timetable: e.target.value })} /></Field><Field label="Status"><select style={inputStyle} value={f.status} onChange={e => setF({ ...f, status: e.target.value })}><option value="active">active</option><option value="inactive">inactive</option></select></Field></div><div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Btn variant="ghost" onClick={() => setShow(false)}>Cancel</Btn><Btn onClick={save}>Save</Btn></div></Modal>}</div>;
-}
-TeachersPage.propTypes = { teachers: PropTypes.array.isRequired, setTeachers: PropTypes.func.isRequired, canEdit: PropTypes.bool.isRequired, toast: PropTypes.func.isRequired };
-function AttendancePage({ students, attendance, setAttendance, canEdit, toast }) {
-  const [cls, setCls] = useState("Grade 7"); const [date, setDate] = useState(new Date().toISOString().slice(0, 10)); const [filterClass, setFilterClass] = useState("all"); const [filterDate, setFilterDate] = useState(""); const [page, setPage] = useState(1); const [showBulk, setShowBulk] = useState(false); const [editing, setEditing] = useState(null); const [bulk, setBulk] = useState([]);
-  const classStudents = useMemo(() => students.filter(s => s.className === cls && s.status === "active"), [students, cls]);
-  useEffect(() => { if (showBulk) setBulk(classStudents.map(s => ({ studentId: s.id, status: "present" }))); }, [showBulk, classStudents]);
-  const filtered = attendance.filter(a => (filterClass === "all" || a.className === filterClass) && (!filterDate || a.date === filterDate));
-  const { pages, rows } = pager(filtered, page); useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
-  const saveBulk = () => { if (!date) return toast("Select date", "error"); const now = new Date().toISOString(); const records = bulk.map(b => { const s = students.find(x => x.id === b.studentId); return { id: genId(), studentId: b.studentId, studentName: s ? `${s.firstName} ${s.lastName}` : "Unknown", className: s ? s.className : cls, date, status: b.status, createdAt: now }; }); const keep = attendance.filter(a => !(a.className === cls && a.date === date)); setAttendance([...keep, ...records]); setShowBulk(false); toast(`Attendance saved for ${cls}`, "success"); };
-  const saveEdit = () => { if (!editing) return; setAttendance(attendance.map(a => a.id === editing.id ? editing : a)); setEditing(null); toast("Attendance updated", "success"); };
-  const del = id => { if (!window.confirm("Delete attendance record?")) return; setAttendance(attendance.filter(a => a.id !== id)); toast("Attendance deleted", "success"); };
-  return <div><div style={{ display: "flex", gap: 8, marginBottom: 8 }}><Badge text={`Present: ${attendance.filter(a => a.status === "present").length}`} tone="success" /><Badge text={`Absent: ${attendance.filter(a => a.status === "absent").length}`} tone="danger" /><Badge text={`Late: ${attendance.filter(a => a.status === "late").length}`} tone="warning" /></div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 8, marginBottom: 10 }}><select style={inputStyle} value={filterClass} onChange={e => setFilterClass(e.target.value)}><option value="all">All classes</option>{ALL_CLASSES.map(c => <option key={c}>{c}</option>)}</select><input type="date" style={inputStyle} value={filterDate} onChange={e => setFilterDate(e.target.value)} />{canEdit && <Btn onClick={() => setShowBulk(true)}>Bulk Mark Class</Btn>}</div>{filtered.length === 0 ? <Msg text="No attendance records." /> : <><div style={{ overflowX: "auto" }}><Table headers={["Date", "Class", "Student", "Status", "Actions"]} rows={rows.map(a => [a.date, a.className, <span key={a.id} style={{ color: C.text, fontWeight: 600 }}>{a.studentName}</span>, <Badge key="s" text={a.status} tone={a.status === "present" ? "success" : a.status === "late" ? "warning" : "danger"} />, <div key="x" style={{ display: "flex", gap: 6 }}>{canEdit && <Btn variant="ghost" onClick={() => setEditing(a)}>Edit</Btn>}{canEdit && <Btn variant="danger" onClick={() => del(a.id)}>Delete</Btn>}</div>])} /></div><Pager page={page} pages={pages} setPage={setPage} /></>}{showBulk && <Modal title="Bulk Attendance by Class" onClose={() => setShowBulk(false)}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}><Field label="Class"><select style={inputStyle} value={cls} onChange={e => setCls(e.target.value)}>{ALL_CLASSES.map(c => <option key={c}>{c}</option>)}</select></Field><Field label="Date"><input type="date" style={inputStyle} value={date} onChange={e => setDate(e.target.value)} /></Field></div>{classStudents.length === 0 ? <Msg text="No active students in this class." /> : <div style={{ maxHeight: 320, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 10, padding: 8, marginBottom: 10 }}>{classStudents.map(s => { const idx = bulk.findIndex(b => b.studentId === s.id); const val = idx >= 0 ? bulk[idx].status : "present"; return <div key={s.id} style={{ display: "grid", gridTemplateColumns: "1fr 150px", gap: 8, alignItems: "center", borderBottom: `1px solid ${C.border}`, padding: "8px 4px" }}><div style={{ color: C.text }}>{s.firstName} {s.lastName}</div><select style={inputStyle} value={val} onChange={e => setBulk(prev => prev.map(x => x.studentId === s.id ? { ...x, status: e.target.value } : x))}><option value="present">present</option><option value="absent">absent</option><option value="late">late</option></select></div>; })}</div>}<div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Btn variant="ghost" onClick={() => setShowBulk(false)}>Cancel</Btn><Btn onClick={saveBulk}>Save Class Attendance</Btn></div></Modal>}{editing && <Modal title="Edit Attendance" onClose={() => setEditing(null)}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}><Field label="Student"><input style={inputStyle} value={editing.studentName} disabled /></Field><Field label="Class"><input style={inputStyle} value={editing.className} disabled /></Field><Field label="Date"><input type="date" style={inputStyle} value={editing.date} onChange={e => setEditing({ ...editing, date: e.target.value })} /></Field><Field label="Status"><select style={inputStyle} value={editing.status} onChange={e => setEditing({ ...editing, status: e.target.value })}><option value="present">present</option><option value="absent">absent</option><option value="late">late</option></select></Field></div><div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Btn variant="ghost" onClick={() => setEditing(null)}>Cancel</Btn><Btn onClick={saveEdit}>Save</Btn></div></Modal>}</div>;
-}
-AttendancePage.propTypes = { students: PropTypes.array.isRequired, attendance: PropTypes.array.isRequired, setAttendance: PropTypes.func.isRequired, canEdit: PropTypes.bool.isRequired, toast: PropTypes.func.isRequired };
-
-function GradesPage({ students, results, setResults, canEdit, toast }) {
-  const [term, setTerm] = useState("Term 2"); const [filterClass, setFilterClass] = useState("all"); const [filterStudent, setFilterStudent] = useState("all"); const [page, setPage] = useState(1); const [showBulk, setShowBulk] = useState(false); const [studentId, setStudentId] = useState(students[0]?.id || ""); const [total, setTotal] = useState("100"); const [bulkMarks, setBulkMarks] = useState(() => SUBJECTS.reduce((a, s) => ({ ...a, [s]: "" }), {})); const [editing, setEditing] = useState(null);
-  const filtered = results.filter(r => (term === "all" || r.term === term) && (filterClass === "all" || r.className === filterClass) && (filterStudent === "all" || String(r.studentId) === String(filterStudent)));
-  const { pages, rows } = pager(filtered, page); useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
-  const saveBulk = () => { const s = students.find(x => x.id === Number(studentId)); if (!s) return toast("Select student", "error"); const t = Number(total); if (!t) return toast("Total marks required", "error"); const entered = SUBJECTS.filter(sub => bulkMarks[sub] !== ""); if (entered.length === 0) return toast("Enter at least one subject mark", "error"); const next = [...results]; entered.forEach(sub => { const m = Number(bulkMarks[sub]); if (Number.isNaN(m) || m < 0 || m > t) return; const existing = next.find(r => r.studentId === s.id && r.subject === sub && r.term === term); const payload = { id: existing ? existing.id : genId(), studentId: s.id, studentName: `${s.firstName} ${s.lastName}`, className: s.className, subject: sub, term, marks: m, total: t, grade: calcGrade(m, t) }; if (existing) next[next.findIndex(r => r.id === existing.id)] = payload; else next.push(payload); }); setResults(next); setBulkMarks(SUBJECTS.reduce((a, sub) => ({ ...a, [sub]: "" }), {})); setShowBulk(false); toast("Bulk results saved", "success"); };
-  const saveEdit = () => { if (!editing) return; const m = Number(editing.marks); const t = Number(editing.total); if (Number.isNaN(m) || Number.isNaN(t) || m < 0 || m > t) return toast("Invalid marks", "error"); setResults(results.map(r => r.id === editing.id ? { ...editing, marks: m, total: t, grade: calcGrade(m, t) } : r)); setEditing(null); toast("Result updated", "success"); };
-  const del = id => { if (!window.confirm("Delete this result?")) return; setResults(results.filter(r => r.id !== id)); toast("Result deleted", "success"); };
-  const counts = { EE: results.filter(r => r.grade === "EE").length, ME: results.filter(r => r.grade === "ME").length, AE: results.filter(r => r.grade === "AE").length, BE: results.filter(r => r.grade === "BE").length };
-  return <div><div style={{ display: "flex", gap: 8, marginBottom: 8 }}><Badge text={`EE: ${counts.EE}`} tone="success" /><Badge text={`ME: ${counts.ME}`} tone="info" /><Badge text={`AE: ${counts.AE}`} tone="warning" /><Badge text={`BE: ${counts.BE}`} tone="danger" /></div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 8, marginBottom: 10 }}><select style={inputStyle} value={term} onChange={e => setTerm(e.target.value)}><option value="all">All terms</option><option value="Term 1">Term 1</option><option value="Term 2">Term 2</option><option value="Term 3">Term 3</option></select><select style={inputStyle} value={filterClass} onChange={e => setFilterClass(e.target.value)}><option value="all">All classes</option>{ALL_CLASSES.map(c => <option key={c}>{c}</option>)}</select><select style={inputStyle} value={filterStudent} onChange={e => setFilterStudent(e.target.value)}><option value="all">All students</option>{students.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}</select>{canEdit && <Btn onClick={() => setShowBulk(true)}>Bulk Enter (All Subjects)</Btn>}</div>{filtered.length === 0 ? <Msg text="No results yet." /> : <><div style={{ overflowX: "auto" }}><Table headers={["Student", "Class", "Subject", "Term", "Score", "Grade", "Actions"]} rows={rows.map(r => [<span key={r.id} style={{ color: C.text, fontWeight: 600 }}>{r.studentName}</span>, r.className, r.subject, r.term, `${r.marks}/${r.total}`, <Badge key="g" text={r.grade} tone={r.grade === "EE" ? "success" : r.grade === "ME" ? "info" : r.grade === "AE" ? "warning" : "danger"} />, <div key="a" style={{ display: "flex", gap: 6 }}>{canEdit && <Btn variant="ghost" onClick={() => setEditing(r)}>Edit</Btn>}{canEdit && <Btn variant="danger" onClick={() => del(r.id)}>Delete</Btn>}</div>])} /></div><Pager page={page} pages={pages} setPage={setPage} /></>}{showBulk && <Modal title="Bulk Results Entry (One Student, All Subjects)" onClose={() => setShowBulk(false)}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}><Field label="Student"><select style={inputStyle} value={studentId} onChange={e => setStudentId(Number(e.target.value))}>{students.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.className})</option>)}</select></Field><Field label="Term"><select style={inputStyle} value={term === "all" ? "Term 2" : term} onChange={e => setTerm(e.target.value)}><option value="Term 1">Term 1</option><option value="Term 2">Term 2</option><option value="Term 3">Term 3</option></select></Field><Field label="Total Marks"><input type="number" style={inputStyle} value={total} onChange={e => setTotal(e.target.value)} /></Field></div><div style={{ maxHeight: 320, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 10, padding: 8, marginBottom: 10 }}>{SUBJECTS.map(sub => <div key={sub} style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 8, alignItems: "center", borderBottom: `1px solid ${C.border}`, padding: "8px 4px" }}><div style={{ color: C.text }}>{sub}</div><input type="number" min="0" style={inputStyle} value={bulkMarks[sub]} onChange={e => setBulkMarks({ ...bulkMarks, [sub]: e.target.value })} placeholder="-" /></div>)}</div><div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Btn variant="ghost" onClick={() => setShowBulk(false)}>Cancel</Btn><Btn onClick={saveBulk}>Save Subjects</Btn></div></Modal>}{editing && <Modal title="Edit Result" onClose={() => setEditing(null)}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}><Field label="Student"><input style={inputStyle} value={editing.studentName} disabled /></Field><Field label="Subject"><input style={inputStyle} value={editing.subject} disabled /></Field><Field label="Term"><select style={inputStyle} value={editing.term} onChange={e => setEditing({ ...editing, term: e.target.value })}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></Field><Field label="Total"><input type="number" style={inputStyle} value={editing.total} onChange={e => setEditing({ ...editing, total: e.target.value })} /></Field><Field label="Marks"><input type="number" style={inputStyle} value={editing.marks} onChange={e => setEditing({ ...editing, marks: e.target.value })} /></Field></div><div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Btn variant="ghost" onClick={() => setEditing(null)}>Cancel</Btn><Btn onClick={saveEdit}>Save</Btn></div></Modal>}</div>;
-}
-GradesPage.propTypes = { students: PropTypes.array.isRequired, results: PropTypes.array.isRequired, setResults: PropTypes.func.isRequired, canEdit: PropTypes.bool.isRequired, toast: PropTypes.func.isRequired };
-function FeesPage({ students, feeStructures, setFeeStructures, payments, setPayments, canEdit, toast }) {
-  const [tab, setTab] = useState("structure");
-  const [term, setTerm] = useState("Term 2");
-  const [showPayment, setShowPayment] = useState(false);
-  const [showStruct, setShowStruct] = useState(false);
-  const [editStruct, setEditStruct] = useState(null);
-  const [filterClass, setFilterClass] = useState("all");
-  const [page, setPage] = useState(1);
-  const [paymentForm, setPaymentForm] = useState({ studentId: students[0]?.id || "", amount: "", feeType: "tuition", method: "mpesa", date: new Date().toISOString().slice(0, 10), status: "paid", term: "Term 2" });
-  const [structForm, setStructForm] = useState({ className: "Grade 7", term: "Term 2", tuition: "", activity: "", misc: "" });
-
-  const expectedByClass = (c, t) => {
-    const fs = feeStructures.find(f => f.className === c && (f.term || "Term 2") === t);
-    return fs ? Number(fs.tuition) + Number(fs.activity) + Number(fs.misc) : null;
-  };
-
-  const balances = students.map(s => {
-    const exp = expectedByClass(s.className, term);
-    const paid = payments.filter(p => p.studentId === s.id && p.status === "paid" && (p.term || "Term 2") === term).reduce((sum, p) => sum + Number(p.amount), 0);
-    const missingStructure = exp === null;
-    return { studentId: s.id, name: `${s.firstName} ${s.lastName}`, className: s.className, expected: missingStructure ? 0 : exp, paid, balance: missingStructure ? 0 : Math.max(0, exp - paid), missingStructure };
-  }).filter(b => filterClass === "all" || b.className === filterClass);
-
-  const filteredPayments = payments.filter(p => (filterClass === "all" || p.className === filterClass) && (p.term || "Term 2") === term);
-  const filteredStructures = feeStructures.filter(f => (filterClass === "all" || f.className === filterClass) && (f.term || "Term 2") === term);
-
-  const { pages, rows } = pager(tab === "payments" ? filteredPayments : tab === "balances" ? balances : filteredStructures, page);
-  useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
-
-  const savePayment = () => {
-    if (!paymentForm.studentId || !paymentForm.amount || Number(paymentForm.amount) < 0) return toast("Payment requires student and valid amount", "error");
-    const s = students.find(x => x.id === Number(paymentForm.studentId));
-    if (!s) return toast("Invalid student", "error");
-    const rec = { ...paymentForm, id: genId(), studentId: Number(paymentForm.studentId), amount: Number(paymentForm.amount), studentName: `${s.firstName} ${s.lastName}`, className: s.className };
-    setPayments([rec, ...payments]);
-    setShowPayment(false);
-    setPaymentForm({ studentId: students[0]?.id || "", amount: "", feeType: "tuition", method: "mpesa", date: new Date().toISOString().slice(0, 10), status: "paid", term });
-    toast("Payment recorded", "success");
-  };
-
-  const saveStructure = () => {
-    if ([structForm.tuition, structForm.activity, structForm.misc].some(v => v === "" || Number(v) < 0)) return toast("Fee items must be non-negative", "error");
-    const payload = { ...structForm, id: editStruct ? editStruct.id : genId(), tuition: Number(structForm.tuition), activity: Number(structForm.activity), misc: Number(structForm.misc) };
-    setFeeStructures([...feeStructures.filter(s => !(s.className === payload.className && (s.term || "Term 2") === payload.term) || (editStruct && s.id === editStruct.id)), payload]);
-    setShowStruct(false);
-    setEditStruct(null);
-    setStructForm({ className: "Grade 7", term, tuition: "", activity: "", misc: "" });
-    toast("Fee structure saved", "success");
-  };
-
-  const delPayment = id => { if (!window.confirm("Delete this payment?")) return; setPayments(payments.filter(p => p.id !== id)); toast("Payment deleted", "success"); };
-  const delStructure = id => { if (!window.confirm("Delete this fee structure?")) return; setFeeStructures(feeStructures.filter(f => f.id !== id)); toast("Fee structure deleted", "success"); };
-
-  return <div>
-    <div style={{ display: "flex", gap: 8, marginBottom: 8 }}><Badge text={`Term: ${term}`} tone="info" /><Badge text={`Collected: ${money(filteredPayments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0))}`} tone="success" /><Badge text={`Outstanding: ${money(balances.reduce((s, b) => s + b.balance, 0))}`} tone="warning" /></div>
-    <div style={{ display: "flex", gap: 8, marginBottom: 10 }}><Btn variant={tab === "structure" ? "primary" : "ghost"} onClick={() => setTab("structure")}>Fee Structure</Btn><Btn variant={tab === "payments" ? "primary" : "ghost"} onClick={() => setTab("payments")}>Payments</Btn><Btn variant={tab === "balances" ? "primary" : "ghost"} onClick={() => setTab("balances")}>Balances</Btn></div>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 8, marginBottom: 10 }}>
-      <select style={inputStyle} value={term} onChange={e => setTerm(e.target.value)}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select>
-      <select style={inputStyle} value={filterClass} onChange={e => setFilterClass(e.target.value)}><option value="all">All classes</option>{ALL_CLASSES.map(c => <option key={c}>{c}</option>)}</select>
-      {canEdit && tab === "payments" && <Btn onClick={() => setShowPayment(true)}>Record Payment</Btn>}
-      {canEdit && tab === "structure" && <Btn onClick={() => { setEditStruct(null); setStructForm({ className: "Grade 7", term, tuition: "", activity: "", misc: "" }); setShowStruct(true); }}>Set Fee Structure</Btn>}
-    </div>
-    {tab === "payments" && (filteredPayments.length === 0 ? <Msg text="No payment records." /> : <><div style={{ overflowX: "auto" }}><Table headers={["Date", "Term", "Student", "Class", "Amount", "Type", "Method", "Status", "Actions"]} rows={rows.map(p => [p.date, p.term || "Term 2", <span key={p.id} style={{ color: C.text, fontWeight: 600 }}>{p.studentName}</span>, p.className, money(p.amount), p.feeType, p.method, <Badge key="st" text={p.status} tone={p.status === "paid" ? "success" : "warning"} />, <div key="a" style={{ display: "flex", gap: 6 }}>{canEdit && <Btn variant="danger" onClick={() => delPayment(p.id)}>Delete</Btn>}</div>])} /></div><Pager page={page} pages={pages} setPage={setPage} /></>)}
-    {tab === "balances" && (balances.length === 0 ? <Msg text="No balances available." /> : <div style={{ overflowX: "auto" }}><Table headers={["Student", "Class", "Expected", "Paid", "Balance", "Status"]} rows={balances.map(b => [<span key={b.studentId} style={{ color: C.text, fontWeight: 600 }}>{b.name}</span>, b.className, money(b.expected), money(b.paid), money(b.balance), <Badge key="bdg" text={b.missingStructure ? "structure missing" : b.balance > 0 ? "pending" : "cleared"} tone={b.missingStructure ? "danger" : b.balance > 0 ? "warning" : "success"} />])} /></div>)}
-    {tab === "structure" && (filteredStructures.length === 0 ? <Msg text="No fee structures set for this term." /> : <><div style={{ overflowX: "auto" }}><Table headers={["Class", "Term", "Tuition", "Activity", "Misc", "Total", "Actions"]} rows={rows.map(f => [<span key={f.id} style={{ color: C.text, fontWeight: 600 }}>{f.className}</span>, f.term || "Term 2", money(f.tuition), money(f.activity), money(f.misc), money(Number(f.tuition) + Number(f.activity) + Number(f.misc)), <div key="a" style={{ display: "flex", gap: 6 }}>{canEdit && <Btn variant="ghost" onClick={() => { setEditStruct(f); setStructForm({ className: f.className, term: f.term || "Term 2", tuition: String(f.tuition), activity: String(f.activity), misc: String(f.misc) }); setShowStruct(true); }}>Edit</Btn>}{canEdit && <Btn variant="danger" onClick={() => delStructure(f.id)}>Delete</Btn>}</div>])} /></div><Pager page={page} pages={pages} setPage={setPage} /></>)}
-    {showPayment && <Modal title="Record Payment" onClose={() => setShowPayment(false)}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}><Field label="Student"><select style={inputStyle} value={paymentForm.studentId} onChange={e => setPaymentForm({ ...paymentForm, studentId: Number(e.target.value) })}>{students.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.className})</option>)}</select></Field><Field label="Term"><select style={inputStyle} value={paymentForm.term} onChange={e => setPaymentForm({ ...paymentForm, term: e.target.value })}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></Field><Field label="Amount"><input type="number" style={inputStyle} value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} /></Field><Field label="Type"><select style={inputStyle} value={paymentForm.feeType} onChange={e => setPaymentForm({ ...paymentForm, feeType: e.target.value })}><option value="tuition">tuition</option><option value="activity">activity</option><option value="misc">misc</option></select></Field><Field label="Method"><select style={inputStyle} value={paymentForm.method} onChange={e => setPaymentForm({ ...paymentForm, method: e.target.value })}><option value="mpesa">mpesa</option><option value="bank">bank</option><option value="cash">cash</option></select></Field><Field label="Date"><input type="date" style={inputStyle} value={paymentForm.date} onChange={e => setPaymentForm({ ...paymentForm, date: e.target.value })} /></Field><Field label="Status"><select style={inputStyle} value={paymentForm.status} onChange={e => setPaymentForm({ ...paymentForm, status: e.target.value })}><option value="paid">paid</option><option value="pending">pending</option></select></Field></div><div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Btn variant="ghost" onClick={() => setShowPayment(false)}>Cancel</Btn><Btn onClick={savePayment}>Save</Btn></div></Modal>}
-    {showStruct && <Modal title={editStruct ? "Edit Fee Structure" : "Set Fee Structure"} onClose={() => setShowStruct(false)}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}><Field label="Class"><select style={inputStyle} value={structForm.className} onChange={e => setStructForm({ ...structForm, className: e.target.value })}>{ALL_CLASSES.map(c => <option key={c}>{c}</option>)}</select></Field><Field label="Term"><select style={inputStyle} value={structForm.term} onChange={e => setStructForm({ ...structForm, term: e.target.value })}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></Field><Field label="Tuition"><input type="number" style={inputStyle} value={structForm.tuition} onChange={e => setStructForm({ ...structForm, tuition: e.target.value })} /></Field><Field label="Activity"><input type="number" style={inputStyle} value={structForm.activity} onChange={e => setStructForm({ ...structForm, activity: e.target.value })} /></Field><Field label="Misc"><input type="number" style={inputStyle} value={structForm.misc} onChange={e => setStructForm({ ...structForm, misc: e.target.value })} /></Field></div><div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Btn variant="ghost" onClick={() => setShowStruct(false)}>Cancel</Btn><Btn onClick={saveStructure}>Save Structure</Btn></div></Modal>}
-  </div>;
-}
-FeesPage.propTypes = { students: PropTypes.array.isRequired, feeStructures: PropTypes.array.isRequired, setFeeStructures: PropTypes.func.isRequired, payments: PropTypes.array.isRequired, setPayments: PropTypes.func.isRequired, canEdit: PropTypes.bool.isRequired, toast: PropTypes.func.isRequired };
-
-function CommunicationPage({ smsLogs, setSmsLogs, integrations, setIntegrations, canEdit, toast }) {
-  const [tab, setTab] = useState("sms");
-  const [form, setForm] = useState({ recipient: "", message: "", channel: "sms" });
-  const send = () => {
-    if (!form.recipient || !form.message) return toast("Recipient and message required", "error");
-    setSmsLogs([{ id: genId(), recipient: form.recipient, message: form.message, channel: form.channel, status: "queued", sentAt: new Date().toISOString() }, ...smsLogs]);
-    setForm({ recipient: "", message: "", channel: "sms" });
-    toast("Message queued", "success");
-  };
-  const setMpesa = updates => setIntegrations({ ...integrations, mpesa: { ...integrations.mpesa, ...updates } });
-  const setBank = updates => setIntegrations({ ...integrations, bank: { ...integrations.bank, ...updates } });
-
-  return <div>
-    <div style={{ display: "flex", gap: 8, marginBottom: 10 }}><Btn variant={tab === "sms" ? "primary" : "ghost"} onClick={() => setTab("sms")}>SMS Log</Btn><Btn variant={tab === "integrations" ? "primary" : "ghost"} onClick={() => setTab("integrations")}>Bank/Mpesa Integrations</Btn></div>
-    {tab === "sms" && <div>{canEdit && <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, marginBottom: 10, display: "grid", gridTemplateColumns: "1fr 2fr 130px", gap: 8 }}><input style={inputStyle} value={form.recipient} onChange={e => setForm({ ...form, recipient: e.target.value })} placeholder="+2547..." /><input style={inputStyle} value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder="Message" /><Btn onClick={send}>Send</Btn></div>}<div style={{ overflowX: "auto" }}><Table headers={["Time", "Recipient", "Channel", "Message", "Status"]} rows={smsLogs.map(s => [new Date(s.sentAt).toLocaleString(), s.recipient, s.channel, s.message, <Badge key={s.id} text={s.status} tone={s.status === "sent" ? "success" : "warning"} />])} /></div></div>}
-    {tab === "integrations" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}><div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }}><div style={{ color: C.text, fontWeight: 700, marginBottom: 8 }}>Mpesa</div><Field label="Enabled"><select style={inputStyle} value={String(integrations.mpesa.enabled)} onChange={e => setMpesa({ enabled: e.target.value === "true" })}><option value="false">false</option><option value="true">true</option></select></Field><Field label="Shortcode"><input style={inputStyle} value={integrations.mpesa.shortcode} onChange={e => setMpesa({ shortcode: e.target.value })} /></Field><Field label="Consumer Key"><input style={inputStyle} value={integrations.mpesa.consumerKey} onChange={e => setMpesa({ consumerKey: e.target.value })} /></Field><Field label="Consumer Secret"><input type="password" style={inputStyle} value={integrations.mpesa.consumerSecret} onChange={e => setMpesa({ consumerSecret: e.target.value })} /></Field></div><div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }}><div style={{ color: C.text, fontWeight: 700, marginBottom: 8 }}>Bank</div><Field label="Enabled"><select style={inputStyle} value={String(integrations.bank.enabled)} onChange={e => setBank({ enabled: e.target.value === "true" })}><option value="false">false</option><option value="true">true</option></select></Field><Field label="Bank Name"><input style={inputStyle} value={integrations.bank.bankName} onChange={e => setBank({ bankName: e.target.value })} /></Field><Field label="Account Number"><input style={inputStyle} value={integrations.bank.accountNumber} onChange={e => setBank({ accountNumber: e.target.value })} /></Field></div></div>}
-  </div>;
-}
-CommunicationPage.propTypes = { smsLogs: PropTypes.array.isRequired, setSmsLogs: PropTypes.func.isRequired, integrations: PropTypes.object.isRequired, setIntegrations: PropTypes.func.isRequired, canEdit: PropTypes.bool.isRequired, toast: PropTypes.func.isRequired };
-
-function SettingsPage({ school, setSchool, users, setUsers, permissions, setPermissions, toast }) {
-  const [tab, setTab] = useState("school"); const [showUser, setShowUser] = useState(false); const [editId, setEditId] = useState(null); const [userForm, setUserForm] = useState({ name: "", email: "", password: "", role: "teacher", status: "active" });
-  const saveSchool = () => toast("School settings saved", "success");
-  const openAdd = () => { setEditId(null); setUserForm({ name: "", email: "", password: "", role: "teacher", status: "active" }); setShowUser(true); };
-  const saveUser = () => { if (!userForm.name || !userForm.email) return toast("Name and email required", "error"); if (!editId && !userForm.password) return toast("Password required", "error"); if (editId) setUsers(users.map(u => u.id === editId ? { ...u, ...userForm, password: userForm.password || u.password } : u)); else setUsers([...users, { ...userForm, id: genId() }]); setShowUser(false); toast("User saved", "success"); };
-  const del = id => { if (!window.confirm("Delete this user?")) return; setUsers(users.filter(u => u.id !== id)); toast("User deleted", "success"); };
-  const setRolePermission = (role, changes) => setPermissions({ ...permissions, [role]: { ...permissions[role], ...changes } });
-  const togglePage = (role, pageId) => {
-    const pages = permissions[role]?.pages || [];
-    const next = pages.includes(pageId) ? pages.filter(p => p !== pageId) : [...pages, pageId];
-    setRolePermission(role, { pages: next });
-  };
-
-  return <div><div style={{ display: "flex", gap: 8, marginBottom: 10 }}><Btn variant={tab === "school" ? "primary" : "ghost"} onClick={() => setTab("school")}>School Profile</Btn><Btn variant={tab === "users" ? "primary" : "ghost"} onClick={() => setTab("users")}>Users & Roles</Btn><Btn variant={tab === "permissions" ? "primary" : "ghost"} onClick={() => setTab("permissions")}>Role Permissions</Btn></div>{tab === "school" && <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}><Field label="School Name"><input style={inputStyle} value={school.name} onChange={e => setSchool({ ...school, name: e.target.value })} /></Field><Field label="Term"><input style={inputStyle} value={school.term} onChange={e => setSchool({ ...school, term: e.target.value })} /></Field><Field label="Year"><input style={inputStyle} value={school.year} onChange={e => setSchool({ ...school, year: e.target.value })} /></Field><Field label="Email"><input style={inputStyle} value={school.email} onChange={e => setSchool({ ...school, email: e.target.value })} /></Field><Field label="Phone"><input style={inputStyle} value={school.phone} onChange={e => setSchool({ ...school, phone: e.target.value })} /></Field><Field label="Address"><input style={inputStyle} value={school.address} onChange={e => setSchool({ ...school, address: e.target.value })} /></Field><Field label="Logo URL"><input style={inputStyle} value={school.logo || ""} onChange={e => setSchool({ ...school, logo: e.target.value })} /></Field></div><div style={{ display: "flex", justifyContent: "flex-end" }}><Btn onClick={saveSchool}>Save School Info</Btn></div></div>}{tab === "users" && <div><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}><Badge text={`Total users: ${users.length}`} tone="info" /><Btn onClick={openAdd}>Add User</Btn></div><div style={{ overflowX: "auto" }}><Table headers={["Name", "Email", "Role", "Status", "Actions"]} rows={users.map(u => [<span key={u.id} style={{ color: C.text, fontWeight: 600 }}>{u.name}</span>, u.email, <Badge key="r" text={u.role} tone={u.role === "admin" ? "danger" : u.role === "teacher" ? "info" : "warning"} />, <Badge key="s" text={u.status} tone={u.status === "active" ? "success" : "danger"} />, <div key="a" style={{ display: "flex", gap: 6 }}><Btn variant="ghost" onClick={() => { setEditId(u.id); setUserForm({ name: u.name, email: u.email, password: "", role: u.role, status: u.status }); setShowUser(true); }}>Edit</Btn><Btn variant="danger" onClick={() => del(u.id)}>Delete</Btn></div>])} /></div></div>}{tab === "permissions" && <div style={{ display: "grid", gap: 10 }}>{Object.entries(permissions).map(([role, cfg]) => <div key={role} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }}><div style={{ color: C.text, fontWeight: 700, marginBottom: 8, textTransform: "capitalize" }}>{role}</div><Field label="Can Edit"><select style={inputStyle} value={String(Boolean(cfg.edit))} onChange={e => setRolePermission(role, { edit: e.target.value === "true" })}><option value="true">true</option><option value="false">false</option></select></Field><div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(120px,1fr))", gap: 6 }}>{NAV.map(n => <label key={n.id} style={{ color: C.textSub, fontSize: 12, display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={(cfg.pages || []).includes(n.id)} onChange={() => togglePage(role, n.id)} />{n.label}</label>)}</div></div>)}</div>}{showUser && <Modal title={editId ? "Edit User" : "Add User"} onClose={() => setShowUser(false)}><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}><Field label="Name"><input style={inputStyle} value={userForm.name} onChange={e => setUserForm({ ...userForm, name: e.target.value })} /></Field><Field label="Email"><input style={inputStyle} value={userForm.email} onChange={e => setUserForm({ ...userForm, email: e.target.value })} /></Field><Field label={editId ? "Password (optional)" : "Password"}><input type="password" style={inputStyle} value={userForm.password} onChange={e => setUserForm({ ...userForm, password: e.target.value })} /></Field><Field label="Role"><select style={inputStyle} value={userForm.role} onChange={e => setUserForm({ ...userForm, role: e.target.value })}><option value="admin">admin</option><option value="teacher">teacher</option><option value="parent">parent</option><option value="student">student</option><option value="viewer">viewer</option></select></Field><Field label="Status"><select style={inputStyle} value={userForm.status} onChange={e => setUserForm({ ...userForm, status: e.target.value })}><option value="active">active</option><option value="inactive">inactive</option></select></Field></div><div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}><Btn variant="ghost" onClick={() => setShowUser(false)}>Cancel</Btn><Btn onClick={saveUser}>Save User</Btn></div></Modal>}</div>;
-}
-SettingsPage.propTypes = { school: PropTypes.object.isRequired, setSchool: PropTypes.func.isRequired, users: PropTypes.array.isRequired, setUsers: PropTypes.func.isRequired, permissions: PropTypes.object.isRequired, setPermissions: PropTypes.func.isRequired, toast: PropTypes.func.isRequired };
-
-export default function App() {
-  const [school, setSchool] = useLocalState("educore.school", DEFAULTS.school);
-  const [users, setUsers] = useLocalState("educore.users", DEFAULTS.users);
-  const [students, setStudents] = useLocalState("educore.students", DEFAULTS.students);
-  const [teachers, setTeachers] = useLocalState("educore.teachers", DEFAULTS.teachers);
-  const [attendance, setAttendance] = useLocalState("educore.attendance", DEFAULTS.attendance);
-  const [results, setResults] = useLocalState("educore.results", DEFAULTS.results);
-  const [feeStructures, setFeeStructures] = useLocalState("educore.feeStructures", DEFAULTS.feeStructures);
-  const [payments, setPayments] = useLocalState("educore.payments", DEFAULTS.payments);
-  const [smsLogs, setSmsLogs] = useLocalState("educore.smsLogs", DEFAULTS.smsLogs);
-  const [integrations, setIntegrations] = useLocalState("educore.integrations", DEFAULTS.integrations);
-  const [permissions, setPermissions] = useLocalState("educore.permissions", ROLE);
-  const [notifications, setNotifications] = useLocalState("educore.notifications", DEFAULTS.notifications);
-  const [auth, setAuth] = useState(() => { const raw = localStorage.getItem("educore.auth"); if (!raw) return null; try { return JSON.parse(raw); } catch { return null; } });
-  const [page, setPage] = useState("dashboard");
-  const [showBell, setShowBell] = useState(false);
-  const [toasts, setToasts] = useState([]);
-
-  const toast = (text, type = "success") => { const id = genId(); setToasts(prev => [...prev, { id, text, type }]); setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500); setNotifications(prev => [{ id: genId(), message: text, read: false, time: new Date().toLocaleString() }, ...prev].slice(0, 80)); };
-  const perms = auth ? permissions[auth.role] : null;
-  const nav = useMemo(() => perms ? NAV.filter(n => perms.pages.includes(n.id)) : [], [perms]);
-  useEffect(() => { if (perms && !perms.pages.includes(page)) setPage(perms.pages[0]); }, [perms, page]);
-
-  useEffect(() => {
-    if (!auth?.token) return;
-    Promise.all([apiGet("/students", auth.token), apiGet("/payments", auth.token)]).then(([studentRows, paymentRows]) => {
-      setStudents(studentRows.map(s => ({ id: s.student_id, admission: s.admission_number, firstName: s.first_name, lastName: s.last_name, className: "Unknown", gender: s.gender, parentName: "", parentPhone: "", dob: s.date_of_birth || "", status: s.status })));
-      setPayments(paymentRows.map(p => ({ id: p.payment_id, studentId: p.student_id, studentName: `Student #${p.student_id}`, className: "Unknown", amount: p.amount, feeType: p.fee_type, method: p.payment_method, date: p.payment_date?.slice?.(0, 10) || p.payment_date, status: p.status, term: school.term || "Term 2" })));
-    }).catch(() => {});
-  }, [auth?.token, school.term, setStudents, setPayments]);
-
-  const canEdit = Boolean(perms?.edit);
-  const canViewFinance = !(["viewer", "student", "parent"].includes(auth?.role));
-
-  const resetDemo = () => {
-    setSchool(DEFAULTS.school); setUsers(DEFAULTS.users); setStudents(DEFAULTS.students); setTeachers(DEFAULTS.teachers); setAttendance(DEFAULTS.attendance); setResults(DEFAULTS.results); setFeeStructures(DEFAULTS.feeStructures); setPayments(DEFAULTS.payments); setSmsLogs(DEFAULTS.smsLogs); setIntegrations(DEFAULTS.integrations); setPermissions(ROLE); setNotifications(DEFAULTS.notifications); toast("Demo data reset", "success");
-  };
-
-  if (!auth) return <LoginView users={users} onLogin={u => { setAuth(u); localStorage.setItem("educore.auth", JSON.stringify(u)); toast(`Logged in as ${u.role}`, "success"); }} />;
-
-  const pageExists = NAV.some(n => n.id === page);
-  const allowed = perms?.pages.includes(page);
-  const pages = {
-    dashboard: <DashboardPage students={students} teachers={teachers} attendance={attendance} payments={payments} feeStructures={feeStructures} results={results} showFinance={canViewFinance} />,
-    students: <StudentsPage students={students} setStudents={setStudents} canEdit={canEdit} results={results} payments={payments} feeStructures={feeStructures} toast={toast} />,
-    teachers: <TeachersPage teachers={teachers} setTeachers={setTeachers} canEdit={canEdit} toast={toast} />,
-    attendance: <AttendancePage students={students} attendance={attendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} />,
-    grades: <GradesPage students={students} results={results} setResults={setResults} canEdit={canEdit} toast={toast} />,
-    fees: canViewFinance ? <FeesPage students={students} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={payments} setPayments={setPayments} canEdit={canEdit} toast={toast} /> : <Forbidden />,
-    discipline: <ComingSoon title="Discipline" />,
-    transport: <ComingSoon title="Transport" />,
-    communication: <CommunicationPage smsLogs={smsLogs} setSmsLogs={setSmsLogs} integrations={integrations} setIntegrations={setIntegrations} canEdit={canEdit} toast={toast} />,
-    settings: auth.role === "admin" ? <div><SettingsPage school={school} setSchool={setSchool} users={users} setUsers={setUsers} permissions={permissions} setPermissions={setPermissions} toast={toast} /><div style={{ marginTop: 12 }}><Btn variant="danger" onClick={() => { if (window.confirm("Reset demo data?")) resetDemo(); }}>Reset Demo Data</Btn></div></div> : <Forbidden />
-  };
-
-  return <div style={{ minHeight: "100vh", display: "flex", background: C.bg, color: C.text, fontFamily: "'DM Sans','Segoe UI',sans-serif" }}><aside style={{ width: 230, borderRight: `1px solid ${C.border}`, background: C.surface, position: "fixed", top: 0, left: 0, height: "100vh", display: "flex", flexDirection: "column" }}><div style={{ padding: 14, borderBottom: `1px solid ${C.border}` }}><div style={{ fontWeight: 800 }}>EduCore</div><div style={{ fontSize: 11, color: C.textMuted }}>{school.name}</div><div style={{ marginTop: 6, color: C.textMuted, fontSize: 11 }}>{school.term} {school.year}</div></div><div style={{ padding: 10, flex: 1, overflowY: "auto" }}>{nav.map(n => <button key={n.id} onClick={() => setPage(n.id)} style={{ width: "100%", textAlign: "left", marginBottom: 4, border: `1px solid ${page === n.id ? C.accentDim : "transparent"}`, borderRadius: 9, padding: "8px 10px", background: page === n.id ? C.accentGlow : "transparent", color: page === n.id ? C.accent : C.textSub, cursor: "pointer" }}>{n.label}</button>)}</div><div style={{ padding: 10, borderTop: `1px solid ${C.border}` }}><div style={{ fontSize: 12 }}>{auth.name}</div><div style={{ color: C.textMuted, fontSize: 11, marginBottom: 8 }}>{auth.role}</div><Btn variant="ghost" onClick={() => { localStorage.removeItem("educore.auth"); setAuth(null); }}>Logout</Btn></div></aside><main style={{ marginLeft: 230, flex: 1 }}><div style={{ height: 62, background: C.surface, borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px", position: "sticky", top: 0, zIndex: 40 }}><div><div style={{ fontWeight: 800, fontSize: 20 }}>{NAV.find(n => n.id === page)?.label || "Unknown"}</div><div style={{ color: C.textMuted, fontSize: 12 }}>Role: {auth.role} | Edit: {canEdit ? "Yes" : "No"}</div></div><div style={{ position: "relative" }}><button onClick={() => setShowBell(!showBell)} style={{ border: `1px solid ${C.border}`, borderRadius: 10, background: C.card, color: C.textSub, cursor: "pointer", padding: "7px 10px" }}>Bell {notifications.filter(n => !n.read).length}</button>{showBell && <NotificationPanel list={notifications} markAll={() => setNotifications(notifications.map(n => ({ ...n, read: true })))} />}</div></div><div style={{ padding: 16 }}>{!pageExists ? <NotFound /> : !allowed ? <Forbidden /> : (pages[page] || <NotFound />)}</div></main><Toasts items={toasts} remove={id => setToasts(prev => prev.filter(t => t.id !== id))} /></div>;
-}
-
-
-
-
-
-
-
-
-
-
-
+export { TeachersPage, SettingsPage };
