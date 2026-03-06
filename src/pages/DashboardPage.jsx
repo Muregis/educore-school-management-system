@@ -2,7 +2,7 @@ import PropTypes from "prop-types";
 import { C } from "../lib/theme";
 import { money } from "../lib/utils";
 
-export default function DashboardPage({ students, teachers, attendance, payments, feeStructures, results }) {
+export default function DashboardPage({ students, teachers, attendance, payments, feeStructures, results, showFinance = true }) {
   const boys = students.filter(s => s.gender === "male").length;
   const girls = students.filter(s => s.gender === "female").length;
   const totalStudents = students.length;
@@ -36,10 +36,19 @@ export default function DashboardPage({ students, teachers, attendance, payments
     }, {})
   ).slice(-7);
 
+  const cards = [
+    ["Boys", boys],
+    ["Girls", girls],
+    ["Total Students", totalStudents],
+    ["Teachers", teachers.length],
+    ["Present Records", present],
+    ...(showFinance ? [["Fees Collected", money(paid)], ["Outstanding", money(outstanding)]] : []),
+  ];
+
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 12 }}>
-        {[["Boys", boys], ["Girls", girls], ["Total Students", totalStudents], ["Teachers", teachers.length], ["Present Records", present], ["Fees Collected", money(paid)], ["Outstanding", money(outstanding)]].map(x => (
+        {cards.map(x => (
           <div key={x[0]} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }}>
             <div style={{ color: C.textMuted, fontSize: 12 }}>{x[0]}</div>
             <div style={{ color: C.text, fontWeight: 800, fontSize: 24 }}>{x[1]}</div>
@@ -94,4 +103,5 @@ DashboardPage.propTypes = {
   payments: PropTypes.array.isRequired,
   feeStructures: PropTypes.array.isRequired,
   results: PropTypes.array.isRequired,
+  showFinance: PropTypes.bool,
 };

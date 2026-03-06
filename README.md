@@ -1,8 +1,30 @@
-# React + Vite
+# EduCore School Management System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend: React + Vite
+Backend: Node.js + Express + MySQL (in `/backend`)
 
-Currently, two official plugins are available:
+## Quick Start
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### Frontend
+```bash
+npm install
+npm run dev
+```
+
+### Backend
+```bash
+cd backend
+npm install
+copy .env.example .env
+npm run dev
+```
+
+Backend default URL: `http://localhost:4000`
+Frontend default URL: `http://localhost:5173`
+
+## Database
+Run these in MySQL Workbench (already done on your side):
+- `database/schema.sql`
+- `database/seed.sql`
+
+If your MySQL runs on port `3307`, keep `DB_PORT=3307` in `backend/.env`.
