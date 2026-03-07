@@ -17,6 +17,7 @@ function parseCsvRows(csvText) {
   });
 }
 
+// Public Mpesa callback (no auth)
 router.post("/mpesa/callback", async (req, res, next) => {
   try {
     const body = req.body || {};
@@ -35,20 +36,15 @@ router.post("/mpesa/callback", async (req, res, next) => {
     let studentId = null;
     if (billRef) {
       const [studentRows] = await pool.query(
-        `SELECT student_id
-         FROM students
-         WHERE school_id = ? AND admission_number = ? AND is_deleted = 0
-         LIMIT 1`,
+        `SELECT student_id FROM students WHERE school_id = ? AND admission_number = ? AND is_deleted = 0 LIMIT 1`,
         [schoolId, billRef]
       );
-      if (studentRows.length) {
-        studentId = studentRows[0].student_id;
-      }
+      if (studentRows.length) studentId = studentRows[0].student_id;
     }
 
     const [result] = await pool.query(
-      `INSERT INTO payments (school_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status)
-       VALUES (?, ?, ?, 'tuition', 'mpesa', ?, ?, 'paid')`,
+      `INSERT INTO payments (school_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status, term)
+       VALUES (?, ?, ?, 'tuition', 'mpesa', ?, ?, 'paid', 'Term 2')`,
       [schoolId, studentId, amount, referenceNumber, paymentDate]
     );
 
@@ -64,6 +60,7 @@ router.post("/mpesa/callback", async (req, res, next) => {
   }
 });
 
+// Bank reconciliation (admin/finance only)
 router.post("/bank/reconcile", authRequired, requireRoles("admin", "finance"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -82,31 +79,23 @@ router.post("/bank/reconcile", authRequired, requireRoles("admin", "finance"), a
       const reference = row.reference_number || row.referenceNumber || row.ref || null;
       const paymentDate = row.payment_date || row.paymentDate || new Date().toISOString().slice(0, 10);
       const feeType = row.fee_type || row.feeType || "tuition";
+      const term = row.term || "Term 2";
 
-      if (!admission || !amount) {
-        skipped += 1;
-        continue;
-      }
+      if (!admission || !amount) { skipped++; continue; }
 
       const [studentRows] = await pool.query(
-        `SELECT student_id
-         FROM students
-         WHERE school_id = ? AND admission_number = ? AND is_deleted = 0
-         LIMIT 1`,
+        `SELECT student_id FROM students WHERE school_id = ? AND admission_number = ? AND is_deleted = 0 LIMIT 1`,
         [schoolId, admission]
       );
 
-      if (!studentRows.length) {
-        skipped += 1;
-        continue;
-      }
+      if (!studentRows.length) { skipped++; continue; }
 
       await pool.query(
-        `INSERT INTO payments (school_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status)
-         VALUES (?, ?, ?, ?, 'bank', ?, ?, 'paid')`,
-        [schoolId, studentRows[0].student_id, amount, feeType, reference, paymentDate]
+        `INSERT INTO payments (school_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status, term)
+         VALUES (?, ?, ?, ?, 'bank', ?, ?, 'paid', ?)`,
+        [schoolId, studentRows[0].student_id, amount, feeType, reference, paymentDate, term]
       );
-      inserted += 1;
+      inserted++;
     }
 
     res.json({ ok: true, inserted, skipped, total: rows.length });

@@ -97,6 +97,7 @@ export default function DashboardPage({ students, teachers, attendance, payments
 }
 
 DashboardPage.propTypes = {
+  auth: PropTypes.object,
   students: PropTypes.array.isRequired,
   teachers: PropTypes.array.isRequired,
   attendance: PropTypes.array.isRequired,

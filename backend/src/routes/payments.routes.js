@@ -52,4 +52,36 @@ router.post("/", async (req, res, next) => {
   }
 });
 
+// update existing payment
+router.put("/:id", async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { amount, feeType, paymentMethod, referenceNumber, paymentDate, status } = req.body;
+    const [result] = await pool.query(
+      `UPDATE payments SET amount=?, fee_type=?, payment_method=?, reference_number=?, payment_date=?, status=?, updated_at=CURRENT_TIMESTAMP
+       WHERE payment_id=? AND school_id=? AND is_deleted=0`,
+      [amount, feeType, paymentMethod, referenceNumber || null, paymentDate, status || "paid", req.params.id, schoolId]
+    );
+    if (!result.affectedRows) return res.status(404).json({ message: "Payment not found" });
+    res.json({ updated: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// delete payment
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const [result] = await pool.query(
+      `UPDATE payments SET is_deleted=1, updated_at=CURRENT_TIMESTAMP WHERE payment_id=? AND school_id=?`,
+      [req.params.id, schoolId]
+    );
+    if (!result.affectedRows) return res.status(404).json({ message: "Payment not found" });
+    res.json({ deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

@@ -73,7 +73,7 @@ router.post("/assignments", requireRoles("admin"), async (req, res, next) => {
 
     const [result] = await pool.query(
       `INSERT INTO student_transport (school_id, student_id, transport_id, start_date, end_date, status)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?)`,
       [schoolId, studentId, transportId, startDate, endDate, status]
     );
 
