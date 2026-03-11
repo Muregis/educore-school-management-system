@@ -19,9 +19,13 @@ export const DEFAULTS = {
   ],
   teachers: [
     { id: 1, firstName: "Grace", lastName: "Akinyi", email: "g.akinyi@school.com", phone: "0711222333", status: "active", classes: ["Grade 7","Grade 8"], timetable: "Mon-Fri 8:00-15:30", subjects: ["Mathematics","Physics"] },
-    { id: 2, firstName: "James", lastName: "Mwangi", email: "j.mwangi@school.com", phone: "0722333444", status: "active", classes: ["Grade 6","Grade 5"], timetable: "Mon-Fri 8:00-15:30", subjects: ["English","History"] }
+    { id: 2, firstName: "James", lastName: "Mwangi", email: "j.mwangi@school.com", phone: "0722333444", status: "active", classes: ["Grade 6","Grade 5"], timetable: "Mon-Fri 8:00-15:30", subjects: ["English","History"] },
   ],
-  attendance: [], results: [], payments: [], smsLogs: [], notifications: [],
+  attendance: [],
+  results: [],
+  payments: [],
+  smsLogs: [],
+  notifications: [],
   feeStructures: [
     { id: 1, className: "Grade 5", term: "Term 2", tuition: 14000, activity: 1500, misc: 500 },
     { id: 2, className: "Grade 6", term: "Term 2", tuition: 15000, activity: 2000, misc: 500 },
@@ -30,17 +34,19 @@ export const DEFAULTS = {
   ],
 };
 
+// dashboard after login. Added with appropriate page access.
 export const ROLE = {
   admin:   { pages: ["dashboard","students","teachers","attendance","grades","fees","discipline","transport","communication","timetable","reports","accounts","settings"], edit: true },
-  teacher: { pages: ["dashboard","students","attendance","grades","discipline","timetable"], edit: true },
-  parent:  { pages: ["dashboard","grades","fees","discipline","transport","communication","timetable"], edit: false },
+  teacher: { pages: ["dashboard","students","attendance","grades","discipline","communication","timetable","reports"], edit: true },
+  finance: { pages: ["dashboard","students","fees","reports"], edit: true },
+  parent:  { pages: ["dashboard","grades","fees","discipline","transport","timetable"], edit: false },
   student: { pages: ["dashboard","grades","attendance","transport","timetable"], edit: false },
 };
 
 export const NAV = [
   { id: "dashboard",     label: "Dashboard" },
   { id: "students",      label: "Students" },
-  { id: "teachers",      label: "Teachers" },
+  { id: "teachers",      label: "Staff" },
   { id: "attendance",    label: "Attendance" },
   { id: "grades",        label: "Grades" },
   { id: "fees",          label: "Fees" },

@@ -19,6 +19,12 @@ import CommunicationPage from "./pages/CommunicationPage";
 import AccountsPage from "./pages/AdminAccountsPage";
 import ReportsPage from "./pages/ReportsPage";
 import TimetablePage from "./pages/TimetablePage";
+import AdmissionsPage from "./pages/AdmissionsPage";
+import InvoicesPage from "./pages/InvoicesPage";
+import ReportCardsPage from "./pages/ReportCardsPage";
+import HRPage from "./pages/HRPage";
+import LibraryPage from "./pages/LibraryPage";
+import StaffPage from "./pages/StaffPage";
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 
 export default function App() {
@@ -47,7 +53,6 @@ export default function App() {
     const id = genId();
     setToasts(prev => [...prev, { id, text, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
-    // Only log notifications for admin and teacher — not portal users
     if (auth && ["admin","teacher","finance"].includes(auth.role)) {
       setNotifications(prev => [{ id: genId(), message: text, read: false, time: new Date().toLocaleString() }, ...prev].slice(0, 80));
     }
@@ -58,7 +63,6 @@ export default function App() {
   const isParent = auth?.role === "parent";
   const canEdit  = Boolean(perms?.edit);
 
-  // All children sharing same parentPhone
   const myChildren = useMemo(() => {
     if (!isParent) return [];
     const loginStudent = students.find(s => (s.id ?? s.student_id) === auth?.studentId);
@@ -96,50 +100,42 @@ export default function App() {
 
   if (!auth) return (
     <LoginView
-      users={users}
       onLogin={u => { setAuth(u); setActiveChildId(null); localStorage.setItem("educore.auth", JSON.stringify(u)); toast(`Welcome, ${u.name}`, "success"); }}
     />
   );
 
-  const pageExists = NAV.some(n => n.id === page) || ["accounts","reports","timetable"].includes(page);
-  const allowed    = perms?.pages.includes(page) || (auth.role === "admin" && ["accounts","reports","timetable"].includes(page));
+  const pageExists = NAV.some(n => n.id === page);
+  const allowed    = perms?.pages.includes(page);
 
   const pages = {
-    dashboard:     <DashboardPage students={myStudents} teachers={teachers} attendance={myAttendance} payments={myPayments} feeStructures={feeStructures} results={myResults} />,
+    dashboard:     <DashboardPage auth={auth} school={school} students={myStudents} teachers={teachers} attendance={myAttendance} payments={myPayments} feeStructures={feeStructures} results={myResults} toast={toast} />,
     students:      <StudentsPage auth={auth} students={myStudents} setStudents={setStudents} canEdit={canEdit} results={myResults} payments={myPayments} feeStructures={feeStructures} toast={toast} />,
     teachers:      <TeachersPage auth={auth} teachers={teachers} setTeachers={setTeachers} canEdit={canEdit} toast={toast} />,
     attendance:    <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     grades:        <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     fees:          <FeesPage auth={auth} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
-    discipline:    <DisciplinePage auth={auth} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
+    admissions:    <AdmissionsPage auth={auth} canEdit={canEdit} toast={toast} />,
+    invoices:      <InvoicesPage auth={auth} students={students} canEdit={canEdit} toast={toast} />,
+    reportcards:   <ReportCardsPage auth={auth} students={myStudents} canEdit={canEdit} toast={toast} />,
+    hr:            ["admin","hr"].includes(auth.role) ? <HRPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
+    staff:         ["admin","hr"].includes(auth.role) ? <StaffPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
+    library:       <LibraryPage auth={auth} students={myStudents} teachers={teachers} toast={toast} />,
+    discipline:    <DisciplinePage auth={auth} students={myStudents} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     transport:     <TransportPage auth={auth} canEdit={canEdit} toast={toast} />,
     communication: <CommunicationPage auth={auth} canEdit={canEdit} toast={toast} />,
+    timetable:     <TimetablePage auth={auth} teachers={teachers} canEdit={canEdit} toast={toast} />,
+    reports:       auth.role === "admin" || auth.role === "teacher" ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
+    accounts:      auth.role === "admin" ? <AccountsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
     settings:      auth.role === "admin"
       ? <div><SettingsPage school={school} setSchool={setSchool} users={users} setUsers={setUsers} toast={toast} /><div style={{ marginTop: 12 }}><Btn variant="danger" onClick={() => { if (window.confirm("Reset demo data?")) resetDemo(); }}>Reset Demo Data</Btn></div></div>
       : <Forbidden />,
-    accounts:   auth.role === "admin" ? <AccountsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
-    reports:    auth.role === "admin" || auth.role === "teacher" ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
-    timetable:  <TimetablePage auth={auth} teachers={teachers} canEdit={canEdit} toast={toast} />,
   };
-
-  // Build nav including admin-only extras
-  const fullNav = [
-    ...nav,
-    ...(auth.role === "admin" ? [
-      { id: "accounts",  label: "Accounts" },
-      { id: "reports",   label: "Reports" },
-      { id: "timetable", label: "Timetable" },
-    ] : auth.role === "teacher" ? [
-      { id: "reports",   label: "Reports" },
-      { id: "timetable", label: "Timetable" },
-    ] : []),
-  ];
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", background: C.bg, color: C.text, fontFamily: "'DM Sans','Segoe UI',sans-serif" }}>
       <aside style={{ width: 230, borderRight: `1px solid ${C.border}`, background: C.surface, position: "fixed", top: 0, left: 0, height: "100vh", display: "flex", flexDirection: "column" }}>
         <div style={{ padding: 14, borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ fontWeight: 800 }}>EduCore</div>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>EduCore</div>
           <div style={{ fontSize: 11, color: C.textMuted }}>{school.name}</div>
           <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{school.term} {school.year}</div>
         </div>
@@ -171,8 +167,8 @@ export default function App() {
         )}
 
         <div style={{ padding: 10, flex: 1, overflowY: "auto" }}>
-          {fullNav.map(n => (
-            <button key={n.id} onClick={() => setPage(n.id)} style={{ width: "100%", textAlign: "left", marginBottom: 4, border: `1px solid ${page === n.id ? C.accentDim : "transparent"}`, borderRadius: 9, padding: "8px 10px", background: page === n.id ? C.accentGlow : "transparent", color: page === n.id ? C.accent : C.textSub, cursor: "pointer" }}>
+          {nav.map(n => (
+            <button key={n.id} onClick={() => setPage(n.id)} style={{ width: "100%", textAlign: "left", marginBottom: 4, border: `1px solid ${page === n.id ? C.accentDim : "transparent"}`, borderRadius: 9, padding: "8px 10px", background: page === n.id ? C.accentGlow : "transparent", color: page === n.id ? C.accent : C.textSub, cursor: "pointer", fontSize: 13 }}>
               {n.label}
             </button>
           ))}
@@ -188,7 +184,7 @@ export default function App() {
       <main style={{ marginLeft: 230, flex: 1 }}>
         <div style={{ height: 62, background: C.surface, borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 16px", position: "sticky", top: 0, zIndex: 40 }}>
           <div>
-            <div style={{ fontWeight: 800, fontSize: 20 }}>{fullNav.find(n => n.id === page)?.label || page}</div>
+            <div style={{ fontWeight: 800, fontSize: 20 }}>{nav.find(n => n.id === page)?.label || page}</div>
             <div style={{ color: C.textMuted, fontSize: 12 }}>
               {isPortal
                 ? `${isParent ? "Parent" : "Student"} · ${activeChild ? `${activeChild.firstName ?? activeChild.first_name} ${activeChild.lastName ?? activeChild.last_name}` : auth.name}`

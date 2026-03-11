@@ -19,13 +19,17 @@ import mpesaRoutes         from "./routes/mpesa.routes.js";
 import paystackRoutes      from "./routes/paystack.routes.js";
 import accountsRoutes      from "./routes/accounts.routes.js";
 import timetableRoutes     from "./routes/timetable.routes.js";
+import admissionsRoutes    from "./routes/admissions.routes.js";
+import invoicesRoutes      from "./routes/invoices.routes.js";
+import reportcardsRoutes   from "./routes/reportcards.routes.js";
+import analyticsRoutes     from "./routes/analytics.routes.js";
+import hrRoutes            from "./routes/hr.routes.js";
+import libraryRoutes       from "./routes/library.routes.js";
 import { errorHandler }    from "./middleware/error.js";
 
 const app = express();
 
-// Paystack webhook needs raw body — register before express.json
 app.use("/api/paystack/webhook", express.raw({ type: "application/json" }));
-
 app.use(cors({ origin: env.corsOrigin }));
 app.use(express.json({ limit: "2mb" }));
 app.use(morgan("dev"));
@@ -47,6 +51,12 @@ app.use("/api/mpesa",         mpesaRoutes);
 app.use("/api/paystack",      paystackRoutes);
 app.use("/api/accounts",      accountsRoutes);
 app.use("/api/timetable",     timetableRoutes);
+app.use("/api/admissions",    admissionsRoutes);
+app.use("/api/invoices",      invoicesRoutes);
+app.use("/api/reportcards",   reportcardsRoutes);
+app.use("/api/analytics",     analyticsRoutes);
+app.use("/api/hr",            hrRoutes);
+app.use("/api/library",       libraryRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
 app.use(errorHandler);

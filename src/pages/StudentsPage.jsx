@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
 import Field from "../components/Field";
@@ -9,7 +9,8 @@ import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
-import { Pager, Msg, csv, pager } from "../components/Helpers";
+import { Pager, Msg } from "../components/Helpers";
+import { csv, pager } from "../lib/utils";
 
 // Normalise a student row coming from the backend into the shape the UI expects
 function normalise(s) {
@@ -42,7 +43,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     if (auth?.token) {
       apiFetch("/students", { token: auth.token })
         .then(data => setStudents(data.map(normalise)))
-        .catch(e => console.warn("Failed to fetch students", e));
+        .catch(e => toast("Failed to fetch students", "error"));
     }
   }, [auth, setStudents]);
 
@@ -86,7 +87,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           body: { admissionNumber: f.admission || `ADM-${Date.now()}`, firstName: f.firstName, lastName: f.lastName, gender: f.gender, classId: null, dateOfBirth: f.dob || null, phone: f.parentPhone || null, email: null, address: null, status: f.status },
           token: auth?.token,
         });
-        setStudents(prev => [...prev, { ...f, id: res.studentId, admission: f.admission || `ADM-${Date.now()}` }]);
+        setStudents(prev => [...prev, normalise(res)]);
       }
       setShow(false);
       toast("Student saved", "success");
@@ -123,7 +124,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <option value="inactive">inactive</option>
         </select>
         <Btn variant="ghost" onClick={() => { csv("students.csv", ["Admission","First","Last","Class","Gender","Parent","Phone","Status"], filtered.map(s => [s.admission,s.firstName,s.lastName,s.className,s.gender,s.parentName||"",s.parentPhone||"",s.status])); toast("Students CSV exported","success"); }}>Export CSV</Btn>
-        {canEdit && <Btn onClick={openAdd}>Add Student</Btn>}
+        {canEdit && auth.role !== "finance" && <Btn onClick={openAdd}>Add Student</Btn>}
       </div>
       {filtered.length === 0 ? <Msg text="No students found." /> : (
         <>
@@ -137,8 +138,8 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
                 <Badge key="b" text={s.status} tone={s.status === "active" ? "success" : "danger"} />,
                 <div key="a" style={{ display: "flex", gap: 6 }}>
                   <Btn variant="ghost" onClick={() => setProfile(s)}>Profile</Btn>
-                  {canEdit && <Btn variant="ghost" onClick={() => { setEditId(s.id); setF(s); setShow(true); }}>Edit</Btn>}
-                  {canEdit && <Btn variant="danger" onClick={() => del(s.id)}>Delete</Btn>}
+                  {canEdit && auth.role !== "finance" && <Btn variant="ghost" onClick={() => { setEditId(s.id); setF(s); setShow(true); }}>Edit</Btn>}
+                  {canEdit && auth.role !== "finance" && <Btn variant="danger" onClick={() => del(s.id)}>Delete</Btn>}
                 </div>
               ])}
             />

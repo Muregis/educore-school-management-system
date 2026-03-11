@@ -1,0 +1,28 @@
+$kind: http-request
+name: Verify Payment
+method: GET
+url: '{{baseUrl}}/api/paystack/verify/{{paymentReference}}'
+order: 2000
+headers:
+  - key: Authorization
+    value: 'Bearer {{token}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Response received", () => {
+        pm.response.to.have.status(200);
+      });
+      pm.test("Payment verified", () => {
+        const json = pm.response.json();
+        pm.expect(json.ok).to.be.true;
+        pm.expect(json.amount).to.be.a("number");
+        console.log("Payment verified! Amount:", json.amount, "KES | Channel:", json.channel);
+      });
+description: |-
+  Verifies a Paystack transaction by reference number.
+
+  The `{{paymentReference}}` variable is auto-populated from the Initialize Payment step.
+
+  On success, the payment record in the DB is updated to 'paid' and an SMS
+  confirmation is sent to the student's parent via Africa's Talking.

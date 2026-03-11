@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
 import Field from "../components/Field";
@@ -7,27 +7,19 @@ import Modal from "../components/Modal";
 import Table from "../components/Table";
 import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
-import { genId } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { Pager, Msg, csv, pager } from "../components/Helpers";
 
-const calcGrade = (m, t) => {
-  const p = (Number(m) / Number(t || 1)) * 100;
-  if (p >= 80) return "EE";
-  if (p >= 65) return "ME";
-  if (p >= 50) return "AE";
-  return "BE";
-};
 
 export default function GradesPage({ auth, students, results, setResults, canEdit, toast }) {
-  const [term, setTerm] = useState("Term 2");
-  const [filterClass, setFilterClass] = useState("all");
+  const [term, setTerm]                 = useState("Term 2");
+  const [filterClass, setFilterClass]   = useState("all");
   const [filterStudent, setFilterStudent] = useState("all");
-  const [page, setPage] = useState(1);
-  const [showBulk, setShowBulk] = useState(false);
-  const [studentId, setStudentId] = useState(students[0]?.id || "");
-  const [total, setTotal] = useState("100");
-  const [bulkMarks, setBulkMarks] = useState(() =>
+  const [page, setPage]                 = useState(1);
+  const [showBulk, setShowBulk]         = useState(false);
+  const [studentId, setStudentId]       = useState(students[0]?.id || "");
+  const [total, setTotal]               = useState("100");
+  const [bulkMarks, setBulkMarks]       = useState(() =>
     SUBJECTS.reduce((a, s) => ({ ...a, [s]: "" }), {})
   );
   const [editing, setEditing] = useState(null);
@@ -48,9 +40,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   );
 
   const { pages, rows } = pager(filtered, page);
-  useEffect(() => {
-    if (page > pages) setPage(1);
-  }, [page, pages]);
+  useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
 
   const saveBulk = async () => {
     const s = students.find(x => x.id === Number(studentId));
@@ -60,11 +50,14 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
     const entered = SUBJECTS.filter(sub => bulkMarks[sub] !== "");
     if (entered.length === 0) return toast("Enter at least one subject mark", "error");
     try {
-      await apiFetch(`/grades/bulk`, {
+      // Bug #4 fixed: was always sending classId: null.
+      // Now sends the student's actual classId (from class_id or id field).
+      const classId = s.classId ?? s.class_id ?? null;
+      await apiFetch("/grades/bulk", {
         method: "POST",
         body: {
           studentId: s.id,
-          classId: null,
+          classId,
           term,
           totalMarks: t,
           subjects: entered.map(sub => ({ subject: sub, marks: Number(bulkMarks[sub]) })),
@@ -88,15 +81,15 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
     if (Number.isNaN(m) || Number.isNaN(t) || m < 0 || m > t)
       return toast("Invalid marks", "error");
     try {
+      // Bug #4 fixed: removed hardcoded classId: null — backend doesn't need it for PUT.
       await apiFetch(`/grades/${editing.id}`, {
         method: "PUT",
         body: {
-          studentId: editing.studentId,
-          classId: null,
-          subject: editing.subject,
-          term: editing.term,
-          marks: m,
-          totalMarks: t,
+          subject:        editing.subject,
+          term:           editing.term,
+          marks:          m,
+          totalMarks:     t,
+          teacherComment: editing.teacherComment ?? "",
         },
         token: auth?.token,
       });
@@ -135,6 +128,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
         <Badge text={`AE: ${counts.AE}`} tone="warning" />
         <Badge text={`BE: ${counts.BE}`} tone="danger" />
       </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 8, marginBottom: 10 }}>
         <select style={inputStyle} value={term} onChange={e => setTerm(e.target.value)}>
           <option value="all">All terms</option>
@@ -150,11 +144,18 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           <option value="all">All students</option>
           {students.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
         </select>
-        <Btn variant="ghost" onClick={() => { csv("results.csv", ["Student","Class","Subject","Term","Marks","Total","Grade"], filtered.map(r => [r.studentName, r.className, r.subject, r.term, r.marks, r.total, r.grade])); toast("Results CSV exported", "success"); }}>
+        <Btn variant="ghost" onClick={() => {
+          csv("results.csv",
+            ["Student","Class","Subject","Term","Marks","Total","Grade"],
+            filtered.map(r => [r.studentName, r.className, r.subject, r.term, r.marks, r.total, r.grade])
+          );
+          toast("Results CSV exported", "success");
+        }}>
           Export CSV
         </Btn>
         {canEdit && <Btn onClick={() => setShowBulk(true)}>Bulk Enter (All Subjects)</Btn>}
       </div>
+
       {filtered.length === 0 ? <Msg text="No results yet." /> : (
         <>
           <div style={{ overflowX: "auto" }}>
@@ -162,43 +163,53 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
               headers={["Student","Class","Subject","Term","Score","Grade","Actions"]}
               rows={rows.map(r => [
                 <span key={r.id} style={{ color: C.text, fontWeight: 600 }}>{r.studentName}</span>,
-                r.className, r.subject, r.term,
+                r.className,
+                r.subject,
+                r.term,
                 `${r.marks}/${r.total}`,
-                <Badge key="g" text={r.grade} tone={r.grade === "EE" ? "success" : r.grade === "ME" ? "info" : r.grade === "AE" ? "warning" : "danger"} />,
+                <Badge key="g" text={r.grade}
+                  tone={r.grade === "EE" ? "success" : r.grade === "ME" ? "info" : r.grade === "AE" ? "warning" : "danger"} />,
                 <div key="a" style={{ display: "flex", gap: 6 }}>
                   {canEdit && <Btn variant="ghost" onClick={() => setEditing(r)}>Edit</Btn>}
                   {canEdit && <Btn variant="danger" onClick={() => del(r.id)}>Delete</Btn>}
-                </div>
+                </div>,
               ])}
             />
           </div>
           <Pager page={page} pages={pages} setPage={setPage} />
         </>
       )}
+
       {showBulk && (
         <Modal title="Bulk Results Entry (One Student, All Subjects)" onClose={() => setShowBulk(false)}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
             <Field label="Student">
               <select style={inputStyle} value={studentId} onChange={e => setStudentId(Number(e.target.value))}>
-                {students.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.className})</option>)}
+                {students.map(s => (
+                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.className})</option>
+                ))}
               </select>
             </Field>
             <Field label="Term">
-              <select style={inputStyle} value={term === "all" ? "Term 2" : term} onChange={e => setTerm(e.target.value)}>
+              <select style={inputStyle} value={term === "all" ? "Term 2" : term}
+                onChange={e => setTerm(e.target.value)}>
                 <option value="Term 1">Term 1</option>
                 <option value="Term 2">Term 2</option>
                 <option value="Term 3">Term 3</option>
               </select>
             </Field>
             <Field label="Total Marks">
-              <input type="number" style={inputStyle} value={total} onChange={e => setTotal(e.target.value)} />
+              <input type="number" style={inputStyle} value={total}
+                onChange={e => setTotal(e.target.value)} />
             </Field>
           </div>
           <div style={{ maxHeight: 320, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 10, padding: 8, marginBottom: 10 }}>
             {SUBJECTS.map(sub => (
               <div key={sub} style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 8, alignItems: "center", borderBottom: `1px solid ${C.border}`, padding: "8px 4px" }}>
                 <div style={{ color: C.text }}>{sub}</div>
-                <input type="number" min="0" style={inputStyle} value={bulkMarks[sub]} onChange={e => setBulkMarks({ ...bulkMarks, [sub]: e.target.value })} placeholder="-" />
+                <input type="number" min="0" style={inputStyle} value={bulkMarks[sub]}
+                  onChange={e => setBulkMarks({ ...bulkMarks, [sub]: e.target.value })}
+                  placeholder="-" />
               </div>
             ))}
           </div>
@@ -208,22 +219,34 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           </div>
         </Modal>
       )}
+
       {editing && (
         <Modal title="Edit Result" onClose={() => setEditing(null)}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Student"><input style={inputStyle} value={editing.studentName} disabled /></Field>
-            <Field label="Subject"><input style={inputStyle} value={editing.subject} disabled /></Field>
+            <Field label="Student">
+              <input style={inputStyle} value={editing.studentName} disabled />
+            </Field>
+            <Field label="Subject">
+              <input style={inputStyle} value={editing.subject} disabled />
+            </Field>
             <Field label="Term">
-              <select style={inputStyle} value={editing.term} onChange={e => setEditing({ ...editing, term: e.target.value })}>
+              <select style={inputStyle} value={editing.term}
+                onChange={e => setEditing({ ...editing, term: e.target.value })}>
                 <option>Term 1</option>
                 <option>Term 2</option>
                 <option>Term 3</option>
               </select>
             </Field>
-            <Field label="Total"><input type="number" style={inputStyle} value={editing.total} onChange={e => setEditing({ ...editing, total: e.target.value })} /></Field>
-            <Field label="Marks"><input type="number" style={inputStyle} value={editing.marks} onChange={e => setEditing({ ...editing, marks: e.target.value })} /></Field>
+            <Field label="Total">
+              <input type="number" style={inputStyle} value={editing.total}
+                onChange={e => setEditing({ ...editing, total: e.target.value })} />
+            </Field>
+            <Field label="Marks">
+              <input type="number" style={inputStyle} value={editing.marks}
+                onChange={e => setEditing({ ...editing, marks: e.target.value })} />
+            </Field>
           </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
             <Btn variant="ghost" onClick={() => setEditing(null)}>Cancel</Btn>
             <Btn onClick={saveEdit}>Save</Btn>
           </div>
@@ -234,10 +257,10 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
 }
 
 GradesPage.propTypes = {
-  auth: PropTypes.object,
-  students: PropTypes.array.isRequired,
-  results: PropTypes.array.isRequired,
+  auth:       PropTypes.object,
+  students:   PropTypes.array.isRequired,
+  results:    PropTypes.array.isRequired,
   setResults: PropTypes.func.isRequired,
-  canEdit: PropTypes.bool.isRequired,
-  toast: PropTypes.func.isRequired,
+  canEdit:    PropTypes.bool.isRequired,
+  toast:      PropTypes.func.isRequired,
 };

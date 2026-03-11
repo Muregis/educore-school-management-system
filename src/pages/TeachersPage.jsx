@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
 import Field from "../components/Field";
@@ -6,8 +6,9 @@ import Badge from "../components/Badge";
 import Modal from "../components/Modal";
 import Table from "../components/Table";
 import { C, inputStyle } from "../lib/theme";
+import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
 import { apiFetch } from "../lib/api";
-import { Pager, Msg, csv, pager } from "../components/Helpers";
+import { Msg, pager, Pager } from "../components/Helpers";
 
 function normalise(t) {
   return {
@@ -35,7 +36,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
     if (auth?.token) {
       apiFetch("/teachers", { token: auth.token })
         .then(data => setTeachers(data.map(normalise)))
-        .catch(e => console.warn("Failed to fetch teachers", e));
+        .catch(e => toast("Failed to fetch teachers", "error"));
     }
   }, [auth, setTeachers]);
 
@@ -97,7 +98,13 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
           <option value="active">active</option>
           <option value="inactive">inactive</option>
         </select>
-        <Btn variant="ghost" onClick={() => { csv("teachers.csv", ["Name","Email","Phone","Status","Classes","Subjects"], filtered.map(t => [`${t.firstName} ${t.lastName}`,t.email,t.phone||"",t.status,(t.classes||[]).join("|"),(t.subjects||[]).join("|")])); toast("Teachers CSV exported","success"); }}>Export CSV</Btn>
+        <Btn variant="ghost" onClick={() => {
+          const headers = ["Name","Email","Phone","Status","Classes","Subjects"];
+          const rows = filtered.map(t => [`${t.firstName} ${t.lastName}`,t.email,t.phone||"",t.status,(t.classes||[]).join("|"),(t.subjects||[]).join("|")]);
+          const content = [headers, ...rows].map(r => r.join(",")).join("\n");
+          const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([content], { type: "text/csv" })); a.download = "teachers.csv"; a.click();
+          toast("Teachers CSV exported", "success");
+        }}>Export CSV</Btn>
         {canEdit && <Btn onClick={openAdd}>Add Teacher</Btn>}
       </div>
       {filtered.length === 0 ? <Msg text="No teachers found." /> : (
@@ -129,12 +136,44 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
             <Field label="Last Name"><input style={inputStyle} value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} /></Field>
             <Field label="Email"><input style={inputStyle} value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></Field>
             <Field label="Phone"><input style={inputStyle} value={f.phone||""} onChange={e => setF({ ...f, phone: e.target.value })} /></Field>
-            <Field label="Classes (comma separated)"><input style={inputStyle} value={(f.classes||[]).join(", ")} onChange={e => setF({ ...f, classes: e.target.value.split(",").map(x=>x.trim()).filter(Boolean) })} /></Field>
-            <Field label="Subjects (comma separated)"><input style={inputStyle} value={(f.subjects||[]).join(", ")} onChange={e => setF({ ...f, subjects: e.target.value.split(",").map(x=>x.trim()).filter(Boolean) })} /></Field>
-            <Field label="Timetable"><input style={inputStyle} value={f.timetable||""} onChange={e => setF({ ...f, timetable: e.target.value })} /></Field>
             <Field label="Status"><select style={inputStyle} value={f.status} onChange={e => setF({ ...f, status: e.target.value })}><option value="active">active</option><option value="inactive">inactive</option></select></Field>
+            <Field label="Timetable"><input style={inputStyle} value={f.timetable||""} onChange={e => setF({ ...f, timetable: e.target.value })} /></Field>
           </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+            <div>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 6 }}>Subjects (select all that apply)</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {SUBJECTS.map(s => {
+                  const sel = (f.subjects||[]).includes(s);
+                  return (
+                    <div key={s} onClick={() => setF(prev => ({ ...prev, subjects: sel ? prev.subjects.filter(x => x !== s) : [...(prev.subjects||[]), s] }))}
+                      style={{ padding: "4px 10px", borderRadius: 20, fontSize: 12, cursor: "pointer",
+                        background: sel ? C.accent : C.card, color: sel ? "#fff" : C.textSub,
+                        border: `1px solid ${sel ? C.accent : C.border}` }}>
+                      {s}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 6 }}>Classes (select all that apply)</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {ALL_CLASSES.map(c => {
+                  const sel = (f.classes||[]).includes(c);
+                  return (
+                    <div key={c} onClick={() => setF(prev => ({ ...prev, classes: sel ? prev.classes.filter(x => x !== c) : [...(prev.classes||[]), c] }))}
+                      style={{ padding: "4px 10px", borderRadius: 20, fontSize: 12, cursor: "pointer",
+                        background: sel ? "#22c55e" : C.card, color: sel ? "#fff" : C.textSub,
+                        border: `1px solid ${sel ? "#22c55e" : C.border}` }}>
+                      {c}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
             <Btn variant="ghost" onClick={() => setShow(false)}>Cancel</Btn>
             <Btn onClick={save}>Save</Btn>
           </div>

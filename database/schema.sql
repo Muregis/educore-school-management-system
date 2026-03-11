@@ -32,11 +32,19 @@ DROP TABLE IF EXISTS guardians;
 DROP TABLE IF EXISTS students;
 DROP TABLE IF EXISTS teachers;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS hr_leave;
+DROP TABLE IF EXISTS hr_attendance;
+DROP TABLE IF EXISTS hr_payslips;
+DROP TABLE IF EXISTS hr_staff;
+DROP TABLE IF EXISTS admissions;
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS report_cards;
+DROP TABLE IF EXISTS invoices;
 DROP TABLE IF EXISTS schools;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
--- ─── Schools ─────────────────────────────────────────────────────────────────
+-- Schools 
 CREATE TABLE schools (
   school_id           BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   name                VARCHAR(160) NOT NULL,
@@ -56,17 +64,16 @@ CREATE TABLE schools (
   INDEX idx_schools_deleted (is_deleted)
 ) ENGINE=InnoDB;
 
--- ─── Users ────────────────────────────────────────────────────────────────────
--- student_id links portal accounts (parent / student) to a specific student row
+-- Users
 CREATE TABLE users (
   user_id        BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id      BIGINT UNSIGNED NOT NULL,
-  student_id     BIGINT UNSIGNED NULL,                        -- NULL for staff; set for parent/student portal accounts
+  student_id     BIGINT UNSIGNED NULL,
   full_name      VARCHAR(160) NOT NULL,
   email          VARCHAR(160) NOT NULL,
   phone          VARCHAR(40)  NULL,
   password_hash  VARCHAR(255) NOT NULL,
-  role           ENUM('admin','teacher','finance','parent','student') NOT NULL,
+  role           ENUM('admin','teacher','finance','hr','librarian','parent','student') NOT NULL,
   status         ENUM('active','inactive') NOT NULL DEFAULT 'active',
   last_login_at  DATETIME NULL,
   is_deleted     TINYINT(1)   NOT NULL DEFAULT 0,
@@ -79,7 +86,7 @@ CREATE TABLE users (
   CONSTRAINT fk_users_school FOREIGN KEY (school_id) REFERENCES schools(school_id)
 ) ENGINE=InnoDB;
 
--- ─── Teachers ────────────────────────────────────────────────────────────────
+-- Teachers 
 CREATE TABLE teachers (
   teacher_id    BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id     BIGINT UNSIGNED NOT NULL,
@@ -104,7 +111,7 @@ CREATE TABLE teachers (
   CONSTRAINT fk_teachers_user   FOREIGN KEY (user_id)   REFERENCES users(user_id)
 ) ENGINE=InnoDB;
 
--- ─── Classes ─────────────────────────────────────────────────────────────────
+-- Classes 
 CREATE TABLE classes (
   class_id         BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id        BIGINT UNSIGNED NOT NULL,
@@ -123,14 +130,12 @@ CREATE TABLE classes (
   CONSTRAINT fk_classes_teacher FOREIGN KEY (class_teacher_id) REFERENCES teachers(teacher_id)
 ) ENGINE=InnoDB;
 
--- ─── Students ────────────────────────────────────────────────────────────────
--- class_name is denormalised for fast queries (kept in sync with classes.class_name)
--- parent_phone is denormalised for easy SMS / child-switcher grouping
+-- Students 
 CREATE TABLE students (
   student_id       BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id        BIGINT UNSIGNED NOT NULL,
   class_id         BIGINT UNSIGNED NULL,
-  class_name       VARCHAR(80)  NULL,                         -- denormalised convenience column
+  class_name       VARCHAR(80)  NULL,
   admission_number VARCHAR(60)  NOT NULL,
   first_name       VARCHAR(100) NOT NULL,
   last_name        VARCHAR(100) NOT NULL,
@@ -139,8 +144,8 @@ CREATE TABLE students (
   phone            VARCHAR(40)  NULL,
   email            VARCHAR(160) NULL,
   address          VARCHAR(255) NULL,
-  parent_name      VARCHAR(160) NULL,                         -- primary guardian name (convenience)
-  parent_phone     VARCHAR(40)  NULL,                         -- primary guardian phone (convenience)
+  parent_name      VARCHAR(160) NULL,
+  parent_phone     VARCHAR(40)  NULL,
   admission_date   DATE NULL,
   status           ENUM('active','inactive','graduated','transferred') NOT NULL DEFAULT 'active',
   is_deleted       TINYINT(1)   NOT NULL DEFAULT 0,
@@ -155,7 +160,7 @@ CREATE TABLE students (
   CONSTRAINT fk_students_class  FOREIGN KEY (class_id)  REFERENCES classes(class_id)
 ) ENGINE=InnoDB;
 
--- ─── Guardians ───────────────────────────────────────────────────────────────
+-- Guardians 
 CREATE TABLE guardians (
   guardian_id       BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id         BIGINT UNSIGNED NOT NULL,
@@ -176,7 +181,7 @@ CREATE TABLE guardians (
   CONSTRAINT fk_guardians_school FOREIGN KEY (school_id) REFERENCES schools(school_id)
 ) ENGINE=InnoDB;
 
--- ─── Student ↔ Guardian link ──────────────────────────────────────────────────
+-- Student to Guardian link 
 CREATE TABLE student_guardians (
   id                       BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id                BIGINT UNSIGNED NOT NULL,
@@ -194,7 +199,7 @@ CREATE TABLE student_guardians (
   CONSTRAINT fk_student_guardians_guardian FOREIGN KEY (guardian_id) REFERENCES guardians(guardian_id)
 ) ENGINE=InnoDB;
 
--- ─── Discipline ───────────────────────────────────────────────────────────────
+-- Discipline 
 CREATE TABLE discipline_records (
   discipline_id    BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id        BIGINT UNSIGNED NOT NULL,
@@ -216,7 +221,7 @@ CREATE TABLE discipline_records (
   CONSTRAINT fk_discipline_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id)
 ) ENGINE=InnoDB;
 
--- ─── Teacher ↔ Class assignments ─────────────────────────────────────────────
+-- Teacher to Class assignments 
 CREATE TABLE teacher_classes (
   id         BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id  BIGINT UNSIGNED NOT NULL,
@@ -233,7 +238,7 @@ CREATE TABLE teacher_classes (
   CONSTRAINT fk_teacher_classes_class    FOREIGN KEY (class_id)   REFERENCES classes(class_id)
 ) ENGINE=InnoDB;
 
--- ─── Timetable ────────────────────────────────────────────────────────────────
+-- Timetable 
 CREATE TABLE timetable_entries (
   timetable_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id    BIGINT UNSIGNED NOT NULL,
@@ -254,7 +259,7 @@ CREATE TABLE timetable_entries (
   CONSTRAINT fk_timetable_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id)
 ) ENGINE=InnoDB;
 
--- ─── Subjects ────────────────────────────────────────────────────────────────
+-- Subjects 
 CREATE TABLE subjects (
   subject_id   BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id    BIGINT UNSIGNED NOT NULL,
@@ -270,7 +275,7 @@ CREATE TABLE subjects (
   CONSTRAINT fk_subjects_school FOREIGN KEY (school_id) REFERENCES schools(school_id)
 ) ENGINE=InnoDB;
 
--- ─── Class ↔ Subject assignments ─────────────────────────────────────────────
+-- Class to Subject assignments 
 CREATE TABLE class_subjects (
   class_subject_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id        BIGINT UNSIGNED NOT NULL,
@@ -288,7 +293,7 @@ CREATE TABLE class_subjects (
   CONSTRAINT fk_class_subjects_teacher  FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id)
 ) ENGINE=InnoDB;
 
--- ─── Attendance ───────────────────────────────────────────────────────────────
+-- Attendance 
 CREATE TABLE attendance (
   attendance_id     BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id         BIGINT UNSIGNED NOT NULL,
@@ -310,7 +315,7 @@ CREATE TABLE attendance (
   CONSTRAINT fk_attendance_marker  FOREIGN KEY (marked_by_user_id) REFERENCES users(user_id)
 ) ENGINE=InnoDB;
 
--- ─── Exams ────────────────────────────────────────────────────────────────────
+-- Exams
 CREATE TABLE exams (
   exam_id       BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id     BIGINT UNSIGNED NOT NULL,
@@ -328,80 +333,62 @@ CREATE TABLE exams (
   CONSTRAINT fk_exams_school FOREIGN KEY (school_id) REFERENCES schools(school_id)
 ) ENGINE=InnoDB;
 
--- ─── Results ─────────────────────────────────────────────────────────────────
+-- Results 
 CREATE TABLE results (
   result_id        BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id        BIGINT UNSIGNED NOT NULL,
   student_id       BIGINT UNSIGNED NOT NULL,
-  subject_id       BIGINT UNSIGNED NOT NULL,
-  exam_id          BIGINT UNSIGNED NOT NULL,
-  class_id         BIGINT UNSIGNED NOT NULL,
-  teacher_id       BIGINT UNSIGNED NULL,
-  marks_obtained   DECIMAL(6,2) NOT NULL,
-  total_marks      DECIMAL(6,2) NOT NULL,
+  subject          VARCHAR(120) NOT NULL,
+  term             VARCHAR(40)  NOT NULL DEFAULT 'Term 2',
+  marks            DECIMAL(6,2) NOT NULL,
+  total_marks      DECIMAL(6,2) NOT NULL DEFAULT 100,
   grade            VARCHAR(8)   NULL,
+  class_id         BIGINT UNSIGNED NULL,
+  teacher_id       BIGINT UNSIGNED NULL,
   teacher_comment  VARCHAR(255) NULL,
   is_deleted       TINYINT(1)   NOT NULL DEFAULT 0,
   created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_results_student_subject_exam (school_id, student_id, subject_id, exam_id),
-  INDEX idx_results_school_class (school_id, class_id),
-  INDEX idx_results_deleted      (is_deleted),
+  INDEX idx_results_school_student (school_id, student_id),
+  INDEX idx_results_school_class   (school_id, class_id),
+  INDEX idx_results_deleted        (is_deleted),
   CONSTRAINT fk_results_school   FOREIGN KEY (school_id)  REFERENCES schools(school_id),
   CONSTRAINT fk_results_student  FOREIGN KEY (student_id) REFERENCES students(student_id),
-  CONSTRAINT fk_results_subject  FOREIGN KEY (subject_id) REFERENCES subjects(subject_id),
-  CONSTRAINT fk_results_exam     FOREIGN KEY (exam_id)    REFERENCES exams(exam_id),
   CONSTRAINT fk_results_class    FOREIGN KEY (class_id)   REFERENCES classes(class_id),
   CONSTRAINT fk_results_teacher  FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id)
 ) ENGINE=InnoDB;
 
--- ─── Fee Structures ───────────────────────────────────────────────────────────
+-- Fee Structures 
 CREATE TABLE fee_structures (
   fee_structure_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id        BIGINT UNSIGNED NOT NULL,
-  class_id         BIGINT UNSIGNED NOT NULL,
-  class_name       VARCHAR(80) NULL,                          -- denormalised for easy queries
-  term             ENUM('Term 1','Term 2','Term 3') NOT NULL,
-  academic_year    SMALLINT NOT NULL,
-  is_active        TINYINT(1) NOT NULL DEFAULT 1,
+  class_name       VARCHAR(80)  NOT NULL,
+  term             VARCHAR(40)  NOT NULL DEFAULT 'Term 2',
+  tuition          DECIMAL(12,2) NOT NULL DEFAULT 0,
+  activity         DECIMAL(12,2) NOT NULL DEFAULT 0,
+  misc             DECIMAL(12,2) NOT NULL DEFAULT 0,
   is_deleted       TINYINT(1) NOT NULL DEFAULT 0,
   created_at       TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_fee_structure_class_term_year (school_id, class_id, term, academic_year),
-  INDEX idx_fee_structures_deleted            (is_deleted),
-  CONSTRAINT fk_fee_structures_school FOREIGN KEY (school_id) REFERENCES schools(school_id),
-  CONSTRAINT fk_fee_structures_class  FOREIGN KEY (class_id)  REFERENCES classes(class_id)
+  UNIQUE KEY uq_fee_structure_class_term (school_id, class_name, term),
+  INDEX idx_fee_structures_deleted       (is_deleted),
+  CONSTRAINT fk_fee_structures_school FOREIGN KEY (school_id) REFERENCES schools(school_id)
 ) ENGINE=InnoDB;
 
--- ─── Fee Structure Items ──────────────────────────────────────────────────────
-CREATE TABLE fee_structure_items (
-  fee_item_id      BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-  school_id        BIGINT UNSIGNED NOT NULL,
-  fee_structure_id BIGINT UNSIGNED NOT NULL,
-  fee_type         ENUM('tuition','activity','transport','library','misc') NOT NULL,
-  amount           DECIMAL(12,2) NOT NULL,
-  description      VARCHAR(255) NULL,
-  is_deleted       TINYINT(1)   NOT NULL DEFAULT 0,
-  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_fee_structure_type   (school_id, fee_structure_id, fee_type),
-  INDEX idx_fee_items_deleted        (is_deleted),
-  CONSTRAINT fk_fee_items_school     FOREIGN KEY (school_id)        REFERENCES schools(school_id),
-  CONSTRAINT fk_fee_items_structure  FOREIGN KEY (fee_structure_id) REFERENCES fee_structures(fee_structure_id)
-) ENGINE=InnoDB;
-
--- ─── Payments ────────────────────────────────────────────────────────────────
+-- Payments 
 CREATE TABLE payments (
   payment_id          BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id           BIGINT UNSIGNED NOT NULL,
   student_id          BIGINT UNSIGNED NOT NULL,
   fee_structure_id    BIGINT UNSIGNED NULL,
   amount              DECIMAL(12,2) NOT NULL,
-  fee_type            ENUM('tuition','activity','transport','library','misc') NOT NULL,
-  payment_method      ENUM('mpesa','bank','cash') NOT NULL,
+  fee_type            VARCHAR(60)  NOT NULL DEFAULT 'tuition',
+  payment_method      VARCHAR(40)  NOT NULL DEFAULT 'cash',
   reference_number    VARCHAR(100) NULL,
   payment_date        DATE NOT NULL,
   status              ENUM('paid','pending','failed','reversed') NOT NULL DEFAULT 'paid',
+  paid_by             VARCHAR(120) NULL,
+  term                VARCHAR(40)  NULL DEFAULT 'Term 2',
   received_by_user_id BIGINT UNSIGNED NULL,
   is_deleted          TINYINT(1)   NOT NULL DEFAULT 0,
   created_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -410,13 +397,11 @@ CREATE TABLE payments (
   INDEX idx_payments_school_status       (school_id, status),
   INDEX idx_payments_reference           (reference_number),
   INDEX idx_payments_deleted             (is_deleted),
-  CONSTRAINT fk_payments_school     FOREIGN KEY (school_id)           REFERENCES schools(school_id),
-  CONSTRAINT fk_payments_student    FOREIGN KEY (student_id)          REFERENCES students(student_id),
-  CONSTRAINT fk_payments_structure  FOREIGN KEY (fee_structure_id)    REFERENCES fee_structures(fee_structure_id),
-  CONSTRAINT fk_payments_user       FOREIGN KEY (received_by_user_id) REFERENCES users(user_id)
+  CONSTRAINT fk_payments_school   FOREIGN KEY (school_id)  REFERENCES schools(school_id),
+  CONSTRAINT fk_payments_student  FOREIGN KEY (student_id) REFERENCES students(student_id)
 ) ENGINE=InnoDB;
 
--- ─── Transport ────────────────────────────────────────────────────────────────
+-- Transport 
 CREATE TABLE transport_routes (
   transport_id   BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id      BIGINT UNSIGNED NOT NULL,
@@ -434,7 +419,7 @@ CREATE TABLE transport_routes (
   CONSTRAINT fk_transport_school FOREIGN KEY (school_id) REFERENCES schools(school_id)
 ) ENGINE=InnoDB;
 
--- ─── Student Transport Assignments ───────────────────────────────────────────
+-- Student Transport Assignments 
 CREATE TABLE student_transport (
   id           BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id    BIGINT UNSIGNED NOT NULL,
@@ -453,7 +438,7 @@ CREATE TABLE student_transport (
   CONSTRAINT fk_student_transport_route   FOREIGN KEY (transport_id) REFERENCES transport_routes(transport_id)
 ) ENGINE=InnoDB;
 
--- ─── Library ─────────────────────────────────────────────────────────────────
+-- Library 
 CREATE TABLE books (
   book_id             BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id           BIGINT UNSIGNED NOT NULL,
@@ -473,25 +458,28 @@ CREATE TABLE books (
 ) ENGINE=InnoDB;
 
 CREATE TABLE borrow_records (
-  borrow_id   BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-  school_id   BIGINT UNSIGNED NOT NULL,
-  book_id     BIGINT UNSIGNED NOT NULL,
-  student_id  BIGINT UNSIGNED NOT NULL,
-  borrow_date DATE NOT NULL,
-  due_date    DATE NOT NULL,
-  return_date DATE NULL,
-  status      ENUM('borrowed','returned','overdue') NOT NULL DEFAULT 'borrowed',
-  is_deleted  TINYINT(1) NOT NULL DEFAULT 0,
-  created_at  TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at  TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  borrow_id           BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  school_id           BIGINT UNSIGNED NOT NULL,
+  book_id             BIGINT UNSIGNED NOT NULL,
+  borrower_id         BIGINT UNSIGNED NOT NULL,
+  borrower_type       ENUM('student','staff') NOT NULL DEFAULT 'student',
+  borrow_date         DATE NOT NULL,
+  due_date            DATE NOT NULL,
+  return_date         DATE NULL,
+  status              ENUM('borrowed','returned','overdue') NOT NULL DEFAULT 'borrowed',
+  notes               TEXT NULL,
+  issued_by_user_id   BIGINT UNSIGNED NULL,
+  returned_to_user_id BIGINT UNSIGNED NULL,
+  is_deleted          TINYINT(1) NOT NULL DEFAULT 0,
+  created_at          TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMP  NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_borrow_school_status (school_id, status),
   INDEX idx_borrow_deleted       (is_deleted),
-  CONSTRAINT fk_borrow_school   FOREIGN KEY (school_id)  REFERENCES schools(school_id),
-  CONSTRAINT fk_borrow_book     FOREIGN KEY (book_id)    REFERENCES books(book_id),
-  CONSTRAINT fk_borrow_student  FOREIGN KEY (student_id) REFERENCES students(student_id)
+  CONSTRAINT fk_borrow_school   FOREIGN KEY (school_id) REFERENCES schools(school_id),
+  CONSTRAINT fk_borrow_book     FOREIGN KEY (book_id)   REFERENCES books(book_id)
 ) ENGINE=InnoDB;
 
--- ─── SMS / Communication Logs ─────────────────────────────────────────────────
+-- SMS / Communication Logs 
 CREATE TABLE sms_logs (
   sms_id            BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   school_id         BIGINT UNSIGNED NOT NULL,
@@ -511,45 +499,177 @@ CREATE TABLE sms_logs (
   CONSTRAINT fk_sms_user   FOREIGN KEY (sent_by_user_id) REFERENCES users(user_id)
 ) ENGINE=InnoDB;
 
--- ─── Views ───────────────────────────────────────────────────────────────────
-CREATE OR REPLACE VIEW v_monthly_fee_collection AS
-SELECT school_id,
-       DATE_FORMAT(payment_date, '%Y-%m') AS `year_month`,
-       SUM(CASE WHEN status = 'paid' AND is_deleted = 0 THEN amount ELSE 0 END) AS total_collected
-FROM payments
-GROUP BY school_id, DATE_FORMAT(payment_date, '%Y-%m');
+-- Admissions 
+CREATE TABLE admissions (
+  admission_id    BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  school_id       BIGINT UNSIGNED NOT NULL,
+  full_name       VARCHAR(200) NOT NULL,
+  date_of_birth   DATE NULL,
+  gender          ENUM('male','female','other') NULL,
+  applying_class  VARCHAR(60)  NULL,
+  academic_year   VARCHAR(20)  DEFAULT '2026',
+  parent_name     VARCHAR(200) NULL,
+  parent_phone    VARCHAR(40)  NULL,
+  parent_email    VARCHAR(160) NULL,
+  address         VARCHAR(255) NULL,
+  previous_school VARCHAR(200) NULL,
+  status          ENUM('pending','reviewing','accepted','rejected') NOT NULL DEFAULT 'pending',
+  notes           TEXT NULL,
+  admission_fee   DECIMAL(12,2) DEFAULT 0,
+  fee_paid        TINYINT(1)   DEFAULT 0,
+  is_deleted      TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_admissions_school FOREIGN KEY (school_id) REFERENCES schools(school_id)
+) ENGINE=InnoDB;
 
-CREATE OR REPLACE VIEW v_attendance_rate AS
-SELECT school_id,
-       attendance_date,
-       ROUND(100 * AVG(CASE WHEN status = 'present' THEN 1 ELSE 0 END), 2) AS attendance_rate_pct
-FROM attendance
-WHERE is_deleted = 0
-GROUP BY school_id, attendance_date;
+-- Invoices 
+CREATE TABLE invoices (
+  invoice_id     BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  school_id      BIGINT UNSIGNED NOT NULL,
+  student_id     BIGINT UNSIGNED NOT NULL,
+  invoice_number VARCHAR(100) NULL,
+  term           VARCHAR(40)  NOT NULL DEFAULT 'Term 2',
+  academic_year  VARCHAR(20)  DEFAULT '2026',
+  tuition        DECIMAL(12,2) DEFAULT 0,
+  activity       DECIMAL(12,2) DEFAULT 0,
+  transport      DECIMAL(12,2) DEFAULT 0,
+  misc           DECIMAL(12,2) DEFAULT 0,
+  total          DECIMAL(12,2) DEFAULT 0,
+  amount_paid    DECIMAL(12,2) DEFAULT 0,
+  balance        DECIMAL(12,2) DEFAULT 0,
+  due_date       DATE NULL,
+  status         ENUM('unpaid','partial','paid') NOT NULL DEFAULT 'unpaid',
+  is_deleted     TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_invoices_school   FOREIGN KEY (school_id)  REFERENCES schools(school_id),
+  CONSTRAINT fk_invoices_student  FOREIGN KEY (student_id) REFERENCES students(student_id)
+) ENGINE=InnoDB;
 
-CREATE OR REPLACE VIEW v_fee_defaulters AS
-SELECT s.school_id,
-       s.student_id,
-       s.admission_number,
-       CONCAT(s.first_name, ' ', s.last_name) AS student_name,
-       COALESCE(s.class_name, c.class_name)   AS class_name,
-       s.parent_phone,
-       COALESCE(fs_total.expected_total, 0)   AS expected_total,
-       COALESCE(paid_total.paid_total, 0)     AS paid_total,
-       GREATEST(COALESCE(fs_total.expected_total, 0) - COALESCE(paid_total.paid_total, 0), 0) AS balance_due
-FROM students s
-LEFT JOIN classes c ON c.class_id = s.class_id
-LEFT JOIN (
-    SELECT f.school_id, f.class_id, SUM(i.amount) AS expected_total
-    FROM fee_structures f
-    JOIN fee_structure_items i ON i.fee_structure_id = f.fee_structure_id
-    WHERE f.is_deleted = 0 AND i.is_deleted = 0 AND f.is_active = 1
-    GROUP BY f.school_id, f.class_id
-) fs_total ON fs_total.school_id = s.school_id AND fs_total.class_id = s.class_id
-LEFT JOIN (
-    SELECT school_id, student_id, SUM(amount) AS paid_total
-    FROM payments
-    WHERE status = 'paid' AND is_deleted = 0
-    GROUP BY school_id, student_id
-) paid_total ON paid_total.school_id = s.school_id AND paid_total.student_id = s.student_id
-WHERE s.is_deleted = 0;
+-- Report Cards 
+CREATE TABLE report_cards (
+  report_id             BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  school_id             BIGINT UNSIGNED NOT NULL,
+  student_id            BIGINT UNSIGNED NOT NULL,
+  term                  VARCHAR(40)  NOT NULL DEFAULT 'Term 2',
+  academic_year         VARCHAR(20)  DEFAULT '2026',
+  class_name            VARCHAR(60)  NULL,
+  total_marks           DECIMAL(8,2) DEFAULT 0,
+  average               DECIMAL(5,2) DEFAULT 0,
+  class_position        INT NULL,
+  out_of                INT NULL,
+  class_teacher_comment TEXT NULL,
+  principal_comment     TEXT NULL,
+  conduct               ENUM('Excellent','Good','Satisfactory','Needs Improvement') DEFAULT 'Good',
+  days_present          INT DEFAULT 0,
+  days_absent           INT DEFAULT 0,
+  is_published          TINYINT(1)   DEFAULT 0,
+  generated_at          TIMESTAMP NULL,
+  is_deleted            TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_rc (school_id, student_id, term, academic_year),
+  CONSTRAINT fk_report_cards_school   FOREIGN KEY (school_id)  REFERENCES schools(school_id),
+  CONSTRAINT fk_report_cards_student  FOREIGN KEY (student_id) REFERENCES students(student_id)
+) ENGINE=InnoDB;
+
+-- Notifications 
+CREATE TABLE notifications (
+  notification_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  school_id       BIGINT UNSIGNED NOT NULL,
+  user_id         BIGINT UNSIGNED NULL,
+  title           VARCHAR(200) NOT NULL,
+  message         TEXT NOT NULL,
+  type            ENUM('info','success','warning','error') DEFAULT 'info',
+  is_read         TINYINT(1)   DEFAULT 0,
+  link            VARCHAR(255) NULL,
+  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_notifications_school FOREIGN KEY (school_id) REFERENCES schools(school_id)
+) ENGINE=InnoDB;
+
+-- HR Staff 
+CREATE TABLE hr_staff (
+  staff_id      BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  school_id     BIGINT UNSIGNED NOT NULL,
+  full_name     VARCHAR(200) NOT NULL,
+  email         VARCHAR(160) NULL,
+  phone         VARCHAR(40)  NULL,
+  national_id   VARCHAR(40)  NULL,
+  department    VARCHAR(100) NOT NULL DEFAULT 'Academic',
+  job_title     VARCHAR(100) NOT NULL,
+  contract_type ENUM('Permanent','Contract','Part-time','Volunteer') DEFAULT 'Permanent',
+  start_date    DATE NULL,
+  salary        DECIMAL(12,2) DEFAULT 0,
+  status        ENUM('active','inactive','on-leave') DEFAULT 'active',
+  notes         TEXT NULL,
+  is_deleted    TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_hr_staff_school FOREIGN KEY (school_id) REFERENCES schools(school_id)
+) ENGINE=InnoDB;
+
+-- HR Leave Requests 
+CREATE TABLE hr_leave (
+  leave_id    BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  school_id   BIGINT UNSIGNED NOT NULL,
+  staff_id    BIGINT UNSIGNED NOT NULL,
+  leave_type  VARCHAR(60)  DEFAULT 'Annual',
+  from_date   DATE NOT NULL,
+  to_date     DATE NOT NULL,
+  reason      TEXT NULL,
+  status      ENUM('pending','approved','rejected') DEFAULT 'pending',
+  is_deleted  TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_hr_leave_school FOREIGN KEY (school_id) REFERENCES schools(school_id),
+  CONSTRAINT fk_hr_leave_staff  FOREIGN KEY (staff_id)  REFERENCES hr_staff(staff_id)
+) ENGINE=InnoDB;
+
+-- HR Staff Attendance
+CREATE TABLE hr_attendance (
+  hr_attendance_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  school_id        BIGINT UNSIGNED NOT NULL,
+  staff_id         BIGINT UNSIGNED NOT NULL,
+  attendance_date  DATE NOT NULL,
+  check_in         TIME NULL,
+  check_out        TIME NULL,
+  status           ENUM('present','absent','late','half-day','on-leave') DEFAULT 'present',
+  notes            TEXT NULL,
+  marked_by        BIGINT UNSIGNED NULL,
+  is_deleted       TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_hr_att (school_id, staff_id, attendance_date),
+  CONSTRAINT fk_hr_att_school FOREIGN KEY (school_id) REFERENCES schools(school_id),
+  CONSTRAINT fk_hr_att_staff  FOREIGN KEY (staff_id)  REFERENCES hr_staff(staff_id)
+) ENGINE=InnoDB;
+
+-- HR Payslips
+CREATE TABLE hr_payslips (
+  payslip_id     BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  school_id      BIGINT UNSIGNED NOT NULL,
+  staff_id       BIGINT UNSIGNED NOT NULL,
+  month          TINYINT NOT NULL,
+  year           SMALLINT NOT NULL,
+  basic_salary   DECIMAL(12,2) DEFAULT 0,
+  allowances     DECIMAL(12,2) DEFAULT 0,
+  deductions     DECIMAL(12,2) DEFAULT 0,
+  net_pay        DECIMAL(12,2) DEFAULT 0,
+  paye           DECIMAL(12,2) DEFAULT 0,
+  nhif           DECIMAL(12,2) DEFAULT 0,
+  nssf           DECIMAL(12,2) DEFAULT 0,
+  notes          TEXT NULL,
+  status         ENUM('draft','approved','paid') DEFAULT 'draft',
+  paid_date      DATE NULL,
+  generated_by   BIGINT UNSIGNED NULL,
+  is_deleted     TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_payslip (school_id, staff_id, month, year),
+  CONSTRAINT fk_payslip_school FOREIGN KEY (school_id) REFERENCES schools(school_id),
+  CONSTRAINT fk_payslip_staff  FOREIGN KEY (staff_id)  REFERENCES hr_staff(staff_id)
+) ENGINE=InnoDB;
+
+
+SELECT 'EduCore schema loaded successfully' AS status;

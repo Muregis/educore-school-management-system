@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
 import Field from "../components/Field";
-import { C, inputStyle } from "../lib/theme";
-import { apiFetch } from "../lib/api";
+import { inputStyle } from "../lib/theme";
 
-export default function SettingsPage({ auth, school, setSchool, users, setUsers, toast }) {
+export default function SettingsPage({ school, setSchool, users, setUsers, toast }) {
   const [form, setForm] = useState({ ...school });
   const [newUser, setNewUser] = useState({ firstName: "", lastName: "", role: "teacher" });
 
@@ -128,7 +127,7 @@ export default function SettingsPage({ auth, school, setSchool, users, setUsers,
 }
 
 SettingsPage.propTypes = {
-  auth: PropTypes.object,
+
   school: PropTypes.object.isRequired,
   setSchool: PropTypes.func.isRequired,
   users: PropTypes.array.isRequired,

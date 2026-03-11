@@ -5,92 +5,127 @@ import { authRequired } from "../middleware/auth.js";
 const router = Router();
 router.use(authRequired);
 
-// list attendance records with optional filters
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { studentId, classId, date } = req.query;
-    let sql = `SELECT attendance_id, student_id, class_id, attendance_date, status, remarks, marked_by_user_id
-               FROM attendance WHERE school_id = ? AND is_deleted = 0`;
+    const { classId, date, from, to, studentId } = req.query;
+
+    let sql = `SELECT a.attendance_id, a.student_id,
+                      CONCAT(s.first_name,' ',s.last_name) AS student_name,
+                      s.admission_number, s.class_name, a.attendance_date, a.status, a.class_id
+            FROM attendance a
+              JOIN students s ON s.student_id = a.student_id
+              WHERE a.school_id = ? AND a.is_deleted = 0`;
     const params = [schoolId];
-    if (studentId) { sql += " AND student_id = ?"; params.push(studentId); }
-    if (classId) { sql += " AND class_id = ?"; params.push(classId); }
-    if (date) { sql += " AND attendance_date = ?"; params.push(date); }
-    sql += " ORDER BY attendance_date DESC, attendance_id DESC";
+
+    if (classId)   { sql += " AND a.class_id = ?";        params.push(classId); }
+    if (studentId) { sql += " AND a.student_id = ?";      params.push(studentId); }
+    if (date)      { sql += " AND a.attendance_date = ?"; params.push(date); }
+    if (from)      { sql += " AND a.attendance_date >= ?";params.push(from); }
+    if (to)        { sql += " AND a.attendance_date <= ?";params.push(to); }
+
+    sql += " ORDER BY a.attendance_date DESC, a.attendance_id DESC";
     const [rows] = await pool.query(sql, params);
     res.json(rows);
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
-// get single record
-router.get("/:id", async (req, res, next) => {
+// ── Helper: resolve classId from either numeric ID or class_name string ───────
+async function resolveClassId(schoolId, classId) {
+  // Already a number
+  if (!isNaN(Number(classId)) && Number(classId) > 0) return Number(classId);
+  // Try looking up by name
+  const [cls] = await pool.query(
+    `SELECT class_id FROM classes WHERE school_id=? AND class_name=? AND is_deleted=0 LIMIT 1`,
+    [schoolId, classId]
+  );
+  if (cls.length) return cls[0].class_id;
+  // Class not in classes table — auto-create a placeholder so FK is satisfied
+  const [result] = await pool.query(
+    `INSERT INTO classes (school_id, class_name, academic_year, status) VALUES (?, ?, YEAR(CURDATE()), 'active')`,
+    [schoolId, classId]
+  );
+  return result.insertId;
+}
+
+// ── Bulk attendance save ──────────────────────────────────────────────────────
+router.post("/bulk", async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
-    const [rows] = await pool.query(
-      `SELECT * FROM attendance WHERE attendance_id = ? AND school_id = ? AND is_deleted = 0 LIMIT 1`,
-      [req.params.id, schoolId]
+    const { schoolId, userId } = req.user;
+    const { classId, date, records } = req.body;
+
+    if (!classId || !date || !Array.isArray(records) || !records.length)
+      return res.status(400).json({ message: "classId, date and records array are required" });
+
+    const resolvedClassId = await resolveClassId(schoolId, classId);
+
+    // Delete existing for this class+date then re-insert
+    await pool.query(
+      `DELETE FROM attendance WHERE school_id=? AND class_id=? AND attendance_date=?`,
+      [schoolId, resolvedClassId, date]
     );
-    if (!rows.length) return res.status(404).json({ message: "Record not found" });
-    res.json(rows[0]);
-  } catch (err) {
-    next(err);
-  }
+
+    const values = records.map(r => [
+      schoolId,
+      r.studentId ?? r.student_id,
+      resolvedClassId,
+      date,
+      r.status || "present",
+      userId || null
+    ]);
+
+    await pool.query(
+      `INSERT INTO attendance (school_id, student_id, class_id, attendance_date, status, marked_by_user_id) VALUES ?`,
+      [values]
+    );
+
+    res.status(201).json({ saved: records.length });
+  } catch (err) { next(err); }
 });
 
-// create attendance
+// ── Single attendance record ──────────────────────────────────────────────────
 router.post("/", async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
-    const { studentId, classId, attendanceDate, status, remarks = null } = req.body;
-    if (!studentId || !classId || !attendanceDate || !status) {
-      return res.status(400).json({ message: "studentId, classId, attendanceDate and status are required" });
-    }
-    const [result] = await pool.query(
-      `INSERT INTO attendance (school_id, student_id, class_id, attendance_date, status, remarks, marked_by_user_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [schoolId, studentId, classId, attendanceDate, status, remarks, userId]
+    const { studentId, classId, date, status = "present" } = req.body;
+    if (!studentId || !classId || !date)
+      return res.status(400).json({ message: "studentId, classId and date are required" });
+
+    const resolvedClassId = await resolveClassId(schoolId, classId);
+
+    await pool.query(
+      `INSERT INTO attendance (school_id, student_id, class_id, attendance_date, status, marked_by_user_id)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE status=VALUES(status), updated_at=CURRENT_TIMESTAMP`,
+      [schoolId, studentId, resolvedClassId, date, status, userId || null]
     );
-    res.status(201).json({ attendanceId: result.insertId });
-  } catch (err) {
-    if (err.code === "ER_DUP_ENTRY") {
-      return res.status(409).json({ message: "Attendance already recorded for this student/date" });
-    }
-    next(err);
-  }
+    res.status(201).json({ saved: true });
+  } catch (err) { next(err); }
 });
 
-// update record
 router.put("/:id", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { status, remarks, attendanceDate } = req.body;
+    const { status, date } = req.body;
     const [result] = await pool.query(
-      `UPDATE attendance SET status=?, remarks=?, attendance_date=?, updated_at=CURRENT_TIMESTAMP
-       WHERE attendance_id=? AND school_id=? AND is_deleted=0`,
-      [status, remarks || null, attendanceDate, req.params.id, schoolId]
+      `UPDATE attendance SET status=?, attendance_date=?, updated_at=CURRENT_TIMESTAMP
+      WHERE attendance_id=? AND school_id=?`,
+      [status, date, req.params.id, schoolId]
     );
     if (!result.affectedRows) return res.status(404).json({ message: "Record not found" });
     res.json({ updated: true });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
-// soft delete
 router.delete("/:id", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [result] = await pool.query(
-      `UPDATE attendance SET is_deleted=1, updated_at=CURRENT_TIMESTAMP WHERE attendance_id=? AND school_id=?`,
+    await pool.query(
+      `UPDATE attendance SET is_deleted=1 WHERE attendance_id=? AND school_id=?`,
       [req.params.id, schoolId]
     );
-    if (!result.affectedRows) return res.status(404).json({ message: "Record not found" });
     res.json({ deleted: true });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
 export default router;

@@ -1,0 +1,28 @@
+$kind: http-request
+name: Get SMS Logs
+method: GET
+url: '{{baseUrl}}/api/communication/sms-logs'
+order: 3000
+headers:
+  - key: Authorization
+    value: 'Bearer {{token}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("SMS logs fetched", () => {
+        pm.response.to.have.status(200);
+      });
+      pm.test("Response is an array", () => {
+        const json = pm.response.json();
+        pm.expect(json).to.be.an("array");
+        console.log(`Total SMS logs: ${json.length}`);
+        if (json.length > 0) {
+          const latest = json[0];
+          console.log(`Latest: [${latest.status}] to ${latest.recipient} at ${latest.sent_at}`);
+        }
+      });
+description: |-
+  Retrieves the last 300 SMS log entries for the school.
+
+  Each log entry shows: recipient, message, channel, status (sent/failed/queued), and timestamp.

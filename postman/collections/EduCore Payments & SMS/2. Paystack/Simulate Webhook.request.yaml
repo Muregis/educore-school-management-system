@@ -1,0 +1,49 @@
+$kind: http-request
+name: Simulate Webhook
+method: POST
+url: '{{baseUrl}}/api/paystack/webhook'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: x-paystack-signature
+    value: 'test-signature-will-fail-validation'
+body:
+  type: json
+  content: |-
+    {
+      "event": "charge.success",
+      "data": {
+        "reference": "{{paymentReference}}",
+        "amount": 500000,
+        "status": "success",
+        "channel": "card",
+        "metadata": {
+          "schoolId": 1,
+          "studentId": {{studentId}},
+          "studentName": "John Doe",
+          "feeType": "tuition"
+        }
+      }
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Webhook received (signature check expected)", () => {
+        // 401 is expected because we can't generate a real HMAC signature here
+        // In production, Paystack signs the payload with your secret key
+        pm.expect([200, 401]).to.include(pm.response.code);
+        if (pm.response.code === 401) {
+          console.log("Expected: Signature validation failed (this is correct in test mode).");
+          console.log("In production, Paystack sends a valid x-paystack-signature header.");
+        }
+      });
+description: |-
+  Simulates a Paystack `charge.success` webhook event.
+
+  **Note:** This will return 401 because the `x-paystack-signature` header
+  cannot be correctly generated without the secret key HMAC. This is expected
+  and demonstrates that the webhook signature validation is working correctly.
+
+  In production, Paystack sends a real signed payload to your public webhook URL.

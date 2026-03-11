@@ -1,0 +1,13 @@
+$kind: collection
+name: EduCore Payments & SMS
+description: |-
+  Test collection for Paystack payment processing and Africa's Talking bulk SMS
+  in the EduCore school management system.
+
+  ## Flow
+  1. Login to get a JWT token (auto-saved to {{token}})
+  2. Initialize a Paystack payment → get authorization URL + reference
+  3. Verify the payment using the reference
+  4. Send a single SMS
+  5. Send a bulk SMS to a class
+  6. View SMS logs

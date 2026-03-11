@@ -11,7 +11,6 @@ router.use(authRequired);
 async function sendViaSms(recipients, message, schoolId, sentByUserId = null) {
   const logs = [];
 
-  // Try Africa's Talking if configured
   if (env.atApiKey && env.atUsername) {
     try {
       const params = new URLSearchParams({
@@ -24,50 +23,56 @@ async function sendViaSms(recipients, message, schoolId, sentByUserId = null) {
       const response = await fetch("https://api.africastalking.com/version1/messaging", {
         method:  "POST",
         headers: {
-          apiKey:         env.atApiKey,
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept:         "application/json",
+          "apiKey":        env.atApiKey,
+          "Content-Type":  "application/x-www-form-urlencoded",
+          "Accept":        "application/json",
         },
         body: params.toString(),
       });
 
       const result = await response.json();
+      console.log("AT SMS response:", JSON.stringify(result));
+
       const atRecipients = result?.SMSMessageData?.Recipients || [];
 
-      // Log per recipient with real status from AT
       for (const r of atRecipients) {
         const status = r.status === "Success" ? "sent" : "failed";
         await pool.query(
           `INSERT INTO sms_logs (school_id, recipient, message, channel, status, sent_by_user_id, sent_at, provider_response)
-           VALUES (?, ?, ?, 'sms', ?, ?, NOW(), ?)`,
+          VALUES (?, ?, ?, 'sms', ?, ?, NOW(), ?)`,
           [schoolId, r.number, message, status, sentByUserId, JSON.stringify(r)]
         );
         logs.push({ phone: r.number, status });
       }
 
-      // Handle any recipients not returned by AT
+      // Log any recipients AT didn't return
       const atNumbers = atRecipients.map(r => r.number);
       for (const phone of recipients) {
         if (!atNumbers.includes(phone)) {
           await pool.query(
             `INSERT INTO sms_logs (school_id, recipient, message, channel, status, sent_by_user_id, sent_at)
-             VALUES (?, ?, ?, 'sms', 'failed', ?, NOW())`,
+            VALUES (?, ?, ?, 'sms', 'failed', ?, NOW())`,
             [schoolId, phone, message, sentByUserId]
           );
           logs.push({ phone, status: "failed" });
         }
       }
-      return { sent: logs.filter(l => l.status === "sent").length, failed: logs.filter(l => l.status === "failed").length, logs };
+
+      return {
+        sent:       logs.filter(l => l.status === "sent").length,
+        failed:     logs.filter(l => l.status === "failed").length,
+        logs,
+      };
     } catch (err) {
-      console.error("AT SMS error:", err);
+      console.error("AT SMS error:", err.message);
     }
   }
 
-  // Fallback — log as queued if AT not configured
+  // Fallback — queued (AT not configured)
   for (const phone of recipients) {
     await pool.query(
       `INSERT INTO sms_logs (school_id, recipient, message, channel, status, sent_by_user_id, sent_at)
-       VALUES (?, ?, ?, 'sms', 'queued', ?, NOW())`,
+      VALUES (?, ?, ?, 'sms', 'queued', ?, NOW())`,
       [schoolId, phone, message, sentByUserId]
     );
     logs.push({ phone, status: "queued" });
@@ -75,14 +80,24 @@ async function sendViaSms(recipients, message, schoolId, sentByUserId = null) {
   return { sent: 0, failed: 0, queued: logs.length, logs };
 }
 
+// ─── GET AT config status (admin only) ───────────────────────────────────────
+router.get("/sms-status", async (req, res) => {
+  res.json({
+    atConfigured: Boolean(env.atApiKey && env.atUsername),
+    username: env.atUsername || null,
+    senderId: env.atSenderId || null,
+    hasApiKey: Boolean(env.atApiKey),
+  });
+});
+
 // ─── GET sms logs ─────────────────────────────────────────────────────────────
 router.get("/sms-logs", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const [rows] = await pool.query(
       `SELECT sms_id, recipient, message, channel, status, sent_at, provider_response
-       FROM sms_logs WHERE school_id=? AND is_deleted=0
-       ORDER BY sent_at DESC LIMIT 300`,
+      FROM sms_logs WHERE school_id=? AND is_deleted=0
+      ORDER BY sent_at DESC LIMIT 300`,
       [schoolId]
     );
     res.json(rows);
@@ -90,7 +105,7 @@ router.get("/sms-logs", async (req, res, next) => {
 });
 
 // ─── POST single SMS ──────────────────────────────────────────────────────────
-router.post("/sms", requireRoles("admin","teacher"), async (req, res, next) => {
+router.post("/sms", requireRoles("admin", "teacher"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const { recipient, message } = req.body;
@@ -103,29 +118,29 @@ router.post("/sms", requireRoles("admin","teacher"), async (req, res, next) => {
 });
 
 // ─── POST bulk SMS to class ───────────────────────────────────────────────────
-router.post("/sms/bulk", requireRoles("admin","teacher"), async (req, res, next) => {
+router.post("/sms/bulk", requireRoles("admin", "teacher"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const { className, message } = req.body;
     if (!message) return res.status(400).json({ message: "message is required" });
 
-    // Get all parent phones for the class
-    let sql    = `SELECT DISTINCT parent_phone AS phone FROM students
-                  WHERE school_id=? AND is_deleted=0 AND parent_phone IS NOT NULL AND parent_phone != ''`;
+    let sql      = `SELECT DISTINCT parent_phone AS phone FROM students
+                    WHERE school_id=? AND is_deleted=0
+                    AND parent_phone IS NOT NULL AND parent_phone != ''`;
     const params = [schoolId];
-    if (className && className !== "all") { sql += " AND class_name=?"; params.push(className); }
+    if (className && className !== "all") {
+      sql += " AND class_name=?";
+      params.push(className);
+    }
 
     const [rows] = await pool.query(sql, params);
-    if (!rows.length) return res.status(404).json({ message: "No recipients found for this class" });
+    if (!rows.length)
+      return res.status(404).json({ message: "No parent phone numbers found for this class" });
 
     const phones = rows.map(r => r.phone);
     const result = await sendViaSms(phones, message, schoolId, userId);
 
-    res.json({
-      ...result,
-      total:      phones.length,
-      recipients: phones,
-    });
+    res.json({ ...result, total: phones.length, recipients: phones });
   } catch (err) { next(err); }
 });
 

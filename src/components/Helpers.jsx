@@ -1,12 +1,8 @@
 import PropTypes from "prop-types";
-import { C, inputStyle } from "../lib/theme";
+import { C } from "../lib/theme";
 import Btn from "./Btn";
 
-// generic pager function (not a component)
-export const pager = (arr, p) => ({
-  pages: Math.max(1, Math.ceil(arr.length / PAGE_SIZE)),
-  rows: arr.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE),
-});
+
 
 // component used for page navigation
 export function Pager({ page, pages, setPage }) {
@@ -41,15 +37,6 @@ export function Msg({ text, tone = "muted" }) {
   );
 }
 Msg.propTypes = { text: PropTypes.string.isRequired, tone: PropTypes.string };
-
-export function csv(name, headers, rows) {
-  const esc = v => `"${String(v ?? "").replaceAll('"', '""')}"`;
-  const content = [headers.map(esc).join(","), ...rows.map(r => r.map(esc).join(","))].join("\n");
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([content], { type: "text/csv;charset=utf-8;" }));
-  a.download = name;
-  a.click();
-}
 
 export function Toasts({ items, remove }) {
   return (
@@ -101,5 +88,36 @@ export const NotFound = () => (
   </div>
 );
 
-// page size constant for pager function
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 20;
+
+/**
+ * Returns { pages, rows } for the given array and current page (1-indexed).
+ */
+export function pager(items, page, size = PAGE_SIZE) {
+  const pages = Math.max(1, Math.ceil(items.length / size));
+  const rows  = items.slice((page - 1) * size, page * size);
+  return { pages, rows };
+}
+
+/**
+ * Triggers a CSV file download in the browser.
+ * @param {string}   filename  e.g. "results.csv"
+ * @param {string[]} headers   Column header labels
+ * @param {Array[]}  rowData   Array of row arrays (values are auto-escaped)
+ */
+export function csv(filename, headers, rowData) {
+  const escape = v => {
+    const s = v == null ? "" : String(v);
+    return s.includes(",") || s.includes('"') || s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  };
+  const lines = [headers, ...rowData].map(row => row.map(escape).join(","));
+  const blob  = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url   = URL.createObjectURL(blob);
+  const a     = document.createElement("a");
+  a.href      = url;
+  a.download  = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

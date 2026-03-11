@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
 import Field from "../components/Field";
@@ -9,7 +9,37 @@ import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
-import { Pager, Msg, csv, pager } from "../components/Helpers";
+import { Msg } from "../components/Helpers";
+
+// Inline helpers
+function csv(filename, headers, rows) {
+  const content = [headers, ...rows].map(r => r.join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([content], { type: "text/csv" }));
+  a.download = filename; a.click();
+}
+function pager(items, page, size = 20) {
+  const pages = Math.max(1, Math.ceil(items.length / size));
+  const rows  = items.slice((page - 1) * size, page * size);
+  return { pages, rows };
+}
+function Pager({ page, pages, setPage }) {
+  if (pages <= 1) return null;
+  return (
+    <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 12 }}>
+      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+        style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #334155", background: "#1e293b", color: "#94a3b8", cursor: page === 1 ? "default" : "pointer" }}>‹</button>
+      <span style={{ padding: "4px 10px", fontSize: 13, color: "#94a3b8" }}>{page} / {pages}</span>
+      <button onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}
+        style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #334155", background: "#1e293b", color: "#94a3b8", cursor: page === pages ? "default" : "pointer" }}>›</button>
+    </div>
+  );
+}
+Pager.propTypes = {
+  page: PropTypes.number.isRequired,
+  pages: PropTypes.number.isRequired,
+  setPage: PropTypes.func.isRequired,
+};
 
 function normalisePayment(p) {
   return {
@@ -23,6 +53,7 @@ function normalisePayment(p) {
     date:        p.payment_date?.slice(0,10) ?? p.date ?? "",
     status:      p.status         ?? "paid",
     reference:   p.reference_number ?? p.reference ?? "",
+    paidBy:      p.paid_by          ?? p.paidBy    ?? "",
   };
 }
 
@@ -48,7 +79,7 @@ function loadPaystackScript() {
   });
 }
 
-export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, toast, linkedStudentId }) {
+export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, toast }) {
   const [tab, setTab]                 = useState("payments");
   const [showPayment, setShowPayment] = useState(false);
   const [showStruct, setShowStruct]   = useState(false);
@@ -61,7 +92,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [editStruct, setEditStruct]   = useState(null);
   const [filterClass, setFilterClass] = useState("all");
   const [page, setPage]               = useState(1);
-  const [paymentForm, setPaymentForm] = useState({ studentId: students[0]?.id || "", amount: "", feeType: "tuition", method: "cash", date: new Date().toISOString().slice(0,10), status: "paid" });
+  const [paymentForm, setPaymentForm] = useState({ studentId: students[0]?.id || "", amount: "", feeType: "tuition", method: "cash", date: new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
   const [structForm, setStructForm]   = useState({ className: "Grade 7", tuition: "", activity: "", misc: "" });
 
   const reloadPayments = useCallback(async () => {
@@ -74,8 +105,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     if (auth?.token) {
       apiFetch("/payments/fee-structures", { token: auth.token })
         .then(data => setFeeStructures(data.map(normaliseFeeStruct)))
-        .catch(e => console.warn("Fee structures:", e));
-      reloadPayments().catch(e => console.warn("Payments:", e));
+        .catch(e => toast("Failed to load fee structures", "error"));
+      reloadPayments().catch(e => toast("Failed to load payments", "error"));
     }
   }, [auth, setFeeStructures, reloadPayments]);
 
@@ -130,9 +161,16 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
       await loadPaystackScript();
 
+      const psKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "";
+      if (!psKey || psKey.length < 10 || psKey === "pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx") {
+        toast("Paystack not configured — add VITE_PAYSTACK_PUBLIC_KEY to .env with your actual Paystack public key", "error");
+        setPaystackLoading(false);
+        return;
+      }
+
       // Open Paystack inline popup
       const handler = window.PaystackPop.setup({
-        key:       import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "",
+        key:       psKey,
         email:     paystackForm.email,
         amount:    Number(paystackForm.amount) * 100,
         currency:  "KES",
@@ -153,7 +191,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             });
             setShowReceipt(true);
             toast("Payment confirmed!", "success");
-          } catch (e) { toast("Payment received but verification failed — contact admin", "warning"); }
+          } catch { toast("Payment received but verification failed — contact admin", "warning"); }
         },
         onCancel: () => { toast("Payment cancelled", "warning"); },
       });
@@ -176,7 +214,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     try {
       await apiFetch("/payments", {
         method: "POST",
-        body: { studentId: sid, amount: amt, feeType: paymentForm.feeType, paymentMethod: paymentForm.method, paymentDate: paymentForm.date, status: paymentForm.status },
+        body: { studentId: sid, amount: amt, feeType: paymentForm.feeType, paymentMethod: paymentForm.method, paymentDate: paymentForm.date, status: paymentForm.status, paidBy: paymentForm.paidBy || null },
         token: auth?.token,
       });
       await reloadPayments();
@@ -265,11 +303,12 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         <>
           <div style={{ overflowX: "auto" }}>
             <Table
-              headers={["Date","Student","Class","Amount","Method","Status","Ref","Actions"]}
+              headers={["Date","Student","Class","Amount","Method","Paid By","Status","Ref","Actions"]}
               rows={rows.map(p=>[
                 p.date,
                 <span key={p.id} style={{color:C.text,fontWeight:600}}>{p.studentName}</span>,
                 p.className, money(p.amount), p.method,
+                <span key="pb" style={{color:C.textSub,fontSize:12}}>{p.paidBy||"—"}</span>,
                 <Badge key="st" text={p.status} tone={p.status==="paid"?"success":p.status==="pending"?"warning":"danger"} />,
                 <span key="ref" style={{fontSize:11,color:C.textMuted}}>{p.reference||"—"}</span>,
                 canEdit && <Btn key="del" variant="danger" onClick={()=>delPayment(p.id)}>Delete</Btn>
@@ -288,8 +327,10 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             rows={balances.map(b=>[
               <span key={b.studentId} style={{color:C.text,fontWeight:600}}>{b.name}</span>,
               b.className, money(b.expected), money(b.paid), money(b.balance),
-              <Badge key="bdg" text={b.balance>0?"pending":"cleared"} tone={b.balance>0?"warning":"success"} />,
-              canEdit && b.balance > 0 ? (
+              b.expected === 0
+                ? <Badge key="bdg" text="no structure" tone="info" />
+                : <Badge key="bdg" text={b.balance>0?"pending":"cleared"} tone={b.balance>0?"warning":"success"} />,
+              b.expected > 0 && b.balance > 0 ? (
                 <div key="pay" style={{display:"flex",gap:6}}>
                   <Btn onClick={()=>openPaystack(b)}>💳 Pay Online</Btn>
                 </div>
@@ -352,6 +393,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             <Field label="Method"><select style={inputStyle} value={paymentForm.method} onChange={e=>setPaymentForm({...paymentForm,method:e.target.value})}><option value="cash">Cash</option><option value="mpesa">Mpesa</option><option value="bank">Bank</option></select></Field>
             <Field label="Date"><input type="date" style={inputStyle} value={paymentForm.date} onChange={e=>setPaymentForm({...paymentForm,date:e.target.value})} /></Field>
             <Field label="Status"><select style={inputStyle} value={paymentForm.status} onChange={e=>setPaymentForm({...paymentForm,status:e.target.value})}><option value="paid">Paid</option><option value="pending">Pending</option></select></Field>
+            <Field label="Paid By (parent/guardian/sponsor)" style={{gridColumn:"1 / -1"}}>
+              <input style={inputStyle} value={paymentForm.paidBy} onChange={e=>setPaymentForm({...paymentForm,paidBy:e.target.value})} placeholder="e.g. John Kamau (Father)" />
+            </Field>
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:10}}>
             <Btn variant="ghost" onClick={()=>setShowPayment(false)}>Cancel</Btn>

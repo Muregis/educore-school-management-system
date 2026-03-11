@@ -1,80 +1,62 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
 import Field from "../components/Field";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
-import { DEFAULTS } from "../lib/constants";
 
-export default function LoginView({ users, onLogin }) {
-  const [mode, setMode]           = useState("staff");
-  const [email, setEmail]         = useState("");
-  const [admission, setAdmission] = useState("");
-  const [password, setPassword]   = useState("");
+export default function LoginView({ onLogin }) {
+  const [mode, setMode]             = useState("staff");
+  const [email, setEmail]           = useState("");
+  const [admission, setAdmission]   = useState("");
+  const [password, setPassword]     = useState("");
   const [portalRole, setPortalRole] = useState("parent");
-  const [error, setError]         = useState("");
-  const [loading, setLoading]     = useState(false);
+  const [error, setError]           = useState("");
+  const [loading, setLoading]       = useState(false);
 
   const submitStaff = async e => {
     e.preventDefault();
     setError(""); setLoading(true);
-
-    // Try backend first
     try {
       const data = await apiFetch("/auth/login", {
         method: "POST",
-        body: { email, password, schoolId: 1 }
+        body: { email, password, schoolId: 1 },
       });
-      onLogin({ id: data.user.userId, name: data.user.name, email: data.user.email, role: data.user.role, schoolId: data.user.schoolId, token: data.token, studentId: null });
-      setLoading(false); return;
-    } catch { /* fallback */ }
-
-    // Local fallback — staff only
-    const match = users.find(u =>
-      u.email &&
-      u.email.toLowerCase() === email.toLowerCase() &&
-      u.password === password &&
-      u.status === "active" &&
-      ["admin", "teacher"].includes(u.role)
-    );
-    if (!match) { setError("Invalid credentials."); setLoading(false); return; }
-    onLogin(match);
+      onLogin({
+        id:       data.user.userId,
+        name:     data.user.name,
+        email:    data.user.email,
+        role:     data.user.role,
+        schoolId: data.user.schoolId,
+        token:    data.token,
+        studentId: null,
+      });
+    } catch (err) {
+      setError(err.message || "Login failed");
+    }
     setLoading(false);
   };
 
   const submitPortal = async e => {
     e.preventDefault();
     setError(""); setLoading(true);
-    const trimmed = admission.trim();
-
-    // Try backend portal login
     try {
       const data = await apiFetch("/auth/portal-login", {
         method: "POST",
-        body: { admissionNumber: trimmed, password, role: portalRole, schoolId: 1 }
+        body: { admissionNumber: admission.trim(), password, role: portalRole, schoolId: 1 },
       });
-      onLogin({ id: data.user.userId, name: data.user.name, role: data.user.role, schoolId: data.user.schoolId, token: data.token, studentId: data.user.studentId, admission: trimmed });
-      setLoading(false); return;
-    } catch { /* fallback */ }
-
-    // Local fallback — find student by admission number
-    const student = DEFAULTS.students.find(s => s.admission === trimmed);
-    if (!student) { setError("Admission number not found."); setLoading(false); return; }
-
-    // Check password against demo portal users
-    const portalUser = DEFAULTS.users.find(u =>
-      u.admission === trimmed &&
-      u.role === portalRole &&
-      u.password === password &&
-      u.status === "active"
-    );
-    if (!portalUser) { setError("Invalid password."); setLoading(false); return; }
-
-    const name = portalRole === "parent"
-      ? `${student.parentName || "Parent"} (${student.firstName} ${student.lastName})`
-      : `${student.firstName} ${student.lastName}`;
-
-    onLogin({ ...portalUser, name, studentId: student.id, admission: trimmed });
+      onLogin({
+        id:        data.user.userId,
+        name:      data.user.name,
+        role:      data.user.role,
+        schoolId:  data.user.schoolId,
+        token:     data.token,
+        studentId: data.user.studentId,
+        admission: admission.trim(),
+      });
+    } catch (err) {
+      setError(err.message || "Login failed");
+    }
     setLoading(false);
   };
 
@@ -107,7 +89,7 @@ export default function LoginView({ users, onLogin }) {
             {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
             <Btn type="submit" disabled={loading}>{loading ? "Signing in..." : "Sign In"}</Btn>
             <div style={{ marginTop: 12, color: C.textMuted, fontSize: 11 }}>
-              Demo → admin@greenfield.ac.ke / admin123
+              admin@greenfield.ac.ke / admin123
             </div>
           </form>
         )}
@@ -129,7 +111,7 @@ export default function LoginView({ users, onLogin }) {
             {error && <div style={{ color: "#ef4444", fontSize: 12, marginBottom: 10 }}>{error}</div>}
             <Btn type="submit" disabled={loading}>{loading ? "Signing in..." : "Sign In"}</Btn>
             <div style={{ marginTop: 12, color: C.textMuted, fontSize: 11 }}>
-              Demo → ADM-2020-001 / parent123 (parent) · student123 (student)
+              ADM-2020-001 / parent123 (parent) · student123 (student)
             </div>
           </form>
         )}
@@ -139,6 +121,5 @@ export default function LoginView({ users, onLogin }) {
 }
 
 LoginView.propTypes = {
-  users: PropTypes.array.isRequired,
   onLogin: PropTypes.func.isRequired,
 };

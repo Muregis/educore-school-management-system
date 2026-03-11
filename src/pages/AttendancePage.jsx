@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
 import Field from "../components/Field";
@@ -8,7 +8,8 @@ import Table from "../components/Table";
 import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
-import { Pager, Msg, csv, pager } from "../components/Helpers";
+import { Pager, Msg } from "../components/Helpers";
+import { csv, pager } from "../lib/utils";
 
 function normalise(a) {
   return {

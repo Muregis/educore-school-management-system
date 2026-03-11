@@ -1,0 +1,40 @@
+$kind: http-request
+name: Send Single SMS
+method: POST
+url: '{{baseUrl}}/api/communication/sms'
+order: 1000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: 'Bearer {{token}}'
+body:
+  type: json
+  content: |-
+    {
+      "recipient": "+254700000001",
+      "message": "Hello from EduCore! This is a test SMS sent via Africa's Talking sandbox."
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("SMS sent successfully", () => {
+        pm.response.to.have.status(201);
+      });
+      pm.test("Response has sent/failed counts", () => {
+        const json = pm.response.json();
+        pm.expect(json).to.have.property("sent");
+        pm.expect(json).to.have.property("failed");
+        console.log(`SMS result — Sent: ${json.sent}, Failed: ${json.failed}`);
+        if (json.logs) {
+          json.logs.forEach(l => console.log(`  ${l.phone}: ${l.status}`));
+        }
+      });
+description: |-
+  Sends a single SMS to one recipient via Africa's Talking.
+
+  **Sandbox note:** In sandbox mode, messages are delivered to the AT simulator,
+  not real phones. Use numbers like +254700000001 for testing.
+
+  Requires admin or teacher role.

@@ -28,13 +28,30 @@ export default function ReportsPage({ auth }) {
   useEffect(() => {
     if (!auth?.token) { setLoading(false); return; }
     Promise.all([
-      apiFetch("/reports/summary",              { token: auth.token }),
-      apiFetch("/reports/monthly-fee-collection",{ token: auth.token }),
-      apiFetch("/reports/attendance-rate",       { token: auth.token }),
-      apiFetch("/reports/fee-defaulters",        { token: auth.token }),
-      apiFetch("/reports/grades",                { token: auth.token }),
+      apiFetch("/reports/summary",               { token: auth.token }),
+      apiFetch("/reports/monthly-fee-collection", { token: auth.token }),
+      apiFetch("/reports/attendance-rate",        { token: auth.token }),
+      apiFetch("/reports/fee-defaulters",         { token: auth.token }),
+      apiFetch("/reports/grade-distribution",     { token: auth.token }),
     ]).then(([s, m, a, d, g]) => {
-      setSummary(s); setMonthly(m); setAttendance(a); setDefaulters(d); setGrades(g);
+      // Normalise backend key names to what the UI expects
+      const normSummary = s ? {
+        students:       s.totalStudents   ?? s.students       ?? 0,
+        teachers:       s.totalTeachers   ?? s.teachers       ?? 0,
+        feesCollected:  s.totalCollected  ?? s.feesCollected  ?? 0,
+        feesPending:    s.totalPending    ?? s.feesPending    ?? 0,
+        openDiscipline: s.openDiscipline  ?? 0,
+      } : null;
+      setSummary(normSummary);
+      // Normalise monthly: backend returns "collected", UI uses "total"
+      setMonthly((m || []).map(row => ({ ...row, total: row.total ?? row.collected ?? 0 })));
+      setAttendance(a); setDefaulters(d);
+      // grade-distribution may return avgScore -- normalise to avg_score
+      setGrades((g || []).map(row => ({
+        ...row,
+        avg_score:  row.avg_score  ?? row.avgScore  ?? 0,
+        class_name: row.class_name ?? row.subject   ?? "",
+      })));
     }).catch(console.warn).finally(() => setLoading(false));
   }, [auth]);
 

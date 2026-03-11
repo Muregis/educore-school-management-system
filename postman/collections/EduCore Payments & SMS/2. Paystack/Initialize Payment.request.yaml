@@ -1,0 +1,45 @@
+$kind: http-request
+name: Initialize Payment
+method: POST
+url: '{{baseUrl}}/api/paystack/initialize'
+order: 1000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: 'Bearer {{token}}'
+body:
+  type: json
+  content: |-
+    {
+      "email": "parent@example.com",
+      "amount": 5000,
+      "studentId": {{studentId}},
+      "studentName": "John Doe",
+      "admissionNumber": "ADM-001",
+      "feeType": "tuition"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Payment initialized successfully", () => {
+        pm.response.to.have.status(200);
+      });
+      pm.test("Authorization URL returned", () => {
+        const json = pm.response.json();
+        pm.expect(json.authorizationUrl).to.be.a("string").and.include("paystack");
+        pm.expect(json.reference).to.be.a("string");
+        // Save reference for the verify step
+        pm.collectionVariables.set("paymentReference", json.reference);
+        console.log("Payment reference saved:", json.reference);
+        console.log("Open this URL to complete payment:", json.authorizationUrl);
+      });
+description: |-
+  Initializes a Paystack transaction for a student fee payment.
+
+  **Amount:** KES 5,000 (sent as kobo internally: 500,000)
+
+  After running this request:
+  - Copy the `authorizationUrl` and open it in a browser to simulate payment
+  - The `reference` is auto-saved to {{paymentReference}} for the verify step
