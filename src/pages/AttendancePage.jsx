@@ -36,7 +36,7 @@ export default function AttendancePage({ auth, students, attendance, setAttendan
     if (auth?.token) {
       apiFetch("/attendance", { token: auth.token })
         .then(data => setAttendance(data.map(normalise)))
-        .catch(e => console.warn("Failed to load attendance", e));
+        .catch(e => toast("Failed to load attendance", "error"));
     }
   }, [auth, setAttendance]);
 

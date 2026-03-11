@@ -71,28 +71,17 @@ router.get("/fee-defaulters", async (req, res, next) => {
     const [rows] = await pool.query(
       `SELECT s.student_id, s.first_name, s.last_name, s.admission_number,
               s.class_name, s.parent_phone,
-              COALESCE(fsi_agg.expected, 0)        AS expected,
+              COALESCE(f.tuition + f.activity + f.misc, 0) AS expected,
               COALESCE(SUM(p.amount), 0)           AS paid,
-              COALESCE(fsi_agg.expected, 0) - COALESCE(SUM(p.amount), 0) AS balance
+              COALESCE(f.tuition + f.activity + f.misc, 0) - COALESCE(SUM(p.amount), 0) AS balance
         FROM students s
-        -- aggregate fee items into a single expected-total per class
-        LEFT JOIN (
-        SELECT f.school_id, f.class_name,
-                SUM(CASE WHEN i.fee_type='tuition'  AND i.is_deleted=0 THEN i.amount ELSE 0 END) AS tuition,
-                SUM(CASE WHEN i.fee_type='activity' AND i.is_deleted=0 THEN i.amount ELSE 0 END) AS activity,
-                SUM(CASE WHEN i.fee_type='misc'     AND i.is_deleted=0 THEN i.amount ELSE 0 END) AS misc,
-                SUM(CASE WHEN i.is_deleted=0 THEN i.amount ELSE 0 END)                           AS expected
-          FROM fee_structures f
-          JOIN fee_structure_items i ON i.fee_structure_id = f.fee_structure_id
-          WHERE f.school_id = ? AND f.is_deleted = 0 AND f.is_active = 1
-          GROUP BY f.school_id, f.class_name
-        ) fsi_agg ON fsi_agg.school_id = s.school_id AND fsi_agg.class_name = s.class_name
+        LEFT JOIN fee_structures f ON f.class_name = s.class_name AND f.school_id = s.school_id AND f.is_deleted = 0
         LEFT JOIN payments p ON p.student_id = s.student_id AND p.status = 'paid' AND p.is_deleted = 0
         WHERE s.school_id = ? AND s.is_deleted = 0
-        GROUP BY s.student_id, fsi_agg.expected
+        GROUP BY s.student_id, f.tuition, f.activity, f.misc
         HAVING balance > 0
         ORDER BY balance DESC`,
-      [schoolId, schoolId]
+      [schoolId]
     );
     res.json(rows);
   } catch (err) { next(err); }
@@ -103,16 +92,15 @@ router.get("/grade-distribution", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const [rows] = await pool.query(
-      `SELECT sub.subject_name AS subject,
-              AVG(r.marks_obtained)  AS avgScore,
-              MAX(r.marks_obtained)  AS highest,
-              MIN(r.marks_obtained)  AS lowest,
+      `SELECT r.subject AS subject,
+              AVG(r.marks)  AS avgScore,
+              MAX(r.marks)  AS highest,
+              MIN(r.marks)  AS lowest,
               COUNT(*)               AS entries
         FROM results r
-        JOIN subjects sub ON sub.subject_id = r.subject_id
         WHERE r.school_id = ? AND r.is_deleted = 0
-        GROUP BY sub.subject_id, sub.subject_name
-        ORDER BY sub.subject_name`,
+        GROUP BY r.subject
+        ORDER BY r.subject`,
       [schoolId]
     );
     res.json(rows);

@@ -28,7 +28,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
     if (auth?.token) {
       apiFetch("/grades", { token: auth.token })
         .then(data => setResults(data))
-        .catch(e => console.warn("Failed to fetch results", e));
+        .catch(e => toast("Failed to fetch results", "error"));
     }
   }, [auth, setResults]);
 

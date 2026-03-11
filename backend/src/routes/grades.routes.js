@@ -8,35 +8,34 @@ router.use(authRequired);
 
 // ─── Helper: map DB result row → camelCase shape the frontend expects ─────────
 function normalise(r) {
-return {
+  return {
     id:             r.result_id,
     studentId:      r.student_id,
     studentName:    r.student_name ?? `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim(),
     className:      r.class_name  ?? "",
     subject:        r.subject_name ?? r.subject ?? "",
     term:           r.term        ?? "Term 2",
-    marks:          Number(r.marks_obtained ?? 0),
-    total:          Number(r.total_marks    ?? 100),
+    marks:          Number(r.marks ?? 0),
+    total:          Number(r.total_marks ?? 100),
     grade:          r.grade       ?? "",
     teacherComment: r.teacher_comment ?? "",
-};
+  };
 }
 
 // ─── GET /api/grades — list all results for the school ───────────────────────
 router.get("/", async (req, res, next) => {
-try {
+  try {
     const { schoolId } = req.user;
     const { studentId, term, classId } = req.query;
 
     let sql = `
-        SELECT r.result_id, r.student_id, r.marks_obtained, r.total_marks, r.grade,
-            r.teacher_comment, r.term, r.exam_id,
-            sub.subject_name,
+        SELECT r.result_id, r.student_id, r.marks, r.total_marks, r.grade,
+            r.teacher_comment, r.term,
+            r.subject,
             s.first_name, s.last_name,
-            COALESCE(s.class_name, c.class_name) AS class_name
+            s.class_name
     FROM results r
     JOIN students s  ON s.student_id  = r.student_id
-    JOIN subjects sub ON sub.subject_id = r.subject_id
     LEFT JOIN classes c ON c.class_id = r.class_id
     WHERE r.school_id = ? AND r.is_deleted = 0`;
     const params = [schoolId];
@@ -54,24 +53,23 @@ try {
 
 // ─── GET /api/grades/:id — single result ─────────────────────────────────────
 router.get("/:id", async (req, res, next) => {
-try {
+  try {
     const { schoolId } = req.user;
     const [rows] = await pool.query(
-    `SELECT r.result_id, r.student_id, r.marks_obtained, r.total_marks, r.grade,
+    `SELECT r.result_id, r.student_id, r.marks, r.total_marks, r.grade,
             r.teacher_comment, r.term,
-            sub.subject_name,
+            r.subject,
             s.first_name, s.last_name,
-            COALESCE(s.class_name, c.class_name) AS class_name
+            s.class_name
         FROM results r
         JOIN students s   ON s.student_id  = r.student_id
-        JOIN subjects sub ON sub.subject_id = r.subject_id
         LEFT JOIN classes c ON c.class_id = r.class_id
         WHERE r.result_id = ? AND r.school_id = ? AND r.is_deleted = 0 LIMIT 1`,
         [req.params.id, schoolId]
     );
     if (!rows.length) return res.status(404).json({ message: "Result not found" });
     res.json(normalise(rows[0]));
-} catch (err) { next(err); }
+  } catch (err) { next(err); }
 });
 
 // ─── POST /api/grades/bulk — save multiple subjects for one student ───────────
@@ -142,12 +140,12 @@ try {
 
     const grade = calcGrade(marks, totalMarks);
 
-      // Upsert — update if already exists for this student/subject/exam combo
+      // Upsert — update if already exists for this student/subject combo
     const [res] = await pool.query(
-        `INSERT INTO results (school_id, student_id, subject_id, exam_id, class_id, marks_obtained, total_marks, grade, term)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE marks_obtained=VALUES(marks_obtained), total_marks=VALUES(total_marks), grade=VALUES(grade), is_deleted=0, updated_at=CURRENT_TIMESTAMP`,
-        [schoolId, studentId, subjectId, resolvedExamId, resolvedClassId, Number(marks), Number(totalMarks), grade, term]
+        `INSERT INTO results (school_id, student_id, subject, class_id, marks, total_marks, grade, term)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE marks=VALUES(marks), total_marks=VALUES(total_marks), grade=VALUES(grade), is_deleted=0, updated_at=CURRENT_TIMESTAMP`,
+        [schoolId, studentId, subject, resolvedClassId, Number(marks), Number(totalMarks), grade, term]
     );
         saved.push({ subjectId, resultId: res.insertId || res.info });
     }
@@ -181,7 +179,7 @@ try {
     params.push(req.params.id, schoolId);
 
     const [result] = await pool.query(
-        `UPDATE results SET marks_obtained=?, total_marks=?, grade=?, term=?, teacher_comment=?${subjectClause}, updated_at=CURRENT_TIMESTAMP
+        `UPDATE results SET marks=?, total_marks=?, grade=?, term=?, teacher_comment=?${subjectClause}, updated_at=CURRENT_TIMESTAMP
         WHERE result_id=? AND school_id=? AND is_deleted=0`,
         params
     );

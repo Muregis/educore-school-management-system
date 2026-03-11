@@ -52,7 +52,10 @@ export default function ReportsPage({ auth }) {
         avg_score:  row.avg_score  ?? row.avgScore  ?? 0,
         class_name: row.class_name ?? row.subject   ?? "",
       })));
-    }).catch(console.warn).finally(() => setLoading(false));
+    }).catch(e => {
+      toast("Failed to load reports data", "error");
+      console.error("Reports load error:", e);
+    }).finally(() => setLoading(false));
   }, [auth]);
 
   const tabBtn = id => (

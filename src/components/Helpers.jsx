@@ -2,122 +2,143 @@ import PropTypes from "prop-types";
 import { C } from "../lib/theme";
 import Btn from "./Btn";
 
-
-
-// component used for page navigation
+// ── Pager ─────────────────────────────────────────────────────────────────────
 export function Pager({ page, pages, setPage }) {
   if (pages <= 1) return null;
   return (
-    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
-      <Btn variant="ghost" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-        Prev
-      </Btn>
-      <div style={{ color: C.textSub, alignSelf: "center", fontSize: 12 }}>
-        {page}/{pages}
-      </div>
-      <Btn variant="ghost" disabled={page >= pages} onClick={() => setPage(page + 1)}>
-        Next
-      </Btn>
+    <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:6, marginTop:14 }}>
+      <button
+        disabled={page <= 1}
+        onClick={() => setPage(page - 1)}
+        style={{ padding:"5px 13px", borderRadius:8, border:`1px solid ${C.border}`, background:C.card, color: page<=1 ? C.textMuted : C.textSub, cursor: page<=1 ? "default" : "pointer", fontSize:13 }}>
+        ‹
+      </button>
+      {Array.from({ length: Math.min(pages, 7) }, (_, i) => {
+        const p = pages <= 7 ? i+1 : i+1; // simple for now
+        const active = p === page;
+        return (
+          <button key={p} onClick={() => setPage(p)} style={{
+            padding:"5px 11px", borderRadius:8, fontSize:13, cursor:"pointer",
+            border:`1px solid ${active ? C.accent : C.border}`,
+            background: active ? C.accentGlow : C.card,
+            color: active ? C.accent : C.textSub,
+            fontWeight: active ? 700 : 400,
+          }}>{p}</button>
+        );
+      })}
+      <button
+        disabled={page >= pages}
+        onClick={() => setPage(page + 1)}
+        style={{ padding:"5px 13px", borderRadius:8, border:`1px solid ${C.border}`, background:C.card, color: page>=pages ? C.textMuted : C.textSub, cursor: page>=pages ? "default" : "pointer", fontSize:13 }}>
+        ›
+      </button>
     </div>
   );
 }
-Pager.propTypes = { page: PropTypes.number.isRequired, pages: PropTypes.number.isRequired, setPage: PropTypes.func.isRequired };
+Pager.propTypes = { page:PropTypes.number.isRequired, pages:PropTypes.number.isRequired, setPage:PropTypes.func.isRequired };
 
+// ── Msg ───────────────────────────────────────────────────────────────────────
 export function Msg({ text, tone = "muted" }) {
+  const color = tone === "error" ? C.rose : tone === "success" ? C.green : tone === "warn" ? C.amber : C.textMuted;
   return (
-    <div
-      style={{
-        color: tone === "error" ? C.rose : C.textMuted,
-        fontSize: 12,
-        padding: "10px 0",
-      }}
-    >
+    <div style={{ color, fontSize:13, padding:"10px 0", display:"flex", alignItems:"center", gap:6 }}>
+      {tone === "error" && <span>✕</span>}
+      {tone === "success" && <span>✓</span>}
+      {tone === "warn" && <span>⚠</span>}
       {text}
     </div>
   );
 }
-Msg.propTypes = { text: PropTypes.string.isRequired, tone: PropTypes.string };
+Msg.propTypes = { text:PropTypes.string.isRequired, tone:PropTypes.string };
 
+// ── Toasts ────────────────────────────────────────────────────────────────────
 export function Toasts({ items, remove }) {
   return (
-    <div
-      style={{
-        position: "fixed",
-        right: 14,
-        bottom: 14,
-        zIndex: 3000,
-        display: "grid",
-        gap: 8,
-      }}
-    >
-      {items.map(t => (
-        <div
-          key={t.id}
-          style={{
+    <div style={{ position:"fixed", right:18, bottom:18, zIndex:3000, display:"grid", gap:8, minWidth:260 }}>
+      {items.map(t => {
+        const isErr = t.type === "error";
+        const color = isErr ? C.rose : C.green;
+        return (
+          <div key={t.id} style={{
             background: C.card,
-            border: `1px solid ${t.type === "error" ? C.rose : C.green}66`,
-            borderRadius: 10,
-            padding: "10px 12px",
-            minWidth: 230,
-          }}
-        >
-          <div style={{ color: C.text, fontSize: 13 }}>{t.text}</div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
-            <Btn variant="ghost" onClick={() => remove(t.id)}>
-              Close
-            </Btn>
+            border:`1px solid ${color}55`,
+            borderLeft:`3px solid ${color}`,
+            borderRadius:11,
+            padding:"11px 14px",
+            boxShadow:"0 8px 32px rgba(0,0,0,0.4)",
+            display:"flex", alignItems:"flex-start", gap:10,
+          }}>
+            <span style={{ fontSize:15, marginTop:1 }}>{isErr ? "✕" : "✓"}</span>
+            <div style={{ flex:1 }}>
+              <div style={{ color:C.text, fontSize:13, fontWeight:500 }}>{t.text}</div>
+            </div>
+            <button onClick={() => remove(t.id)} style={{
+              background:"transparent", border:"none", color:C.textMuted,
+              cursor:"pointer", fontSize:16, lineHeight:1, padding:0, marginTop:-1,
+            }}>×</button>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
-Toasts.propTypes = { items: PropTypes.array.isRequired, remove: PropTypes.func.isRequired };
+Toasts.propTypes = { items:PropTypes.array.isRequired, remove:PropTypes.func.isRequired };
 
+// ── Forbidden ─────────────────────────────────────────────────────────────────
 export const Forbidden = () => (
-  <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-    <div style={{ color: C.rose, fontWeight: 800 }}>403 Forbidden</div>
-    <div style={{ color: C.textSub }}>You do not have permission to access this page.</div>
+  <div style={{
+    display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+    minHeight:320, gap:16,
+  }}>
+    <div style={{
+      width:72, height:72, borderRadius:20, background:C.roseDim,
+      border:`1px solid ${C.rose}44`, display:"flex", alignItems:"center",
+      justifyContent:"center", fontSize:32,
+    }}>🔒</div>
+    <div style={{ textAlign:"center" }}>
+      <div style={{ fontWeight:800, fontSize:20, color:C.rose, marginBottom:6 }}>Access Denied</div>
+      <div style={{ color:C.textSub, fontSize:14 }}>You don't have permission to view this page.</div>
+    </div>
   </div>
 );
 
+// ── NotFound ──────────────────────────────────────────────────────────────────
 export const NotFound = () => (
-  <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-    <div style={{ color: C.amber, fontWeight: 800 }}>404 Not Found</div>
-    <div style={{ color: C.textSub }}>Page not found.</div>
+  <div style={{
+    display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+    minHeight:320, gap:16,
+  }}>
+    <div style={{
+      width:72, height:72, borderRadius:20, background:C.amberDim,
+      border:`1px solid ${C.amber}44`, display:"flex", alignItems:"center",
+      justifyContent:"center", fontSize:32,
+    }}>🔍</div>
+    <div style={{ textAlign:"center" }}>
+      <div style={{ fontWeight:800, fontSize:20, color:C.amber, marginBottom:6 }}>Page Not Found</div>
+      <div style={{ color:C.textSub, fontSize:14 }}>This page doesn't exist.</div>
+    </div>
   </div>
 );
 
+// ── pager helper (fn) ─────────────────────────────────────────────────────────
 const PAGE_SIZE = 20;
-
-/**
- * Returns { pages, rows } for the given array and current page (1-indexed).
- */
 export function pager(items, page, size = PAGE_SIZE) {
   const pages = Math.max(1, Math.ceil(items.length / size));
   const rows  = items.slice((page - 1) * size, page * size);
   return { pages, rows };
 }
 
-/**
- * Triggers a CSV file download in the browser.
- * @param {string}   filename  e.g. "results.csv"
- * @param {string[]} headers   Column header labels
- * @param {Array[]}  rowData   Array of row arrays (values are auto-escaped)
- */
+// ── csv export helper ─────────────────────────────────────────────────────────
 export function csv(filename, headers, rowData) {
   const escape = v => {
     const s = v == null ? "" : String(v);
     return s.includes(",") || s.includes('"') || s.includes("\n")
-      ? `"${s.replace(/"/g, '""')}"`
-      : s;
+      ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = [headers, ...rowData].map(row => row.map(escape).join(","));
-  const blob  = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const blob  = new Blob([lines.join("\n")], { type:"text/csv;charset=utf-8;" });
   const url   = URL.createObjectURL(blob);
   const a     = document.createElement("a");
-  a.href      = url;
-  a.download  = filename;
-  a.click();
+  a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 }
