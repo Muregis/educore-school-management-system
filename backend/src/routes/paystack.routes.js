@@ -6,7 +6,7 @@ import { authRequired } from "../middleware/auth.js";
 const router = Router();
 router.use(authRequired);
 
-// ─── Initialize Paystack transaction ─────────────────────────────────────────
+// ── Initialize transaction ────────────────────────────────────────────────────
 router.post("/initialize", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -15,7 +15,8 @@ router.post("/initialize", async (req, res, next) => {
     if (!email || !amount || !studentId)
       return res.status(400).json({ message: "email, amount and studentId are required" });
 
-    const amountKobo = Math.ceil(Number(amount) * 100); // Paystack uses kobo (100 kobo = 1 KES)
+    const amountKobo = Math.ceil(Number(amount) * 100);
+    const reference  = `EDU-${schoolId}-${studentId}-${Date.now()}`;
 
     const response = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",
@@ -24,25 +25,20 @@ router.post("/initialize", async (req, res, next) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        email,
-        amount: amountKobo,
-        currency: "KES",
-        reference: `EDU-${schoolId}-${studentId}-${Date.now()}`,
+        email, amount: amountKobo, reference,
         metadata: { schoolId, studentId, studentName, admissionNumber, feeType },
-        callback_url: `${env.paystackCallbackUrl}/api/paystack/callback`,
+        callback_url: `${env.paystackCallbackUrl}`,
       }),
     });
 
     const data = await response.json();
     if (!data.status) return res.status(400).json({ message: data.message || "Paystack init failed" });
 
-    // Bug #7 fixed: was inserting payment_method = 'mpesa' for a Paystack payment.
-    // Changed to 'paystack'. Also removed hardcoded term column (not in schema).
     await pool.query(
       `INSERT INTO payments
         (school_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status)
-      VALUES (?, ?, ?, ?, 'paystack', ?, CURDATE(), 'pending')
-      ON DUPLICATE KEY UPDATE status='pending', updated_at=CURRENT_TIMESTAMP`,
+       VALUES (?, ?, ?, ?, 'paystack', ?, CURDATE(), 'pending')
+       ON DUPLICATE KEY UPDATE status='pending', updated_at=CURRENT_TIMESTAMP`,
       [schoolId, studentId, amount, feeType, data.data.reference]
     );
 
@@ -54,43 +50,63 @@ router.post("/initialize", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── Paystack webhook (raw body — registered in app.js before express.json) ──
+// ── Verify transaction (called by frontend after popup closes) ────────────────
+router.get("/verify/:reference", async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { reference } = req.params;
+
+    const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      headers: { Authorization: `Bearer ${env.paystackSecretKey}` },
+    });
+    const data = await response.json();
+
+    if (!data.status || data.data?.status !== "success")
+      return res.status(400).json({ message: "Payment not successful" });
+
+    const paidAmount = data.data.amount / 100;
+    const channel    = data.data.channel || "card";
+
+    await pool.query(
+      `UPDATE payments SET status='paid', amount=?, updated_at=CURRENT_TIMESTAMP
+       WHERE reference_number=? AND school_id=?`,
+      [paidAmount, reference, schoolId]
+    );
+
+    res.json({ verified: true, amount: paidAmount, channel, reference });
+  } catch (err) { next(err); }
+});
+
+// ── Webhook (Paystack calls this directly) ────────────────────────────────────
 router.post("/webhook", async (req, res, next) => {
   try {
     const crypto = await import("crypto");
     const secret = env.paystackSecretKey || "";
-    const hash   = crypto
-      .createHmac("sha512", secret)
-      .update(req.body)
-      .digest("hex");
-
-    if (hash !== req.headers["x-paystack-signature"]) {
+    const hash   = crypto.createHmac("sha512", secret).update(req.body).digest("hex");
+    if (hash !== req.headers["x-paystack-signature"])
       return res.status(400).json({ message: "Invalid signature" });
-    }
 
     const event = JSON.parse(req.body.toString());
     if (event.event !== "charge.success") return res.sendStatus(200);
 
     const { reference, amount, metadata } = event.data;
-    const paidAmount = amount / 100; // convert from kobo
-    const { schoolId, studentId, feeType } = metadata || {};
+    const paidAmount = amount / 100;
+    const { schoolId } = metadata || {};
 
     await pool.query(
-      `UPDATE payments
-      SET status='paid', amount=?, updated_at=CURRENT_TIMESTAMP
-      WHERE reference_number=? AND school_id=?`,
+      `UPDATE payments SET status='paid', amount=?, updated_at=CURRENT_TIMESTAMP
+       WHERE reference_number=? AND school_id=?`,
       [paidAmount, reference, schoolId]
     );
-
     res.sendStatus(200);
   } catch (err) { next(err); }
 });
 
-// ─── Paystack callback redirect (browser redirect after payment) ─────────────
+// ── Browser callback after redirect payment ───────────────────────────────────
 router.get("/callback", async (req, res, next) => {
   try {
     const { reference } = req.query;
-    if (!reference) return res.status(400).json({ message: "No reference provided" });
+    if (!reference) return res.status(400).json({ message: "No reference" });
 
     const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       headers: { Authorization: `Bearer ${env.paystackSecretKey}` },
@@ -103,7 +119,6 @@ router.get("/callback", async (req, res, next) => {
         [reference]
       );
     }
-
     res.json({ status: data.data?.status, reference });
   } catch (err) { next(err); }
 });

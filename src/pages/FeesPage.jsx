@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
 import Field from "../components/Field";
@@ -35,11 +35,6 @@ function Pager({ page, pages, setPage }) {
     </div>
   );
 }
-Pager.propTypes = {
-  page: PropTypes.number.isRequired,
-  pages: PropTypes.number.isRequired,
-  setPage: PropTypes.func.isRequired,
-};
 
 function normalisePayment(p) {
   return {
@@ -79,11 +74,16 @@ function loadPaystackScript() {
   });
 }
 
-export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, toast }) {
+export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, toast, linkedStudentId }) {
   const [tab, setTab]                 = useState("payments");
   const [showPayment, setShowPayment] = useState(false);
   const [showStruct, setShowStruct]   = useState(false);
   const [showPaystack, setShowPaystack] = useState(false);
+  const [showMpesa, setShowMpesa]       = useState(false);
+  const [mpesaTarget, setMpesaTarget]   = useState(null);
+  const [mpesaForm, setMpesaForm]       = useState({ phone:"", amount:"" });
+  const [mpesaLoading, setMpesaLoading] = useState(false);
+  const [mpesaStatus, setMpesaStatus]   = useState(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receipt, setReceipt]         = useState(null);
   const [paystackTarget, setPaystackTarget] = useState(null);
@@ -101,12 +101,43 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     setPayments(data.map(normalisePayment));
   }, [auth, setPayments]);
 
+  // Auto-verify Paystack when redirected back
+  useEffect(() => {
+    const ref    = localStorage.getItem("ps_pending_ref");
+    const name   = localStorage.getItem("ps_pending_name");
+    const amount = localStorage.getItem("ps_pending_amount");
+    const params = new URLSearchParams(window.location.search);
+    const urlRef = params.get("reference") || params.get("trxref");
+    if (ref && urlRef && auth?.token) {
+      localStorage.removeItem("ps_pending_ref");
+      localStorage.removeItem("ps_pending_name");
+      localStorage.removeItem("ps_pending_amount");
+      // Clear query params from URL
+      window.history.replaceState({}, "", window.location.pathname);
+      apiFetch(`/paystack/verify/${urlRef}`, { token: auth.token })
+        .then(result => {
+          reloadPayments();
+          setReceipt({
+            studentName: name || "Student",
+            amount:      result.amount || amount,
+            reference:   urlRef,
+            method:      "Paystack (" + (result.channel || "card") + ")",
+            date:        new Date().toLocaleDateString(),
+          });
+          setShowReceipt(true);
+          toast("Paystack payment confirmed!", "success");
+        })
+        .catch(() => toast("Payment received but verification failed — contact admin", "warning"));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth]);
+
   useEffect(() => {
     if (auth?.token) {
       apiFetch("/payments/fee-structures", { token: auth.token })
         .then(data => setFeeStructures(data.map(normaliseFeeStruct)))
-        .catch(e => toast("Failed to load fee structures", "error"));
-      reloadPayments().catch(e => toast("Failed to load payments", "error"));
+        .catch(e => console.warn("Fee structures:", e));
+      reloadPayments().catch(e => console.warn("Payments:", e));
     }
   }, [auth, setFeeStructures, reloadPayments]);
 
@@ -146,7 +177,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
     setPaystackLoading(true);
     try {
-      // Get authorization URL from backend
       const data = await apiFetch("/paystack/initialize", {
         method: "POST",
         body: {
@@ -159,49 +189,70 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         token: auth?.token,
       });
 
-      await loadPaystackScript();
+      // Save reference so we can verify when user returns
+      localStorage.setItem("ps_pending_ref",   data.reference);
+      localStorage.setItem("ps_pending_name",  paystackTarget.name);
+      localStorage.setItem("ps_pending_amount", paystackForm.amount);
 
-      const psKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "";
-      if (!psKey || psKey.length < 10 || psKey === "pk_test_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx") {
-        toast("Paystack not configured — add VITE_PAYSTACK_PUBLIC_KEY to .env with your actual Paystack public key", "error");
-        setPaystackLoading(false);
-        return;
-      }
+      // Redirect to Paystack hosted checkout page
+      window.location.href = data.authorizationUrl;
 
-      // Open Paystack inline popup
-      const handler = window.PaystackPop.setup({
-        key:       psKey,
-        email:     paystackForm.email,
-        amount:    Number(paystackForm.amount) * 100,
-        currency:  "KES",
-        ref:       data.reference,
-        metadata:  { studentId: paystackTarget.studentId, studentName: paystackTarget.name },
-        onSuccess: async (transaction) => {
-          // Verify on backend
-          try {
-            const result = await apiFetch(`/paystack/verify/${transaction.reference}`, { token: auth?.token });
-            await reloadPayments();
-            setShowPaystack(false);
-            setReceipt({
-              studentName: paystackTarget.name,
-              amount:      result.amount,
-              reference:   transaction.reference,
-              method:      "Paystack (" + (result.channel || "card") + ")",
-              date:        new Date().toLocaleDateString(),
-            });
-            setShowReceipt(true);
-            toast("Payment confirmed!", "success");
-          } catch { toast("Payment received but verification failed — contact admin", "warning"); }
-        },
-        onCancel: () => { toast("Payment cancelled", "warning"); },
-      });
-
-      handler.openIframe();
-      setShowPaystack(false);
     } catch (err) {
       toast(err.message || "Paystack init failed", "error");
     }
     setPaystackLoading(false);
+  };
+
+  // ─── Mpesa STK Push ──────────────────────────────────────────────────────────
+  const openMpesa = (b) => {
+    setMpesaTarget(b);
+    setMpesaForm({ phone:"", amount:String(b.balance) });
+    setMpesaStatus(null);
+    setShowMpesa(true);
+  };
+
+  const initiateMpesa = async () => {
+    if (!mpesaForm.phone) return toast("Phone number required (e.g. 0712345678)", "error");
+    if (!mpesaForm.amount || Number(mpesaForm.amount) <= 0) return toast("Enter a valid amount", "error");
+    setMpesaLoading(true);
+    setMpesaStatus(null);
+    try {
+      // Normalize phone to 2547XXXXXXXX format
+      let phone = mpesaForm.phone.trim().replace(/\s+/g, "");
+      if (phone.startsWith("+")) phone = phone.slice(1);
+      if (phone.startsWith("0"))  phone = "254" + phone.slice(1);
+      if (!phone.startsWith("254")) phone = "254" + phone;
+
+      const data = await apiFetch("/mpesa/stk-push", {
+        method: "POST",
+        body: {
+          phone,
+          amount:      Number(mpesaForm.amount),
+          studentId:   mpesaTarget.studentId,
+          studentName: mpesaTarget.name,
+        },
+        token: auth?.token,
+      });
+      setMpesaStatus({ ok:true, checkoutRequestId: data.checkoutRequestId });
+      toast("STK push sent — check your phone", "success");
+    } catch (err) {
+      toast(err.message || "Mpesa STK push failed", "error");
+    }
+    setMpesaLoading(false);
+  };
+
+  const checkMpesaStatus = async () => {
+    if (!mpesaStatus?.checkoutRequestId) return;
+    try {
+      const data = await apiFetch(`/mpesa/status/${mpesaStatus.checkoutRequestId}`, { token: auth?.token });
+      if (data.status === "paid") {
+        await reloadPayments();
+        setShowMpesa(false);
+        toast("Mpesa payment confirmed!", "success");
+      } else {
+        toast(`Status: ${data.status} — payment not yet confirmed`, "warning");
+      }
+    } catch { toast("Could not check status", "error"); }
   };
 
   // ─── Manual payment ─────────────────────────────────────────────────────────
@@ -331,8 +382,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 ? <Badge key="bdg" text="no structure" tone="info" />
                 : <Badge key="bdg" text={b.balance>0?"pending":"cleared"} tone={b.balance>0?"warning":"success"} />,
               b.expected > 0 && b.balance > 0 ? (
-                <div key="pay" style={{display:"flex",gap:6}}>
-                  <Btn onClick={()=>openPaystack(b)}>💳 Pay Online</Btn>
+                <div key="pay" style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <Btn onClick={()=>openPaystack(b)}>💳 Paystack</Btn>
+                  <Btn variant="ghost" onClick={()=>openMpesa(b)}>📱 Mpesa</Btn>
                 </div>
               ) : "—"
             ])}
@@ -377,6 +429,47 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             <Btn onClick={initiatePaystack} disabled={paystackLoading}>
               {paystackLoading ? "Opening..." : "Open Payment"}
             </Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Mpesa STK Push Modal */}
+      {showMpesa && mpesaTarget && (
+        <Modal title={`Mpesa Payment — ${mpesaTarget.name}`} onClose={()=>setShowMpesa(false)}>
+          <div style={{color:C.textSub,marginBottom:12,fontSize:13}}>
+            Outstanding balance: <strong style={{color:C.text}}>{money(mpesaTarget.balance)}</strong>
+          </div>
+          <div style={{background:"#052e16",border:"1px solid #16a34a",borderRadius:10,padding:12,marginBottom:12,fontSize:12,color:"#86efac"}}>
+            📱 An STK push will be sent to the parent&apos;s phone. They will enter their Mpesa PIN to complete payment.
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+            <div>
+              <div style={{fontSize:12,color:C.textMuted,marginBottom:4}}>Phone Number</div>
+              <input style={{...inputStyle,width:"100%"}} value={mpesaForm.phone}
+                onChange={e=>setMpesaForm({...mpesaForm,phone:e.target.value})}
+                placeholder="0712345678 or 254712345678" />
+            </div>
+            <div>
+              <div style={{fontSize:12,color:C.textMuted,marginBottom:4}}>Amount (KES)</div>
+              <input type="number" style={{...inputStyle,width:"100%"}} value={mpesaForm.amount}
+                onChange={e=>setMpesaForm({...mpesaForm,amount:e.target.value})} />
+            </div>
+          </div>
+          {mpesaStatus?.ok && (
+            <div style={{background:"#052e16",border:"1px solid #16a34a",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#86efac"}}>
+              ✅ STK push sent! Ask parent to check their phone and enter Mpesa PIN.
+              <div style={{marginTop:8}}>
+                <Btn variant="ghost" onClick={checkMpesaStatus}>🔄 Check Payment Status</Btn>
+              </div>
+            </div>
+          )}
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
+            <Btn variant="ghost" onClick={()=>setShowMpesa(false)}>Cancel</Btn>
+            {!mpesaStatus?.ok && (
+              <Btn onClick={initiateMpesa} disabled={mpesaLoading}>
+                {mpesaLoading ? "Sending..." : "Send STK Push"}
+              </Btn>
+            )}
           </div>
         </Modal>
       )}
