@@ -3,6 +3,7 @@ import { pool } from "../config/db.js";
 import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
+import { sendEmail, sendBulkEmail, isEmailConfigured, templates } from "../services/email.service.js";
 
 const router = Router();
 router.use(authRequired);
@@ -51,7 +52,7 @@ async function sendViaSms(recipients, message, schoolId, sentByUserId = null) {
         if (!atNumbers.includes(phone)) {
           await pool.query(
             `INSERT INTO sms_logs (school_id, recipient, message, channel, status, sent_by_user_id, sent_at)
-            VALUES (?, ?, ?, 'sms', 'failed', ?, NOW())`,
+             VALUES (?, ?, ?, 'sms', 'failed', ?, NOW())`,
             [schoolId, phone, message, sentByUserId]
           );
           logs.push({ phone, status: "failed" });
@@ -154,6 +155,101 @@ router.patch("/sms-logs/:id/status", requireRoles("admin"), async (req, res, nex
       [status, req.params.id, schoolId]
     );
     res.json({ updated: true });
+  } catch (err) { next(err); }
+});
+
+
+// ── GET email config status ───────────────────────────────────────────────────
+router.get("/email-status", async (req, res) => {
+  res.json({
+    configured: isEmailConfigured(),
+    from: process.env.SMTP_FROM || null,
+    host: process.env.SMTP_HOST || null,
+  });
+});
+
+// ── POST send single email ────────────────────────────────────────────────────
+router.post("/email", requireRoles("admin", "teacher"), async (req, res, next) => {
+  try {
+    const { schoolId, userId } = req.user;
+    const { to, subject, message, recipientName } = req.body;
+    if (!to || !subject || !message)
+      return res.status(400).json({ message: "to, subject and message are required" });
+
+    const html = templates.custom({ recipientName: recipientName || "Parent/Guardian", subject, message });
+    const result = await sendEmail({ to, subject, html, schoolId, sentByUserId: userId });
+    res.status(201).json({ ...result, message: "Email sent" });
+  } catch (err) { next(err); }
+});
+
+// ── POST bulk email to class ──────────────────────────────────────────────────
+router.post("/email/bulk", requireRoles("admin", "teacher"), async (req, res, next) => {
+  try {
+    const { schoolId, userId } = req.user;
+    const { className, subject, message } = req.body;
+    if (!subject || !message) return res.status(400).json({ message: "subject and message are required" });
+
+    let sql = `SELECT s.student_id, s.first_name, s.last_name,
+              u.email, s.parent_name
+              FROM students s
+              LEFT JOIN users u ON u.student_id = s.student_id AND u.role = 'parent' AND u.is_deleted = 0
+              WHERE s.school_id=? AND s.is_deleted=0 AND u.email IS NOT NULL AND u.email != ''`;
+    const params = [schoolId];
+    if (className && className !== "all") { sql += " AND s.class_name=?"; params.push(className); }
+
+    const [rows] = await pool.query(sql, params);
+    if (!rows.length) return res.status(404).json({ message: "No email addresses found for this class" });
+
+    const recipients = rows.map(r => ({
+      email: r.email,
+      name:  r.parent_name || `${r.first_name} ${r.last_name}`,
+    }));
+
+    const result = await sendBulkEmail({
+      recipients, subject,
+      htmlFn: (r) => templates.custom({ recipientName: r.name, subject, message }),
+      schoolId, sentByUserId: userId,
+    });
+
+    res.json({ ...result, message: `Email sent to ${result.total} recipients` });
+  } catch (err) { next(err); }
+});
+
+// ── POST fee reminder email to defaulters ─────────────────────────────────────
+router.post("/email/fee-reminder", requireRoles("admin", "finance"), async (req, res, next) => {
+  try {
+    const { schoolId, userId } = req.user;
+    const { className } = req.body;
+
+    // Find parents with outstanding balances who have emails
+    let sql = `SELECT s.first_name, s.last_name, s.parent_name, s.class_name,
+              u.email,
+              COALESCE(SUM(i.amount_due),0) - COALESCE(SUM(p.paid),0) AS balance
+              FROM students s
+              LEFT JOIN users u ON u.student_id = s.student_id AND u.role = 'parent' AND u.is_deleted = 0
+              LEFT JOIN invoices i ON i.student_id = s.student_id AND i.school_id = s.school_id AND i.is_deleted = 0
+              LEFT JOIN (SELECT invoice_id, SUM(amount) AS paid FROM payments WHERE school_id=? AND is_deleted=0 GROUP BY invoice_id) p
+              ON p.invoice_id = i.invoice_id
+              WHERE s.school_id=? AND s.is_deleted=0 AND u.email IS NOT NULL AND u.email != ''`;
+    const params = [schoolId, schoolId];
+    if (className && className !== "all") { sql += " AND s.class_name=?"; params.push(className); }
+    sql += " GROUP BY s.student_id, u.email HAVING balance > 0";
+
+    const [rows] = await pool.query(sql, params);
+    if (!rows.length) return res.json({ message: "No fee defaulters with email found", sent: 0 });
+
+    const subject = "Outstanding Fee Balance — Action Required";
+    const result = await sendBulkEmail({
+      recipients: rows.map(r => ({ email: r.email, name: r.parent_name || `${r.first_name} ${r.last_name}`, balance: r.balance, studentName: `${r.first_name} ${r.last_name}` })),
+      subject,
+      htmlFn: (r) => templates.custom({
+        recipientName: r.name, subject,
+        message: `Your child ${r.studentName} has an outstanding fee balance of KES ${Number(r.balance).toLocaleString()}. Please log in to the parent portal to make payment or contact the school finance office.`,
+      }),
+      schoolId, sentByUserId: userId,
+    });
+
+    res.json({ ...result, message: `Fee reminder sent to ${result.total} parents` });
   } catch (err) { next(err); }
 });
 

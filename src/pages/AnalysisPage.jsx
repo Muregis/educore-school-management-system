@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import { C } from "../lib/theme";
-import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
-import { ALL_CLASSES } from "../lib/constants";
 
 // ─── Shared helpers ────────────────────────────────────────────────────────
 const inputStyle = {
@@ -91,7 +89,11 @@ function buildInterventions(subjectRankings, streamAverages) {
 }
 
 // ─── Analysis Tab ──────────────────────────────────────────────────────────
-function AnalysisTab({ auth }) {
+export default function AnalysisPage({ auth }) {
+  return <AnalysisPageInner auth={auth} />;
+}
+
+function AnalysisPageInner({ auth }) {
   const [data, setData]           = useState(null);
   const [loading, setLoading]     = useState(false);
   const [aiReport, setAiReport]   = useState("");
@@ -103,6 +105,9 @@ function AnalysisTab({ auth }) {
   const [availClasses, setAvailClasses] = useState([]);
   const [activeStream, setActiveStream] = useState(null);
   const [reportMode, setReportMode]     = useState("visual"); // "visual" | "ai"
+  const [trends, setTrends]             = useState(null);
+  const [topStudents, setTopStudents]   = useState(null);
+  const [topClass, setTopClass]         = useState("");
 
   const load = useCallback(async () => {
     if (!auth?.token) return;
@@ -116,6 +121,14 @@ function AnalysisTab({ auth }) {
       if (result.terms?.length)   setAvailTerms(result.terms);
       if (result.classes?.length) setAvailClasses(result.classes);
       setActiveStream(null);
+
+      // Fetch trends + top students in parallel
+      const [trendRes, topRes] = await Promise.all([
+        apiFetch(`/analysis/trends${className ? `?class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
+        apiFetch(`/analysis/top-students?limit=10${term ? `&term=${encodeURIComponent(term)}` : ""}${className ? `&class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
+      ]);
+      setTrends(trendRes);
+      setTopStudents(topRes);
     } catch (e) { console.error("Analysis error:", e); }
     setLoading(false);
   }, [auth, term, className]);
@@ -146,14 +159,38 @@ function AnalysisTab({ auth }) {
       }).join(" | ");
       lines.push(`  ${subj}: ${row}`);
     });
+    // Term trends
+    if (trends && trends.terms.length > 1) {
+      lines.push("");
+      lines.push("TERM PERFORMANCE TRENDS (overall avg per term):");
+      trends.overall.forEach(t => lines.push(`  ${t.term}: ${t.avg_score}%`));
+      lines.push("SUBJECT TRENDS:");
+      trends.subjects.forEach(subj => {
+        const row = trends.terms.map(t => `${t}:${trends.data[subj]?.[t] ?? "N/A"}%`).join(" → ");
+        lines.push(`  ${subj}: ${row}`);
+      });
+    }
+    // Top students
+    if (topStudents && topStudents.overall.length > 0) {
+      lines.push("");
+      lines.push("TOP 5 STUDENTS (overall):");
+      topStudents.overall.slice(0,5).forEach((s,i) =>
+        lines.push(`  ${i+1}. ${s.first_name} ${s.last_name} (${s.stream_label}): ${s.avg_score}%`)
+      );
+    }
     return lines.join("\n");
   };
 
   const generateAIReport = async () => {
-    if (!data || data.streamAverages.length === 0) return;
+    console.log("[AI] data:", data, "token:", auth?.token ? "present" : "MISSING");
+    if (!data || data.streamAverages.length === 0) {
+      setAiError("No data loaded yet. Please wait for the visual report to load first.");
+      return;
+    }
     setAiLoading(true);
     setAiReport(""); setAiError("");
     const dataset = buildDataset();
+    console.log("[AI] dataset length:", dataset.length, "first 200:", dataset.slice(0,200));
 
     const prompt = `You are an academic performance analyst for a Kenyan primary/secondary school.
 
@@ -188,23 +225,18 @@ Give 5-7 concrete, practical recommendations. Each should be actionable by a tea
 Keep the tone professional but simple enough for a school administrator to act on immediately.`;
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const result = await apiFetch("/analysis/ai-report", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1800,
-          messages: [{ role: "user", content: prompt }],
-        }),
+        token: auth?.token,
+        body: { prompt },
       });
-      const result = await response.json();
-      if (result.content?.[0]?.text) {
-        setAiReport(result.content[0].text);
+      if (result.text) {
+        setAiReport(result.text);
       } else {
-        setAiError("No response from AI. Check your network connection.");
+        setAiError("No response from AI. Try again.");
       }
     } catch (e) {
-      setAiError("Failed to reach AI service: " + e.message);
+      setAiError("Failed to generate report: " + e.message);
     }
     setAiLoading(false);
   };
@@ -585,227 +617,161 @@ Keep the tone professional but simple enough for a school administrator to act o
             ))}
           </div>
         </div>
-      </>)}
-    </div>
-  );
-}
-AnalysisTab.propTypes = { auth: PropTypes.object };
 
-// ─── Main ReportsPage ──────────────────────────────────────────────────────
-export default function ReportsPage({ auth }) {
-  const [summary, setSummary]       = useState(null);
-  const [monthly, setMonthly]       = useState([]);
-  const [attendance, setAttendance] = useState([]);
-  const [defaulters, setDefaulters] = useState([]);
-  const [grades, setGrades]         = useState([]);
-  const [tab, setTab]               = useState("overview");
-  const [filterClass, setFilterClass] = useState("all");
-  const [loading, setLoading]       = useState(true);
-
-  useEffect(() => {
-    if (!auth?.token) { setLoading(false); return; }
-    Promise.all([
-      apiFetch("/reports/summary",                { token: auth.token }),
-      apiFetch("/reports/monthly-fee-collection", { token: auth.token }),
-      apiFetch("/reports/attendance-rate",        { token: auth.token }),
-      apiFetch("/reports/fee-defaulters",         { token: auth.token }),
-      apiFetch("/reports/grade-distribution",     { token: auth.token }),
-    ]).then(([s, m, a, d, g]) => {
-      const normSummary = s ? {
-        students:       s.totalStudents  ?? s.students       ?? 0,
-        teachers:       s.totalTeachers  ?? s.teachers       ?? 0,
-        feesCollected:  s.totalCollected ?? s.feesCollected  ?? 0,
-        feesPending:    s.totalPending   ?? s.feesPending    ?? 0,
-        openDiscipline: s.openDiscipline ?? 0,
-      } : null;
-      setSummary(normSummary);
-      setMonthly((m || []).map(row => ({ ...row, total: row.total ?? row.collected ?? 0 })));
-      setAttendance(a);
-      setDefaulters(d);
-      setGrades((g || []).map(row => ({
-        ...row,
-        avg_score:  row.avg_score  ?? row.avgScore  ?? 0,
-        class_name: row.class_name ?? row.subject   ?? "",
-      })));
-    }).catch(e => {
-      console.error("Reports load error:", e);
-    }).finally(() => setLoading(false));
-  }, [auth]);
-
-  const tabBtn = id => (
-    <button key={id} onClick={() => setTab(id)} style={{
-      padding:"7px 14px", border:"none",
-      borderBottom:`2px solid ${tab === id ? C.accent : "transparent"}`,
-      background:"transparent", color: tab === id ? C.accent : C.textMuted,
-      cursor:"pointer", fontWeight: tab === id ? 700 : 400, fontSize:13,
-    }}>
-      {id === "analysis" ? "📊 Analysis" : id.charAt(0).toUpperCase() + id.slice(1)}
-    </button>
-  );
-
-  const filteredGrades     = filterClass === "all" ? grades     : grades.filter(g => g.class_name === filterClass);
-  const filteredDefaulters = filterClass === "all" ? defaulters : defaulters.filter(d => d.class_name === filterClass);
-
-  if (loading) return <div style={{ color:C.textMuted, padding:32 }}>Loading reports…</div>;
-
-  return (
-    <div>
-      {/* Summary cards */}
-      {summary && (
-        <div style={{ display:"flex", flexWrap:"wrap", gap:10, marginBottom:20 }}>
-          <StatCard label="Active Students"  value={summary.students}               tone="info" />
-          <StatCard label="Active Teachers"  value={summary.teachers}               tone="info" />
-          <StatCard label="Fees Collected"   value={money(summary.feesCollected)}   tone="success" />
-          <StatCard label="Fees Pending"     value={money(summary.feesPending)}     tone="warning" />
-          <StatCard label="Open Discipline"  value={summary.openDiscipline}         tone="danger" />
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div style={{ display:"flex", borderBottom:`1px solid ${C.border}`, marginBottom:16, flexWrap:"wrap" }}>
-        {["overview","fees","attendance","grades","defaulters","analysis"].map(tabBtn)}
-      </div>
-
-      {/* Class filter (grades / defaulters tabs) */}
-      {["grades","defaulters"].includes(tab) && (
-        <select style={{ background:C.card, color:C.text, border:`1px solid ${C.border}`,
-          borderRadius:8, padding:"6px 10px", marginBottom:12, fontSize:13 }}
-          value={filterClass} onChange={e => setFilterClass(e.target.value)}>
-          <option value="all">All classes</option>
-          {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
-        </select>
-      )}
-
-      {/* ── Overview ── */}
-      {tab === "overview" && (
-        <div>
-          <h3 style={{ color:C.text, marginBottom:8 }}>Monthly Fee Collection</h3>
-          {monthly.length === 0 ? <p style={{ color:C.textMuted }}>No payment data yet.</p> : (
-            <div style={{ overflowX:"auto" }}>
+        {/* SECTION 5 — Term Performance Trends */}
+        {trends && trends.terms.length > 1 && (
+          <div style={{ marginBottom:32 }}>
+            <h3 style={{ color:C.text, marginBottom:4 }}>5. Term Performance Trends</h3>
+            <p style={{ color:C.textMuted, fontSize:13, marginBottom:16 }}>
+              How overall and subject performance has changed across terms.
+            </p>
+            {/* Overall trend bar */}
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:20, marginBottom:16 }}>
+              <div style={{ fontWeight:700, color:C.text, marginBottom:14, fontSize:14 }}>📈 Overall Average by Term</div>
+              <div style={{ display:"flex", gap:12, alignItems:"flex-end", height:120 }}>
+                {trends.overall.map((t, i) => {
+                  const g = gradeInfo(t.avg_score);
+                  const h = Math.max(20, (t.avg_score / 100) * 100);
+                  return (
+                    <div key={t.term} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+                      <div style={{ fontSize:13, fontWeight:800, color:g.color }}>{t.avg_score}%</div>
+                      <div style={{ width:"100%", height:h, background:g.color, borderRadius:"6px 6px 0 0",
+                        opacity: 0.8 + i * 0.1, transition:"height 0.3s",
+                        boxShadow:`0 0 12px ${g.color}44` }} />
+                      <div style={{ fontSize:11, color:C.textMuted, textAlign:"center" }}>{t.term}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Subject trend table */}
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflowX:"auto" }}>
               <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead><tr>{["Month","Transactions","Total"].map(h =>
-                  <th key={h} style={{ textAlign:"left", padding:"8px 10px", borderBottom:`1px solid ${C.border}`, color:C.textMuted, fontSize:12 }}>{h}</th>)}
-                </tr></thead>
-                <tbody>{monthly.map((m, i) => (
-                  <tr key={i} style={{ borderBottom:`1px solid ${C.border}` }}>
-                    <td style={{ padding:"8px 10px", color:C.text }}>{m.month}</td>
-                    <td style={{ padding:"8px 10px", color:C.textSub }}>{m.transactions}</td>
-                    <td style={{ padding:"8px 10px", color:"#4ade80", fontWeight:700 }}>{money(m.total)}</td>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign:"left", padding:"10px 14px", color:C.textMuted, fontSize:12, borderBottom:`1px solid ${C.border}` }}>Subject</th>
+                    {trends.terms.map(t => (
+                      <th key={t} style={{ textAlign:"center", padding:"10px 14px", color:C.textMuted, fontSize:12, borderBottom:`1px solid ${C.border}` }}>{t}</th>
+                    ))}
+                    <th style={{ textAlign:"center", padding:"10px 14px", color:C.textMuted, fontSize:12, borderBottom:`1px solid ${C.border}` }}>Trend</th>
                   </tr>
-                ))}</tbody>
+                </thead>
+                <tbody>
+                  {trends.subjects.map(subj => {
+                    const scores = trends.terms.map(t => trends.data[subj]?.[t] ?? null);
+                    const valid  = scores.filter(s => s !== null);
+                    const first  = valid[0] ?? 0;
+                    const last   = valid[valid.length - 1] ?? 0;
+                    const diff   = last - first;
+                    const trendIcon = diff > 2 ? "📈" : diff < -2 ? "📉" : "➡️";
+                    const trendColor = diff > 2 ? "#4ade80" : diff < -2 ? "#f87171" : C.textMuted;
+                    return (
+                      <tr key={subj} style={{ borderBottom:`1px solid ${C.border}` }}>
+                        <td style={{ padding:"9px 14px", fontWeight:600, color:C.text, fontSize:13 }}>{subj}</td>
+                        {trends.terms.map(t => {
+                          const sc = trends.data[subj]?.[t];
+                          if (sc == null) return <td key={t} style={{ padding:"9px 14px", textAlign:"center", color:C.textMuted }}>—</td>;
+                          const g = gradeInfo(sc);
+                          return (
+                            <td key={t} style={{ padding:"9px 14px", textAlign:"center" }}>
+                              <span style={{ background:g.bg, border:`1px solid ${g.color}44`, borderRadius:7,
+                                padding:"2px 8px", fontSize:12, fontWeight:700, color:g.color }}>{sc}%</span>
+                            </td>
+                          );
+                        })}
+                        <td style={{ padding:"9px 14px", textAlign:"center", fontSize:14 }}>
+                          <span style={{ color:trendColor, fontWeight:700 }}>
+                            {trendIcon} {diff > 0 ? "+" : ""}{diff !== 0 ? diff.toFixed(1)+"%" : "Stable"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
               </table>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* ── Fees ── */}
-      {tab === "fees" && (
-        <div>
-          <h3 style={{ color:C.text, marginBottom:8 }}>Monthly Fee Collection</h3>
-          {monthly.length === 0 ? <p style={{ color:C.textMuted }}>No payment data yet.</p> : (
-            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-              {monthly.map((m, i) => {
-                const max = Math.max(...monthly.map(x => Number(x.total)));
-                const pct = max > 0 ? (Number(m.total) / max) * 100 : 0;
+        {/* SECTION 6 — Top Students */}
+        {topStudents && topStudents.overall.length > 0 && (
+          <div style={{ marginBottom:32 }}>
+            <h3 style={{ color:C.text, marginBottom:4 }}>6. Top Performing Students</h3>
+            <p style={{ color:C.textMuted, fontSize:13, marginBottom:16 }}>
+              Highest average scores across all subjects for the selected term.
+            </p>
+
+            {/* Class filter for top students */}
+            <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" }}>
+              {["", ...[...new Set(topStudents.byClass.map(s => s.class_name))]].map(cls => (
+                <button key={cls} onClick={() => setTopClass(cls)} style={{
+                  padding:"5px 14px", borderRadius:20, fontSize:12, fontWeight:600, cursor:"pointer",
+                  background: topClass === cls ? C.accent : C.card,
+                  color: topClass === cls ? "#fff" : C.textMuted,
+                  border: `1px solid ${topClass === cls ? C.accent : C.border}`,
+                }}>{cls || "🏆 Overall Top 10"}</button>
+              ))}
+            </div>
+
+            {/* Leaderboard */}
+            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:"hidden" }}>
+              {(topClass
+                ? topStudents.byClass.filter(s => s.class_name === topClass)
+                : topStudents.overall
+              ).map((s, i) => {
+                const g = gradeInfo(s.avg_score);
+                const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
                 return (
-                  <div key={i} style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <div style={{ width:70, fontSize:12, color:C.textMuted }}>{m.month}</div>
-                    <div style={{ flex:1, background:C.border, borderRadius:6, height:20, overflow:"hidden" }}>
-                      <div style={{ width:`${pct}%`, background:C.accent, height:"100%", borderRadius:6, transition:"width 0.4s" }} />
+                  <div key={s.student_id} style={{
+                    display:"flex", alignItems:"center", gap:14, padding:"12px 18px",
+                    borderBottom:`1px solid ${C.border}`,
+                    background: i < 3 ? `${g.color}08` : "transparent",
+                  }}>
+                    {/* Rank */}
+                    <div style={{ width:36, textAlign:"center", flexShrink:0 }}>
+                      {medal
+                        ? <span style={{ fontSize:20 }}>{medal}</span>
+                        : <span style={{ fontWeight:800, color:C.textMuted, fontSize:14 }}>#{s.rank ?? i+1}</span>
+                      }
                     </div>
-                    <div style={{ width:100, fontSize:12, color:C.text, textAlign:"right" }}>{money(m.total)}</div>
+                    {/* Avatar */}
+                    <div style={{
+                      width:36, height:36, borderRadius:10, flexShrink:0,
+                      background: g.bg, border:`1px solid ${g.color}44`,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                      fontWeight:800, fontSize:14, color:g.color,
+                    }}>
+                      {s.first_name?.[0]}{s.last_name?.[0]}
+                    </div>
+                    {/* Name */}
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontWeight:700, color:C.text, fontSize:14 }}>
+                        {s.first_name} {s.last_name}
+                      </div>
+                      <div style={{ fontSize:11, color:C.textMuted }}>
+                        {s.stream_label} · {s.admission_number}
+                      </div>
+                    </div>
+                    {/* Score bar */}
+                    <div style={{ width:120, display:"flex", flexDirection:"column", gap:4 }}>
+                      <ScoreBar score={s.avg_score} color={g.color} />
+                    </div>
+                    {/* Score */}
+                    <div style={{ width:56, textAlign:"right", flexShrink:0 }}>
+                      <div style={{ fontWeight:900, fontSize:18, color:g.color }}>{s.avg_score}%</div>
+                      <div style={{ fontSize:10, color:C.textMuted }}>{s.subjects_sat} subjects</div>
+                    </div>
                   </div>
                 );
               })}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* ── Attendance ── */}
-      {tab === "attendance" && (
-        <div>
-          <h3 style={{ color:C.text, marginBottom:8 }}>Attendance Rate by Class</h3>
-          {attendance.length === 0 ? <p style={{ color:C.textMuted }}>No attendance data yet.</p> : (
-            <div style={{ overflowX:"auto" }}>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead><tr>{["Class","Total Records","Present","Rate"].map(h =>
-                  <th key={h} style={{ textAlign:"left", padding:"8px 10px", borderBottom:`1px solid ${C.border}`, color:C.textMuted, fontSize:12 }}>{h}</th>)}
-                </tr></thead>
-                <tbody>{attendance.map((a, i) => (
-                  <tr key={i} style={{ borderBottom:`1px solid ${C.border}` }}>
-                    <td style={{ padding:"8px 10px", color:C.text, fontWeight:600 }}>{a.class_name}</td>
-                    <td style={{ padding:"8px 10px", color:C.textSub }}>{a.total}</td>
-                    <td style={{ padding:"8px 10px", color:C.textSub }}>{a.present}</td>
-                    <td style={{ padding:"8px 10px" }}>
-                      <span style={{ color: Number(a.rate)>=80 ? "#4ade80" : Number(a.rate)>=60 ? "#facc15" : "#f87171", fontWeight:700 }}>{a.rate}%</span>
-                    </td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Grades ── */}
-      {tab === "grades" && (
-        <div>
-          <h3 style={{ color:C.text, marginBottom:8 }}>Grade Averages by Subject</h3>
-          {filteredGrades.length === 0 ? <p style={{ color:C.textMuted }}>No grade data yet.</p> : (
-            <div style={{ overflowX:"auto" }}>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead><tr>{["Class","Subject","Average","Highest","Lowest","Entries"].map(h =>
-                  <th key={h} style={{ textAlign:"left", padding:"8px 10px", borderBottom:`1px solid ${C.border}`, color:C.textMuted, fontSize:12 }}>{h}</th>)}
-                </tr></thead>
-                <tbody>{filteredGrades.map((g, i) => (
-                  <tr key={i} style={{ borderBottom:`1px solid ${C.border}` }}>
-                    <td style={{ padding:"8px 10px", color:C.text }}>{g.class_name}</td>
-                    <td style={{ padding:"8px 10px", color:C.textSub }}>{g.subject}</td>
-                    <td style={{ padding:"8px 10px", fontWeight:700, color: Number(g.avg_score)>=70 ? "#4ade80" : Number(g.avg_score)>=50 ? "#facc15" : "#f87171" }}>{g.avg_score}</td>
-                    <td style={{ padding:"8px 10px", color:"#4ade80" }}>{g.highest}</td>
-                    <td style={{ padding:"8px 10px", color:"#f87171" }}>{g.lowest}</td>
-                    <td style={{ padding:"8px 10px", color:C.textMuted }}>{g.entries}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Defaulters ── */}
-      {tab === "defaulters" && (
-        <div>
-          <h3 style={{ color:C.text, marginBottom:8 }}>Fee Defaulters</h3>
-          {filteredDefaulters.length === 0 ? <p style={{ color:C.textMuted }}>No defaulters — all fees cleared! 🎉</p> : (
-            <div style={{ overflowX:"auto" }}>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead><tr>{["Student","Class","Admission","Phone","Expected","Paid","Balance"].map(h =>
-                  <th key={h} style={{ textAlign:"left", padding:"8px 10px", borderBottom:`1px solid ${C.border}`, color:C.textMuted, fontSize:12 }}>{h}</th>)}
-                </tr></thead>
-                <tbody>{filteredDefaulters.map((d, i) => (
-                  <tr key={i} style={{ borderBottom:`1px solid ${C.border}` }}>
-                    <td style={{ padding:"8px 10px", color:C.text, fontWeight:600 }}>{d.first_name} {d.last_name}</td>
-                    <td style={{ padding:"8px 10px", color:C.textSub }}>{d.class_name}</td>
-                    <td style={{ padding:"8px 10px", color:C.textMuted, fontSize:12 }}>{d.admission_number}</td>
-                    <td style={{ padding:"8px 10px", color:C.textMuted, fontSize:12 }}>{d.parent_phone}</td>
-                    <td style={{ padding:"8px 10px", color:C.textSub }}>{money(d.expected)}</td>
-                    <td style={{ padding:"8px 10px", color:"#4ade80" }}>{money(d.paid)}</td>
-                    <td style={{ padding:"8px 10px", color:"#f87171", fontWeight:700 }}>{money(d.balance)}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Analysis ── */}
-      {tab === "analysis" && <AnalysisTab auth={auth} />}
+      </>)}
     </div>
   );
 }
+AnalysisPageInner.propTypes = { auth: PropTypes.object };
 
-ReportsPage.propTypes = { auth: PropTypes.object };
+AnalysisPage.propTypes = { auth: PropTypes.object };

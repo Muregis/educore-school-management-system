@@ -25,12 +25,38 @@ import reportcardsRoutes   from "./routes/reportcards.routes.js";
 import analyticsRoutes     from "./routes/analytics.routes.js";
 import hrRoutes            from "./routes/hr.routes.js";
 import libraryRoutes       from "./routes/library.routes.js";
+import analysisRoutes      from "./routes/analysis.routes.js";
+import activityRoutes      from "./routes/activity.routes.js";
+import adminRoutes         from "./routes/admin.routes.js";
+import lessonPlansRoutes   from "./routes/lessonplans.routes.js";
+import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }    from "./middleware/error.js";
 
 const app = express();
 
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Promise Rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+});
+
+const corsOrigins = String(env.corsOrigin || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
+
 app.use("/api/paystack/webhook", express.raw({ type: "application/json" }));
-app.use(cors({ origin: env.corsOrigin }));
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (corsOrigins.includes(origin)) return cb(null, true);
+    if (/^http:\/\/localhost:\d+$/.test(origin) || /^http:\/\/127\.0\.0\.1:\d+$/.test(origin))
+      return cb(null, true);
+    return cb(new Error(`CORS blocked origin: ${origin}`));
+  },
+  optionsSuccessStatus: 204,
+}));
 app.use(express.json({ limit: "2mb" }));
 app.use(morgan("dev"));
 
@@ -57,8 +83,15 @@ app.use("/api/reportcards",   reportcardsRoutes);
 app.use("/api/analytics",     analyticsRoutes);
 app.use("/api/hr",            hrRoutes);
 app.use("/api/library",       libraryRoutes);
+app.use("/api/analysis",      analysisRoutes);
+app.use("/api/activity-logs", activityRoutes);
+app.use("/api/admin",         adminRoutes);
+app.use("/api/lesson-plans",  lessonPlansRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
 app.use(errorHandler);
+
+// ── Start backup scheduler (daily at midnight) ───────────────────────────────
+startBackupScheduler();
 
 export default app;

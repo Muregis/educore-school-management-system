@@ -1,136 +1,282 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
-import Btn from "../components/Btn";
-import Field from "../components/Field";
-import { inputStyle } from "../lib/theme";
+import { C } from "../lib/theme";
+import { apiFetch } from "../lib/api";
+import AdminSettings from "./AdminSettings";
 
-export default function SettingsPage({ school, setSchool, users, setUsers, toast }) {
+// ── Shared input style ────────────────────────────────────────────────────────
+const inp = {
+  background: C.card, border: `1px solid ${C.border}`, borderRadius: 8,
+  color: C.text, padding: "8px 12px", fontSize: 13, width: "100%",
+  boxSizing: "border-box",
+};
+
+const Lbl = ({ children }) => (
+  <label style={{ display: "block", fontSize: 11, fontWeight: 700,
+    color: C.textMuted, marginBottom: 5, textTransform: "uppercase",
+    letterSpacing: "0.06em" }}>
+    {children}
+  </label>
+);
+Lbl.propTypes = { children: PropTypes.node };
+
+// ── School Info Tab ───────────────────────────────────────────────────────────
+function SchoolTab({ school, setSchool, toast }) {
   const [form, setForm] = useState({ ...school });
-  const [newUser, setNewUser] = useState({ firstName: "", lastName: "", role: "teacher" });
+  const [saving, setSaving] = useState(false);
 
-  const saveSchool = () => {
-    setSchool(form);
-    toast("School info updated", "success");
+  const save = async () => {
+    setSaving(true);
+    try {
+      await apiFetch("/settings/school", {
+        method: "PUT",
+        token: null,
+        body: form,
+      });
+      setSchool(form);
+      toast("School info saved", "success");
+    } catch (e) {
+      toast(e.message || "Save failed", "error");
+    }
+    setSaving(false);
   };
 
-  const addUser = () => {
-    if (!newUser.firstName || !newUser.lastName) return toast("Name required", "error");
-    setUsers([...users, { ...newUser, id: Date.now() }]);
-    setNewUser({ firstName: "", lastName: "", role: "teacher" });
-    toast("User added", "success");
+  const f = (key) => ({
+    value: form[key] || "",
+    onChange: (e) => setForm((p) => ({ ...p, [key]: e.target.value })),
+    style: inp,
+  });
+
+  return (
+    <div style={{ maxWidth: 560 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+        <div><Lbl>School Name</Lbl><input {...f("name")} /></div>
+        <div><Lbl>County / Location</Lbl><input {...f("county")} /></div>
+        <div><Lbl>Phone</Lbl><input {...f("phone")} /></div>
+        <div><Lbl>Email</Lbl><input {...f("email")} type="email" /></div>
+        <div><Lbl>Current Term</Lbl>
+          <select {...f("term")} style={inp}>
+            {["Term 1", "Term 2", "Term 3"].map(t => (
+              <option key={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+        <div><Lbl>Academic Year</Lbl><input {...f("year")} /></div>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <Lbl>Postal Address</Lbl><input {...f("address")} />
+        </div>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <Lbl>School Motto</Lbl><input {...f("motto")} />
+        </div>
+      </div>
+      <button onClick={save} disabled={saving} style={{
+        background: C.accent, color: "#fff", border: "none", borderRadius: 9,
+        padding: "9px 28px", fontWeight: 700, fontSize: 14, cursor: saving ? "not-allowed" : "pointer",
+        opacity: saving ? 0.7 : 1,
+      }}>
+        {saving ? "Saving…" : "Save Changes"}
+      </button>
+    </div>
+  );
+}
+SchoolTab.propTypes = { school: PropTypes.object, setSchool: PropTypes.func, toast: PropTypes.func };
+
+// ── Users Tab ─────────────────────────────────────────────────────────────────
+function UsersTab({ auth, toast }) {
+  const [users, setUsers]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm]     = useState({ full_name: "", email: "", role: "teacher", password: "" });
+  const [saving, setSaving] = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    apiFetch("/settings/users", { token: auth?.token })
+      .then(d => { setUsers(d || []); setLoading(false); })
+      .catch(() => setLoading(false));
   };
 
-  const removeUser = id => {
-    if (!window.confirm("Remove this user?")) return;
-    setUsers(users.filter(u => u.id !== id));
-    toast("User removed", "success");
+  useEffect(load, [auth]);
+
+  const save = async () => {
+    if (!form.full_name || !form.email || !form.password)
+      return toast("Name, email and password are required", "error");
+    setSaving(true);
+    try {
+      await apiFetch("/settings/users", {
+        method: "POST", token: auth?.token, body: form,
+      });
+      toast("User created", "success");
+      setForm({ full_name: "", email: "", role: "teacher", password: "" });
+      setShowForm(false);
+      load();
+    } catch (e) {
+      toast(e.message || "Failed to create user", "error");
+    }
+    setSaving(false);
+  };
+
+  const toggleStatus = async (u) => {
+    const newStatus = u.status === "active" ? "inactive" : "active";
+    try {
+      await apiFetch(`/settings/users/${u.user_id}`, {
+        method: "PATCH", token: auth?.token, body: { status: newStatus },
+      });
+      setUsers(prev => prev.map(x => x.user_id === u.user_id ? { ...x, status: newStatus } : x));
+      toast(`${u.full_name} ${newStatus}`, "success");
+    } catch (e) {
+      toast(e.message || "Update failed", "error");
+    }
+  };
+
+  const roleColors = {
+    admin: "#3B82F6", teacher: "#14B8A6", finance: "#F59E0B",
+    hr: "#A855F7", librarian: "#22C55E",
   };
 
   return (
-    <div style={{ padding: 10 }}>
-      <h2>School Info</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <Field label="Name">
-          <input
-            style={inputStyle}
-            value={form.name}
-            onChange={e => setForm({ ...form, name: e.target.value })}
-          />
-        </Field>
-        <Field label="Address">
-          <input
-            style={inputStyle}
-            value={form.address}
-            onChange={e => setForm({ ...form, address: e.target.value })}
-          />
-        </Field>
-        <Field label="Contact">
-          <input
-            style={inputStyle}
-            value={form.contact}
-            onChange={e => setForm({ ...form, contact: e.target.value })}
-          />
-        </Field>
-        <Field label="Registration">
-          <input
-            style={inputStyle}
-            value={form.registration}
-            onChange={e => setForm({ ...form, registration: e.target.value })}
-          />
-        </Field>
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: C.textMuted }}>{users.length} staff accounts</div>
+        <button onClick={() => setShowForm(v => !v)} style={{
+          background: C.accent, color: "#fff", border: "none", borderRadius: 8,
+          padding: "7px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer",
+        }}>
+          {showForm ? "Cancel" : "+ New User"}
+        </button>
       </div>
-      <div style={{ marginTop: 10 }}>
-        <Btn onClick={saveSchool}>Save School</Btn>
-      </div>
-      <hr style={{ margin: "20px 0" }} />
-      <h2>Users</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <Field label="First Name">
-          <input
-            style={inputStyle}
-            value={newUser.firstName}
-            onChange={e => setNewUser({ ...newUser, firstName: e.target.value })}
-          />
-        </Field>
-        <Field label="Last Name">
-          <input
-            style={inputStyle}
-            value={newUser.lastName}
-            onChange={e => setNewUser({ ...newUser, lastName: e.target.value })}
-          />
-        </Field>
-        <Field label="Role">
-          <select
-            style={inputStyle}
-            value={newUser.role}
-            onChange={e => setNewUser({ ...newUser, role: e.target.value })}
-          >
-            <option value="admin">admin</option>
-            <option value="teacher">teacher</option>
-            <option value="staff">staff</option>
-          </select>
-        </Field>
-      </div>
-      <div style={{ marginTop: 10 }}>
-        <Btn onClick={addUser}>Add User</Btn>
-      </div>
-      <div style={{ marginTop: 20 }}>
-        {users.length === 0 ? (
-          <p>No users defined.</p>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Role</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map(u => (
-                  <tr key={u.id}>
-                    <td>{u.firstName} {u.lastName}</td>
-                    <td>{u.role}</td>
-                    <td>
-                      <Btn variant="danger" onClick={() => removeUser(u.id)}>Remove</Btn>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+      {showForm && (
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
+          padding: 20, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div><Lbl>Full Name</Lbl>
+              <input style={inp} value={form.full_name}
+                onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} /></div>
+            <div><Lbl>Email</Lbl>
+              <input style={inp} type="email" value={form.email}
+                onChange={e => setForm(p => ({ ...p, email: e.target.value }))} /></div>
+            <div><Lbl>Role</Lbl>
+              <select style={inp} value={form.role}
+                onChange={e => setForm(p => ({ ...p, role: e.target.value }))}>
+                {["teacher","finance","hr","librarian","admin"].map(r =>
+                  <option key={r}>{r}</option>)}
+              </select></div>
+            <div><Lbl>Password</Lbl>
+              <input style={inp} type="password" value={form.password}
+                onChange={e => setForm(p => ({ ...p, password: e.target.value }))} /></div>
           </div>
-        )}
+          <button onClick={save} disabled={saving} style={{
+            background: C.accent, color: "#fff", border: "none", borderRadius: 8,
+            padding: "8px 24px", fontWeight: 700, fontSize: 13, cursor: "pointer",
+          }}>{saving ? "Creating…" : "Create User"}</button>
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ color: C.textMuted, padding: 24 }}>Loading users…</div>
+      ) : (
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                {["Name", "Email", "Role", "Status", "Action"].map(h => (
+                  <th key={h} style={{ textAlign: "left", padding: "10px 14px",
+                    borderBottom: `1px solid ${C.border}`, color: C.textMuted,
+                    fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.user_id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <td style={{ padding: "10px 14px", color: C.text, fontWeight: 600 }}>{u.full_name}</td>
+                  <td style={{ padding: "10px 14px", color: C.textSub, fontSize: 12 }}>{u.email}</td>
+                  <td style={{ padding: "10px 14px" }}>
+                    <span style={{ background: `${roleColors[u.role] || C.accent}22`,
+                      border: `1px solid ${roleColors[u.role] || C.accent}44`,
+                      color: roleColors[u.role] || C.accent,
+                      borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700,
+                      textTransform: "capitalize" }}>{u.role}</span>
+                  </td>
+                  <td style={{ padding: "10px 14px" }}>
+                    <span style={{
+                      color: u.status === "active" ? "#4ade80" : "#f87171",
+                      fontSize: 12, fontWeight: 600,
+                    }}>{u.status}</span>
+                  </td>
+                  <td style={{ padding: "10px 14px" }}>
+                    {u.role !== "admin" && (
+                      <button onClick={() => toggleStatus(u)} style={{
+                        background: "transparent",
+                        border: `1px solid ${C.border}`,
+                        borderRadius: 7, color: C.textMuted,
+                        cursor: "pointer", padding: "4px 12px", fontSize: 12,
+                      }}>
+                        {u.status === "active" ? "Deactivate" : "Activate"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+UsersTab.propTypes = { auth: PropTypes.object, toast: PropTypes.func };
+
+// ── Tab definitions ───────────────────────────────────────────────────────────
+const TABS = [
+  { id: "school",   label: "🏫 School Info" },
+  { id: "users",    label: "👥 Users" },
+  { id: "activity", label: "📋 Activity Logs" },
+  { id: "backups",  label: "🗄️ DB Backups" },
+];
+
+// ── Main SettingsPage ─────────────────────────────────────────────────────────
+export default function SettingsPage({ auth, school, setSchool, users, setUsers, toast }) {
+  const [tab, setTab] = useState("school");
+
+  // Pass users/setUsers through for legacy local-state compatibility
+  void users; void setUsers;
+
+  return (
+    <div>
+      {/* Tab bar */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 24, flexWrap: "wrap" }}>
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            padding: "8px 18px", borderRadius: 9, fontSize: 13, fontWeight: 700,
+            cursor: "pointer",
+            background: tab === t.id ? C.accent : C.card,
+            color: tab === t.id ? "#fff" : C.textMuted,
+            border: `1px solid ${tab === t.id ? C.accent : C.border}`,
+          }}>{t.label}</button>
+        ))}
       </div>
+
+      {/* Tab content */}
+      {tab === "school" && (
+        <SchoolTab school={school} setSchool={setSchool} toast={toast} />
+      )}
+      {tab === "users" && (
+        <UsersTab auth={auth} toast={toast} />
+      )}
+      {(tab === "activity" || tab === "backups") && (
+        <AdminSettings auth={auth} initialTab={tab} />
+      )}
     </div>
   );
 }
 
 SettingsPage.propTypes = {
-
-  school: PropTypes.object.isRequired,
-  setSchool: PropTypes.func.isRequired,
-  users: PropTypes.array.isRequired,
-  setUsers: PropTypes.func.isRequired,
-  toast: PropTypes.func.isRequired,
+  auth:      PropTypes.object,
+  school:    PropTypes.object,
+  setSchool: PropTypes.func,
+  users:     PropTypes.array,
+  setUsers:  PropTypes.func,
+  toast:     PropTypes.func,
 };

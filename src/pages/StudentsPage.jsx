@@ -40,11 +40,12 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", status: "active", admission: "" });
 
   useEffect(() => {
-    if (auth?.token) {
-      apiFetch("/students", { token: auth.token })
-        .then(data => setStudents(data.map(normalise)))
-        .catch(e => toast("Failed to fetch students", "error"));
-    }
+    if (!auth?.token) return;
+    const ac = new AbortController();
+    apiFetch("/students", { token: auth.token, signal: ac.signal })
+      .then(data => setStudents(data.map(normalise)))
+      .catch(e => { if (e?.code !== "EABORT") toast("Failed to fetch students", "error"); });
+    return () => ac.abort();
   }, [auth, setStudents]);
 
   const expected = c => {

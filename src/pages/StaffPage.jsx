@@ -66,21 +66,26 @@ export default function StaffPage({ auth, canEdit, toast }) {
   const [form, setForm] = useState(blank);
   const set = k => v => setForm(f => ({ ...f, [k]: v }));
 
-  const load = async () => {
+  const load = async (signal) => {
     setLoading(true);
     try {
-      const s = await apiFetch("/hr/staff", { token: auth.token });
+      const s = await apiFetch("/hr/staff", { token: auth.token, signal });
       setStaff(Array.isArray(s) ? s : []);
-    } catch { /**/ }
+    } catch (e) { if (e?.code !== "EABORT") { /**/ } }
     try {
-      const u = await apiFetch("/accounts/users", { token: auth.token });
+      const u = await apiFetch("/accounts/users", { token: auth.token, signal });
       setUsers(Array.isArray(u) ? u : []);
-    } catch { /**/ }
+    } catch (e) { if (e?.code !== "EABORT") { /**/ } }
     setLoading(false);
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [auth]);
+  useEffect(() => {
+    if (!auth?.token) return;
+    const ac = new AbortController();
+    load(ac.signal);
+    return () => ac.abort();
+  }, [auth]);
 
   const filtered = staff.filter(s => {
     const matchDept   = filter === "all" || s.department === filter;

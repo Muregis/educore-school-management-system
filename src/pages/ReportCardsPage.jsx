@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import FeeBlock from "../components/FeeBlock";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
 import Field from "../components/Field";
@@ -7,7 +8,7 @@ import Modal from "../components/Modal";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 
-export default function ReportCardsPage({ auth, students, canEdit, toast }) {
+export default function ReportCardsPage({ auth, students, canEdit, toast, feeBlocked = false, onGoFees}) {
   const [reportCards, setReportCards] = useState([]);
   const [selected, setSelected]       = useState(null);
   const [fullData, setFullData]       = useState(null);
@@ -25,7 +26,6 @@ export default function ReportCardsPage({ auth, students, canEdit, toast }) {
     } catch (e) { toast(e.message, "error"); }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [auth, term, year]);
 
   const viewFull = async (studentId) => {
@@ -105,6 +105,8 @@ export default function ReportCardsPage({ auth, students, canEdit, toast }) {
     w.document.close();
   };
 
+
+  if (feeBlocked) return <FeeBlock onGoFees={onGoFees} pageName="Report Cards" />;
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
@@ -172,7 +174,7 @@ export default function ReportCardsPage({ auth, students, canEdit, toast }) {
               </table>
               {fullData.reportCard?.class_teacher_comment && (
                 <div style={{ background: C.bg, borderRadius: 8, padding: "8px 12px", marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 2 }}>Teacher&apos;s Comment</div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 2 }}>Teacher's Comment</div>
                   <div style={{ color: C.textSub, fontSize: 13 }}>{fullData.reportCard.class_teacher_comment}</div>
                 </div>
               )}

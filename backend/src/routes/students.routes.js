@@ -1,33 +1,35 @@
 import { Router } from "express";
+import bcrypt from "bcryptjs";
 import { pool } from "../config/db.js";
 import { authRequired } from "../middleware/auth.js";
+import { logActivity } from "../helpers/activity.logger.js";
+import { requireRoles } from "../middleware/roles.js";
 
 const router = Router();
 router.use(authRequired);
 
-// ─── GET list ────────────────────────────────────────────────────────────────
+// Always return class_name so frontend normalise() works
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const [rows] = await pool.query(
-      `SELECT student_id, admission_number, first_name, last_name, gender,
-              class_id, class_name, date_of_birth, phone, email, address,
-              parent_name, parent_phone, admission_date, status, created_at
-        FROM students
-      WHERE school_id = ? AND is_deleted = 0
-      ORDER BY student_id DESC`,
+      `SELECT s.student_id, s.admission_number, s.first_name, s.last_name,
+              s.gender, s.class_id, s.class_name, s.status, s.date_of_birth,
+              s.phone, s.email, s.parent_name, s.parent_phone, s.admission_date, s.created_at
+      FROM students s
+      WHERE s.school_id=? AND s.is_deleted=0
+      ORDER BY s.class_name, s.first_name`,
       [schoolId]
     );
     res.json(rows);
   } catch (err) { next(err); }
 });
 
-// ─── GET single ──────────────────────────────────────────────────────────────
 router.get("/:id", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const [rows] = await pool.query(
-      `SELECT * FROM students WHERE student_id = ? AND school_id = ? AND is_deleted = 0 LIMIT 1`,
+      `SELECT * FROM students WHERE student_id=? AND school_id=? AND is_deleted=0 LIMIT 1`,
       [req.params.id, schoolId]
     );
     if (!rows.length) return res.status(404).json({ message: "Student not found" });
@@ -35,41 +37,56 @@ router.get("/:id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── POST create ─────────────────────────────────────────────────────────────
-router.post("/", async (req, res, next) => {
+router.post("/", requireRoles("admin","teacher"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const {
-      admissionNumber, firstName, lastName, gender,
-      classId = null, className = null,
-      dateOfBirth = null, phone = null, email = null,
-      address = null, parentName = null, parentPhone = null,
-      admissionDate = null, status = "active",
+      admissionNumber, firstName, lastName, gender, className,
+      classId = null, dateOfBirth = null, phone = null, parentName = null,
+      parentPhone = null, email = null, address = null,
+      admissionDate = null, status = "active"
     } = req.body;
 
     if (!admissionNumber || !firstName || !lastName || !gender)
-      return res.status(400).json({ message: "admissionNumber, firstName, lastName and gender are required" });
+      return res.status(400).json({ message: "admissionNumber, firstName, lastName, gender are required" });
 
-    // Resolve class_name from classId if not provided
-    let resolvedClassName = className;
-    if (!resolvedClassName && classId) {
+    // Resolve classId from className if not provided
+    let resolvedClassId = classId;
+    let resolvedClassName = className || null;
+    if (className && !classId) {
       const [cls] = await pool.query(
-        `SELECT class_name FROM classes WHERE class_id = ? AND school_id = ? AND is_deleted = 0 LIMIT 1`,
-        [classId, schoolId]
+        `SELECT class_id FROM classes WHERE school_id=? AND class_name=? LIMIT 1`,
+        [schoolId, className]
       );
-      if (cls.length) resolvedClassName = cls[0].class_name;
+      if (cls.length) resolvedClassId = cls[0].class_id;
     }
 
     const [result] = await pool.query(
-      `INSERT INTO students
-        (school_id, admission_number, first_name, last_name, gender, class_id, class_name,
-          date_of_birth, phone, email, address, parent_name, parent_phone, admission_date, status)
+      `INSERT INTO students (school_id, class_id, class_name, admission_number, first_name, last_name,
+        gender, date_of_birth, phone, email, address, parent_name, parent_phone, admission_date, status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [schoolId, admissionNumber, firstName, lastName, gender,
-      classId, resolvedClassName,
-      dateOfBirth, phone, email, address, parentName, parentPhone, admissionDate, status]
+      [schoolId, resolvedClassId, resolvedClassName, admissionNumber, firstName, lastName,
+      gender, dateOfBirth, phone, email, address, parentName, parentPhone,
+      admissionDate || new Date().toISOString().slice(0,10), status]
     );
-    res.status(201).json({ studentId: result.insertId });
+
+    // Auto-create student portal account (login: admissionNumber, pass: admissionNumber)
+    try {
+      const hash = await bcrypt.hash(admissionNumber, 10);
+      await pool.query(
+        `INSERT IGNORE INTO users (school_id, student_id, full_name, email, password_hash, role, status)
+        VALUES (?, ?, ?, ?, ?, 'student', 'active')`,
+        [schoolId, result.insertId, `${firstName} ${lastName}`, admissionNumber, hash]
+      );
+    } catch { /* ignore if account already exists */ }
+
+    // Return the full new student row so frontend can update state correctly
+    const [newRow] = await pool.query(
+      `SELECT * FROM students WHERE student_id=? LIMIT 1`,
+      [result.insertId]
+    );
+    logActivity(req, { action:"student.create", entity:"student", entityId:result.insertId, description:`Student admitted: ${req.body.firstName} ${req.body.lastName}` });
+    res.status(201).json(newRow[0]);
   } catch (err) {
     if (err.code === "ER_DUP_ENTRY")
       return res.status(409).json({ message: "Admission number already exists" });
@@ -77,58 +94,39 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-// ─── PUT update ──────────────────────────────────────────────────────────────
-router.put("/:id", async (req, res, next) => {
+router.put("/:id", requireRoles("admin","teacher"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const {
-      firstName, lastName, gender,
-      classId,              // may be null/undefined
-      className,            // optional override
-      dateOfBirth, phone, email, address,
-      parentName, parentPhone,
-      status,
+      firstName, lastName, gender, className, classId,
+      dateOfBirth, phone, parentName, parentPhone, email, address, status
     } = req.body;
 
-    if (!firstName || !lastName)
-      return res.status(400).json({ message: "firstName and lastName are required" });
-
-    // Resolve class_name for the denormalised column
-    let resolvedClassName = className ?? null;
-    const resolvedClassId = classId != null ? Number(classId) : null;
-
-    if (!resolvedClassName && resolvedClassId) {
+    let resolvedClassId = classId || null;
+    if (className && !classId) {
       const [cls] = await pool.query(
-        `SELECT class_name FROM classes WHERE class_id = ? AND school_id = ? AND is_deleted = 0 LIMIT 1`,
-        [resolvedClassId, schoolId]
+        `SELECT class_id FROM classes WHERE school_id=? AND class_name=? LIMIT 1`,
+        [schoolId, className]
       );
-      if (cls.length) resolvedClassName = cls[0].class_name;
+      if (cls.length) resolvedClassId = cls[0].class_id;
     }
 
     const [result] = await pool.query(
-      `UPDATE students
-      SET first_name=?, last_name=?, gender=?,
-            class_id=?, class_name=?,
-            date_of_birth=?, phone=?, email=?, address=?,
-            parent_name=?, parent_phone=?,
-            status=?, updated_at=CURRENT_TIMESTAMP
-        WHERE student_id=? AND school_id=? AND is_deleted=0`,
-      [
-        firstName, lastName, gender,
-        resolvedClassId, resolvedClassName,
-        dateOfBirth || null, phone || null, email || null, address || null,
-        parentName || null, parentPhone || null,
-        status || "active",
-        req.params.id, schoolId,
-      ]
+      `UPDATE students SET first_name=?, last_name=?, gender=?, class_id=?, class_name=?,
+      date_of_birth=?, phone=?, email=?, address=?, parent_name=?, parent_phone=?,
+      status=?, updated_at=CURRENT_TIMESTAMP
+      WHERE student_id=? AND school_id=? AND is_deleted=0`,
+      [firstName, lastName, gender, resolvedClassId, className||null,
+      dateOfBirth||null, phone||null, email||null, address||null,
+      parentName||null, parentPhone||null, status||"active",
+      req.params.id, schoolId]
     );
     if (!result.affectedRows) return res.status(404).json({ message: "Student not found" });
     res.json({ updated: true });
   } catch (err) { next(err); }
 });
 
-// ─── DELETE soft delete ───────────────────────────────────────────────────────
-router.delete("/:id", async (req, res, next) => {
+router.delete("/:id", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const [result] = await pool.query(

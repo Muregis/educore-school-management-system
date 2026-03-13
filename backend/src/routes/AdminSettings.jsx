@@ -1,0 +1,753 @@
+import { useState } from "react";
+import { apiFetch } from "../lib/api";
+import PropTypes from "prop-types";
+
+// ─── DESIGN TOKENS (matching EduCore) ────────────────────────────────────────
+const C = {
+  bg: "#080C14",
+  surface: "#0E1420",
+  card: "#121929",
+  border: "#1E2D47",
+  accent: "#3B82F6",
+  accentGlow: "rgba(59,130,246,0.12)",
+  accentDim: "#1D3461",
+  teal: "#14B8A6",
+  tealDim: "#0D3330",
+  amber: "#F59E0B",
+  amberDim: "#3D2200",
+  rose: "#F43F5E",
+  roseDim: "#3D0015",
+  green: "#22C55E",
+  greenDim: "#0D2E1A",
+  purple: "#A855F7",
+  purpleDim: "#2D1554",
+  text: "#E2EAF8",
+  textSub: "#7A92B8",
+  textMuted: "#3D5070",
+};
+
+// ─── ICONS ────────────────────────────────────────────────────────────────────
+const Icon = ({ name, size = 16, color = "currentColor" }) => {
+  const icons = {
+    school:   <><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></>,
+    users:    <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
+    lock:     <><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+    bell:     <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>,
+    settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
+    save:     <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>,
+    edit:     <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>,
+    trash:    <><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></>,
+    plus:     <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    check:    <><polyline points="20 6 9 17 4 12"/></>,
+    x:        <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    eye:      <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
+    eyeOff:   <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></>,
+    shield:   <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></>,
+    calendar: <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
+    phone:    <><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.18 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6.29 6.29l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></>,
+    mail:     <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></>,
+    map:      <><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>,
+    user:     <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+    key:      <><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></>,
+    toggle:   <><rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="16" cy="12" r="3"/></>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {icons[name] || null}
+    </svg>
+  );
+};
+
+Icon.propTypes = { name: PropTypes.string.isRequired, size: PropTypes.number, color: PropTypes.string };
+
+// ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
+const inputStyle = {
+  width: "100%", background: C.surface, border: `1px solid ${C.border}`,
+  borderRadius: 10, padding: "10px 14px", color: C.text, fontSize: 14,
+  outline: "none", boxSizing: "border-box",
+};
+
+const Field = ({ label, hint, children }) => (
+  <div style={{ marginBottom: 18 }}>
+    <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.textSub, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</label>
+    {children}
+    {hint && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{hint}</div>}
+  </div>
+);
+
+Field.propTypes = { label: PropTypes.string.isRequired, hint: PropTypes.string, children: PropTypes.node.isRequired };
+
+const Inp = ({ label, hint, type = "text", value, onChange, placeholder }) => (
+  <Field label={label} hint={hint}>
+    <input type={type} value={value} onChange={onChange} placeholder={placeholder} style={inputStyle} />
+  </Field>
+);
+
+Inp.propTypes = { label: PropTypes.string.isRequired, hint: PropTypes.string, type: PropTypes.string, value: PropTypes.string.isRequired, onChange: PropTypes.func.isRequired, placeholder: PropTypes.string };
+
+const Sel = ({ label, hint, value, onChange, options }) => (
+  <Field label={label} hint={hint}>
+    <select value={value} onChange={onChange} style={{ ...inputStyle, cursor: "pointer" }}>
+      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  </Field>
+);
+
+Sel.propTypes = { label: PropTypes.string.isRequired, hint: PropTypes.string, value: PropTypes.string.isRequired, onChange: PropTypes.func.isRequired, options: PropTypes.array.isRequired };
+
+const Btn = ({ children, onClick, variant = "primary", icon, color }) => {
+  const vs = {
+    primary: { background: color || C.accent, color: "#fff", border: "none" },
+    ghost:   { background: "transparent", color: C.textSub, border: `1px solid ${C.border}` },
+    danger:  { background: C.roseDim, color: C.rose, border: `1px solid ${C.rose}44` },
+    success: { background: C.greenDim, color: C.green, border: `1px solid ${C.green}44` },
+  };
+  return (
+    <button onClick={onClick} style={{ ...vs[variant], borderRadius: 10, padding: "9px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7 }}>
+      {icon && <Icon name={icon} size={14} color="currentColor" />}{children}
+    </button>
+  );
+};
+
+Btn.propTypes = { children: PropTypes.node.isRequired, onClick: PropTypes.func.isRequired, variant: PropTypes.string, icon: PropTypes.string, color: PropTypes.string };
+
+// Toast notification
+const Toast = ({ msg, type, onDone }) => {
+  const colors = { success: C.green, error: C.rose, info: C.accent };
+  const color = colors[type] || C.accent;
+  return (
+    <div style={{
+      position: "fixed", bottom: 28, right: 28, zIndex: 2000,
+      background: C.card, border: `1px solid ${color}44`,
+      borderLeft: `4px solid ${color}`, borderRadius: 12,
+      padding: "14px 20px", display: "flex", alignItems: "center", gap: 12,
+      boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
+      animation: "slideIn 0.3s ease",
+    }}>
+      <Icon name={type === "success" ? "check" : type === "error" ? "x" : "bell"} size={16} color={color} />
+      <span style={{ fontSize: 13, color: C.text, fontWeight: 500 }}>{msg}</span>
+      <button onClick={onDone} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", marginLeft: 8 }}>
+        <Icon name="x" size={14} />
+      </button>
+      <style>{`@keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
+    </div>
+  );
+};
+
+Toast.propTypes = { msg: PropTypes.string, type: PropTypes.string, onDone: PropTypes.func };
+
+// Toggle switch
+const Toggle = ({ value, onChange, label, description }) => (
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: `1px solid ${C.border}` }}>
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{label}</div>
+      {description && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{description}</div>}
+    </div>
+    <div onClick={() => onChange(!value)} style={{
+      width: 44, height: 24, borderRadius: 99, cursor: "pointer", position: "relative",
+      background: value ? C.accent : C.border, transition: "background 0.2s",
+      flexShrink: 0,
+    }}>
+      <div style={{
+        position: "absolute", top: 3, left: value ? 23 : 3,
+        width: 18, height: 18, borderRadius: "50%", background: "#fff",
+        transition: "left 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+      }} />
+    </div>
+  </div>
+);
+
+Toggle.propTypes = { value: PropTypes.bool.isRequired, onChange: PropTypes.func.isRequired, label: PropTypes.string.isRequired, description: PropTypes.string };
+
+// Section card wrapper
+const Section = ({ title, subtitle, icon, color = C.accent, dim = C.accentGlow, children }) => (
+  <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, overflow: "hidden", marginBottom: 20 }}>
+    <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ background: dim, borderRadius: 10, padding: 9 }}>
+        <Icon name={icon} size={16} color={color} />
+      </div>
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 1 }}>{subtitle}</div>}
+      </div>
+    </div>
+    <div style={{ padding: 24 }}>{children}</div>
+  </div>
+);
+
+Section.propTypes = { title: PropTypes.string.isRequired, subtitle: PropTypes.string, icon: PropTypes.string.isRequired, color: PropTypes.string, dim: PropTypes.string, children: PropTypes.node.isRequired };
+
+// ─── MOCK USER ACCOUNTS ───────────────────────────────────────────────────────
+const INITIAL_USERS = [
+  { id: 1, name: "Mrs. Wanjiku",   email: "wanjiku@greenfield.ac.ke",  role: "admin",   status: "active",   initials: "MW", color: [C.accent, C.purple] },
+  { id: 2, name: "Grace Akinyi",   email: "g.akinyi@greenfield.ac.ke", role: "teacher", status: "active",   initials: "GA", color: [C.teal, C.accent] },
+  { id: 3, name: "James Mwangi",   email: "j.mwangi@greenfield.ac.ke", role: "teacher", status: "active",   initials: "JM", color: [C.amber, C.rose] },
+  { id: 4, name: "Priya Shah",     email: "p.shah@greenfield.ac.ke",   role: "teacher", status: "active",   initials: "PS", color: [C.purple, C.teal] },
+  { id: 5, name: "Samuel Korir",   email: "s.korir@greenfield.ac.ke",  role: "viewer",  status: "inactive", initials: "SK", color: [C.rose, C.amber] },
+];
+
+const ROLE_META = {
+  admin:   { label: "Admin",   color: C.purple, dim: C.purpleDim },
+  teacher: { label: "Teacher", color: C.teal,   dim: C.tealDim },
+  viewer:  { label: "Viewer",  color: C.amber,  dim: C.amberDim },
+};
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+// ─── ACTIVITY LOGS TAB ───────────────────────────────────────────────────────
+const ActivityLogsTab = ({ auth }) => {
+  const [logs, setLogs]       = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter]   = useState("");
+
+  useEffect(() => {
+    apiFetch("/activity-logs?limit=200", { token: auth?.token })
+      .then(d => { setLogs(d.logs || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [auth]);
+
+  const filtered = filter
+    ? logs.filter(l => l.action?.includes(filter) || l.user_name?.toLowerCase().includes(filter.toLowerCase()) || l.description?.toLowerCase().includes(filter.toLowerCase()))
+    : logs;
+
+  const actionColor = (action) => {
+    if (action?.startsWith("auth"))     return "#a78bfa";
+    if (action?.startsWith("payment"))  return "#4ade80";
+    if (action?.startsWith("student"))  return "#60a5fa";
+    if (action?.startsWith("grade"))    return "#f59e0b";
+    return "#94a3b8";
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom:16 }}>
+        <input value={filter} onChange={e => setFilter(e.target.value)}
+          placeholder="Filter by action, user or description..."
+          style={{ background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)",
+            borderRadius:8, padding:"8px 12px", color:"#fff", fontSize:13, width:"100%", maxWidth:360 }} />
+      </div>
+      {loading ? <div style={{ color:"#94a3b8" }}>Loading...</div> : (
+        <div style={{ display:"flex", flexDirection:"column", gap:6, maxHeight:520, overflowY:"auto" }}>
+          {filtered.length === 0 && <div style={{ color:"#94a3b8", fontSize:13 }}>No activity logs found.</div>}
+          {filtered.map(log => (
+            <div key={log.log_id} style={{ display:"flex", alignItems:"flex-start", gap:12,
+              background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)",
+              borderRadius:8, padding:"10px 14px" }}>
+              <div style={{ width:8, height:8, borderRadius:"50%", background:actionColor(log.action),
+                marginTop:5, flexShrink:0 }} />
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap" }}>
+                  <span style={{ fontSize:12, fontWeight:700, color:actionColor(log.action),
+                    background:actionColor(log.action)+"22", padding:"1px 7px", borderRadius:4 }}>
+                    {log.action}
+                  </span>
+                  {log.user_name && <span style={{ fontSize:12, color:"#94a3b8" }}>by {log.user_name}</span>}
+                  <span style={{ fontSize:11, color:"#64748b", marginLeft:"auto" }}>
+                    {new Date(log.created_at).toLocaleString()}
+                  </span>
+                </div>
+                {log.description && <div style={{ fontSize:12, color:"#cbd5e1", marginTop:3 }}>{log.description}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+ActivityLogsTab.propTypes = { auth: PropTypes.object };
+
+// ─── BACKUPS TAB ──────────────────────────────────────────────────────────────
+const BackupsTab = ({ auth }) => {
+  const [backups, setBackups]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [running, setRunning]   = useState(false);
+  const [message, setMessage]   = useState(null);
+
+  const load = () => {
+    apiFetch("/admin/backups", { token: auth?.token })
+      .then(d => { setBackups(d.backups || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(load, [auth]);
+
+  const triggerBackup = async () => {
+    setRunning(true); setMessage(null);
+    try {
+      const res = await apiFetch("/admin/backups", { method:"POST", token: auth?.token });
+      setMessage({ type:"success", text:`✅ ${res.message} — ${res.filename} (${res.sizeKb} KB)` });
+      load();
+    } catch(e) {
+      setMessage({ type:"error", text:`❌ Backup failed: ${e.message}` });
+    }
+    setRunning(false);
+  };
+
+  const deleteBackup = async (filename) => {
+    if (!confirm(`Delete ${filename}?`)) return;
+    try {
+      await apiFetch(`/admin/backups/${filename}`, { method:"DELETE", token: auth?.token });
+      load();
+    } catch(e) { alert(e.message); }
+  };
+
+  return (
+    <div>
+      <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16, flexWrap:"wrap" }}>
+        <button onClick={triggerBackup} disabled={running} style={{
+          background: running ? "#334155" : "linear-gradient(135deg,#3B82F6,#6366f1)",
+          color:"#fff", border:"none", borderRadius:8, padding:"9px 20px",
+          fontWeight:700, fontSize:13, cursor: running ? "not-allowed" : "pointer",
+        }}>{running ? "⏳ Running backup..." : "💾 Run Backup Now"}</button>
+        <span style={{ fontSize:12, color:"#94a3b8" }}>Last 7 backups kept automatically. Backups run daily at midnight.</span>
+      </div>
+      {message && (
+        <div style={{ marginBottom:14, padding:"10px 14px", borderRadius:8, fontSize:13,
+          background: message.type === "success" ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)",
+          border: `1px solid ${message.type === "success" ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`,
+          color: message.type === "success" ? "#4ade80" : "#f87171" }}>
+          {message.text}
+        </div>
+      )}
+      {loading ? <div style={{ color:"#94a3b8" }}>Loading...</div> : (
+        backups.length === 0
+          ? <div style={{ color:"#94a3b8", fontSize:13 }}>No backups found. Run your first backup above.</div>
+          : <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {backups.map(b => (
+                <div key={b.filename} style={{ display:"flex", alignItems:"center", gap:12,
+                  background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)",
+                  borderRadius:8, padding:"10px 16px" }}>
+                  <span style={{ fontSize:18 }}>🗄️</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:600, color:"#e2e8f0" }}>{b.filename}</div>
+                    <div style={{ fontSize:11, color:"#94a3b8" }}>
+                      {b.sizeKb} KB · {new Date(b.createdAt).toLocaleString()}
+                    </div>
+                  </div>
+                  <a href={`${import.meta.env.VITE_API_URL}/admin/backups/${b.filename}/download`}
+                    style={{ fontSize:12, color:"#60a5fa", textDecoration:"none", fontWeight:600 }}>
+                    ⬇ Download
+                  </a>
+                  <button onClick={() => deleteBackup(b.filename)} style={{
+                    background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.3)",
+                    color:"#f87171", borderRadius:6, padding:"4px 10px", fontSize:12, cursor:"pointer",
+                  }}>Delete</button>
+                </div>
+              ))}
+            </div>
+      )}
+    </div>
+  );
+};
+BackupsTab.propTypes = { auth: PropTypes.object };
+
+const TABS = [
+  { id: "school",        label: "School Info",    icon: "school" },
+  { id: "users",         label: "User Accounts",  icon: "users" },
+  { id: "security",      label: "Security",       icon: "shield" },
+  { id: "notifications", label: "Notifications",  icon: "bell" },
+  { id: "activity",      label: "Activity Logs",  icon: "log" },
+  { id: "backups",       label: "DB Backups",     icon: "database" },
+];
+
+// ─── SCHOOL INFO TAB ──────────────────────────────────────────────────────────
+const SchoolInfoTab = ({ onSave }) => {
+  const [form, setForm] = useState({
+    name:        "Greenfield Academy",
+    motto:       "Excellence in Every Child",
+    type:        "private",
+    curriculum:  "cbc",
+    email:       "admin@greenfield.ac.ke",
+    phone:       "+254 712 345 678",
+    address:     "123 Ngong Road, Nairobi",
+    county:      "Nairobi",
+    term:        "Term 2",
+    year:        "2025",
+    term_start:  "2025-05-05",
+    term_end:    "2025-08-01",
+    admin_name:  "Mrs. Wanjiku",
+    admin_title: "School Principal",
+  });
+  const f = k => e => setForm({ ...form, [k]: e.target.value });
+
+  return (
+    <div>
+      {/* School identity */}
+      <div style={{ background: C.accentGlow, border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: 20, marginBottom: 24, display: "flex", alignItems: "center", gap: 18 }}>
+        <div style={{ width: 64, height: 64, borderRadius: 16, background: `linear-gradient(135deg, ${C.accent}, #6366F1)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
+          🏫
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 17, fontWeight: 800, color: C.text }}>{form.name}</div>
+          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{form.motto}</div>
+          <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>
+            <span style={{ background: C.accentDim, borderRadius: 5, padding: "2px 8px", marginRight: 6, fontWeight: 600 }}>{form.curriculum.toUpperCase()}</span>
+            <span style={{ background: C.surface, borderRadius: 5, padding: "2px 8px", fontWeight: 600 }}>{form.type.charAt(0).toUpperCase() + form.type.slice(1)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
+        <Inp label="School Name" value={form.name} onChange={f("name")} placeholder="e.g. Greenfield Academy" />
+        <Inp label="School Motto" value={form.motto} onChange={f("motto")} placeholder="e.g. Excellence in Every Child" />
+        <Sel label="School Type" value={form.type} onChange={f("type")} options={[{value:"private",label:"Private"},{value:"public",label:"Public"},{value:"international",label:"International"}]} />
+        <Sel label="Curriculum" value={form.curriculum} onChange={f("curriculum")} options={[{value:"cbc",label:"CBC (Competency Based)"},{value:"844",label:"8-4-4"},{value:"igcse",label:"IGCSE"},{value:"ib",label:"IB"}]} />
+      </div>
+
+      <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Contact & Location</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
+        <Inp label="School Email" type="email" value={form.email} onChange={f("email")} placeholder="admin@school.ac.ke" />
+        <Inp label="Phone Number" value={form.phone} onChange={f("phone")} placeholder="+254 7XX XXX XXX" />
+        <Inp label="Physical Address" value={form.address} onChange={f("address")} placeholder="Street, Town" />
+        <Inp label="County" value={form.county} onChange={f("county")} placeholder="e.g. Nairobi" />
+      </div>
+
+      <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Current Academic Term</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0 24px" }}>
+        <Sel label="Term" value={form.term} onChange={f("term")} options={["Term 1","Term 2","Term 3"].map(t=>({value:t,label:t}))} />
+        <Inp label="Year" value={form.year} onChange={f("year")} placeholder="e.g. 2025" />
+        <Inp label="Term Start" type="date" value={form.term_start} onChange={f("term_start")} />
+        <Inp label="Term End" type="date" value={form.term_end} onChange={f("term_end")} />
+      </div>
+
+      <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Administrator</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
+        <Inp label="Admin Name" value={form.admin_name} onChange={f("admin_name")} placeholder="e.g. Mrs. Wanjiku" />
+        <Inp label="Admin Title / Role" value={form.admin_title} onChange={f("admin_title")} placeholder="e.g. School Principal" />
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+        <Btn icon="save" onClick={onSave}>Save School Info</Btn>
+      </div>
+    </div>
+  );
+};
+
+SchoolInfoTab.propTypes = { onSave: PropTypes.func.isRequired };
+
+// ─── USERS TAB ────────────────────────────────────────────────────────────────
+const UsersTab = ({ onSave }) => {
+  const [users, setUsers] = useState(INITIAL_USERS);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState({ name: "", email: "", role: "teacher", password: "" });
+  const [showPwd, setShowPwd] = useState(false);
+  const f = k => e => setForm({ ...form, [k]: e.target.value });
+
+  const initials = name => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const colorPairs = [[C.accent, C.purple],[C.teal, C.accent],[C.amber, C.rose],[C.purple, C.teal],[C.green, C.teal],[C.rose, C.amber]];
+
+  const addUser = () => {
+    if (!form.name || !form.email) return;
+    if (editId) {
+      setUsers(users.map(u => u.id === editId ? { ...u, name: form.name, email: form.email, role: form.role, initials: initials(form.name) } : u));
+      setEditId(null);
+    } else {
+      setUsers([...users, { id: Date.now(), name: form.name, email: form.email, role: form.role, status: "active", initials: initials(form.name), color: colorPairs[users.length % colorPairs.length] }]);
+    }
+    setForm({ name: "", email: "", role: "teacher", password: "" });
+    setShowAdd(false);
+    onSave();
+  };
+
+  const startEdit = u => {
+    setForm({ name: u.name, email: u.email, role: u.role, password: "" });
+    setEditId(u.id);
+    setShowAdd(true);
+  };
+
+  const toggleStatus = id => setUsers(users.map(u => u.id === id ? { ...u, status: u.status === "active" ? "inactive" : "active" } : u));
+  const deleteUser = id => setUsers(users.filter(u => u.id !== id));
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div style={{ fontSize: 13, color: C.textSub }}>{users.length} accounts · {users.filter(u => u.status === "active").length} active</div>
+        <Btn icon="plus" onClick={() => { setShowAdd(true); setEditId(null); setForm({ name: "", email: "", role: "teacher", password: "" }); }}>Add User</Btn>
+      </div>
+
+      {/* Add / Edit form */}
+      {showAdd && (
+        <div style={{ background: C.surface, border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: 20, marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 16 }}>{editId ? "Edit User" : "New User Account"}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+            <Inp label="Full Name" value={form.name} onChange={f("name")} placeholder="e.g. Grace Akinyi" />
+            <Inp label="Email Address" type="email" value={form.email} onChange={f("email")} placeholder="user@school.ac.ke" />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+            <Sel label="Role" value={form.role} onChange={f("role")} options={[{value:"admin",label:"Admin — Full access"},{value:"teacher",label:"Teacher — Limited access"},{value:"viewer",label:"Viewer — Read only"}]} />
+            <Field label="Password" hint={editId ? "Leave blank to keep current password" : ""}>
+              <div style={{ position: "relative" }}>
+                <input type={showPwd ? "text" : "password"} value={form.password} onChange={f("password")} placeholder={editId ? "••••••••" : "Set password"} style={{ ...inputStyle, paddingRight: 40 }} />
+                <button onClick={() => setShowPwd(!showPwd)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.textMuted, cursor: "pointer" }}>
+                  <Icon name={showPwd ? "eyeOff" : "eye"} size={15} />
+                </button>
+              </div>
+            </Field>
+          </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Btn variant="ghost" onClick={() => { setShowAdd(false); setEditId(null); }}>Cancel</Btn>
+            <Btn icon="save" onClick={addUser}>{editId ? "Save Changes" : "Create Account"}</Btn>
+          </div>
+        </div>
+      )}
+
+      {/* User list */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {users.map(u => {
+          const role = ROLE_META[u.role];
+          return (
+            <div key={u.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14 }}>
+              {/* Avatar */}
+              <div style={{ width: 42, height: 42, borderRadius: "50%", background: `linear-gradient(135deg, ${u.color[0]}, ${u.color[1]})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: "#fff", flexShrink: 0 }}>
+                {u.initials}
+              </div>
+              {/* Info */}
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{u.name}</span>
+                  <span style={{ background: role.dim, color: role.color, borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em" }}>{role.label}</span>
+                  {u.status === "inactive" && <span style={{ background: C.roseDim, color: C.rose, borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>Inactive</span>}
+                </div>
+                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{u.email}</div>
+              </div>
+              {/* Actions */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button onClick={() => toggleStatus(u.id)} title={u.status === "active" ? "Deactivate" : "Activate"}
+                  style={{ background: u.status === "active" ? C.greenDim : C.roseDim, border: "none", borderRadius: 8, padding: "6px 10px", cursor: "pointer", color: u.status === "active" ? C.green : C.rose, fontSize: 11, fontWeight: 700 }}>
+                  {u.status === "active" ? "Active" : "Inactive"}
+                </button>
+                <button onClick={() => startEdit(u)} style={{ background: C.accentGlow, border: `1px solid ${C.accentDim}`, borderRadius: 8, padding: 7, cursor: "pointer", color: C.accent }}>
+                  <Icon name="edit" size={13} />
+                </button>
+                <button onClick={() => deleteUser(u.id)} style={{ background: C.roseDim, border: `1px solid ${C.rose}33`, borderRadius: 8, padding: 7, cursor: "pointer", color: C.rose }}>
+                  <Icon name="trash" size={13} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+UsersTab.propTypes = { onSave: PropTypes.func.isRequired };
+
+// ─── SECURITY TAB ─────────────────────────────────────────────────────────────
+const SecurityTab = ({ onSave }) => {
+  const [form, setForm] = useState({ current: "", newPwd: "", confirm: "" });
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [toggles, setToggles] = useState({
+    twoFactor: false,
+    sessionTimeout: true,
+    loginAlerts: true,
+    passwordExpiry: false,
+  });
+  const f = k => e => setForm({ ...form, [k]: e.target.value });
+  const t = k => v => setToggles({ ...toggles, [k]: v });
+
+  const strength = pwd => {
+    if (!pwd) return { label: "", color: C.border, width: 0 };
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+    const levels = [
+      { label: "Weak",   color: C.rose,  width: 25 },
+      { label: "Fair",   color: C.amber, width: 50 },
+      { label: "Good",   color: C.teal,  width: 75 },
+      { label: "Strong", color: C.green, width: 100 },
+    ];
+    return levels[score - 1] || levels[0];
+  };
+
+  const str = strength(form.newPwd);
+
+  const PwdField = ({ label, val, show, setShow, onChange, placeholder }) => (
+    <Field label={label}>
+      <div style={{ position: "relative" }}>
+        <input type={show ? "text" : "password"} value={val} onChange={onChange} placeholder={placeholder}
+          style={{ ...inputStyle, paddingRight: 42 }} />
+        <button onClick={() => setShow(!show)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.textMuted, cursor: "pointer" }}>
+          <Icon name={show ? "eyeOff" : "eye"} size={15} />
+        </button>
+      </div>
+    </Field>
+  );
+
+  return (
+    <div>
+      {/* Change password */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Change Password</div>
+        <PwdField label="Current Password" val={form.current} show={showCurrent} setShow={setShowCurrent} onChange={f("current")} placeholder="Enter current password" />
+        <PwdField label="New Password" val={form.newPwd} show={showNew} setShow={setShowNew} onChange={f("newPwd")} placeholder="Min 8 characters" />
+        {form.newPwd && (
+          <div style={{ marginBottom: 16, marginTop: -8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: C.textMuted }}>Password strength</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: str.color }}>{str.label}</span>
+            </div>
+            <div style={{ background: C.border, borderRadius: 99, height: 5 }}>
+              <div style={{ width: `${str.width}%`, background: str.color, borderRadius: 99, height: "100%", transition: "width 0.3s, background 0.3s" }} />
+            </div>
+          </div>
+        )}
+        <Field label="Confirm New Password">
+          <input type="password" value={form.confirm} onChange={f("confirm")} placeholder="Re-enter new password"
+            style={{ ...inputStyle, borderColor: form.confirm && form.confirm !== form.newPwd ? C.rose : C.border }} />
+          {form.confirm && form.confirm !== form.newPwd && (
+            <div style={{ fontSize: 11, color: C.rose, marginTop: 4 }}>Passwords do not match</div>
+          )}
+        </Field>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4, marginBottom: 24 }}>
+          <Btn icon="key" onClick={onSave}>Update Password</Btn>
+        </div>
+      </div>
+
+      <div style={{ height: 1, background: C.border, marginBottom: 20 }} />
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Security Preferences</div>
+
+      <Toggle value={toggles.twoFactor} onChange={t("twoFactor")} label="Two-Factor Authentication" description="Require a verification code on login" />
+      <Toggle value={toggles.sessionTimeout} onChange={t("sessionTimeout")} label="Auto Session Timeout" description="Log out inactive sessions after 30 minutes" />
+      <Toggle value={toggles.loginAlerts} onChange={t("loginAlerts")} label="Login Alerts" description="Send email when a new device logs in" />
+      <Toggle value={toggles.passwordExpiry} onChange={t("passwordExpiry")} label="Password Expiry" description="Require password change every 90 days" />
+    </div>
+  );
+};
+
+SecurityTab.propTypes = { onSave: PropTypes.func.isRequired };
+
+// ─── NOTIFICATIONS TAB ────────────────────────────────────────────────────────
+const NotificationsTab = ({ onSave }) => {
+  const [toggles, setToggles] = useState({
+    feeReminders: true,
+    attendanceAlerts: true,
+    newStudentAlert: true,
+    gradeUpdates: false,
+    weeklyReport: true,
+    smsEnabled: false,
+    emailEnabled: true,
+    systemUpdates: true,
+  });
+  const t = k => v => setToggles({ ...toggles, [k]: v });
+
+  const groups = [
+    {
+      label: "Academic Alerts",
+      items: [
+        { key: "attendanceAlerts", label: "Attendance Alerts", desc: "Notify when a student is absent 3+ days in a row" },
+        { key: "gradeUpdates",     label: "Grade Updates",     desc: "Notify when new results are entered" },
+        { key: "weeklyReport",     label: "Weekly Summary",    desc: "Send a weekly performance digest every Friday" },
+      ]
+    },
+    {
+      label: "Finance Alerts",
+      items: [
+        { key: "feeReminders", label: "Fee Payment Reminders", desc: "Send reminders for pending fee balances" },
+      ]
+    },
+    {
+      label: "Admin Alerts",
+      items: [
+        { key: "newStudentAlert", label: "New Student Registered", desc: "Notify when a new student is added to the system" },
+        { key: "systemUpdates",   label: "System Updates",         desc: "Get notified about new features and maintenance" },
+      ]
+    },
+    {
+      label: "Delivery Channels",
+      items: [
+        { key: "emailEnabled", label: "Email Notifications", desc: "Send notifications to admin@greenfield.ac.ke" },
+        { key: "smsEnabled",   label: "SMS Notifications",   desc: "Send SMS to registered phone number (charges apply)" },
+      ]
+    },
+  ];
+
+  return (
+    <div>
+      {groups.map(group => (
+        <div key={group.label} style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>{group.label}</div>
+          {group.items.map(item => (
+            <Toggle key={item.key} value={toggles[item.key]} onChange={t(item.key)} label={item.label} description={item.desc} />
+          ))}
+        </div>
+      ))}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+        <Btn icon="save" onClick={onSave}>Save Preferences</Btn>
+      </div>
+    </div>
+  );
+};
+
+NotificationsTab.propTypes = { onSave: PropTypes.func.isRequired };
+
+// ─── ADMIN SETTINGS PAGE ──────────────────────────────────────────────────────
+export default function AdminSettings({ auth }) {
+  const [activeTab, setActiveTab] = useState("school");
+  const [toast, setToast] = useState(null);
+
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const renderTab = () => {
+    const save = () => showToast("Changes saved successfully!");
+    switch (activeTab) {
+      case "school":        return <SchoolInfoTab onSave={save} />;
+      case "users":         return <UsersTab onSave={save} />;
+      case "security":      return <SecurityTab onSave={save} />;
+      case "notifications": return <NotificationsTab onSave={save} />;
+      case "activity":      return <ActivityLogsTab auth={auth} />;
+      case "backups":       return <BackupsTab auth={auth} />;
+      default:              return null;
+    }
+  };
+
+  return (
+    <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", color: C.text }}>
+      {/* Tab bar */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 24, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 6 }}>
+        {TABS.map(tab => {
+          const active = activeTab === tab.id;
+          return (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              padding: "9px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 13, fontWeight: active ? 700 : 500,
+              background: active ? C.accentGlow : "transparent",
+              color: active ? C.accent : C.textSub,
+              outline: active ? `1px solid ${C.accentDim}` : "none",
+              transition: "all 0.15s",
+            }}>
+              <Icon name={tab.icon} size={14} color={active ? C.accent : C.textMuted} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab content in section card */}
+      <Section
+        title={TABS.find(t => t.id === activeTab)?.label}
+        subtitle={{
+          school:        "Manage your school's identity, contact info, and term dates",
+          users:         "Control who can access the system and what they can do",
+          security:      "Password management and login security settings",
+          notifications: "Choose what alerts you receive and how they're delivered",
+        }[activeTab]}
+        icon={TABS.find(t => t.id === activeTab)?.icon}
+      >
+        {renderTab()}
+      </Section>
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onDone={() => setToast(null)} />}
+    </div>
+  );
+}

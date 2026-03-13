@@ -8,6 +8,21 @@ const router = Router();
 router.use(authRequired);
 router.use(requireRoles("admin"));
 
+// GET /api/accounts/users — list all portal users in this school (admin-only)
+router.get("/users", async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const [rows] = await pool.query(
+      `SELECT user_id, full_name, email, phone, role, status, created_at
+      FROM users
+      WHERE school_id = ? AND is_deleted = 0
+      ORDER BY role, full_name`,
+      [schoolId]
+    );
+    res.json(rows);
+  } catch (err) { next(err); }
+});
+
 // ─── STAFF ACCOUNTS ───────────────────────────────────────────────────────────
 
 // GET /api/accounts/staff — list all staff (admin / teacher / finance)

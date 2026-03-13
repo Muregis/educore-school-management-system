@@ -2,6 +2,8 @@ import { Router } from "express";
 import { pool } from "../config/db.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
+import { sendEmail, isEmailConfigured, templates } from "../services/email.service.js";
+import { logActivity } from "../helpers/activity.logger.js";
 
 const router = Router();
 router.use(authRequired);
@@ -79,6 +81,37 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [schoolId, studentId, amount, feeType, paymentMethod, referenceNumber, paymentDate, status, term, paidBy]
     );
+
+    // ── Email notification (fire-and-forget) ──
+    if (isEmailConfigured()) {
+      try {
+        const [[student]] = await pool.query(
+          `SELECT s.first_name, s.last_name, s.parent_name,
+          u.email,
+          COALESCE(SUM(i.amount_due),0) - COALESCE(SUM(p2.paid),0) AS balance
+          FROM students s
+          LEFT JOIN users u ON u.student_id = s.student_id AND u.role = 'parent' AND u.is_deleted = 0
+          LEFT JOIN invoices i ON i.student_id = s.student_id AND i.school_id = s.school_id AND i.is_deleted = 0
+          LEFT JOIN (SELECT invoice_id, SUM(amount) AS paid FROM payments WHERE school_id=? AND is_deleted=0 GROUP BY invoice_id) p2 ON p2.invoice_id = i.invoice_id
+          WHERE s.student_id = ? AND s.school_id = ?
+          GROUP BY s.student_id, u.email`, [schoolId, studentId, schoolId]
+        );
+        if (student?.email) {
+          sendEmail({
+            to: student.email,
+            subject: `Payment Received — ${term}`,
+            html: templates.paymentReceived({
+              parentName:   student.parent_name || "Parent/Guardian",
+              studentName:  `${student.first_name} ${student.last_name}`,
+              amount, term, balance: student.balance,
+            }),
+            schoolId,
+          }).catch(() => {});
+        }
+      } catch (_) {}
+    }
+
+    logActivity(req, { action:"payment.create", entity:"payment", entityId:result.insertId, description:`KES ${amount} recorded for student ${studentId}` });
     res.status(201).json({ paymentId: result.insertId });
   } catch (err) { next(err); }
 });

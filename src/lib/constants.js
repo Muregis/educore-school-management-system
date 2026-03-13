@@ -31,8 +31,8 @@ export const DEFAULTS = {
 };
 
 export const ROLE = {
-  admin:     { pages:["dashboard","students","staff","attendance","grades","fees","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","accounts","hr","library","settings"], edit:true },
-  teacher:   { pages:["dashboard","students","attendance","grades","reportcards","discipline","timetable","communication","library"], edit:true },
+  admin:     { pages:["dashboard","students","staff","attendance","grades","fees","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analysis","accounts","hr","library","lessonplans","pendingplans","settings"], edit:true },
+  teacher:   { pages:["dashboard","students","attendance","grades","reportcards","discipline","timetable","communication","library","analysis","lessonplans"], edit:true },
   finance:   { pages:["dashboard","fees","invoices"], edit:true },
   hr:        { pages:["dashboard","hr","staff"], edit:true },
   librarian: { pages:["dashboard","library"], edit:true },
@@ -55,6 +55,7 @@ export const NAV = [
   { id:"communication", label:"Communication",icon:"💬" },
   { id:"timetable",     label:"Timetable",    icon:"🗓" },
   { id:"reports",       label:"Reports",      icon:"📈" },
+  { id:"analysis",      label:"Analysis",     icon:"🤖" },
   { id:"accounts",      label:"Accounts",     icon:"🔑" },
   { id:"hr",            label:"HR",           icon:"🧑" },
   { id:"library",       label:"Library",      icon:"📚" },

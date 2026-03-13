@@ -11,24 +11,50 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   const [books, setBooks] = useState([]);
   const [borrowRecords, setBorrowRecords] = useState([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
+  const [lessonPlans, setLessonPlans] = useState([]);
+  const [lessonPlansLoading, setLessonPlansLoading] = useState(false);
+  const [lessonPlansError, setLessonPlansError] = useState("");
 
   // Load library data for librarian
   useEffect(() => {
-    if (auth?.role === "librarian" && auth?.token) {
-      setLibraryLoading(true);
-      Promise.all([
-        apiFetch("/library/books", { token: auth.token }).catch(() => []),
-        apiFetch("/library/borrow-records", { token: auth.token }).catch(() => [])
-      ]).then(([booksData, borrowsData]) => {
-        setBooks(Array.isArray(booksData) ? booksData : []);
-        setBorrowRecords(Array.isArray(borrowsData) ? borrowsData : []);
-      }).catch(() => {
-        // Silent fail for library data
-      }).finally(() => {
-        setLibraryLoading(false);
-      });
-    }
+    if (!(auth?.role === "librarian" && auth?.token)) return;
+    const ac = new AbortController();
+    setLibraryLoading(true);
+    Promise.all([
+      apiFetch("/library/books", { token: auth.token, signal: ac.signal }).catch(() => []),
+      apiFetch("/library/borrow-records", { token: auth.token, signal: ac.signal }).catch(() => [])
+    ]).then(([booksData, borrowsData]) => {
+      setBooks(Array.isArray(booksData) ? booksData : []);
+      setBorrowRecords(Array.isArray(borrowsData) ? borrowsData : []);
+    }).catch(() => {
+      // Silent fail for library data
+    }).finally(() => {
+      setLibraryLoading(false);
+    });
+    return () => ac.abort();
   }, [auth]);
+
+  // Load lesson plans preview (admin + teacher dashboards)
+  useEffect(() => {
+    if (!auth?.token) return;
+    if (!["admin", "teacher"].includes(auth.role)) return;
+
+    const ac = new AbortController();
+    setLessonPlansLoading(true);
+    setLessonPlansError("");
+    const qs = auth.role === "admin" ? "?status=pending" : "";
+    apiFetch(`/lesson-plans${qs}`, { token: auth.token, signal: ac.signal })
+      .then(d => setLessonPlans(Array.isArray(d) ? d : []))
+      .catch(e => {
+        if (e?.code !== "EABORT") {
+          setLessonPlans([]);
+          setLessonPlansError(e?.message || "Failed to load lesson plans");
+        }
+      })
+      .finally(() => setLessonPlansLoading(false));
+
+    return () => ac.abort();
+  }, [auth?.token, auth?.role]);
 
   // Librarian dashboard
   if (auth?.role === "librarian") {
@@ -185,6 +211,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
 
   // Admin dashboard
   if (auth?.role === "admin") {
+    const pendingPlans = lessonPlansLoading ? "…" : lessonPlans.length;
     const cards = [
       ["Boys", boys],
       ["Girls", girls],
@@ -193,11 +220,12 @@ export default function DashboardPage({ auth, school, students, teachers, attend
       ["Present Records", present],
       ["Fees Collected", money(paid)],
       ["Outstanding", money(outstanding)],
+      ["Pending Plans", pendingPlans],
     ];
 
     return (
       <div style={{ display: "grid", gap: 14 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(8,1fr)", gap: 12 }}>
           {cards.map(x => (
             <div key={x[0]} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }}>
               <div style={{ color: C.textMuted, fontSize: 12 }}>{x[0]}</div>
@@ -241,6 +269,32 @@ export default function DashboardPage({ auth, school, students, teachers, attend
               </div>
             ))}
           </div>
+        </div>
+
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={{ color: C.text, fontWeight: 700 }}>Pending Lesson Plans</div>
+            <div style={{ color: C.textMuted, fontSize: 12 }}>Latest submissions</div>
+          </div>
+          {lessonPlansLoading ? (
+            <Msg text="Loading lesson plans..." />
+          ) : lessonPlansError ? (
+            <div style={{ color: "#f87171", fontSize: 13, padding: 10 }}>{lessonPlansError}</div>
+          ) : lessonPlans.length === 0 ? (
+            <div style={{ color: C.textMuted, fontSize: 13, padding: 10 }}>No pending lesson plans.</div>
+          ) : (
+            <Table
+              headers={["Teacher","Subject","Class","Term / Week","Status","Updated"]}
+              rows={lessonPlans.slice(0, 6).map(p => [
+                p.teacher_name || "-",
+                p.subject,
+                p.class_name,
+                `${p.term}${p.week ? ` · Wk ${p.week}` : ""}`,
+                <Badge key="st" text={p.status} tone={p.status === "pending" ? "warning" : "info"} />,
+                new Date(p.updated_at).toLocaleDateString(),
+              ])}
+            />
+          )}
         </div>
       </div>
     );
@@ -322,6 +376,31 @@ export default function DashboardPage({ auth, school, students, teachers, attend
               </div>
             ))}
           </div>
+        </div>
+
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={{ color: C.text, fontWeight: 700 }}>My Lesson Plans</div>
+            <div style={{ color: C.textMuted, fontSize: 12 }}>Recent documents</div>
+          </div>
+          {lessonPlansLoading ? (
+            <Msg text="Loading lesson plans..." />
+          ) : lessonPlansError ? (
+            <div style={{ color: "#f87171", fontSize: 13, padding: 10 }}>{lessonPlansError}</div>
+          ) : lessonPlans.length === 0 ? (
+            <div style={{ color: C.textMuted, fontSize: 13, padding: 10 }}>No lesson plans yet.</div>
+          ) : (
+            <Table
+              headers={["Type","Subject","Class","Status","Updated"]}
+              rows={lessonPlans.slice(0, 6).map(p => [
+                p.type === "scheme" ? "Scheme" : "Lesson",
+                p.subject,
+                p.class_name,
+                <Badge key="st" text={p.status} tone={p.status === "approved" ? "success" : p.status === "rejected" ? "danger" : p.status === "pending" ? "warning" : "info"} />,
+                new Date(p.updated_at).toLocaleDateString(),
+              ])}
+            />
+          )}
         </div>
       </div>
     );

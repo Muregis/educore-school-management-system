@@ -33,11 +33,12 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const [f, setF] = useState({ firstName: "", lastName: "", email: "", phone: "", status: "active", classes: [], timetable: "", subjects: [] });
 
   useEffect(() => {
-    if (auth?.token) {
-      apiFetch("/teachers", { token: auth.token })
-        .then(data => setTeachers(data.map(normalise)))
-        .catch(e => toast("Failed to fetch teachers", "error"));
-    }
+    if (!auth?.token) return;
+    const ac = new AbortController();
+    apiFetch("/teachers", { token: auth.token, signal: ac.signal })
+      .then(data => setTeachers(data.map(normalise)))
+      .catch(e => { if (e?.code !== "EABORT") toast("Failed to fetch teachers", "error"); });
+    return () => ac.abort();
   }, [auth, setTeachers]);
 
   const normalised = teachers.map(t => t.first_name ? normalise(t) : t);

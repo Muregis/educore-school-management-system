@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import FeeBlock from "../components/FeeBlock";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
 import Field from "../components/Field";
@@ -8,8 +9,7 @@ import Table from "../components/Table";
 import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
-import { Pager, Msg } from "../components/Helpers";
-import { csv, pager } from "../lib/utils";
+import { Pager, Msg, csv, pager } from "../components/Helpers";
 
 function normalise(a) {
   return {
@@ -22,7 +22,7 @@ function normalise(a) {
   };
 }
 
-export default function AttendancePage({ auth, students, attendance, setAttendance, canEdit, toast }) {
+export default function AttendancePage({ auth, students, attendance, setAttendance, canEdit, toast, feeBlocked = false, onGoFees}) {
   const [cls, setCls] = useState("Grade 7");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [filterClass, setFilterClass] = useState("all");
@@ -33,11 +33,12 @@ export default function AttendancePage({ auth, students, attendance, setAttendan
   const [bulk, setBulk] = useState([]);
 
   useEffect(() => {
-    if (auth?.token) {
-      apiFetch("/attendance", { token: auth.token })
-        .then(data => setAttendance(data.map(normalise)))
-        .catch(e => toast("Failed to load attendance", "error"));
-    }
+    if (!auth?.token) return;
+    const ac = new AbortController();
+    apiFetch("/attendance", { token: auth.token, signal: ac.signal })
+      .then(data => setAttendance(data.map(normalise)))
+      .catch(e => { if (e?.code !== "EABORT") console.warn("Failed to load attendance", e); });
+    return () => ac.abort();
   }, [auth, setAttendance]);
 
   const classStudents = useMemo(
@@ -101,6 +102,8 @@ export default function AttendancePage({ auth, students, attendance, setAttendan
     } catch (err) { toast(err.message || "Delete failed", "error"); }
   };
 
+
+  if (feeBlocked) return <FeeBlock onGoFees={onGoFees} pageName="Attendance Records" />;
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>

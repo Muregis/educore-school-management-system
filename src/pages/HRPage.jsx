@@ -55,29 +55,34 @@ export default function HRPage({ auth, canEdit, toast }) {
 
   const [err, setErr] = useState("");
 
-  const load = async () => {
+  const load = async (signal) => {
     setLoading(true);
     try {
-      const s = await apiFetch("/hr/staff", { token: auth.token });
+      const s = await apiFetch("/hr/staff", { token: auth.token, signal });
       setStaff(Array.isArray(s) ? s : []);
-    } catch (e) { toast(e.message, "error"); }
+    } catch (e) { if (e?.code !== "EABORT") toast(e.message, "error"); }
     try {
-      const l = await apiFetch("/hr/leave", { token: auth.token });
+      const l = await apiFetch("/hr/leave", { token: auth.token, signal });
       setLeave(Array.isArray(l) ? l : []);
     } catch { /* table may not exist yet */ }
     try {
-      const a = await apiFetch("/hr/attendance", { token: auth.token });
+      const a = await apiFetch("/hr/attendance", { token: auth.token, signal });
       setAtt(Array.isArray(a) ? a : []);
     } catch { /* table may not exist yet */ }
     try {
-      const p = await apiFetch("/hr/payslips", { token: auth.token });
+      const p = await apiFetch("/hr/payslips", { token: auth.token, signal });
       setPayslips(Array.isArray(p) ? p : []);
     } catch { /* table may not exist yet */ }
     setLoading(false);
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (auth?.token) load(); }, [auth]);
+  useEffect(() => {
+    if (!auth?.token) return;
+    const ac = new AbortController();
+    load(ac.signal);
+    return () => ac.abort();
+  }, [auth]);
 
   // Init bulk attendance when date changes
   useEffect(() => {

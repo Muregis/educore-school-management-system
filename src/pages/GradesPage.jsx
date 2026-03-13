@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import FeeBlock from "../components/FeeBlock";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
 import Field from "../components/Field";
@@ -10,58 +11,49 @@ import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { Pager, Msg, csv, pager } from "../components/Helpers";
 
-// Special mark codes
-const SPECIAL_MARKS = [
-  { value:"NA", label:"N/A — Did not sit this subject" },
-  { value:"X",  label:"X — Missed / Absent from exam" },
-  { value:"Y",  label:"Y — Disqualified (cheating)" },
-];
+// Special mark values
+const SPECIAL_MARKS = {
+  "N/A": "na",      // Did not sit this subject
+  "X":   "absent",  // Missed exam / absent
+  "Y":   "cheat",   // Caught cheating
+};
 
-function markDisplay(marks, total) {
-  if (marks === "NA") return <span style={{ color:C.textMuted, fontStyle:"italic" }}>N/A</span>;
-  if (marks === "X")  return <span style={{ color:C.amber }}>X (Absent)</span>;
-  if (marks === "Y")  return <span style={{ color:C.rose }}>Y (Disqualified)</span>;
+function displayMark(marks, total) {
+  if (marks === "na")     return <span style={{ color:C.textMuted, fontStyle:"italic" }}>N/A</span>;
+  if (marks === "absent") return <Badge tone="warning">X – Absent</Badge>;
+  if (marks === "cheat")  return <Badge tone="danger">Y – Cheating</Badge>;
   return `${marks}/${total}`;
 }
 
-function gradeFor(marks, total) {
-  if (["NA","X","Y"].includes(String(marks))) return String(marks);
-  const pct = (Number(marks) / Number(total)) * 100;
-  if (pct >= 75) return "EE";
-  if (pct >= 50) return "ME";
-  if (pct >= 25) return "AE";
-  return "BE";
+function gradeColor(grade) {
+  if (!grade) return "info";
+  if (grade === "EE") return "success";
+  if (grade === "ME") return "info";
+  if (grade === "AE") return "warning";
+  return "danger";
 }
 
-function gradeTone(g) {
-  if (g === "EE")            return "success";
-  if (g === "ME")            return "info";
-  if (g === "AE")            return "warning";
-  if (g === "BE")            return "danger";
-  if (g === "NA")            return "muted";
-  if (g === "X" || g === "Y") return "danger";
-  return "info";
-}
-
-export default function GradesPage({ auth, students, results, setResults, canEdit, toast }) {
-  const [term, setTerm]               = useState("Term 2");
-  const [filterClass, setFilterClass] = useState("all");
+export default function GradesPage({ auth, students, results, setResults, canEdit, toast, feeBlocked = false, onGoFees}) {
+  const [term, setTerm]                   = useState("Term 2");
+  const [filterClass, setFilterClass]     = useState("all");
   const [filterStudent, setFilterStudent] = useState("all");
-  const [page, setPage]               = useState(1);
-  const [showBulk, setShowBulk]       = useState(false);
-  const [studentId, setStudentId]     = useState(students[0]?.id || "");
-  const [total, setTotal]             = useState("100");
-  const [bulkMarks, setBulkMarks]     = useState(() => SUBJECTS.reduce((a,s)=>({...a,[s]:""}),{}));
-  const [editing, setEditing]         = useState(null);
+  const [page, setPage]                   = useState(1);
+  const [showBulk, setShowBulk]           = useState(false);
+  const [studentId, setStudentId]         = useState(students[0]?.id || "");
+  const [total, setTotal]                 = useState("100");
+  const [bulkMarks, setBulkMarks]         = useState(() =>
+    SUBJECTS.reduce((a, s) => ({ ...a, [s]: "" }), {})
+  );
+  const [editing, setEditing] = useState(null);
 
   useEffect(() => {
-    if (auth?.token) {
-      apiFetch("/grades", { token:auth.token })
-        .then(data => setResults(data))
-        .catch(() => toast("Failed to fetch results", "error"));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth]);
+    if (!auth?.token) return;
+    const ac = new AbortController();
+    apiFetch("/grades", { token: auth.token, signal: ac.signal })
+      .then(data => setResults(data))
+      .catch(e => { if (e?.code !== "EABORT") toast("Failed to fetch results", "error"); });
+    return () => ac.abort();
+  }, [auth, setResults, toast]);
 
   const filtered = results.filter(r =>
     (term === "all" || r.term === term) &&
@@ -82,100 +74,118 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
     try {
       const classId = s.classId ?? s.class_id ?? null;
       await apiFetch("/grades/bulk", {
-        method:"POST",
-        body:{
-          studentId: s.id, classId, term, totalMarks: t,
+        method: "POST",
+        body: {
+          studentId: s.id, classId, term,
+          totalMarks: t,
           subjects: entered.map(sub => ({
             subject: sub,
-            marks:   ["NA","X","Y"].includes(bulkMarks[sub]) ? bulkMarks[sub] : Number(bulkMarks[sub]),
+            marks: Object.values(SPECIAL_MARKS).includes(bulkMarks[sub])
+              ? bulkMarks[sub]
+              : Number(bulkMarks[sub]),
           })),
         },
         token: auth?.token,
       });
-      const data = await apiFetch("/grades", { token:auth?.token });
+      const data = await apiFetch("/grades", { token: auth?.token });
       setResults(data);
-      setBulkMarks(SUBJECTS.reduce((a,sub)=>({...a,[sub]:""}),{}));
+      setBulkMarks(SUBJECTS.reduce((a, sub) => ({ ...a, [sub]: "" }), {}));
       setShowBulk(false);
       toast("Bulk results saved", "success");
-    } catch (err) { toast(err.message||"Save failed","error"); }
+    } catch (err) { toast(err.message || "Save failed", "error"); }
   };
 
   const saveEdit = async () => {
     if (!editing) return;
-    const special = ["NA","X","Y"].includes(String(editing.marks));
-    if (!special) {
+    // Allow special marks
+    const isSpecial = Object.values(SPECIAL_MARKS).includes(editing.marks);
+    if (!isSpecial) {
       const m = Number(editing.marks);
       const t = Number(editing.total);
-      if (Number.isNaN(m)||Number.isNaN(t)||m<0||m>t) return toast("Invalid marks","error");
+      if (Number.isNaN(m) || Number.isNaN(t) || m < 0 || m > t)
+        return toast("Invalid marks", "error");
     }
     try {
       await apiFetch(`/grades/${editing.id}`, {
-        method:"PUT",
-        body:{ subject:editing.subject, term:editing.term, marks:editing.marks, totalMarks:editing.total, teacherComment:editing.teacherComment??"" },
+        method: "PUT",
+        body: {
+          subject: editing.subject, term: editing.term,
+          marks: isSpecial ? editing.marks : Number(editing.marks),
+          totalMarks: Number(editing.total),
+          teacherComment: editing.teacherComment ?? "",
+        },
         token: auth?.token,
       });
-      const data = await apiFetch("/grades", { token:auth?.token });
+      const data = await apiFetch("/grades", { token: auth?.token });
       setResults(data);
       setEditing(null);
       toast("Result updated", "success");
-    } catch (err) { toast(err.message||"Update failed","error"); }
+    } catch (err) { toast(err.message || "Update failed", "error"); }
   };
 
   const del = async id => {
     if (!window.confirm("Delete this result?")) return;
     try {
-      await apiFetch(`/grades/${id}`, { method:"DELETE", token:auth?.token });
+      await apiFetch(`/grades/${id}`, { method: "DELETE", token: auth?.token });
       setResults(results.filter(r => r.id !== id));
       toast("Result deleted", "success");
-    } catch (err) { toast(err.message||"Delete failed","error"); }
+    } catch (err) { toast(err.message || "Delete failed", "error"); }
   };
 
-  const counts = { EE:0, ME:0, AE:0, BE:0 };
-  results.forEach(r => { if (counts[r.grade] !== undefined) counts[r.grade]++; });
+  const counts = {
+    EE: results.filter(r => r.grade === "EE").length,
+    ME: results.filter(r => r.grade === "ME").length,
+    AE: results.filter(r => r.grade === "AE").length,
+    BE: results.filter(r => r.grade === "BE").length,
+  };
 
+
+  if (feeBlocked) return <FeeBlock onGoFees={onGoFees} pageName="Grades & Results" />;
   return (
     <div>
-      {/* Grade summary badges */}
-      <div style={{ display:"flex", gap:8, marginBottom:14, flexWrap:"wrap" }}>
-        {[["EE","success"],["ME","info"],["AE","warning"],["BE","danger"]].map(([g,t])=>(
-          <Badge key={g} tone={t}>{g}: {counts[g]}</Badge>
+      {/* Grade summary */}
+      <div style={{ display:"flex", gap:8, marginBottom:12, flexWrap:"wrap" }}>
+        {[["EE","success"],["ME","info"],["AE","warning"],["BE","danger"]].map(([g,t]) => (
+          <div key={g} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 16px", minWidth:70, textAlign:"center" }}>
+            <div style={{ fontWeight:800, fontSize:20, color: g==="EE"?"#22c55e":g==="ME"?"#38bdf8":g==="AE"?"#f59e0b":"#ef4444" }}>{counts[g]}</div>
+            <div style={{ fontSize:11, color:C.textMuted }}>{g}</div>
+          </div>
         ))}
-        <Badge tone="muted">NA: {results.filter(r=>r.marks==="NA"||r.grade==="NA").length}</Badge>
-        <Badge tone="danger">X: {results.filter(r=>r.marks==="X"||r.grade==="X").length}</Badge>
-        <Badge tone="danger">Y: {results.filter(r=>r.marks==="Y"||r.grade==="Y").length}</Badge>
-      </div>
-
-      {/* Special codes legend */}
-      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:"8px 14px", marginBottom:14, fontSize:12, color:C.textSub, display:"flex", gap:20, flexWrap:"wrap" }}>
-        <span><strong style={{ color:C.textMuted }}>N/A</strong> — Student doesn't do this subject</span>
-        <span><strong style={{ color:C.amber }}>X</strong> — Missed / absent from exam</span>
-        <span><strong style={{ color:C.rose }}>Y</strong> — Disqualified (cheating)</span>
+        {/* Legend */}
+        <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 14px", fontSize:11, color:C.textMuted, display:"flex", flexDirection:"column", gap:2, justifyContent:"center" }}>
+          <div><span style={{color:C.textMuted, fontStyle:"italic"}}>N/A</span> — Did not sit subject</div>
+          <div><Badge tone="warning">X</Badge> — Absent / missed exam</div>
+          <div><Badge tone="danger">Y</Badge> — Caught cheating</div>
+        </div>
       </div>
 
       {/* Filters */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:8, marginBottom:12 }}>
-        <select style={inputStyle} value={term} onChange={e=>setTerm(e.target.value)}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:8, marginBottom:10 }}>
+        <select style={inputStyle} value={term} onChange={e => setTerm(e.target.value)}>
           <option value="all">All terms</option>
           <option value="Term 1">Term 1</option>
           <option value="Term 2">Term 2</option>
           <option value="Term 3">Term 3</option>
         </select>
-        <select style={inputStyle} value={filterClass} onChange={e=>setFilterClass(e.target.value)}>
+        <select style={inputStyle} value={filterClass} onChange={e => setFilterClass(e.target.value)}>
           <option value="all">All classes</option>
-          {ALL_CLASSES.map(c=><option key={c}>{c}</option>)}
+          {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
         </select>
-        <select style={inputStyle} value={filterStudent} onChange={e=>setFilterStudent(e.target.value)}>
+        <select style={inputStyle} value={filterStudent} onChange={e => setFilterStudent(e.target.value)}>
           <option value="all">All students</option>
-          {students.map(s=><option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
+          {students.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
         </select>
-        <Btn variant="ghost" onClick={()=>{
-          csv("results.csv",["Student","Class","Subject","Term","Marks","Total","Grade"],
-            filtered.map(r=>[r.studentName,r.className,r.subject,r.term,r.marks,r.total,r.grade]));
-          toast("CSV exported","success");
+        <Btn variant="ghost" onClick={() => {
+          csv("results.csv",
+            ["Student","Class","Subject","Term","Marks","Total","Grade"],
+            filtered.map(r => [r.studentName, r.className, r.subject, r.term, r.marks, r.total, r.grade])
+          );
+          toast("CSV exported", "success");
         }}>Export CSV</Btn>
-        {canEdit && <Btn onClick={()=>setShowBulk(true)}>Bulk Enter</Btn>}
+        {canEdit && <Btn onClick={() => setShowBulk(true)}>Bulk Enter Results</Btn>}
       </div>
 
+      {/* Table */}
       {filtered.length === 0 ? <Msg text="No results yet." /> : (
         <>
           <div style={{ overflowX:"auto" }}>
@@ -184,11 +194,13 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
               rows={rows.map(r => [
                 <span key={r.id} style={{ color:C.text, fontWeight:600 }}>{r.studentName}</span>,
                 r.className, r.subject, r.term,
-                markDisplay(r.marks, r.total),
-                <Badge key="g" tone={gradeTone(r.grade)}>{r.grade}</Badge>,
+                displayMark(r.marks, r.total),
+                r.marks === "na" || r.marks === "absent" || r.marks === "cheat"
+                  ? <span style={{ color:C.textMuted, fontSize:12 }}>—</span>
+                  : <Badge tone={gradeColor(r.grade)}>{r.grade}</Badge>,
                 <div key="a" style={{ display:"flex", gap:6 }}>
-                  {canEdit && <Btn variant="ghost" onClick={()=>setEditing(r)}>Edit</Btn>}
-                  {canEdit && <Btn variant="danger" onClick={()=>del(r.id)}>Delete</Btn>}
+                  {canEdit && <Btn variant="ghost" onClick={() => setEditing(r)}>Edit</Btn>}
+                  {canEdit && <Btn variant="danger" onClick={() => del(r.id)}>Del</Btn>}
                 </div>,
               ])}
             />
@@ -197,65 +209,68 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
         </>
       )}
 
-      {/* Bulk Entry Modal */}
+      {/* Bulk Modal */}
       {showBulk && (
-        <Modal title="Bulk Results Entry" onClose={()=>setShowBulk(false)}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10, marginBottom:12 }}>
+        <Modal title="Bulk Results Entry" onClose={() => setShowBulk(false)}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
             <Field label="Student">
-              <select style={inputStyle} value={studentId} onChange={e=>setStudentId(Number(e.target.value))}>
-                {students.map(s=>(
+              <select style={inputStyle} value={studentId} onChange={e => setStudentId(Number(e.target.value))}>
+                {students.map(s => (
                   <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.className})</option>
                 ))}
               </select>
             </Field>
             <Field label="Term">
-              <select style={inputStyle} value={term==="all"?"Term 2":term} onChange={e=>setTerm(e.target.value)}>
+              <select style={inputStyle} value={term === "all" ? "Term 2" : term} onChange={e => setTerm(e.target.value)}>
                 <option value="Term 1">Term 1</option>
                 <option value="Term 2">Term 2</option>
                 <option value="Term 3">Term 3</option>
               </select>
             </Field>
             <Field label="Total Marks">
-              <input type="number" style={inputStyle} value={total} onChange={e=>setTotal(e.target.value)} />
+              <input type="number" style={inputStyle} value={total} onChange={e => setTotal(e.target.value)} />
             </Field>
           </div>
 
-          <div style={{ fontSize:11, color:C.textMuted, marginBottom:6 }}>
-            Enter a number for marks, or select a special code from the dropdown.
+          {/* Legend inside modal */}
+          <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:"8px 12px", fontSize:12, color:C.textMuted, marginBottom:8, display:"flex", gap:16 }}>
+            <span>Leave blank to skip subject</span>
+            <span><strong style={{color:C.text}}>N/A</strong> = does not take subject</span>
+            <span><strong style={{color:"#f59e0b"}}>X</strong> = absent</span>
+            <span><strong style={{color:"#ef4444"}}>Y</strong> = cheating</span>
           </div>
 
-          <div style={{ maxHeight:340, overflowY:"auto", border:`1px solid ${C.border}`, borderRadius:10, padding:8, marginBottom:12 }}>
-            {SUBJECTS.map(sub => {
-              const val = bulkMarks[sub];
-              const isSpecial = ["NA","X","Y"].includes(val);
-              return (
-                <div key={sub} style={{ display:"grid", gridTemplateColumns:"1fr 130px 140px", gap:8, alignItems:"center", borderBottom:`1px solid ${C.border}`, padding:"8px 4px" }}>
-                  <div style={{ color:C.text, fontSize:13 }}>{sub}</div>
+          <div style={{ maxHeight:340, overflowY:"auto", border:`1px solid ${C.border}`, borderRadius:10, padding:8, marginBottom:10 }}>
+            {SUBJECTS.map(sub => (
+              <div key={sub} style={{ display:"grid", gridTemplateColumns:"1fr 180px", gap:8, alignItems:"center", borderBottom:`1px solid ${C.border}`, padding:"8px 4px" }}>
+                <div style={{ color:C.text, fontSize:13 }}>{sub}</div>
+                <select
+                  value={["na","absent","cheat"].includes(bulkMarks[sub]) ? bulkMarks[sub] : "__num__"}
+                  onChange={e => {
+                    const v = e.target.value;
+                    if (v !== "__num__") setBulkMarks({ ...bulkMarks, [sub]: v });
+                    else setBulkMarks({ ...bulkMarks, [sub]: "" });
+                  }}
+                  style={{ ...inputStyle, marginBottom:0 }}
+                >
+                  <option value="__num__">Enter marks →</option>
+                  <option value="na">N/A – Does not sit</option>
+                  <option value="absent">X – Absent</option>
+                  <option value="cheat">Y – Cheating</option>
+                </select>
+                {!["na","absent","cheat"].includes(bulkMarks[sub]) && (
                   <input
-                    type={isSpecial ? "text" : "number"}
-                    min="0"
-                    style={{ ...inputStyle, opacity: isSpecial ? 0.4 : 1 }}
-                    value={isSpecial ? "" : val}
-                    disabled={isSpecial}
-                    onChange={e => setBulkMarks({...bulkMarks,[sub]:e.target.value})}
+                    type="number" min="0" style={{ ...inputStyle, gridColumn:"2", marginTop:4 }}
+                    value={bulkMarks[sub]}
+                    onChange={e => setBulkMarks({ ...bulkMarks, [sub]: e.target.value })}
                     placeholder="marks"
                   />
-                  <select
-                    style={{ ...inputStyle, fontSize:11 }}
-                    value={isSpecial ? val : ""}
-                    onChange={e => setBulkMarks({...bulkMarks,[sub]:e.target.value})}
-                  >
-                    <option value="">— numeric —</option>
-                    {SPECIAL_MARKS.map(sm=>(
-                      <option key={sm.value} value={sm.value}>{sm.label}</option>
-                    ))}
-                  </select>
-                </div>
-              );
-            })}
+                )}
+              </div>
+            ))}
           </div>
           <div style={{ display:"flex", justifyContent:"flex-end", gap:8 }}>
-            <Btn variant="ghost" onClick={()=>setShowBulk(false)}>Cancel</Btn>
+            <Btn variant="ghost" onClick={() => setShowBulk(false)}>Cancel</Btn>
             <Btn onClick={saveBulk}>Save Results</Btn>
           </div>
         </Modal>
@@ -263,37 +278,42 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
 
       {/* Edit Modal */}
       {editing && (
-        <Modal title="Edit Result" onClose={()=>setEditing(null)}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
-            <Field label="Student"><input style={inputStyle} value={editing.studentName} disabled /></Field>
-            <Field label="Subject"><input style={inputStyle} value={editing.subject} disabled /></Field>
+        <Modal title="Edit Result" onClose={() => setEditing(null)}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            <Field label="Student">
+              <input style={inputStyle} value={editing.studentName} disabled />
+            </Field>
+            <Field label="Subject">
+              <input style={inputStyle} value={editing.subject} disabled />
+            </Field>
             <Field label="Term">
-              <select style={inputStyle} value={editing.term} onChange={e=>setEditing({...editing,term:e.target.value})}>
+              <select style={inputStyle} value={editing.term} onChange={e => setEditing({ ...editing, term:e.target.value })}>
                 <option>Term 1</option><option>Term 2</option><option>Term 3</option>
               </select>
             </Field>
-            <Field label="Total Marks">
-              <input type="number" style={inputStyle} value={editing.total} onChange={e=>setEditing({...editing,total:e.target.value})} />
+            <Field label="Total">
+              <input type="number" style={inputStyle} value={editing.total} onChange={e => setEditing({ ...editing, total:e.target.value })} />
+            </Field>
+            <Field label="Marks / Status">
+              <select style={inputStyle} value={["na","absent","cheat"].includes(editing.marks) ? editing.marks : "__num__"}
+                onChange={e => {
+                  const v = e.target.value;
+                  if (v !== "__num__") setEditing({ ...editing, marks:v });
+                  else setEditing({ ...editing, marks:"" });
+                }}>
+                <option value="__num__">Numeric marks</option>
+                <option value="na">N/A – Does not sit</option>
+                <option value="absent">X – Absent</option>
+                <option value="cheat">Y – Cheating</option>
+              </select>
+              {!["na","absent","cheat"].includes(editing.marks) && (
+                <input type="number" style={{ ...inputStyle, marginTop:6 }} value={editing.marks}
+                  onChange={e => setEditing({ ...editing, marks:e.target.value })} />
+              )}
             </Field>
           </div>
-          <Field label="Marks / Special Code">
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-              <input
-                type={["NA","X","Y"].includes(String(editing.marks)) ? "text" : "number"}
-                style={{ ...inputStyle, opacity:["NA","X","Y"].includes(String(editing.marks))?0.4:1 }}
-                value={["NA","X","Y"].includes(String(editing.marks)) ? "" : editing.marks}
-                disabled={["NA","X","Y"].includes(String(editing.marks))}
-                onChange={e=>setEditing({...editing,marks:e.target.value})}
-              />
-              <select style={inputStyle} value={["NA","X","Y"].includes(String(editing.marks))?editing.marks:""}
-                onChange={e=>setEditing({...editing,marks:e.target.value||editing.marks})}>
-                <option value="">— numeric —</option>
-                {SPECIAL_MARKS.map(sm=><option key={sm.value} value={sm.value}>{sm.label}</option>)}
-              </select>
-            </div>
-          </Field>
-          <div style={{ display:"flex", justifyContent:"flex-end", gap:8, marginTop:12 }}>
-            <Btn variant="ghost" onClick={()=>setEditing(null)}>Cancel</Btn>
+          <div style={{ display:"flex", justifyContent:"flex-end", gap:8, marginTop:10 }}>
+            <Btn variant="ghost" onClick={() => setEditing(null)}>Cancel</Btn>
             <Btn onClick={saveEdit}>Save</Btn>
           </div>
         </Modal>
@@ -303,7 +323,10 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
 }
 
 GradesPage.propTypes = {
-  auth:PropTypes.object, students:PropTypes.array.isRequired,
-  results:PropTypes.array.isRequired, setResults:PropTypes.func.isRequired,
-  canEdit:PropTypes.bool.isRequired, toast:PropTypes.func.isRequired,
+  auth:       PropTypes.object,
+  students:   PropTypes.array.isRequired,
+  results:    PropTypes.array.isRequired,
+  setResults: PropTypes.func.isRequired,
+  canEdit:    PropTypes.bool.isRequired,
+  toast:      PropTypes.func.isRequired,
 };
