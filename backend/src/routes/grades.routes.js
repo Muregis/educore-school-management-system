@@ -1,10 +1,14 @@
 import { Router } from "express";
 import { pool } from "../config/db.js";
+import { pgPool } from "../config/pg.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
 const router = Router();
 router.use(authRequired);
+
+const usePgGradesGet =
+  String(process.env.USE_PG_GRADES_GET || "").toLowerCase() === "true";
 
 // ─── Helper: map DB result row → camelCase shape the frontend expects ─────────
 function normalise(r) {
@@ -27,6 +31,30 @@ router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId, term, classId } = req.query;
+
+    if (usePgGradesGet) {
+      let sql = `
+        SELECT r.result_id, r.student_id, r.marks, r.total_marks, r.grade,
+            r.teacher_comment, r.term,
+            r.subject,
+            s.first_name, s.last_name,
+            s.class_name
+        FROM results r
+        JOIN students s  ON s.student_id  = r.student_id
+        LEFT JOIN classes c ON c.class_id = r.class_id
+        WHERE r.school_id = $1 AND r.is_deleted = false`;
+      const params = [schoolId];
+      let idx = 2;
+
+      if (studentId) { sql += ` AND r.student_id = $${idx++}`; params.push(studentId); }
+      if (term)      { sql += ` AND r.term = $${idx++}`;       params.push(term); }
+      if (classId)   { sql += ` AND r.class_id = $${idx++}`;   params.push(classId); }
+
+      sql += " ORDER BY r.result_id DESC";
+
+      const { rows } = await pgPool.query(sql, params);
+      return res.json(rows.map(normalise));
+    }
 
     let sql = `
         SELECT r.result_id, r.student_id, r.marks, r.total_marks, r.grade,

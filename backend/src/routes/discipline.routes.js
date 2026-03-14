@@ -1,10 +1,14 @@
 import { Router } from "express";
 import { pool } from "../config/db.js";
+import { pgPool } from "../config/pg.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
 const router = Router();
 router.use(authRequired);
+
+const usePgDisciplineGet =
+  String(process.env.USE_PG_DISCIPLINE_GET || "").toLowerCase() === "true";
 
 router.get("/", async (req, res, next) => {
   try {
@@ -12,6 +16,21 @@ router.get("/", async (req, res, next) => {
 
     // Portal users can only see their own student's records
     const filterStudentId = ["parent","student"].includes(role) ? tokenStudentId : (req.query.studentId || null);
+
+    if (usePgDisciplineGet) {
+      let sql = `SELECT d.discipline_id, d.student_id, s.first_name, s.last_name,
+                        s.admission_number, d.incident_type, d.incident_details,
+                        d.action_taken, d.incident_date, d.status
+                 FROM discipline_records d
+                 JOIN students s ON s.student_id = d.student_id
+                 WHERE d.school_id = $1 AND d.is_deleted = false`;
+      const params = [schoolId];
+      if (filterStudentId) { sql += " AND d.student_id = $2"; params.push(filterStudentId); }
+      sql += " ORDER BY d.incident_date DESC, d.discipline_id DESC";
+
+      const { rows } = await pgPool.query(sql, params);
+      return res.json(rows);
+    }
 
     let sql = `SELECT d.discipline_id, d.student_id, s.first_name, s.last_name,
                       s.admission_number, d.incident_type, d.incident_details,

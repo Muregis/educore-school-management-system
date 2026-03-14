@@ -1,6 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { pool } from "../config/db.js";
+import { pgPool } from "../config/pg.js";
 import { authRequired } from "../middleware/auth.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { requireRoles } from "../middleware/roles.js";
@@ -8,10 +9,27 @@ import { requireRoles } from "../middleware/roles.js";
 const router = Router();
 router.use(authRequired);
 
+const usePgStudentsGet =
+  String(process.env.USE_PG_STUDENTS_GET || "").toLowerCase() === "true";
+
 // Always return class_name so frontend normalise() works
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+
+    if (usePgStudentsGet) {
+      const { rows } = await pgPool.query(
+        `SELECT s.student_id, s.admission_number, s.first_name, s.last_name,
+                s.gender, s.class_id, s.class_name, s.status, s.date_of_birth,
+                s.phone, s.email, s.parent_name, s.parent_phone, s.admission_date, s.created_at
+        FROM students s
+        WHERE s.school_id=$1 AND s.is_deleted=false
+        ORDER BY s.class_name, s.first_name`,
+        [schoolId]
+      );
+      return res.json(rows);
+    }
+
     const [rows] = await pool.query(
       `SELECT s.student_id, s.admission_number, s.first_name, s.last_name,
               s.gender, s.class_id, s.class_name, s.status, s.date_of_birth,

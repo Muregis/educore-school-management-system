@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { pool } from "../config/db.js";
+import { pgPool } from "../config/pg.js";
 import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
@@ -7,6 +8,9 @@ import { sendEmail, sendBulkEmail, isEmailConfigured, templates } from "../servi
 
 const router = Router();
 router.use(authRequired);
+
+const usePgSmsLogsGet =
+  String(process.env.USE_PG_SMS_LOGS_GET || "").toLowerCase() === "true";
 
 // ─── Africa's Talking SMS sender ─────────────────────────────────────────────
 async function sendViaSms(recipients, message, schoolId, sentByUserId = null) {
@@ -95,6 +99,19 @@ router.get("/sms-status", async (req, res) => {
 router.get("/sms-logs", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+
+    if (usePgSmsLogsGet) {
+      const { rows } = await pgPool.query(
+        `SELECT sms_id, recipient, message, channel, status, sent_at, provider_response
+        FROM sms_logs
+        WHERE school_id=$1 AND is_deleted=false
+        ORDER BY sent_at DESC NULLS LAST, sms_id DESC
+        LIMIT 300`,
+        [schoolId]
+      );
+      return res.json(rows);
+    }
+
     const [rows] = await pool.query(
       `SELECT sms_id, recipient, message, channel, status, sent_at, provider_response
       FROM sms_logs WHERE school_id=? AND is_deleted=0
