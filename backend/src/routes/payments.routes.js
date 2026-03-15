@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
+import { pgPool } from "../config/pg.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { sendEmail, isEmailConfigured, templates } from "../services/email.service.js";
@@ -13,13 +13,13 @@ router.use(authRequired);
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
+    const { rows } = await pgPool.query(
       `SELECT p.payment_id, p.student_id, p.amount, p.fee_type, p.payment_method,
               p.reference_number, p.payment_date, p.status, p.paid_by,
               s.first_name, s.last_name, s.class_name
       FROM payments p
-      LEFT JOIN students s ON s.student_id = p.student_id AND s.is_deleted = 0
-      WHERE p.school_id = ? AND p.is_deleted = 0
+      LEFT JOIN students s ON s.student_id = p.student_id AND s.is_deleted = false
+      WHERE p.school_id = $1 AND p.is_deleted = false
       ORDER BY p.payment_date DESC, p.payment_id DESC`,
       [schoolId]
     );
@@ -31,9 +31,9 @@ router.get("/", async (req, res, next) => {
 router.get("/fee-structures", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
+    const { rows } = await pgPool.query(
       `SELECT fee_structure_id, class_name, term, tuition, activity, misc
-      FROM fee_structures WHERE school_id = ? AND is_deleted = 0
+      FROM fee_structures WHERE school_id = $1 AND is_deleted = false
       ORDER BY class_name`,
       [schoolId]
     );
@@ -48,10 +48,14 @@ router.post("/fee-structures", requireRoles("admin", "finance"), async (req, res
     const { className, term = "Term 2", tuition = 0, activity = 0, misc = 0 } = req.body;
     if (!className) return res.status(400).json({ message: "className is required" });
 
-    await pool.query(
+    await pgPool.query(
       `INSERT INTO fee_structures (school_id, class_name, term, tuition, activity, misc)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE tuition=VALUES(tuition), activity=VALUES(activity), misc=VALUES(misc), updated_at=CURRENT_TIMESTAMP`,
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (school_id, class_name, term) DO UPDATE SET 
+        tuition = EXCLUDED.tuition, 
+        activity = EXCLUDED.activity, 
+        misc = EXCLUDED.misc, 
+        updated_at = CURRENT_TIMESTAMP`,
       [schoolId, className, term, tuition, activity, misc]
     );
     res.status(201).json({ saved: true });
@@ -77,26 +81,31 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
     if (!studentId || !amount || !paymentDate)
       return res.status(400).json({ message: "studentId, amount and paymentDate are required" });
 
-    const [result] = await pool.query(
+    const { rows } = await pgPool.query(
       `INSERT INTO payments (school_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status, term, paid_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING payment_id`,
       [schoolId, studentId, amount, feeType, paymentMethod, referenceNumber, paymentDate, status, term, paidBy]
     );
+    const result = rows[0];
 
     // ── Email notification (fire-and-forget) ──
     if (isEmailConfigured()) {
       try {
-        const [[student]] = await pool.query(
+        const { rows: studentRows } = await pgPool.query(
           `SELECT s.first_name, s.last_name, s.parent_name,
           u.email,
           COALESCE(SUM(i.amount_due),0) - COALESCE(SUM(p2.paid),0) AS balance
           FROM students s
-          LEFT JOIN users u ON u.student_id = s.student_id AND u.role = 'parent' AND u.is_deleted = 0
-          LEFT JOIN invoices i ON i.student_id = s.student_id AND i.school_id = s.school_id AND i.is_deleted = 0
-          LEFT JOIN (SELECT invoice_id, SUM(amount) AS paid FROM payments WHERE school_id=? AND is_deleted=0 GROUP BY invoice_id) p2 ON p2.invoice_id = i.invoice_id
-          WHERE s.student_id = ? AND s.school_id = ?
+          LEFT JOIN users u ON u.student_id = s.student_id AND u.role = 'parent'
+          LEFT JOIN invoices i ON i.student_id = s.student_id AND i.school_id = s.school_id
+          LEFT JOIN (SELECT invoice_id, SUM(amount) AS paid FROM payments WHERE school_id=$1 AND is_deleted=false GROUP BY invoice_id) p2 ON p2.invoice_id = i.invoice_id
+          WHERE s.student_id = $2 AND s.school_id = $3
+            AND (u.is_deleted = false OR u.is_deleted IS NULL)
+            AND (i.is_deleted = false OR i.is_deleted IS NULL)
           GROUP BY s.student_id, u.email`, [schoolId, studentId, schoolId]
         );
+        const student = studentRows[0];
         if (student?.email) {
           sendEmail({
             to: student.email,
@@ -112,17 +121,17 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
       } catch (_) {}
     }
 
-    logActivity(req, { action:"payment.create", entity:"payment", entityId:result.insertId, description:`KES ${amount} recorded for student ${studentId}` });
+    logActivity(req, { action:"payment.create", entity:"payment", entityId:result.payment_id, description:`KES ${amount} recorded for student ${studentId}` });
     
     // NEW: Log payment creation for audit
     await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_CREATE, {
-      entityId: result.insertId,
+      entityId: result.payment_id,
       entityType: 'payment',
       description: `Payment recorded: KES ${amount} for student ${studentId} (${feeType})`,
       newValues: { studentId, amount, feeType, paymentMethod, referenceNumber, paymentDate, status, term, paidBy }
     });
     
-    res.status(201).json({ paymentId: result.insertId });
+    res.status(201).json({ paymentId: result.payment_id });
   } catch (err) { next(err); }
 });
 
@@ -131,13 +140,15 @@ router.put("/:id", requireRoles("admin", "finance"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { amount, feeType, paymentMethod, referenceNumber, paymentDate, status, paidBy } = req.body;
-    const [result] = await pool.query(
-      `UPDATE payments SET amount=?, fee_type=?, payment_method=?, reference_number=?,
-      payment_date=?, status=?, paid_by=?, updated_at=CURRENT_TIMESTAMP
-      WHERE payment_id=? AND school_id=? AND is_deleted=0`,
+    const { rows } = await pgPool.query(
+      `UPDATE payments SET amount=$1, fee_type=$2, payment_method=$3, reference_number=$4,
+      payment_date=$5, status=$6, paid_by=$7, updated_at=CURRENT_TIMESTAMP
+      WHERE payment_id=$8 AND school_id=$9 AND is_deleted=false
+      RETURNING *`,
       [amount, feeType, paymentMethod, referenceNumber||null, paymentDate, status||"paid", paidBy||null, req.params.id, schoolId]
     );
-    if (!result.affectedRows) return res.status(404).json({ message: "Payment not found" });
+    const result = rows[0];
+    if (!result) return res.status(404).json({ message: "Payment not found" });
     
     // NEW: Log payment update for audit
     await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_UPDATE, {
@@ -155,12 +166,14 @@ router.put("/:id", requireRoles("admin", "finance"), async (req, res, next) => {
 router.delete("/:id", requireRoles("admin", "finance"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [result] = await pool.query(
-      `UPDATE payments SET is_deleted=1, updated_at=CURRENT_TIMESTAMP
-      WHERE payment_id=? AND school_id=?`,
+    const { rows } = await pgPool.query(
+      `UPDATE payments SET is_deleted=true, updated_at=CURRENT_TIMESTAMP
+      WHERE payment_id=$1 AND school_id=$2
+      RETURNING *`,
       [req.params.id, schoolId]
     );
-    if (!result.affectedRows) return res.status(404).json({ message: "Payment not found" });
+    const result = rows[0];
+    if (!result) return res.status(404).json({ message: "Payment not found" });
     
     // NEW: Log payment deletion for audit
     await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_DELETE, {

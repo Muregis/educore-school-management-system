@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
+import { pgPool } from "../config/pg.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
@@ -68,17 +68,19 @@ router.get("/attendance-rate", async (req, res, next) => {
 router.get("/fee-defaulters", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
+    const { rows } = await pgPool.query(
       `SELECT s.student_id, s.first_name, s.last_name, s.admission_number,
               s.class_name, s.parent_phone,
               COALESCE(f.tuition + f.activity + f.misc, 0) AS expected,
               COALESCE(SUM(p.amount), 0)           AS paid,
               COALESCE(f.tuition + f.activity + f.misc, 0) - COALESCE(SUM(p.amount), 0) AS balance
         FROM students s
-        LEFT JOIN fee_structures f ON f.class_name = s.class_name AND f.school_id = s.school_id AND f.is_deleted = 0
-        LEFT JOIN payments p ON p.student_id = s.student_id AND p.status = 'paid' AND p.is_deleted = 0
-        WHERE s.school_id = ? AND s.is_deleted = 0
-        GROUP BY s.student_id, f.tuition, f.activity, f.misc
+        LEFT JOIN fee_structures f ON f.class_name = s.class_name AND f.school_id = s.school_id 
+        LEFT JOIN payments p ON p.student_id = s.student_id AND p.status = 'paid'
+        WHERE s.school_id = $1 AND s.is_deleted = false 
+          AND (f.is_deleted = false OR f.is_deleted IS NULL)
+          AND (p.is_deleted = false OR p.is_deleted IS NULL)
+        GROUP BY s.student_id, s.first_name, s.last_name, s.admission_number, s.class_name, s.parent_phone, f.tuition, f.activity, f.misc
         HAVING balance > 0
         ORDER BY balance DESC`,
       [schoolId]

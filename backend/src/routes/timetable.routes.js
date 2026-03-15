@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
+import { pgPool } from "../config/pg.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js"; 
 const router = Router();
@@ -34,19 +34,18 @@ router.get("/", async (req, res, next) => {
     const { schoolId } = req.user;
     const { className, teacherId } = req.query;
 
-    let sql = `
-      SELECT te.timetable_id, te.class_id, te.subject_name, te.teacher_id,
+    let sql = `SELECT te.timetable_id, te.class_id, te.subject_name, te.teacher_id,
             te.day_of_week, te.start_time, te.end_time, te.room, te.school_id,
             COALESCE(c.class_name, '') AS class_name,
             CONCAT(t.first_name, ' ', t.last_name) AS teacher_name
       FROM timetable_entries te
       LEFT JOIN classes  c ON c.class_id  = te.class_id
       LEFT JOIN teachers t ON t.teacher_id = te.teacher_id
-      WHERE te.school_id = ? AND te.is_deleted = 0`;
+      WHERE te.school_id = $1 AND te.is_deleted = false`;
     const params = [schoolId];
 
     if (className) {
-      sql += " AND c.class_name = ?";
+      sql += " AND c.class_name = $2";
       params.push(className);
     }
     if (teacherId) {
@@ -71,21 +70,21 @@ router.post("/", requireRoles("admin"), async (req, res, next) => {
       return res.status(400).json({ message: "className, dayOfWeek, subject, startTime, endTime are required" });
 
     // Resolve class_id from class_name
-    const [cls] = await pool.query(
-      `SELECT class_id FROM classes WHERE school_id = ? AND class_name = ? AND is_deleted = 0 LIMIT 1`,
+    const { rows } = await pgPool.query(
+      `SELECT class_id FROM classes WHERE school_id = $1 AND class_name = $2 AND is_deleted = false LIMIT 1`,
       [schoolId, className]
     );
-    if (!cls.length) return res.status(404).json({ message: `Class "${className}" not found` });
+    if (!rows.length) return res.status(404).json({ message: `Class "${className}" not found` });
 
     const abbrevDay = DAY_MAP[dayOfWeek] ?? dayOfWeek; // accept both full and abbrev
 
-    const [result] = await pool.query(
+    const { rows: result } = await pgPool.query(
       `INSERT INTO timetable_entries
         (school_id, class_id, subject_name, teacher_id, day_of_week, start_time, end_time, room)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [schoolId, cls[0].class_id, subject, teacherId || null, abbrevDay, startTime, endTime, period || null]
     );
-    res.status(201).json({ timetableId: result.insertId });
+    res.status(201).json({ timetableId: result[0].id });
   } catch (err) { next(err); }
 });
 
