@@ -1,4 +1,4 @@
-import { pgPool } from "../config/pg.js";
+import { pool } from "../config/db.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 
 // Student Ledger Service for fee balance tracking
@@ -12,64 +12,64 @@ export class LedgerService {
 
   // Record a charge (fee assessment) in student ledger
   static async recordCharge(schoolId, studentId, amount, description, referenceType = null, referenceId = null) {
+    const connection = await pool.getConnection();
     try {
-      await pgPool.query('BEGIN');
+      await connection.beginTransaction();
 
       // Get current balance
-      const balanceResult = await pgPool.query(
+      const [[currentBalance]] = await connection.query(
         `SELECT balance_after FROM student_ledger 
-         WHERE student_id = $1 AND school_id = $2 
+         WHERE student_id = ? AND school_id = ? 
          ORDER BY ledger_id DESC LIMIT 1`,
         [studentId, schoolId]
       );
-      const [currentBalance] = balanceResult.rows;
 
       const previousBalance = currentBalance?.balance_after || 0;
       const newBalance = previousBalance + Number(amount);
 
       // Insert ledger entry
-      const result = await pgPool.query(
+      const [result] = await connection.query(
         `INSERT INTO student_ledger 
          (school_id, student_id, transaction_type, amount, balance_after, 
           reference_type, reference_id, description, receipt_number)
-         VALUES ($1, $2, 'charge', $3, $4, $5, $6, $7, NULL)
-         RETURNING ledger_id`,
+         VALUES (?, ?, 'charge', ?, ?, ?, ?, ?, NULL)`,
         [schoolId, studentId, amount, newBalance, referenceType, referenceId, description]
       );
 
-      await pgPool.query('COMMIT');
-      return result.rows[0].ledger_id;
+      await connection.commit();
+      return result.insertId;
     } catch (error) {
-      await pgPool.query('ROLLBACK');
+      await connection.rollback();
       throw error;
+    } finally {
+      connection.release();
     }
   }
 
   // Record a payment in student ledger
   static async recordPayment(schoolId, studentId, amount, description, paymentId, req) {
+    const connection = await pool.getConnection();
     try {
-      await pgPool.query('BEGIN');
+      await connection.beginTransaction();
 
       // Get current balance
-      const balanceResult = await pgPool.query(
+      const [[currentBalance]] = await connection.query(
         `SELECT balance_after FROM student_ledger 
-         WHERE student_id = $1 AND school_id = $2 
+         WHERE student_id = ? AND school_id = ? 
          ORDER BY ledger_id DESC LIMIT 1`,
         [studentId, schoolId]
       );
-      const [currentBalance] = balanceResult.rows;
 
       const previousBalance = currentBalance?.balance_after || 0;
       const newBalance = previousBalance - Number(amount);
       const receiptNumber = this.generateReceiptNumber();
 
       // Insert ledger entry
-      const result = await pgPool.query(
+      const [result] = await connection.query(
         `INSERT INTO student_ledger 
          (school_id, student_id, transaction_type, amount, balance_after, 
           reference_type, reference_id, description, receipt_number)
-         VALUES ($1, $2, 'payment', $3, $4, 'payment', $5, $6, $7)
-         RETURNING ledger_id`,
+         VALUES (?, ?, 'payment', ?, ?, 'payment', ?, ?, ?)`,
         [schoolId, studentId, amount, newBalance, paymentId, description, receiptNumber]
       );
 
@@ -83,49 +83,50 @@ export class LedgerService {
         });
       }
 
-      await pgPool.query('COMMIT');
-      return { ledgerId: result.rows[0].ledger_id, receiptNumber, newBalance };
+      await connection.commit();
+      return { ledgerId: result.insertId, receiptNumber, newBalance };
     } catch (error) {
-      await pgPool.query('ROLLBACK');
+      await connection.rollback();
       throw error;
+    } finally {
+      connection.release();
     }
   }
 
   // Get student balance
   static async getStudentBalance(schoolId, studentId) {
-    const result = await pgPool.query(
+    const [[result]] = await pool.query(
       `SELECT balance_after FROM student_ledger 
-       WHERE student_id = $1 AND school_id = $2 
+       WHERE student_id = ? AND school_id = ? 
        ORDER BY ledger_id DESC LIMIT 1`,
       [studentId, schoolId]
     );
-    const [balanceRow] = result.rows;
-    return balanceRow?.balance_after || 0;
+    return result?.balance_after || 0;
   }
 
   // Get student ledger entries
   static async getStudentLedger(schoolId, studentId, limit = 50, offset = 0) {
-    const result = await pgPool.query(
+    const [rows] = await pool.query(
       `SELECT * FROM student_ledger 
-       WHERE school_id = $1 AND student_id = $2 
+       WHERE school_id = ? AND student_id = ? 
        ORDER BY created_at DESC 
-       LIMIT $3 OFFSET $4`,
+       LIMIT ? OFFSET ?`,
       [schoolId, studentId, limit, offset]
     );
-    return result.rows;
+    return rows;
   }
 
   // Get fee statement for student
   static async getFeeStatement(schoolId, studentId, term = null) {
-    let whereClause = `WHERE sl.school_id = $1 AND sl.student_id = $2`;
+    let whereClause = `WHERE sl.school_id = ? AND sl.student_id = ?`;
     const params = [schoolId, studentId];
     
     if (term) {
-      whereClause += ` AND sl.term = $${params.length + 1}`;
+      whereClause += ` AND sl.term = ?`;
       params.push(term);
     }
 
-    const rowsResult = await pgPool.query(
+    const [rows] = await pool.query(
       `SELECT sl.*, s.first_name, s.last_name, s.admission_number
        FROM student_ledger sl
        JOIN students s ON s.student_id = sl.student_id
@@ -133,20 +134,18 @@ export class LedgerService {
        ORDER BY sl.created_at DESC`,
       params
     );
-    const rows = rowsResult.rows;
 
     // Calculate summary
-    const summaryResult = await pgPool.query(
+    const [[summary]] = await pool.query(
       `SELECT 
          SUM(CASE WHEN transaction_type = 'charge' THEN amount ELSE 0 END) as total_charges,
          SUM(CASE WHEN transaction_type = 'payment' THEN amount ELSE 0 END) as total_payments,
          COALESCE(MAX(CASE WHEN transaction_type = 'payment' THEN balance_after END), 
-                  (SELECT balance_after FROM student_ledger WHERE student_id = $1 AND school_id = $2 ORDER BY ledger_id DESC LIMIT 1)) as current_balance
+                  (SELECT balance_after FROM student_ledger WHERE student_id = ? AND school_id = ? ORDER BY ledger_id DESC LIMIT 1)) as current_balance
        FROM student_ledger 
-       WHERE school_id = $2 AND student_id = $1`,
-      [studentId, schoolId]
+       WHERE school_id = ? AND student_id = ?`,
+      [studentId, schoolId, schoolId, studentId]
     );
-    const [summary] = summaryResult.rows;
 
     return {
       student: rows[0] ? {
@@ -166,33 +165,31 @@ export class LedgerService {
 
   // Create fee assessment for multiple students
   static async assessFeesForClass(schoolId, classId, feeStructureId, term, academicYear) {
+    const connection = await pool.getConnection();
     try {
-      await pgPool.query('BEGIN');
+      await connection.beginTransaction();
 
       // Get students in class
-      const studentsResult = await pgPool.query(
-        `SELECT student_id FROM students WHERE class_id = $1 AND school_id = $2 AND is_deleted = false`,
+      const [students] = await connection.query(
+        `SELECT student_id FROM students WHERE class_id = ? AND school_id = ? AND is_deleted = 0`,
         [classId, schoolId]
       );
-      const students = studentsResult.rows;
 
       // Get fee structure
-      const feeStructureResult = await pgPool.query(
-        `SELECT * FROM fee_structures WHERE fee_structure_id = $1 AND school_id = $2 AND is_deleted = false`,
+      const [[feeStructure]] = await connection.query(
+        `SELECT * FROM fee_structures WHERE fee_structure_id = ? AND school_id = ? AND is_deleted = 0`,
         [feeStructureId, schoolId]
       );
-      const [feeStructure] = feeStructureResult.rows;
 
       if (!feeStructure) {
         throw new Error('Fee structure not found');
       }
 
       // Get fee items for this structure
-      const feeItemsResult = await pgPool.query(
-        `SELECT * FROM fee_items WHERE fee_structure_id = $1 AND school_id = $2`,
+      const [feeItems] = await connection.query(
+        `SELECT * FROM fee_items WHERE fee_structure_id = ? AND school_id = ?`,
         [feeStructureId, schoolId]
       );
-      const feeItems = feeItemsResult.rows;
 
       // Assess fees for each student
       const results = [];
@@ -212,11 +209,13 @@ export class LedgerService {
         }
       }
 
-      await pgPool.query('COMMIT');
+      await connection.commit();
       return results;
     } catch (error) {
-      await pgPool.query('ROLLBACK');
+      await connection.rollback();
       throw error;
+    } finally {
+      connection.release();
     }
   }
 }

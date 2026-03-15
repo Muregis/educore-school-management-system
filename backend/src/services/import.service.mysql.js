@@ -1,4 +1,4 @@
-import { pgPool } from "../config/pg.js";
+import { pool } from "../config/db.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import { LedgerService } from "./ledger.service.js";
 import bcrypt from "bcryptjs";
@@ -65,6 +65,7 @@ export class ImportService {
 
   // Import students from parsed data
   static async importStudents(schoolId, students, req) {
+    const connection = await pool.getConnection();
     const results = {
       imported: [],
       duplicates: [],
@@ -72,17 +73,16 @@ export class ImportService {
     };
 
     try {
-      await pgPool.query('BEGIN');
+      await connection.beginTransaction();
 
       for (const student of students) {
         try {
           // Check for duplicate admission number
-          const { rows } = await pgPool.query(
+          const [[existing]] = await connection.query(
             `SELECT student_id FROM students 
-             WHERE admission_number = $1 AND school_id = $2 AND is_deleted = false`,
+             WHERE admission_number = ? AND school_id = ? AND is_deleted = 0`,
             [student.admission_number, schoolId]
           );
-          const [existing] = rows;
 
           if (existing) {
             results.duplicates.push({
@@ -98,11 +98,10 @@ export class ImportService {
           let className = student.class_name || null;
           
           if (student.class_name) {
-            const { rows } = await pgPool.query(
-              `SELECT class_id FROM classes WHERE school_id = $1 AND class_name = $2 LIMIT 1`,
+            const [[cls]] = await connection.query(
+              `SELECT class_id FROM classes WHERE school_id = ? AND class_name = ? LIMIT 1`,
               [schoolId, student.class_name]
             );
-            const [cls] = rows;
             if (cls) {
               classId = cls.class_id;
             } else {
@@ -116,13 +115,12 @@ export class ImportService {
           }
 
           // Insert student
-          const result = await pgPool.query(
+          const [result] = await connection.query(
             `INSERT INTO students 
              (school_id, class_id, class_name, admission_number, first_name, last_name,
               gender, date_of_birth, phone, email, parent_name, parent_phone, 
               admission_date, status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-             RETURNING student_id`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               schoolId, classId, className, student.admission_number, 
               student.first_name, student.last_name, student.gender.toLowerCase(),
@@ -134,16 +132,15 @@ export class ImportService {
             ]
           );
 
-          const studentId = result.rows[0].student_id;
+          const studentId = result.insertId;
 
           // Auto-create student portal account
           try {
             const hash = await bcrypt.hash(student.admission_number, 10);
-            await pgPool.query(
-              `INSERT INTO users 
+            await connection.query(
+              `INSERT IGNORE INTO users 
                (school_id, student_id, full_name, email, password_hash, role, status)
-               VALUES ($1, $2, $3, $4, $5, 'student', 'active')
-               ON CONFLICT (school_id, student_id) DO NOTHING`,
+               VALUES (?, ?, ?, ?, ?, 'student', 'active')`,
               [schoolId, studentId, `${student.first_name} ${student.last_name}`, 
                student.admission_number, hash]
             );
@@ -176,12 +173,14 @@ export class ImportService {
         }
       }
 
-      await pgPool.query('COMMIT');
+      await connection.commit();
       return results;
 
     } catch (error) {
-      await pgPool.query('ROLLBACK');
+      await connection.rollback();
       throw error;
+    } finally {
+      connection.release();
     }
   }
 
@@ -211,20 +210,20 @@ export class ImportService {
 
   // Export students to CSV
   static async exportStudentsToCSV(schoolId, filters = {}) {
-    let whereClause = `WHERE s.school_id = $1 AND s.is_deleted = false`;
+    let whereClause = `WHERE s.school_id = ? AND s.is_deleted = 0`;
     const params = [schoolId];
 
     if (filters.classId) {
-      whereClause += ` AND s.class_id = $${params.length + 1}`;
+      whereClause += ` AND s.class_id = ?`;
       params.push(filters.classId);
     }
 
     if (filters.status) {
-      whereClause += ` AND s.status = $${params.length + 1}`;
+      whereClause += ` AND s.status = ?`;
       params.push(filters.status);
     }
 
-    const { rows } = await pgPool.query(
+    const [students] = await pool.query(
       `SELECT s.admission_number, s.first_name, s.last_name, s.gender, 
               s.class_name, s.date_of_birth, s.phone, s.email, 
               s.parent_name, s.parent_phone, s.admission_date, s.status
@@ -233,7 +232,6 @@ export class ImportService {
        ORDER BY s.class_name, s.admission_number`,
       params
     );
-    const students = rows;
 
     if (students.length === 0) {
       throw new Error('No students found matching the criteria');

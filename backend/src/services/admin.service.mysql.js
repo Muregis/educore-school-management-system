@@ -1,4 +1,4 @@
-import { pgPool } from "../config/pg.js";
+import { pool } from "../config/db.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -8,16 +8,16 @@ import { env } from "../config/env.js";
 export class AdminService {
   // Reset user password
   static async resetPassword(adminUser, targetUserId, newPassword, req) {
+    const connection = await pool.getConnection();
     try {
-      await pgPool.query('BEGIN');
+      await connection.beginTransaction();
 
       // Get target user info
-      const { rows } = await pgPool.query(
+      const [[targetUser]] = await connection.query(
         `SELECT user_id, school_id, full_name, email, role FROM users 
-         WHERE user_id = $1 AND is_deleted = false`,
+         WHERE user_id = ? AND is_deleted = 0`,
         [targetUserId]
       );
-      const [targetUser] = rows;
 
       if (!targetUser) {
         throw new Error('User not found');
@@ -32,9 +32,9 @@ export class AdminService {
       const hash = await bcrypt.hash(newPassword, 10);
 
       // Update password
-      await pgPool.query(
-        `UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP 
-         WHERE user_id = $2`,
+      await connection.query(
+        `UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP 
+         WHERE user_id = ?`,
         [hash, targetUserId]
       );
 
@@ -46,7 +46,7 @@ export class AdminService {
         newValues: { action: 'password_reset', performedBy: adminUser.user_id }
       });
 
-      await pgPool.query('COMMIT');
+      await connection.commit();
       
       return {
         success: true,
@@ -56,20 +56,21 @@ export class AdminService {
       };
 
     } catch (error) {
-      await pgPool.query('ROLLBACK');
+      await connection.rollback();
       throw error;
+    } finally {
+      connection.release();
     }
   }
 
   // Generate impersonation token
   static async generateImpersonationToken(adminUser, targetUserId, req) {
     // Get target user info
-    const { rows } = await pgPool.query(
+    const [[targetUser]] = await pool.query(
       `SELECT user_id, school_id, full_name, email, role, student_id FROM users 
-       WHERE user_id = $1 AND is_deleted = false`,
+       WHERE user_id = ? AND is_deleted = 0`,
       [targetUserId]
     );
-    const [targetUser] = rows;
 
     if (!targetUser) {
       throw new Error('User not found');
@@ -128,59 +129,55 @@ export class AdminService {
 
     // Database connection test
     try {
-      await pgPool.query('SELECT 1');
+      await pool.query('SELECT 1');
       metrics.database = { status: 'healthy', latency: Date.now() };
     } catch (error) {
       metrics.database = { status: 'unhealthy', error: error.message };
     }
 
     // User counts
-    const userResult = await pgPool.query(
+    const [[userCounts]] = await pool.query(
       `SELECT 
          COUNT(*) as total_users,
          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_users,
-         SUM(CASE WHEN last_login_at > NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END) as recent_logins
-       FROM users WHERE school_id = $1 AND is_deleted = false`,
+         SUM(CASE WHEN last_login_at > DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as recent_logins
+       FROM users WHERE school_id = ? AND is_deleted = 0`,
       [schoolId]
     );
-    const [userCounts] = userResult.rows;
 
     metrics.users = userCounts;
 
     // Student counts
-    const studentResult = await pgPool.query(
+    const [[studentCounts]] = await pool.query(
       `SELECT 
          COUNT(*) as total_students,
          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_students
-       FROM students WHERE school_id = $1 AND is_deleted = false`,
+       FROM students WHERE school_id = ? AND is_deleted = 0`,
       [schoolId]
     );
-    const [studentCounts] = studentResult.rows;
 
     metrics.students = studentCounts;
 
     // Payment summary
-    const paymentResult = await pgPool.query(
+    const [[paymentSummary]] = await pool.query(
       `SELECT 
          COUNT(*) as total_payments,
          SUM(amount) as total_amount,
-         SUM(CASE WHEN payment_date > NOW() - INTERVAL '30 days' THEN amount ELSE 0 END) as recent_amount
-       FROM payments WHERE school_id = $1 AND is_deleted = false`,
+         SUM(CASE WHEN payment_date > DATE_SUB(NOW(), INTERVAL 30 DAY) THEN amount ELSE 0 END) as recent_amount
+       FROM payments WHERE school_id = ? AND is_deleted = 0`,
       [schoolId]
     );
-    const [paymentSummary] = paymentResult.rows;
 
     metrics.payments = paymentSummary;
 
     // Storage usage (approximate)
-    const storageResult = await pgPool.query(
+    const [[storageUsage]] = await pool.query(
       `SELECT 
          COUNT(*) as total_records,
          SUM(LENGTH(first_name) + LENGTH(last_name) + LENGTH(email)) as data_size
-       FROM students WHERE school_id = $1 AND is_deleted = false`,
+       FROM students WHERE school_id = ? AND is_deleted = 0`,
       [schoolId]
     );
-    const [storageUsage] = storageResult.rows;
 
     metrics.storage = {
       totalRecords: storageUsage.total_records,
@@ -194,55 +191,53 @@ export class AdminService {
   static async getActivityLogs(schoolId, filters = {}, page = 1, limit = 50) {
     const offset = (page - 1) * limit;
     
-    let whereClause = `WHERE al.school_id = $1`;
+    let whereClause = `WHERE al.school_id = ?`;
     const params = [schoolId];
 
     if (filters.userId) {
-      whereClause += ` AND al.user_id = $${params.length + 1}`;
+      whereClause += ` AND al.user_id = ?`;
       params.push(filters.userId);
     }
 
     if (filters.action) {
-      whereClause += ` AND al.action = $${params.length + 1}`;
+      whereClause += ` AND al.action = ?`;
       params.push(filters.action);
     }
 
     if (filters.dateFrom) {
-      whereClause += ` AND al.created_at >= $${params.length + 1}`;
+      whereClause += ` AND al.created_at >= ?`;
       params.push(filters.dateFrom);
     }
 
     if (filters.dateTo) {
-      whereClause += ` AND al.created_at <= $${params.length + 1}`;
+      whereClause += ` AND al.created_at <= ?`;
       params.push(filters.dateTo);
     }
 
     // Get logs
-    const logsResult = await pgPool.query(
+    const [logs] = await pool.query(
       `SELECT al.*, u.full_name, u.role
        FROM activity_logs al
        LEFT JOIN users u ON u.user_id = al.user_id
        ${whereClause}
        ORDER BY al.created_at DESC
-       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+       LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
-    const logs = logsResult.rows;
 
     // Get total count
-    const countResult = await pgPool.query(
+    const [[countResult]] = await pool.query(
       `SELECT COUNT(*) as total FROM activity_logs al ${whereClause}`,
       params
     );
-    const [countResultRow] = countResult.rows;
 
     return {
       logs,
       pagination: {
         page,
         limit,
-        total: countResultRow.total,
-        pages: Math.ceil(countResultRow.total / limit)
+        total: countResult.total,
+        pages: Math.ceil(countResult.total / limit)
       }
     };
   }
@@ -251,88 +246,84 @@ export class AdminService {
   static async getAuditLogs(schoolId, filters = {}, page = 1, limit = 50) {
     const offset = (page - 1) * limit;
     
-    let whereClause = `WHERE al.school_id = $1`;
+    let whereClause = `WHERE al.school_id = ?`;
     const params = [schoolId];
 
     if (filters.userId) {
-      whereClause += ` AND al.user_id = $${params.length + 1}`;
+      whereClause += ` AND al.user_id = ?`;
       params.push(filters.userId);
     }
 
     if (filters.action) {
-      whereClause += ` AND al.action = $${params.length + 1}`;
+      whereClause += ` AND al.action = ?`;
       params.push(filters.action);
     }
 
     if (filters.entityType) {
-      whereClause += ` AND al.entity_type = $${params.length + 1}`;
+      whereClause += ` AND al.entity_type = ?`;
       params.push(filters.entityType);
     }
 
     if (filters.dateFrom) {
-      whereClause += ` AND al.timestamp >= $${params.length + 1}`;
+      whereClause += ` AND al.timestamp >= ?`;
       params.push(filters.dateFrom);
     }
 
     if (filters.dateTo) {
-      whereClause += ` AND al.timestamp <= $${params.length + 1}`;
+      whereClause += ` AND al.timestamp <= ?`;
       params.push(filters.dateTo);
     }
 
     // Get logs
-    const logsResult = await pgPool.query(
+    const [logs] = await pool.query(
       `SELECT al.*, u.full_name, u.role
        FROM audit_logs al
        LEFT JOIN users u ON u.user_id = al.user_id
        ${whereClause}
        ORDER BY al.timestamp DESC
-       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+       LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
-    const logs = logsResult.rows;
 
     // Get total count
-    const countResult = await pgPool.query(
+    const [[countResult]] = await pool.query(
       `SELECT COUNT(*) as total FROM audit_logs al ${whereClause}`,
       params
     );
-    const [countResultRow] = countResult.rows;
 
     return {
       logs,
       pagination: {
         page,
         limit,
-        total: countResultRow.total,
-        pages: Math.ceil(countResultRow.total / limit)
+        total: countResult.total,
+        pages: Math.ceil(countResult.total / limit)
       }
     };
   }
 
   // Get user management data
   static async getUserManagementData(schoolId) {
-    const userStatsResult = await pgPool.query(
+    const [[userStats]] = await pool.query(
       `SELECT 
          role,
          COUNT(*) as total,
          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
-         SUM(CASE WHEN last_login_at > NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END) as recent_logins
+         SUM(CASE WHEN last_login_at > DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as recent_logins
        FROM users 
-       WHERE school_id = $1 AND is_deleted = false
+       WHERE school_id = ? AND is_deleted = 0
        GROUP BY role`,
       [schoolId]
     );
-    const [userStats] = userStatsResult.rows;
 
-    const recentUsersResult = await pgPool.query(
+    const [[recentUsers]] = await pool.query(
       `SELECT u.user_id, u.full_name, u.email, u.role, u.status, u.last_login_at, u.created_at
        FROM users u
-       WHERE u.school_id = $1 AND u.is_deleted = false
+       WHERE u.school_id = ? AND u.is_deleted = 0
        ORDER BY u.created_at DESC
        LIMIT 10`,
       [schoolId]
     );
-    const recentUsers = recentUsersResult.rows;
 
     return {
       stats: userStats,
@@ -342,20 +333,20 @@ export class AdminService {
 
   // Bulk user operations
   static async bulkUpdateUsers(schoolId, userIds, updates, req) {
+    const connection = await pool.getConnection();
     const results = { updated: [], errors: [] };
 
     try {
-      await pgPool.query('BEGIN');
+      await connection.beginTransaction();
 
       for (const userId of userIds) {
         try {
           // Verify user belongs to school
-          const userResult = await pgPool.query(
+          const [[user]] = await connection.query(
             `SELECT user_id, full_name, role FROM users 
-             WHERE user_id = $1 AND school_id = $2 AND is_deleted = false`,
+             WHERE user_id = ? AND school_id = ? AND is_deleted = 0`,
             [userId, schoolId]
           );
-          const [user] = userResult.rows;
 
           if (!user) {
             results.errors.push({ userId, message: 'User not found' });
@@ -367,12 +358,12 @@ export class AdminService {
           const updateValues = [];
 
           if (updates.status) {
-            updateFields.push('status = $1');
+            updateFields.push('status = ?');
             updateValues.push(updates.status);
           }
 
           if (updates.role) {
-            updateFields.push('role = $2');
+            updateFields.push('role = ?');
             updateValues.push(updates.role);
           }
 
@@ -384,8 +375,8 @@ export class AdminService {
           updateFields.push('updated_at = CURRENT_TIMESTAMP');
           updateValues.push(userId);
 
-          await pgPool.query(
-            `UPDATE users SET ${updateFields.join(', ')} WHERE user_id = $${updateValues.length}`,
+          await connection.query(
+            `UPDATE users SET ${updateFields.join(', ')} WHERE user_id = ?`,
             updateValues
           );
 
@@ -404,12 +395,14 @@ export class AdminService {
         }
       }
 
-      await pgPool.query('COMMIT');
+      await connection.commit();
       return results;
 
     } catch (error) {
-      await pgPool.query('ROLLBACK');
+      await connection.rollback();
       throw error;
+    } finally {
+      connection.release();
     }
   }
 }

@@ -2,8 +2,6 @@ import { Router } from "express";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { LedgerService } from "../services/ledger.service.js";
-import { pgPool } from "../config/pg.js";
-import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 
 const router = Router();
 router.use(authRequired);
@@ -16,12 +14,11 @@ router.get("/student/:studentId", async (req, res, next) => {
     const { limit = 50, offset = 0 } = req.query;
 
     // Verify student belongs to school
-    const studentResult = await pgPool.query(
+    const [[student]] = await pool.query(
       `SELECT student_id, first_name, last_name FROM students 
-       WHERE student_id = $1 AND school_id = $2 AND is_deleted = false`,
+       WHERE student_id = ? AND school_id = ? AND is_deleted = 0`,
       [studentId, schoolId]
     );
-    const [student] = studentResult.rows;
 
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
@@ -52,12 +49,11 @@ router.get("/student/:studentId/statement", async (req, res, next) => {
     const { term } = req.query;
 
     // Verify student belongs to school
-    const studentResult = await pgPool.query(
+    const [[student]] = await pool.query(
       `SELECT student_id, first_name, last_name FROM students 
-       WHERE student_id = $1 AND school_id = $2 AND is_deleted = false`,
+       WHERE student_id = ? AND school_id = ? AND is_deleted = 0`,
       [studentId, schoolId]
     );
-    const [student] = studentResult.rows;
 
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
@@ -87,12 +83,11 @@ router.post("/assess-fees",
       }
 
       // Verify class belongs to school
-      const classResult = await pgPool.query(
+      const [[cls]] = await pool.query(
         `SELECT class_id, class_name FROM classes 
-         WHERE class_id = $1 AND school_id = $2 AND is_deleted = false`,
+         WHERE class_id = ? AND school_id = ? AND is_deleted = 0`,
         [classId, schoolId]
       );
-      const [cls] = classResult.rows;
 
       if (!cls) {
         return res.status(404).json({ message: "Class not found" });
@@ -124,16 +119,16 @@ router.get("/balances",
       const { schoolId } = req.user;
       const { classId, status } = req.query;
 
-      let whereClause = `WHERE s.school_id = $1 AND s.is_deleted = false`;
+      let whereClause = `WHERE s.school_id = ? AND s.is_deleted = 0`;
       const params = [schoolId];
 
       if (classId) {
-        whereClause += ` AND s.class_id = $${params.length + 1}`;
+        whereClause += ` AND s.class_id = ?`;
         params.push(classId);
       }
 
       // Get students with their latest balance
-      const studentsResult = await pgPool.query(
+      const [students] = await pool.query(
         `SELECT s.student_id, s.admission_number, s.first_name, s.last_name, s.class_name,
                 COALESCE(sl.balance_after, 0) as balance,
                 sl.created_at as last_transaction_date
@@ -142,13 +137,12 @@ router.get("/balances",
            SELECT student_id, balance_after, created_at,
                   ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY ledger_id DESC) as rn
            FROM student_ledger
-           WHERE school_id = $1
+           WHERE school_id = ?
          ) sl ON sl.student_id = s.student_id AND sl.rn = 1
          ${whereClause}
          ORDER BY s.class_name, s.first_name`,
         [schoolId, ...params.slice(1)]
       );
-      const students = studentsResult.rows;
 
       // Filter by balance status if requested
       let filteredStudents = students;
@@ -192,63 +186,63 @@ router.post("/adjustment",
       }
 
       // Verify student belongs to school
-      const studentResult = await pgPool.query(
+      const [[student]] = await pool.query(
         `SELECT student_id, first_name, last_name FROM students 
-         WHERE student_id = $1 AND school_id = $2 AND is_deleted = false`,
+         WHERE student_id = ? AND school_id = ? AND is_deleted = 0`,
         [studentId, schoolId]
       );
-      const [student] = studentResult.rows;
 
       if (!student) {
         return res.status(404).json({ message: "Student not found" });
       }
 
+      const connection = await pool.getConnection();
       try {
-        await pgPool.query('BEGIN');
+        await connection.beginTransaction();
 
         // Get current balance
-        const balanceResult = await pgPool.query(
+        const [[currentBalance]] = await connection.query(
           `SELECT balance_after FROM student_ledger 
-           WHERE student_id = $1 AND school_id = $2 
+           WHERE student_id = ? AND school_id = ? 
            ORDER BY ledger_id DESC LIMIT 1`,
           [studentId, schoolId]
         );
-        const [currentBalance] = balanceResult.rows;
 
         const previousBalance = currentBalance?.balance_after || 0;
         const newBalance = previousBalance + Number(amount);
 
         // Insert adjustment entry
-        const result = await pgPool.query(
+        const [result] = await connection.query(
           `INSERT INTO student_ledger 
            (school_id, student_id, transaction_type, amount, balance_after, 
             reference_type, reference_id, description)
-           VALUES ($1, $2, 'adjustment', $3, $4, 'adjustment', NULL, $5)
-           RETURNING ledger_id`,
+           VALUES (?, ?, 'adjustment', ?, ?, 'adjustment', NULL, ?)`,
           [schoolId, studentId, amount, newBalance, description]
         );
 
         // Log adjustment for audit
         await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_UPDATE, {
-          entityId: result.rows[0].ledger_id,
+          entityId: result.insertId,
           entityType: 'ledger_adjustment',
           description: `Ledger adjustment for student ${studentId}: ${amount} (${description})`,
           newValues: { studentId, amount, previousBalance, newBalance, description }
         });
 
-        await pgPool.query('COMMIT');
+        await connection.commit();
 
         res.json({
           message: "Adjustment recorded successfully",
-          adjustmentId: result.rows[0].ledger_id,
+          adjustmentId: result.insertId,
           previousBalance,
           newBalance,
           amount
         });
 
       } catch (error) {
-        await pgPool.query('ROLLBACK');
+        await connection.rollback();
         throw error;
+      } finally {
+        connection.release();
       }
 
     } catch (error) {
