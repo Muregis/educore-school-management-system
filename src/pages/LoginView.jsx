@@ -267,7 +267,7 @@ export default function LoginView({ onLogin }) {
     try {
       const data = await apiFetch("/auth/login", {
         method: "POST",
-        body: { email, password, schoolId: 1 },
+        body: { email, password }, // Removed hardcoded schoolId: 1
       });
       onLogin({
         id: data.user.userId, name: data.user.name,
@@ -284,7 +284,7 @@ export default function LoginView({ onLogin }) {
     try {
       const data = await apiFetch("/auth/portal-login", {
         method: "POST",
-        body: { admissionNumber: admission.trim(), password, role: portalRole, schoolId: 1 },
+        body: { admissionNumber: admission.trim(), password, role: portalRole }, // Removed hardcoded schoolId: 1
       });
       onLogin({
         id: data.user.userId, name: data.user.name,

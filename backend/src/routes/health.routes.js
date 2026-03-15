@@ -43,10 +43,12 @@ const router = Router();
     // Helpful dev diagnostics (avoid leaking details in production)
     if (process.env.NODE_ENV !== "production") {
       try {
-        const [[{ usersCount }]] = await pool.query(`SELECT COUNT(*) AS usersCount FROM users WHERE is_deleted = 0`);
-        const [[{ schoolsCount }]] = await pool.query(`SELECT COUNT(*) AS schoolsCount FROM schools WHERE is_deleted = 0`);
-        payload.usersCount = Number(usersCount || 0);
-        payload.schoolsCount = Number(schoolsCount || 0);
+        // OLD: Exposing global statistics is a security risk in multi-tenant system
+    // const [[{ usersCount }]] = await pool.query(`SELECT COUNT(*) AS usersCount FROM users WHERE is_deleted = 0`);
+    // const [[{ schoolsCount }]] = await pool.query(`SELECT COUNT(*) AS schoolsCount FROM schools WHERE is_deleted = 0`);
+    // payload.usersCount = Number(usersCount || 0);
+    // payload.schoolsCount = Number(schoolsCount || 0);
+    // Security: Remove global stats to prevent cross-tenant information disclosure
       } catch {
         // ignore (tables might not exist yet)
       }

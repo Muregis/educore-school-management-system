@@ -28,6 +28,7 @@ export const env = {
   dbName:               process.env.DB_NAME      || "educore_db",
   jwtSecret:            process.env.JWT_SECRET   || "educore_dev_secret_change_me",
   jwtExpiresIn:         process.env.JWT_EXPIRES_IN || "7d",
+  supabaseJwtSecret:    process.env.SUPABASE_JWT_SECRET || "",
   corsOrigin:           process.env.CORS_ORIGIN  || "http://localhost:5173",
 
   // Mpesa Daraja

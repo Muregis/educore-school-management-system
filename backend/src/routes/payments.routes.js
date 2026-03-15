@@ -4,6 +4,7 @@ import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { sendEmail, isEmailConfigured, templates } from "../services/email.service.js";
 import { logActivity } from "../helpers/activity.logger.js";
+import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 
 const router = Router();
 router.use(authRequired);
@@ -112,6 +113,15 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
     }
 
     logActivity(req, { action:"payment.create", entity:"payment", entityId:result.insertId, description:`KES ${amount} recorded for student ${studentId}` });
+    
+    // NEW: Log payment creation for audit
+    await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_CREATE, {
+      entityId: result.insertId,
+      entityType: 'payment',
+      description: `Payment recorded: KES ${amount} for student ${studentId} (${feeType})`,
+      newValues: { studentId, amount, feeType, paymentMethod, referenceNumber, paymentDate, status, term, paidBy }
+    });
+    
     res.status(201).json({ paymentId: result.insertId });
   } catch (err) { next(err); }
 });
@@ -128,6 +138,15 @@ router.put("/:id", requireRoles("admin", "finance"), async (req, res, next) => {
       [amount, feeType, paymentMethod, referenceNumber||null, paymentDate, status||"paid", paidBy||null, req.params.id, schoolId]
     );
     if (!result.affectedRows) return res.status(404).json({ message: "Payment not found" });
+    
+    // NEW: Log payment update for audit
+    await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_UPDATE, {
+      entityId: req.params.id,
+      entityType: 'payment',
+      description: `Payment updated: ID ${req.params.id} - KES ${amount} (${status})`,
+      newValues: { amount, feeType, paymentMethod, referenceNumber, paymentDate, status, paidBy }
+    });
+    
     res.json({ updated: true });
   } catch (err) { next(err); }
 });
@@ -142,6 +161,14 @@ router.delete("/:id", requireRoles("admin", "finance"), async (req, res, next) =
       [req.params.id, schoolId]
     );
     if (!result.affectedRows) return res.status(404).json({ message: "Payment not found" });
+    
+    // NEW: Log payment deletion for audit
+    await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_DELETE, {
+      entityId: req.params.id,
+      entityType: 'payment',
+      description: `Payment deleted: ID ${req.params.id}`
+    });
+    
     res.json({ deleted: true });
   } catch (err) { next(err); }
 });

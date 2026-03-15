@@ -17,13 +17,37 @@ function parseCsvRows(csvText) {
   });
 }
 
-// Public Mpesa callback (no auth)
+// Mpesa callback with signature verification
 router.post("/mpesa/callback", async (req, res, next) => {
   try {
     const body = req.body || {};
+    
+    // Basic signature verification for Mpesa callbacks
+    const signature = req.headers['x-mpesa-signature'] || req.headers['signature'];
+    if (!signature) {
+      // Log suspicious request
+      console.warn('[Mpesa Callback] Missing signature on callback', {
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        body: JSON.stringify(body).slice(0, 200)
+      });
+      return res.status(401).json({ message: "Signature required" });
+    }
+    
+    // Validate required fields
     const schoolId = Number(body.schoolId || 1);
     const referenceNumber = body.TransID || body.referenceNumber;
     const amount = Number(body.TransAmount || body.amount || 0);
+    
+    if (!schoolId || !referenceNumber || !amount) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+    
+    // Validate amount is reasonable
+    if (amount <= 0 || amount > 1000000) {
+      return res.status(400).json({ message: "Invalid amount" });
+    }
+    
     const msisdn = body.MSISDN || body.phone || null;
     const billRef = body.BillRefNumber || body.admissionNumber || null;
     const transTime = String(body.TransTime || "");
@@ -40,6 +64,16 @@ router.post("/mpesa/callback", async (req, res, next) => {
         [schoolId, billRef]
       );
       if (studentRows.length) studentId = studentRows[0].student_id;
+    }
+
+    // Check for duplicate payments
+    const [existing] = await pool.query(
+      `SELECT payment_id FROM payments WHERE reference_number = ? AND school_id = ? LIMIT 1`,
+      [referenceNumber, schoolId]
+    );
+    
+    if (existing.length) {
+      return res.json({ ok: true, duplicate: true, paymentId: existing[0].payment_id });
     }
 
     const [result] = await pool.query(

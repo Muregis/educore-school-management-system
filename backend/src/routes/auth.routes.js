@@ -4,7 +4,10 @@ import jwt from "jsonwebtoken";
 import { pool } from "../config/db.js";
 import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
+import { authRateLimit } from "../middleware/rateLimit.js";
 import { logActivity } from "../helpers/activity.logger.js";
+import { logAuthFailure } from "../helpers/security.logger.js";
+import { generateSupabaseJWT } from "../helpers/supabase-jwt.js";
 
 const router = Router();
 
@@ -18,7 +21,7 @@ function defaultPasswordForRole(role) {
 }
 
 // ── Staff login ───────────────────────────────────────────────────────────────
-router.post("/login", async (req, res, next) => {
+router.post("/login", authRateLimit, async (req, res, next) => {
   try {
     const { email, password, schoolId = 1 } = req.body;
     if (!email || !password)
@@ -31,6 +34,9 @@ router.post("/login", async (req, res, next) => {
       [email, schoolId]
     );
     if (!users.length) {
+      // Log authentication failure
+      logAuthFailure(req, { email, reason: "User not found", schoolId });
+      
       if (process.env.NODE_ENV !== "production") {
         try {
           const [[{ c }]] = await pool.query(
@@ -79,30 +85,47 @@ router.post("/login", async (req, res, next) => {
         );
       } catch (_) { /* ignore */ }
     }
-    if (!valid) return res.status(401).json({ message: "Invalid credentials" });
+    if (!valid) {
+      // Log authentication failure
+      logAuthFailure(req, { email, reason: "Invalid password", schoolId });
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
 
     const role = user.role;
     const name = user.full_name;
+    // OLD:
+    // const userPayload = { userId: user.user_id, schoolId: Number(schoolId), role, name, email: user.email };
+    const userPayload = { user_id: user.user_id, school_id: Number(schoolId), role, name, email: user.email };
 
     const token = jwt.sign(
-      { userId: user.user_id, schoolId: Number(schoolId), role, name },
+      userPayload,
       env.jwtSecret,
       { expiresIn: env.jwtExpiresIn }
     );
 
+    // Generate Supabase-compatible JWT for RLS
+    let supabaseToken = null;
+    try {
+      supabaseToken = generateSupabaseJWT(userPayload);
+    } catch (error) {
+      console.error("Failed to generate Supabase JWT:", error.message);
+      // Continue without Supabase token for now
+    }
+
     // Attach user to req so logActivity can read it
-    req.user = { userId: user.user_id, schoolId: Number(schoolId), role, name };
+    req.user = userPayload;
     logActivity(req, { action: "auth.login", description: `${role} login: ${name}` });
 
     res.json({
       token,
+      supabaseToken, // New Supabase JWT for frontend
       user: { userId: user.user_id, schoolId: Number(schoolId), role, name, email: user.email },
     });
   } catch (err) { next(err); }
 });
 
 // ── Portal login (parent / student) ──────────────────────────────────────────
-router.post("/portal-login", async (req, res, next) => {
+router.post("/portal-login", authRateLimit, async (req, res, next) => {
   try {
     const { admissionNumber, password, schoolId = 1, role = "parent" } = req.body;
     if (!admissionNumber || !password)
@@ -156,15 +179,32 @@ router.post("/portal-login", async (req, res, next) => {
       ? `Parent of ${student.first_name} ${student.last_name}`
       : `${student.first_name} ${student.last_name}`;
 
+    // OLD:
+    // const userPayload = {
+    //   userId: user.user_id, schoolId: student.school_id,
+    //   role, name, studentId: student.student_id,
+    //   admissionNumber: student.admission_number, email: user.email
+    // };
+    const userPayload = {
+      user_id: user.user_id, school_id: student.school_id,
+      role, name, student_id: student.student_id,
+      admission_number: student.admission_number, email: user.email
+    };
+
     const token = jwt.sign(
-      {
-        userId: user.user_id, schoolId: student.school_id,
-        role, name, studentId: student.student_id,
-        admissionNumber: student.admission_number,
-      },
+      userPayload,
       env.jwtSecret,
       { expiresIn: env.jwtExpiresIn }
     );
+
+    // Generate Supabase-compatible JWT for RLS
+    let supabaseToken = null;
+    try {
+      supabaseToken = generateSupabaseJWT(userPayload);
+    } catch (error) {
+      console.error("Failed to generate Supabase JWT:", error.message);
+      // Continue without Supabase token for now
+    }
 
     // Fee balance check (parents only)
     let feeBlocked = false;
@@ -194,6 +234,7 @@ router.post("/portal-login", async (req, res, next) => {
 
     res.json({
       token,
+      supabaseToken, // New Supabase JWT for frontend
       feeBlocked,
       user: {
         userId: user.user_id, schoolId: student.school_id,

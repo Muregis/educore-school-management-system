@@ -93,6 +93,23 @@ router.post("/webhook", async (req, res, next) => {
     const paidAmount = amount / 100;
     const { schoolId } = metadata || {};
 
+    // NEW: Validate webhook tenant safety
+    if (!schoolId) {
+      console.error("SECURITY: Missing school_id in Paystack webhook metadata", { reference });
+      return res.status(400).json({ message: "Invalid payment metadata" });
+    }
+
+    // Verify payment belongs to the correct school before updating
+    const [paymentCheck] = await pool.query(
+      `SELECT school_id FROM payments WHERE reference_number = ? AND school_id = ? LIMIT 1`,
+      [reference, schoolId]
+    );
+    
+    if (!paymentCheck.length) {
+      console.error("SECURITY: Cross-tenant webhook attempt", { reference, webhookSchoolId: schoolId });
+      return res.status(403).json({ message: "Payment not found for this school" });
+    }
+
     await pool.query(
       `UPDATE payments SET status='paid', amount=?, updated_at=CURRENT_TIMESTAMP
        WHERE reference_number=? AND school_id=?`,
@@ -114,9 +131,27 @@ router.get("/callback", async (req, res, next) => {
     const data = await response.json();
 
     if (data.data?.status === "success") {
+      // Extract school_id from payment metadata to prevent cross-school updates
+      const { schoolId } = data.data.metadata || {};
+      if (!schoolId) {
+        console.error("Missing school_id in webhook metadata");
+        return res.status(400).json({ message: "Invalid payment metadata" });
+      }
+      
+      const [paymentCheck] = await pool.query(
+        // OLD:
+        // `SELECT school_id FROM payments WHERE reference_number = ? LIMIT 1`,
+        `SELECT school_id FROM payments WHERE reference_number = ? AND school_id = ? LIMIT 1`,
+        [reference, schoolId]
+      );
+      
+      if (!paymentCheck.length) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+      
       await pool.query(
-        `UPDATE payments SET status='paid', updated_at=CURRENT_TIMESTAMP WHERE reference_number=?`,
-        [reference]
+        `UPDATE payments SET status='paid', updated_at=CURRENT_TIMESTAMP WHERE reference_number=? AND school_id=?`,
+        [reference, paymentCheck[0].school_id]
       );
     }
     res.json({ status: data.data?.status, reference });
