@@ -138,8 +138,9 @@ router.get("/portal", async (req, res, next) => {
               CONCAT(s.first_name,' ',s.last_name) AS student_name,
               s.admission_number, s.class_name
       FROM users u
-      LEFT JOIN students s ON s.student_id = u.student_id AND s.is_deleted = 0
-      WHERE u.school_id = ? AND u.role IN ('parent','student') AND u.is_deleted = 0
+      LEFT JOIN students s ON s.student_id = u.student_id 
+      WHERE u.school_id = ? AND u.role IN ('parent','student') AND u.is_deleted = 0 
+        AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
       ORDER BY u.role, u.full_name`,
       [schoolId]
     );

@@ -1,4 +1,4 @@
-import { pool } from "../config/db.js";
+import { pgPool } from "../config/pg.js";
 
 // NEW: Enhanced audit logging for sensitive actions
 export async function logAuditEvent(req, action, details = {}) {
@@ -6,11 +6,11 @@ export async function logAuditEvent(req, action, details = {}) {
     const { user_id, school_id } = req.user || {};
     const { entityId, entityType, oldValues, newValues, description } = details;
 
-    await pool.query(
+    await pgPool.query(
       `INSERT INTO audit_logs (
         user_id, school_id, action, entity_type, entity_id,
         old_values, new_values, description, ip_address, user_agent, timestamp
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
       [
         user_id || null,
         school_id || null,

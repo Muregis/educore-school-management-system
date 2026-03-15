@@ -209,8 +209,10 @@ router.post("/email/bulk", requireRoles("admin", "teacher"), async (req, res, ne
     let sql = `SELECT s.student_id, s.first_name, s.last_name,
               u.email, s.parent_name
               FROM students s
-              LEFT JOIN users u ON u.student_id = s.student_id AND u.role = 'parent' AND u.is_deleted = 0
-              WHERE s.school_id=? AND s.is_deleted=0 AND u.email IS NOT NULL AND u.email != ''`;
+              LEFT JOIN users u ON u.student_id = s.student_id AND u.role = 'parent'
+              WHERE s.school_id=? AND s.is_deleted=0 
+                AND (u.is_deleted = 0 OR u.is_deleted IS NULL)
+                AND u.email IS NOT NULL AND u.email != ''`;
     const params = [schoolId];
     if (className && className !== "all") { sql += " AND s.class_name=?"; params.push(className); }
 
@@ -243,11 +245,14 @@ router.post("/email/fee-reminder", requireRoles("admin", "finance"), async (req,
               u.email,
               COALESCE(SUM(i.amount_due),0) - COALESCE(SUM(p.paid),0) AS balance
               FROM students s
-              LEFT JOIN users u ON u.student_id = s.student_id AND u.role = 'parent' AND u.is_deleted = 0
-              LEFT JOIN invoices i ON i.student_id = s.student_id AND i.school_id = s.school_id AND i.is_deleted = 0
+              LEFT JOIN users u ON u.student_id = s.student_id AND u.role = 'parent'
+              LEFT JOIN invoices i ON i.student_id = s.student_id AND i.school_id = s.school_id
               LEFT JOIN (SELECT invoice_id, SUM(amount) AS paid FROM payments WHERE school_id=? AND is_deleted=0 GROUP BY invoice_id) p
               ON p.invoice_id = i.invoice_id
-              WHERE s.school_id=? AND s.is_deleted=0 AND u.email IS NOT NULL AND u.email != ''`;
+              WHERE s.school_id=? AND s.is_deleted=0 
+                AND (u.is_deleted = 0 OR u.is_deleted IS NULL)
+                AND (i.is_deleted = 0 OR i.is_deleted IS NULL)
+                AND u.email IS NOT NULL AND u.email != ''`;
     const params = [schoolId, schoolId];
     if (className && className !== "all") { sql += " AND s.class_name=?"; params.push(className); }
     sql += " GROUP BY s.student_id, u.email HAVING balance > 0";

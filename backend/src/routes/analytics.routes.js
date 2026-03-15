@@ -84,9 +84,11 @@ router.get("/", async (req, res, next) => {
                 COALESCE(SUM(p.amount),0) AS paid,
                 COALESCE((fs.tuition + fs.activity + fs.misc),0) AS expected
         FROM students s
-        LEFT JOIN payments p  ON p.student_id=s.student_id AND p.status='paid' AND p.is_deleted=0
-        LEFT JOIN fee_structures fs ON fs.class_name=s.class_name AND fs.school_id=s.school_id AND fs.is_deleted=0
+        LEFT JOIN payments p  ON p.student_id=s.student_id AND p.status='paid'
+        LEFT JOIN fee_structures fs ON fs.class_name=s.class_name AND fs.school_id=s.school_id
         WHERE s.school_id=? AND s.is_deleted=0 AND s.status='active' AND fs.fee_structure_id IS NOT NULL
+          AND (p.is_deleted = 0 OR p.is_deleted IS NULL)
+          AND (fs.is_deleted = 0 OR fs.is_deleted IS NULL)
         GROUP BY s.student_id, fs.tuition, fs.activity, fs.misc
         HAVING paid < expected`,
         [schoolId]
