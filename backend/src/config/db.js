@@ -1,4 +1,4 @@
-import mysql from "mysql2/promise";
+import { pgPool } from "./pg.js";
 import { env } from "./env.js";
 
 // Default to PostgreSQL, fallback to MySQL for legacy compatibility
