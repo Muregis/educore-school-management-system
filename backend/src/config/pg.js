@@ -32,6 +32,21 @@ function buildPgConfigFromEnv() {
 
 export const pgPool = new Pool(buildPgConfigFromEnv());
 
+// Connection pool session reset to prevent tenant contamination
+pgPool.on('connect', (client) => {
+  // Reset session variables when connection is established
+  client.query('SELECT reset_tenant_session()').catch(err => {
+    console.warn('Failed to reset tenant session on connect:', err.message);
+  });
+});
+
+pgPool.on('acquire', (client) => {
+  // Reset session variables when connection is acquired from pool
+  client.query('SELECT reset_tenant_session()').catch(err => {
+    console.warn('Failed to reset tenant session on acquire:', err.message);
+  });
+});
+
 export async function testPgConnection() {
   const client = await pgPool.connect();
   try {

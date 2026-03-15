@@ -13,13 +13,13 @@ router.get("/", async (req, res, next) => {
     const { studentId, term, academicYear } = req.query;
     let sql = `SELECT rc.*, CONCAT(s.first_name,' ',s.last_name) AS student_name, s.class_name, s.admission_number
                 FROM report_cards rc JOIN students s ON s.student_id = rc.student_id
-                WHERE rc.school_id=? AND rc.is_deleted=0`;
+                WHERE rc.school_id=$1 AND rc.is_deleted=false`;
     const params = [schoolId];
     if (studentId) { sql += " AND rc.student_id=?"; params.push(studentId); }
     if (term)       { sql += " AND rc.term=?"; params.push(term); }
     if (academicYear) { sql += " AND rc.academic_year=?"; params.push(academicYear); }
     sql += " ORDER BY rc.created_at DESC";
-    const [rows] = await pool.query(sql, params);
+    const [rows] = await pgPool.query(sql, params);
     res.json(rows);
   } catch (err) { next(err); }
 });

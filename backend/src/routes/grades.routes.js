@@ -34,8 +34,7 @@ router.get("/", async (req, res, next) => {
     const { studentId, term, classId } = req.query;
 
     if (usePgGradesGet) {
-      let sql = `
-        SELECT r.result_id, r.student_id, r.marks, r.total_marks, r.grade,
+      let sql = `SELECT r.result_id, r.student_id, r.marks, r.total_marks, r.grade,
             r.teacher_comment, r.term,
             r.subject,
             s.first_name, s.last_name,

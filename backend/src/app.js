@@ -32,7 +32,7 @@ import adminRoutes         from "./routes/admin.routes.js";
 import lessonPlansRoutes   from "./routes/lessonplans.routes.js";
 import importRoutes         from "./routes/import.routes.js";
 import ledgerRoutes        from "./routes/ledger.routes.js";
-import { startBackupScheduler } from "./services/backup.service.js";
+// import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }    from "./middleware/error.js";
 import { authRequired } from "./middleware/auth.js";
 import { tenantContext, tenantSecurityCheck } from "./middleware/tenantContext.js";
@@ -106,6 +106,6 @@ app.use((req, res) => res.status(404).json({ message: "Not found" }));
 app.use(errorHandler);
 
 // ── Start backup scheduler (daily at midnight) ───────────────────────────────
-startBackupScheduler();
+// startBackupScheduler();
 
 export default app;

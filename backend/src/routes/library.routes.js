@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
+import { pgPool } from "../config/pg.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
@@ -10,8 +10,8 @@ router.use(authRequired);
 router.get("/books", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
-      `SELECT * FROM books WHERE school_id=? AND is_deleted=0 ORDER BY title`,
+    const { rows } = await pgPool.query(
+      `SELECT * FROM books WHERE school_id=$1 AND is_deleted=false ORDER BY title`,
       [schoolId]
     );
     res.json(rows);
@@ -80,30 +80,23 @@ router.get("/borrows", async (req, res, next) => {
       SELECT br.borrow_id, br.book_id, b.title AS book_title, b.category,
              br.borrower_id, br.borrower_type, br.borrow_date, br.due_date,
              br.return_date, br.status, br.notes,
-             DATEDIFF(CURDATE(), br.borrow_date) AS days_out,
-             DATEDIFF(br.due_date, CURDATE()) AS days_remaining,
-             CASE
-               WHEN br.borrower_type='student' THEN CONCAT(s.first_name,' ',s.last_name)
-               WHEN br.borrower_type='staff'   THEN CONCAT(t.first_name,' ',t.last_name)
-               ELSE 'Unknown'
-             END AS borrower_name,
              CASE WHEN br.borrower_type='student' THEN s.admission_number ELSE t.staff_number END AS borrower_ref
       FROM borrow_records br
       JOIN books b ON b.book_id = br.book_id
       LEFT JOIN students s ON s.student_id = br.borrower_id AND br.borrower_type='student'
       LEFT JOIN teachers t ON t.teacher_id = br.borrower_id AND br.borrower_type='staff'
-      WHERE br.school_id=? AND br.is_deleted=0`;
+      WHERE br.school_id=$1 AND br.is_deleted=false`;
 
     const params = [schoolId];
 
     // Students only see their own borrows
     if (role === "student" && studentId) {
-      sql += " AND br.borrower_type='student' AND br.borrower_id=?";
+      sql += " AND br.borrower_type='student' AND br.borrower_id=$2";
       params.push(studentId);
     }
 
     sql += " ORDER BY br.borrow_date DESC, br.borrow_id DESC";
-    const [rows] = await pool.query(sql, params);
+    const { rows } = await pgPool.query(sql, params);
     res.json(rows);
   } catch (err) { next(err); }
 });

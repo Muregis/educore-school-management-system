@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
+import { pgPool } from "../config/pg.js";
 import { authRequired } from "../middleware/auth.js";
 import { env } from "../config/env.js";
 
@@ -7,8 +7,8 @@ const router = Router();
 
 async function sq(sql, params = []) {
   try {
-    const [r] = await pool.query(sql, params);
-    return r;
+    const { rows } = await pgPool.query(sql, params);
+    return rows;
   } catch (err) {
     console.error("SQL error:", err);
     return [];
@@ -22,9 +22,9 @@ router.get("/streams", authRequired, async (req, res, next) => {
     const term = req.query.term || "Term 2";
     const className = req.query.class_name || null;
 
-    const base = "r.school_id=? AND r.term=? AND r.is_deleted=0 AND c.is_deleted=0 AND s.is_deleted=0 AND s.status='active'";
+    const base = "r.school_id=$1 AND r.term=$2 AND r.is_deleted=false AND c.is_deleted=false AND s.is_deleted=false AND s.status='active'";
     const p = [schoolId, term];
-    const classFilter = className ? " AND c.class_name=?" : "";
+    const classFilter = className ? " AND c.class_name=$3" : "";
     if (className) p.push(className);
 
     const streamAvgs = await sq(
@@ -49,8 +49,8 @@ router.get("/streams", authRequired, async (req, res, next) => {
         COUNT(r.result_id) AS entries
       FROM results r
       JOIN classes c ON c.class_id = r.class_id
-      WHERE r.school_id=? AND r.term=? AND r.is_deleted=0 AND r.class_id IS NOT NULL
-        ${className ? "AND c.class_name=?" : ""}
+      WHERE r.school_id=$1 AND r.term=$2 AND r.is_deleted=false AND r.class_id IS NOT NULL
+        ${className ? "AND c.class_name=$3" : ""}
       GROUP BY r.subject ORDER BY avg_score DESC`, sp);
 
     const mp = [schoolId, term];
@@ -61,8 +61,8 @@ router.get("/streams", authRequired, async (req, res, next) => {
         ROUND(AVG(r.marks / r.total_marks * 100),1) AS avg_score
       FROM results r
       JOIN classes c ON c.class_id = r.class_id
-      WHERE r.school_id=? AND r.term=? AND r.is_deleted=0 AND c.is_deleted=0 AND r.class_id IS NOT NULL
-        ${className ? "AND c.class_name=?" : ""}
+      WHERE r.school_id=$1 AND r.term=$2 AND r.is_deleted=false AND c.is_deleted=false AND r.class_id IS NOT NULL
+        ${className ? "AND c.class_name=$3" : ""}
       GROUP BY c.class_id, c.class_name, c.section, r.subject
       ORDER BY c.class_name, c.section, r.subject`, mp);
 
@@ -73,8 +73,8 @@ router.get("/streams", authRequired, async (req, res, next) => {
       matrix[row.stream_label][row.subject] = Number(row.avg_score);
     }
 
-    const terms   = await sq(`SELECT DISTINCT term FROM results WHERE school_id=? AND is_deleted=0 ORDER BY term`, [schoolId]);
-    const classes = await sq(`SELECT DISTINCT class_name FROM classes WHERE school_id=? AND is_deleted=0 AND status='active' ORDER BY class_name`, [schoolId]);
+    const terms   = await sq(`SELECT DISTINCT term FROM results WHERE school_id=$1 AND is_deleted=false ORDER BY term`, [schoolId]);
+    const classes = await sq(`SELECT DISTINCT class_name FROM classes WHERE school_id=$1 AND is_deleted=false AND status='active' ORDER BY class_name`, [schoolId]);
 
     res.json({
       streamAverages:  streamAvgs.map(r => ({ ...r, avg_score: Number(r.avg_score) })),
@@ -146,8 +146,8 @@ router.get("/trends", authRequired, async (req, res, next) => {
         COUNT(DISTINCT r.student_id) AS student_count
        FROM results r
        JOIN classes c ON c.class_id = r.class_id
-       WHERE r.school_id=? AND r.is_deleted=0 AND c.is_deleted=0
-         ${className ? "AND c.class_name=?" : ""}
+       WHERE r.school_id=$1 AND r.is_deleted=false AND c.is_deleted=false
+         ${className ? "AND c.class_name=$2" : ""}
        GROUP BY r.term, r.subject
        ORDER BY r.term, r.subject`, p
     );
@@ -159,8 +159,8 @@ router.get("/trends", authRequired, async (req, res, next) => {
         COUNT(DISTINCT r.student_id) AS student_count
        FROM results r
        JOIN classes c ON c.class_id = r.class_id
-       WHERE r.school_id=? AND r.is_deleted=0 AND c.is_deleted=0
-         ${className ? "AND c.class_name=?" : ""}
+       WHERE r.school_id=$1 AND r.is_deleted=false AND c.is_deleted=false
+         ${className ? "AND c.class_name=$2" : ""}
        GROUP BY r.term
        ORDER BY r.term`, p
     );
@@ -193,9 +193,9 @@ router.get("/top-students", authRequired, async (req, res, next) => {
     const limit     = Math.min(parseInt(req.query.limit) || 10, 20);
 
     const p = [schoolId];
-    const filters = ["r.school_id=?", "r.is_deleted=0", "s.is_deleted=0", "s.status='active'"];
-    if (term)      { filters.push("r.term=?");        p.push(term); }
-    if (className) { filters.push("c.class_name=?");  p.push(className); }
+    const filters = ["r.school_id=$1", "r.is_deleted=false", "s.is_deleted=false", "s.status='active'"];
+    if (term)      { filters.push("r.term=$2");        p.push(term); }
+    if (className) { filters.push("c.class_name=$3");  p.push(className); }
 
     const rows = await sq(
       `SELECT
