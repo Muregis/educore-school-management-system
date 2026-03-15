@@ -81,10 +81,22 @@ router.post("/callback", async (req, res, next) => {
 
     if (String(resultCode) !== "0") {
       if (checkoutReqId) {
-        await pool.query(
-          `UPDATE payments SET status='failed', updated_at=CURRENT_TIMESTAMP WHERE reference_number=?`,
+        // Get school_id from the payment before updating to prevent cross-school access
+        const [paymentCheck] = await pool.query(
+          // OLD:
+          // `SELECT school_id FROM payments WHERE reference_number = ? LIMIT 1`,
+          `SELECT school_id FROM payments WHERE reference_number = ? AND school_id IS NOT NULL LIMIT 1`,
           [checkoutReqId]
         );
+        
+        if (paymentCheck.length) {
+          await pool.query(
+            // OLD:
+            // `UPDATE payments SET status='failed', updated_at=CURRENT_TIMESTAMP WHERE reference_number=?`,
+            `UPDATE payments SET status='failed', updated_at=CURRENT_TIMESTAMP WHERE reference_number=? AND school_id=?`,
+            [checkoutReqId, paymentCheck[0].school_id]
+          );
+        }
       }
       return res.json({ ok: true });
     }
@@ -96,11 +108,24 @@ router.post("/callback", async (req, res, next) => {
     const phone     = String(get("PhoneNumber") || "");
 
     // Update the pending payment row with the real Mpesa receipt number
-    await pool.query(
-      `UPDATE payments SET status='paid', reference_number=?, updated_at=CURRENT_TIMESTAMP
-      WHERE reference_number=? AND status='pending'`,
-      [mpesaCode, checkoutReqId]
+    // Get school_id from the payment before updating to prevent cross-school access
+    const [paymentCheck] = await pool.query(
+      // OLD:
+      // `SELECT school_id FROM payments WHERE reference_number = ? LIMIT 1`,
+      `SELECT school_id FROM payments WHERE reference_number = ? AND school_id IS NOT NULL LIMIT 1`,
+      [checkoutReqId]
     );
+    
+    if (paymentCheck.length) {
+      await pool.query(
+        // OLD:
+        // `UPDATE payments SET status='paid', reference_number=?, updated_at=CURRENT_TIMESTAMP
+        //  WHERE reference_number=? AND status='pending'`,
+        `UPDATE payments SET status='paid', reference_number=?, updated_at=CURRENT_TIMESTAMP
+         WHERE reference_number=? AND status='pending' AND school_id=?`,
+        [mpesaCode, checkoutReqId, paymentCheck[0].school_id]
+      );
+    }
 
     // Fetch student info for SMS confirmation
     const [pending] = await pool.query(
@@ -164,8 +189,11 @@ router.post("/c2b/confirm", async (req, res, next) => {
 
     // Find student by admission number
     const [studentRows] = await pool.query(
+      // OLD:
+      // `SELECT student_id, school_id, first_name, last_name, phone, parent_phone
+      // FROM students WHERE admission_number = ? AND is_deleted = 0 LIMIT 1`,
       `SELECT student_id, school_id, first_name, last_name, phone, parent_phone
-      FROM students WHERE admission_number = ? AND is_deleted = 0 LIMIT 1`,
+      FROM students WHERE admission_number = ? AND school_id IS NOT NULL AND is_deleted = 0 LIMIT 1`,
       [billRef]
     );
 
@@ -201,9 +229,10 @@ router.post("/c2b/confirm", async (req, res, next) => {
 // Check payment status
 router.get("/status/:checkoutRequestId", authRequired, async (req, res, next) => {
   try {
+    const { schoolId } = req.user;
     const [rows] = await pool.query(
-      `SELECT status, reference_number, amount FROM payments WHERE reference_number = ? LIMIT 1`,
-      [req.params.checkoutRequestId]
+      `SELECT status, reference_number, amount FROM payments WHERE reference_number = ? AND school_id = ? LIMIT 1`,
+      [req.params.checkoutRequestId, schoolId]
     );
     if (!rows.length) return res.status(404).json({ message: "Payment not found" });
     res.json(rows[0]);

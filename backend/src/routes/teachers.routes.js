@@ -50,7 +50,7 @@ router.post("/", requireRoles("admin","hr"), async (req, res, next) => {
     } catch { /* ignore duplicate */ }
 
     const [newRow] = await pool.query(
-      `SELECT * FROM teachers WHERE teacher_id=? LIMIT 1`, [result.insertId]
+      `SELECT * FROM teachers WHERE teacher_id=? AND school_id=? LIMIT 1`, [result.insertId, schoolId]
     );
     res.status(201).json({ ...newRow[0], defaultPassword: email.split("@")[0] });
   } catch (err) {

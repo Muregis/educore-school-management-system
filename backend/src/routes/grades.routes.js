@@ -3,6 +3,7 @@ import { pool } from "../config/db.js";
 import { pgPool } from "../config/pg.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
+import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 
 const router = Router();
 router.use(authRequired);
@@ -176,6 +177,14 @@ try {
         [schoolId, studentId, subject, resolvedClassId, Number(marks), Number(totalMarks), grade, term]
     );
         saved.push({ subjectId, resultId: res.insertId || res.info });
+        
+        // NEW: Log grade creation/update
+        await logAuditEvent(req, AUDIT_ACTIONS.GRADE_CREATE, {
+          entityId: res.insertId || res.info,
+          entityType: 'result',
+          description: `Grade recorded for student ${studentId} in ${subject}: ${marks}/${totalMarks} (${grade})`,
+          newValues: { studentId, subject, marks, totalMarks: totalMarks, grade, term }
+        });
     }
 
     res.status(201).json({ saved: saved.length, message: `${saved.length} result(s) saved` });
@@ -212,6 +221,15 @@ try {
         params
     );
     if (!result.affectedRows) return res.status(404).json({ message: "Result not found" });
+    
+    // NEW: Log grade update
+    await logAuditEvent(req, AUDIT_ACTIONS.GRADE_UPDATE, {
+      entityId: req.params.id,
+      entityType: 'result',
+      description: `Grade updated for result ID ${req.params.id}: ${marks}/${totalMarks} (${grade})`,
+      newValues: { marks, totalMarks: totalMarks, grade, term, teacherComment }
+    });
+    
     res.json({ updated: true });
 } catch (err) { next(err); }
 });
@@ -225,6 +243,14 @@ try {
     [req.params.id, schoolId]
     );
     if (!result.affectedRows) return res.status(404).json({ message: "Result not found" });
+    
+    // NEW: Log grade deletion
+    await logAuditEvent(req, AUDIT_ACTIONS.GRADE_DELETE, {
+      entityId: req.params.id,
+      entityType: 'result',
+      description: `Grade deleted for result ID ${req.params.id}`
+    });
+    
     res.json({ deleted: true });
 } catch (err) { next(err); }
 });

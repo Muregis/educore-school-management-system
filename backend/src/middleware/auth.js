@@ -12,6 +12,13 @@ export function authRequired(req, res, next) {
   try {
     const payload = jwt.verify(token, env.jwtSecret);
     req.user = payload;
+    // Ensure backward compatibility during transition
+    if (payload.school_id) {
+      req.user.schoolId = payload.school_id;
+    }
+    if (payload.user_id) {
+      req.user.userId = payload.user_id;
+    }
     return next();
   } catch {
     return res.status(401).json({ message: "Invalid or expired token" });

@@ -33,7 +33,9 @@ router.post("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
       [schoolId, fullName, email||null, phone||null, department||"Academic", jobTitle,
       contractType||"Permanent", startDate||null, salary||0, status||"active", nationalId||null, notes||null]
     );
-    const [row] = await pool.query(`SELECT * FROM hr_staff WHERE staff_id=?`, [result.insertId]);
+    // OLD:
+    // const [row] = await pool.query(`SELECT * FROM hr_staff WHERE staff_id=?`, [result.insertId]);
+    const [row] = await pool.query(`SELECT * FROM hr_staff WHERE staff_id=? AND school_id=?`, [result.insertId, schoolId]);
     res.status(201).json(row[0]);
   } catch (err) { next(err); }
 });

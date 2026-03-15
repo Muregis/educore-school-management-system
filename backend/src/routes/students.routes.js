@@ -99,9 +99,11 @@ router.post("/", requireRoles("admin","teacher"), async (req, res, next) => {
     } catch { /* ignore if account already exists */ }
 
     // Return the full new student row so frontend can update state correctly
+    // OLD:
+    // `SELECT * FROM students WHERE student_id=? LIMIT 1`,
     const [newRow] = await pool.query(
-      `SELECT * FROM students WHERE student_id=? LIMIT 1`,
-      [result.insertId]
+      `SELECT * FROM students WHERE student_id=? AND school_id=? LIMIT 1`,
+      [result.insertId, schoolId]
     );
     logActivity(req, { action:"student.create", entity:"student", entityId:result.insertId, description:`Student admitted: ${req.body.firstName} ${req.body.lastName}` });
     res.status(201).json(newRow[0]);

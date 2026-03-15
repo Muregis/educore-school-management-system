@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import { env } from "./config/env.js";
+import { apiRateLimit } from "./middleware/rateLimit.js";
 import healthRoutes        from "./routes/health.routes.js";
 import authRoutes          from "./routes/auth.routes.js";
 import studentsRoutes      from "./routes/students.routes.js";
@@ -29,8 +30,12 @@ import analysisRoutes      from "./routes/analysis.routes.js";
 import activityRoutes      from "./routes/activity.routes.js";
 import adminRoutes         from "./routes/admin.routes.js";
 import lessonPlansRoutes   from "./routes/lessonplans.routes.js";
+import importRoutes         from "./routes/import.routes.js";
+import ledgerRoutes        from "./routes/ledger.routes.js";
 import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }    from "./middleware/error.js";
+import { authRequired } from "./middleware/auth.js";
+import { tenantContext, tenantSecurityCheck } from "./middleware/tenantContext.js";
 
 const app = express();
 
@@ -59,9 +64,16 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "2mb" }));
 app.use(morgan("dev"));
+app.use(apiRateLimit); // Apply rate limiting to all API routes
+
+// NEW: Apply tenant context middleware globally (after auth, before routes)
+// Note: auth routes are excluded from global auth and handled separately
+app.use("/api/auth", authRoutes);
+app.use("/api", authRequired);
+app.use("/api", tenantContext);
+app.use("/api", tenantSecurityCheck);
 
 app.use("/api",               healthRoutes);
-app.use("/api/auth",          authRoutes);
 app.use("/api/students",      studentsRoutes);
 app.use("/api/teachers",      teachersRoutes);
 app.use("/api/attendance",    attendanceRoutes);
@@ -87,6 +99,8 @@ app.use("/api/analysis",      analysisRoutes);
 app.use("/api/activity-logs", activityRoutes);
 app.use("/api/admin",         adminRoutes);
 app.use("/api/lesson-plans",  lessonPlansRoutes);
+app.use("/api/import",         importRoutes);
+app.use("/api/ledger",         ledgerRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
 app.use(errorHandler);

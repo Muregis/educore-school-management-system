@@ -31,7 +31,9 @@ router.post("/books", requireRoles("admin","librarian"), async (req, res, next) 
        VALUES (?, ?, ?, ?, ?, ?, ?, 'active')`,
       [schoolId, title, author, category, isbn, qty, qty]
     );
-    const [row] = await pool.query(`SELECT * FROM books WHERE book_id=?`, [result.insertId]);
+    // OLD:
+    // const [row] = await pool.query(`SELECT * FROM books WHERE book_id=?`, [result.insertId]);
+    const [row] = await pool.query(`SELECT * FROM books WHERE book_id=? AND school_id=?`, [result.insertId, schoolId]);
     res.status(201).json(row[0]);
   } catch (err) { next(err); }
 });
