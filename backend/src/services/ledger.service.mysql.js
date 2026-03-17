@@ -1,3 +1,6 @@
+// OLD: MySQL-specific Ledger Service (commented for safety)
+// This file used MySQL-specific syntax and is replaced by ledger.service.js which uses Supabase
+/*
 import { pool } from "../config/db.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 
@@ -221,3 +224,4 @@ export class LedgerService {
 }
 
 export default LedgerService;
+*/

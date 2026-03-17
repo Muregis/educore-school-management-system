@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 
 const router = Router();
@@ -10,23 +10,51 @@ router.get("/", async (req, res, next) => {
     const { schoolId } = req.user;
     const { classId, date, from, to, studentId } = req.query;
 
-    let sql = `SELECT a.attendance_id, a.student_id,
-                      CONCAT(s.first_name,' ',s.last_name) AS student_name,
-                      s.admission_number, s.class_name, a.attendance_date, a.status, a.class_id
-            FROM attendance a
-              JOIN students s ON s.student_id = a.student_id
-              WHERE a.school_id = ? AND a.is_deleted = 0`;
-    const params = [schoolId];
+    let query = supabase
+      .from('attendance')
+      .select(`
+        attendance_id, 
+        student_id,
+        attendance_date,
+        status,
+        class_id,
+        students!inner(
+          student_id,
+          first_name,
+          last_name,
+          admission_number,
+          class_name
+        )
+      `)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
 
-    if (classId)   { sql += " AND a.class_id = ?";        params.push(classId); }
-    if (studentId) { sql += " AND a.student_id = ?";      params.push(studentId); }
-    if (date)      { sql += " AND a.attendance_date = ?"; params.push(date); }
-    if (from)      { sql += " AND a.attendance_date >= ?";params.push(from); }
-    if (to)        { sql += " AND a.attendance_date <= ?";params.push(to); }
+    if (classId)   { query = query.eq('class_id', classId); }
+    if (studentId) { query = query.eq('student_id', studentId); }
+    if (date)      { query = query.eq('attendance_date', date); }
+    if (from)      { query = query.gte('attendance_date', from); }
+    if (to)        { query = query.lte('attendance_date', to); }
 
-    sql += " ORDER BY a.attendance_date DESC, a.attendance_id DESC";
-    const [rows] = await pool.query(sql, params);
-    res.json(rows);
+    query = query.order('attendance_date', { ascending: false })
+                   .order('attendance_id', { ascending: false });
+
+    const { data, error } = await query;
+    
+    if (error) throw error;
+    
+    // Transform the data to match expected format
+    const transformedData = data?.map(item => ({
+      attendance_id: item.attendance_id,
+      student_id: item.student_id,
+      student_name: `${item.students.first_name} ${item.students.last_name}`,
+      admission_number: item.students.admission_number,
+      class_name: item.students.class_name,
+      attendance_date: item.attendance_date,
+      status: item.status,
+      class_id: item.class_id
+    })) || [];
+    
+    res.json(transformedData);
   } catch (err) { next(err); }
 });
 
@@ -35,17 +63,27 @@ async function resolveClassId(schoolId, classId) {
   // Already a number
   if (!isNaN(Number(classId)) && Number(classId) > 0) return Number(classId);
   // Try looking up by name
-  const [cls] = await pool.query(
-    `SELECT class_id FROM classes WHERE school_id=? AND class_name=? AND is_deleted=0 LIMIT 1`,
-    [schoolId, classId]
-  );
-  if (cls.length) return cls[0].class_id;
+  const { data: cls } = await supabase
+    .from('classes')
+    .select('class_id')
+    .eq('school_id', schoolId)
+    .eq('class_name', classId)
+    .eq('is_deleted', false)
+    .limit(1)
+    .single();
+  if (cls) return cls.class_id;
   // Class not in classes table — auto-create a placeholder so FK is satisfied
-  const [result] = await pool.query(
-    `INSERT INTO classes (school_id, class_name, academic_year, status) VALUES (?, ?, YEAR(CURDATE()), 'active')`,
-    [schoolId, classId]
-  );
-  return result.insertId;
+  const { data: result } = await supabase
+    .from('classes')
+    .insert({
+      school_id: schoolId,
+      class_name: classId,
+      academic_year: new Date().getFullYear(),
+      status: 'active'
+    })
+    .select('class_id')
+    .single();
+  return result.class_id;
 }
 
 // ── Bulk attendance save ──────────────────────────────────────────────────────

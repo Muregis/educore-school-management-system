@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pgPool } from "../config/pg.js";
+import { pool } from "../config/db.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
@@ -10,7 +10,7 @@ router.use(authRequired);
 router.get("/books", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { rows } = await pgPool.query(
+    const { rows } = await pool.query(
       `SELECT * FROM books WHERE school_id=$1 AND is_deleted=false ORDER BY title`,
       [schoolId]
     );
@@ -26,15 +26,16 @@ router.post("/books", requireRoles("admin","librarian"), async (req, res, next) 
     if (!title || !author) return res.status(400).json({ message: "title and author are required" });
 
     const qty = Number(quantityTotal) || 1;
-    const [result] = await pool.query(
+    const result = await pool.query(
       `INSERT INTO books (school_id, title, author, category, isbn, quantity_total, quantity_available, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'active')`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
+       RETURNING book_id`,
       [schoolId, title, author, category, isbn, qty, qty]
     );
     // OLD:
     // const [row] = await pool.query(`SELECT * FROM books WHERE book_id=?`, [result.insertId]);
-    const [row] = await pool.query(`SELECT * FROM books WHERE book_id=? AND school_id=?`, [result.insertId, schoolId]);
-    res.status(201).json(row[0]);
+    const { rows } = await pool.query(`SELECT * FROM books WHERE book_id=$1 AND school_id=$2`, [result.rows[0].book_id, schoolId]);
+    res.status(201).json(rows[0]);
   } catch (err) { next(err); }
 });
 
@@ -43,17 +44,17 @@ router.put("/books/:id", requireRoles("admin","librarian"), async (req, res, nex
   try {
     const { schoolId } = req.user;
     const { title, author, category, isbn, quantityTotal } = req.body;
-    const [existing] = await pool.query(`SELECT * FROM books WHERE book_id=? AND school_id=?`, [req.params.id, schoolId]);
-    if (!existing.length) return res.status(404).json({ message: "Book not found" });
+    const { rows } = await pool.query(`SELECT * FROM books WHERE book_id=$1 AND school_id=$2`, [req.params.id, schoolId]);
+    if (!rows.length) return res.status(404).json({ message: "Book not found" });
 
-    const book = existing[0];
+    const book = rows[0];
     const newTotal = Number(quantityTotal) || book.quantity_total;
     const checkedOut = book.quantity_total - book.quantity_available;
     const newAvailable = Math.max(0, newTotal - checkedOut);
 
     await pool.query(
-      `UPDATE books SET title=?, author=?, category=?, isbn=?, quantity_total=?, quantity_available=?, updated_at=CURRENT_TIMESTAMP
-       WHERE book_id=? AND school_id=?`,
+      `UPDATE books SET title=$1, author=$2, category=$3, isbn=$4, quantity_total=$5, quantity_available=$6, updated_at=CURRENT_TIMESTAMP
+       WHERE book_id=$7 AND school_id=$8`,
       [title||book.title, author||book.author, category||book.category, isbn??book.isbn,
        newTotal, newAvailable, req.params.id, schoolId]
     );
@@ -65,7 +66,7 @@ router.put("/books/:id", requireRoles("admin","librarian"), async (req, res, nex
 router.delete("/books/:id", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    await pool.query(`UPDATE books SET is_deleted=1 WHERE book_id=? AND school_id=?`, [req.params.id, schoolId]);
+    await pool.query(`UPDATE books SET is_deleted=true WHERE book_id=$1 AND school_id=$2`, [req.params.id, schoolId]);
     res.json({ deleted: true });
   } catch (err) { next(err); }
 });
@@ -96,7 +97,7 @@ router.get("/borrows", async (req, res, next) => {
     }
 
     sql += " ORDER BY br.borrow_date DESC, br.borrow_id DESC";
-    const { rows } = await pgPool.query(sql, params);
+    const { rows } = await pool.query(sql, params);
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -112,10 +113,11 @@ router.post("/borrows", requireRoles("admin","librarian","teacher"), async (req,
     if (!dueDate)    return res.status(400).json({ message: "dueDate is required" });
 
     // Check book exists and has copies available
-    const [books] = await pool.query(
-      `SELECT * FROM books WHERE book_id=? AND school_id=? AND is_deleted=0 LIMIT 1`,
+    const { rows } = await pool.query(
+      `SELECT * FROM books WHERE book_id=$1 AND school_id=$2 AND is_deleted=false LIMIT 1`,
       [bookId, schoolId]
     );
+    const books = rows;
     if (!books.length) return res.status(404).json({ message: "Book not found" });
     const book = books[0];
     if (book.quantity_available < 1)
@@ -123,27 +125,28 @@ router.post("/borrows", requireRoles("admin","librarian","teacher"), async (req,
 
     // Verify borrower exists
     if (borrowerType === "student") {
-      const [s] = await pool.query(`SELECT student_id FROM students WHERE student_id=? AND school_id=? AND is_deleted=0`, [borrowerId, schoolId]);
-      if (!s.length) return res.status(404).json({ message: "Student not found" });
+      const { rows } = await pool.query(`SELECT student_id FROM students WHERE student_id=$1 AND school_id=$2 AND is_deleted=false`, [borrowerId, schoolId]);
+      if (!rows.length) return res.status(404).json({ message: "Student not found" });
     } else {
-      const [t] = await pool.query(`SELECT teacher_id FROM teachers WHERE teacher_id=? AND school_id=? AND is_deleted=0`, [borrowerId, schoolId]);
-      if (!t.length) return res.status(404).json({ message: "Staff member not found" });
+      const { rows } = await pool.query(`SELECT teacher_id FROM teachers WHERE teacher_id=$1 AND school_id=$2 AND is_deleted=false`, [borrowerId, schoolId]);
+      if (!rows.length) return res.status(404).json({ message: "Staff member not found" });
     }
 
     // Insert borrow record
-    const [result] = await pool.query(
+    const result = await pool.query(
       `INSERT INTO borrow_records (school_id, book_id, borrower_id, borrower_type, borrow_date, due_date, notes, status, issued_by_user_id)
-       VALUES (?, ?, ?, ?, CURDATE(), ?, ?, 'borrowed', ?)`,
+       VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, 'borrowed', $7)
+       RETURNING borrow_id`,
       [schoolId, bookId, borrowerId, borrowerType, dueDate, notes, userId]
     );
 
     // Decrement available count
     await pool.query(
-      `UPDATE books SET quantity_available = quantity_available - 1 WHERE book_id=? AND school_id=?`,
+      `UPDATE books SET quantity_available = quantity_available - 1 WHERE book_id=$1 AND school_id=$2`,
       [bookId, schoolId]
     );
 
-    res.status(201).json({ borrowId: result.insertId });
+    res.status(201).json({ borrowId: result.rows[0].borrow_id });
   } catch (err) { next(err); }
 });
 
@@ -152,24 +155,25 @@ router.put("/borrows/:id/return", requireRoles("admin","librarian"), async (req,
   try {
     const { schoolId, userId } = req.user;
 
-    const [records] = await pool.query(
-      `SELECT * FROM borrow_records WHERE borrow_id=? AND school_id=? AND is_deleted=0 LIMIT 1`,
+    const { rows } = await pool.query(
+      `SELECT * FROM borrow_records WHERE borrow_id=$1 AND school_id=$2 AND is_deleted=false LIMIT 1`,
       [req.params.id, schoolId]
     );
+    const records = rows;
     if (!records.length) return res.status(404).json({ message: "Borrow record not found" });
     const record = records[0];
     if (record.status === "returned") return res.status(400).json({ message: "Already returned" });
 
     // Mark returned
     await pool.query(
-      `UPDATE borrow_records SET status='returned', return_date=CURDATE(), returned_to_user_id=?, updated_at=CURRENT_TIMESTAMP
-       WHERE borrow_id=? AND school_id=?`,
+      `UPDATE borrow_records SET status='returned', return_date=CURRENT_DATE, returned_to_user_id=$1, updated_at=CURRENT_TIMESTAMP
+       WHERE borrow_id=$2 AND school_id=$3`,
       [userId, req.params.id, schoolId]
     );
 
     // Increment available count
     await pool.query(
-      `UPDATE books SET quantity_available = quantity_available + 1 WHERE book_id=? AND school_id=?`,
+      `UPDATE books SET quantity_available = quantity_available + 1 WHERE book_id=$1 AND school_id=$2`,
       [record.book_id, schoolId]
     );
 

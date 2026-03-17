@@ -15,12 +15,19 @@ export function logActivity(req, { action, entity = null, entityId = null, descr
                   || req.socket?.remoteAddress
                   || null;
 
-    pool.query(
-      `INSERT INTO activity_logs
-      (school_id, user_id, role, action, entity, entity_id, description, ip_address)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [schoolId, userId, role, action, entity, entityId ?? null, description, ip]
-    ).catch(err => console.error("[activity_log] DB error:", err.message));
+    pool
+      .from('activity_logs')
+      .insert({
+        school_id: schoolId,
+        user_id: userId,
+        role: role,
+        action: action,
+        entity: entity,
+        entity_id: entityId,
+        description: description,
+        ip_address: ip
+      })
+      .catch(err => console.error("[activity_log] DB error:", err.message));
   } catch (err) {
     console.error("[activity_log] Unexpected error:", err.message);
   }

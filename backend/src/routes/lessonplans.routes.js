@@ -49,7 +49,7 @@ router.get("/", async (req, res, next) => {
     const status = req.query.status || null;
     const type   = req.query.type   || null;
 
-    const filters = ["p.school_id = ?", "p.is_deleted = 0"];
+    const filters = ["p.school_id = ?", "p.is_deleted = false"];
     const params  = [schoolId];
 
     if (role === "teacher") {
@@ -59,7 +59,7 @@ router.get("/", async (req, res, next) => {
     if (status) { filters.push("p.status = ?");     params.push(status); }
     if (type)   { filters.push("p.type = ?");       params.push(type); }
 
-    const [rows] = await pool.query(
+    const { data: rows } = await pool.query(
       `SELECT p.plan_id, p.type, p.subject, p.class_name, p.term, p.week,
               p.topic, p.duration, p.status, p.ai_score,
               p.created_at, p.updated_at, p.reviewed_at,
@@ -86,7 +86,7 @@ router.get("/:id", async (req, res, next) => {
          FROM lesson_plans p
          JOIN users u ON u.user_id = p.teacher_id
          LEFT JOIN users r ON r.user_id = p.reviewed_by
-        WHERE p.plan_id = ? AND p.school_id = ? AND p.is_deleted = 0`,
+        WHERE p.plan_id = $1 AND p.school_id = $2 AND p.is_deleted = false`,
       [req.params.id, schoolId]
     );
     if (!plan) return res.status(404).json({ message: "Plan not found" });
@@ -219,7 +219,7 @@ router.put("/:id", requireRoles("teacher", "admin"), async (req, res, next) => {
     const { content, status, subject, class_name, term, week, topic, duration } = req.body;
 
     const [[plan]] = await pool.query(
-      `SELECT * FROM lesson_plans WHERE plan_id=? AND school_id=? AND is_deleted=0`,
+      `SELECT * FROM lesson_plans WHERE plan_id=$1 AND school_id=$2 AND is_deleted=false`,
       [req.params.id, schoolId]
     );
     if (!plan) return res.status(404).json({ message: "Plan not found" });
@@ -258,7 +258,7 @@ router.post("/:id/analyze", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const [[plan]] = await pool.query(
-      `SELECT * FROM lesson_plans WHERE plan_id=? AND school_id=? AND is_deleted=0`,
+      `SELECT * FROM lesson_plans WHERE plan_id=$1 AND school_id=$2 AND is_deleted=false`,
       [req.params.id, schoolId]
     );
     if (!plan) return res.status(404).json({ message: "Plan not found" });
@@ -332,7 +332,7 @@ router.post("/:id/approve", requireRoles("admin"), async (req, res, next) => {
     await pool.query(
       `UPDATE lesson_plans
           SET status='approved', reviewed_by=?, reviewed_at=NOW(), updated_at=NOW()
-        WHERE plan_id=? AND school_id=? AND is_deleted=0`,
+        WHERE plan_id=$1 AND school_id=$2 AND is_deleted=false`,
       [userId, req.params.id, schoolId]
     );
     logActivity(req, { action: "lesson_plan.approve", entity: "lesson_plan", entityId: Number(req.params.id) });
@@ -350,7 +350,7 @@ router.post("/:id/reject", requireRoles("admin"), async (req, res, next) => {
     await pool.query(
       `UPDATE lesson_plans
           SET status='rejected', admin_feedback=?, reviewed_by=?, reviewed_at=NOW(), updated_at=NOW()
-        WHERE plan_id=? AND school_id=? AND is_deleted=0`,
+        WHERE plan_id=$1 AND school_id=$2 AND is_deleted=false`,
       [feedback, userId, req.params.id, schoolId]
     );
     logActivity(req, { action: "lesson_plan.reject", entity: "lesson_plan", entityId: Number(req.params.id), description: feedback.slice(0, 80) });
@@ -363,7 +363,7 @@ router.delete("/:id", async (req, res, next) => {
   try {
     const { schoolId, userId, role } = req.user;
     const [[plan]] = await pool.query(
-      `SELECT * FROM lesson_plans WHERE plan_id=? AND school_id=? AND is_deleted=0`,
+      `SELECT * FROM lesson_plans WHERE plan_id=$1 AND school_id=$2 AND is_deleted=false`,
       [req.params.id, schoolId]
     );
     if (!plan) return res.status(404).json({ message: "Not found" });

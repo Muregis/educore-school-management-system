@@ -42,17 +42,16 @@ router.get("/", async (req, res, next) => {
         FROM results r
         JOIN students s  ON s.student_id  = r.student_id
         LEFT JOIN classes c ON c.class_id = r.class_id
-        WHERE r.school_id = $1 AND r.is_deleted = false`;
+        WHERE r.school_id = ? AND r.is_deleted = false`;
       const params = [schoolId];
-      let idx = 2;
 
-      if (studentId) { sql += ` AND r.student_id = $${idx++}`; params.push(studentId); }
-      if (term)      { sql += ` AND r.term = $${idx++}`;       params.push(term); }
-      if (classId)   { sql += ` AND r.class_id = $${idx++}`;   params.push(classId); }
+      if (studentId) { sql += ` AND r.student_id = ?`; params.push(studentId); }
+      if (term)      { sql += ` AND r.term = ?`;       params.push(term); }
+      if (classId)   { sql += ` AND r.class_id = ?`;   params.push(classId); }
 
       sql += " ORDER BY r.result_id DESC";
 
-      const { rows } = await pgPool.query(sql, params);
+      const { data: rows } = await pool.query(sql, params);
       return res.json(rows.map(normalise));
     }
 

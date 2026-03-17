@@ -52,6 +52,11 @@ export const env = {
   // Groq
   groqApiKey:           process.env.GROQ_API_KEY || "",
 
+  // Supabase
+  supabaseUrl:          process.env.SUPABASE_URL || "",
+  supabaseServiceKey:    process.env.SUPABASE_SERVICE_KEY || "",
+  supabaseAnonKey:       process.env.SUPABASE_ANON_KEY || "",
+
   // Email (SMTP)
   smtpHost:     process.env.SMTP_HOST     || "smtp.gmail.com",
   smtpPort:     Number(process.env.SMTP_PORT || 587),

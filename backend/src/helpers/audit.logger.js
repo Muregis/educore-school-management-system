@@ -1,4 +1,4 @@
-import { pgPool } from "../config/pg.js";
+import { pool } from "../config/db.js";
 
 // NEW: Enhanced audit logging for sensitive actions
 export async function logAuditEvent(req, action, details = {}) {
@@ -6,24 +6,21 @@ export async function logAuditEvent(req, action, details = {}) {
     const { user_id, school_id } = req.user || {};
     const { entityId, entityType, oldValues, newValues, description } = details;
 
-    await pgPool.query(
-      `INSERT INTO audit_logs (
-        user_id, school_id, action, entity_type, entity_id,
-        old_values, new_values, description, ip_address, user_agent, timestamp
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
-      [
-        user_id || null,
-        school_id || null,
-        action,
-        entityType || null,
-        entityId || null,
-        oldValues ? JSON.stringify(oldValues) : null,
-        newValues ? JSON.stringify(newValues) : null,
-        description || null,
-        req.ip || null,
-        req.get('User-Agent') || null
-      ]
-    );
+    await pool
+      .from('audit_logs')
+      .insert({
+        user_id: user_id || null,
+        school_id: school_id || null,
+        action: action,
+        entity_type: entityType || null,
+        entity_id: entityId || null,
+        old_values: oldValues ? JSON.stringify(oldValues) : null,
+        new_values: newValues ? JSON.stringify(newValues) : null,
+        description: description || null,
+        ip_address: req.ip || null,
+        user_agent: req.get('User-Agent') || null,
+        timestamp: new Date().toISOString()
+      });
   } catch (error) {
     console.error('Audit log failed:', error.message);
     // Don't throw - audit logging failure shouldn't break the main operation

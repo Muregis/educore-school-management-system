@@ -21,12 +21,21 @@ export function logSecurityEvent(req, { eventType, severity = "medium", descript
                   || null;
     const userAgent = req.get("User-Agent") || null;
 
-    pool.query(
-      `INSERT INTO security_logs
-      (school_id, user_id, role, event_type, severity, description, ip_address, user_agent, details, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [schoolId, userId, role, eventType, severity, description, ip, userAgent, JSON.stringify(details)]
-    ).catch(err => console.error("[security_log] DB error:", err.message));
+    pool
+      .from('security_logs')
+      .insert({
+        school_id: schoolId,
+        user_id: userId,
+        role: role,
+        event_type: eventType,
+        severity: severity,
+        description: description,
+        ip_address: ip,
+        user_agent: userAgent,
+        details: JSON.stringify(details),
+        created_at: new Date().toISOString()
+      })
+      .catch(err => console.error("[security_log] DB error:", err.message));
   } catch (err) {
     console.error("[security_log] Unexpected error:", err.message);
   }

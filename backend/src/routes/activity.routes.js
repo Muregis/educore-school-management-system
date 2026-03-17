@@ -52,7 +52,7 @@ router.get("/", async (req, res, next) => {
     if (action) { filters.push("l.action LIKE ?"); params.push(`${action}%`); }
     if (role)   { filters.push("l.role = ?");       params.push(role); }
 
-    const [rows] = await pool.query(
+    const { data: rows } = await pool.query(
       `SELECT l.log_id, l.action, l.entity, l.entity_id, l.description,
               l.role, l.ip_address, l.created_at,
               u.full_name AS user_name
@@ -64,7 +64,7 @@ router.get("/", async (req, res, next) => {
       [...params, limit, offset]
     );
 
-    const [[{ total }]] = await pool.query(
+    const { data: [{ total }] } = await pool.query(
       `SELECT COUNT(*) AS total FROM activity_logs l WHERE ${filters.join(" AND ")}`,
       params
     );
@@ -80,7 +80,7 @@ router.get("/", async (req, res, next) => {
 router.get("/summary", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
+    const { data: rows } = await pool.query(
       `SELECT action, COUNT(*) AS count
         FROM activity_logs
         WHERE school_id = ?
