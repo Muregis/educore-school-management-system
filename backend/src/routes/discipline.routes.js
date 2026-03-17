@@ -1,14 +1,10 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
-import { pgPool } from "../config/pg.js";
+import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
 const router = Router();
 router.use(authRequired);
-
-const usePgDisciplineGet =
-  String(process.env.USE_PG_DISCIPLINE_GET || "").toLowerCase() === "true";
 
 router.get("/", async (req, res, next) => {
   try {
@@ -17,36 +13,29 @@ router.get("/", async (req, res, next) => {
     // Portal users can only see their own student's records
     const filterStudentId = ["parent","student"].includes(role) ? tokenStudentId : (req.query.studentId || null);
 
-    if (usePgDisciplineGet) {
-      let sql = `SELECT d.discipline_id, d.student_id, s.first_name, s.last_name,
-                        s.admission_number, d.incident_type, d.incident_details,
-                        d.action_taken, d.incident_date, d.status
-                 FROM discipline_records d
-                 JOIN students s ON s.student_id = d.student_id
-                 WHERE d.school_id = $1 AND d.is_deleted = false`;
-      const params = [schoolId];
-      if (filterStudentId) { sql += " AND d.student_id = $2"; params.push(filterStudentId); }
-      sql += " ORDER BY d.incident_date DESC, d.discipline_id DESC";
-
-      const { rows } = await pgPool.query(sql, params);
-      return res.json(rows);
+    let q = supabase
+      .from('discipline_records')
+      .select('discipline_id, student_id, incident_type, incident_details, action_taken, incident_date, status, students(first_name, last_name, admission_number)')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
+    
+    if (filterStudentId) {
+      q = q.eq('student_id', filterStudentId);
     }
-
-    let sql = `SELECT d.discipline_id, d.student_id, s.first_name, s.last_name,
-                      s.admission_number, d.incident_type, d.incident_details,
-                      d.action_taken, d.incident_date, d.status
-               FROM discipline_records d
-               JOIN students s ON s.student_id = d.student_id
-               WHERE d.school_id = ? AND d.is_deleted = 0`;
-    const params = [schoolId];
-
-    if (filterStudentId) { sql += " AND d.student_id = ?"; params.push(filterStudentId); }
-
-    sql += " ORDER BY d.incident_date DESC, d.discipline_id DESC";
-
-    // OLD: const [rows] = await pool.query(sql, params);
-    const { data: rows } = await pool.query(sql, params);
-    res.json(rows || []);
+    
+    const { data: rows, error } = await q.order('incident_date', { ascending: false });
+    if (error) throw error;
+    
+    // Flatten joined data
+    const result = (rows || []).map(r => ({
+      ...r,
+      first_name: r.students?.first_name,
+      last_name: r.students?.last_name,
+      admission_number: r.students?.admission_number,
+      students: undefined
+    }));
+    
+    res.json(result);
   } catch (err) { next(err); }
 });
 
@@ -57,12 +46,22 @@ router.post("/", requireRoles("admin","teacher"), async (req, res, next) => {
     if (!studentId || !incidentType || !incidentDate)
       return res.status(400).json({ message: "studentId, incidentType, incidentDate are required" });
 
-    const [result] = await pool.query(
-      `INSERT INTO discipline_records (school_id, student_id, teacher_id, incident_type, incident_details, action_taken, incident_date, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [schoolId, studentId, teacherId, incidentType, incidentDetails, actionTaken, incidentDate, status]
-    );
-    res.status(201).json({ disciplineId: result.insertId });
+    const { data: inserted, error } = await supabase
+      .from('discipline_records')
+      .insert({
+        school_id: schoolId,
+        student_id: studentId,
+        teacher_id: teacherId,
+        incident_type: incidentType,
+        incident_details: incidentDetails,
+        action_taken: actionTaken,
+        incident_date: incidentDate,
+        status
+      })
+      .select('discipline_id')
+      .single();
+    if (error) throw error;
+    res.status(201).json({ disciplineId: inserted.discipline_id });
   } catch (err) { next(err); }
 });
 
@@ -70,12 +69,17 @@ router.put("/:id", requireRoles("admin","teacher"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { status, actionTaken } = req.body;
-    const [result] = await pool.query(
-      `UPDATE discipline_records SET status=?, action_taken=?, updated_at=CURRENT_TIMESTAMP
-       WHERE discipline_id=? AND school_id=? AND is_deleted=0`,
-      [status, actionTaken || null, req.params.id, schoolId]
-    );
-    if (!result.affectedRows) return res.status(404).json({ message: "Record not found" });
+    // OLD: const [result] = await pool.query(`UPDATE discipline_records SET status=?, action_taken=?, updated_at=CURRENT_TIMESTAMP WHERE discipline_id=? AND school_id=? AND is_deleted=0`, [status, actionTaken || null, req.params.id, schoolId]);
+    const { data: updated, error } = await supabase
+      .from('discipline_records')
+      .update({ status, action_taken: actionTaken || null, updated_at: new Date().toISOString() })
+      .eq('discipline_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .select('discipline_id')
+      .single();
+    if (error) throw error;
+    if (!updated) return res.status(404).json({ message: "Record not found" });
     res.json({ updated: true });
   } catch (err) { next(err); }
 });

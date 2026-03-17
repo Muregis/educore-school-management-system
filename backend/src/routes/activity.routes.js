@@ -1,33 +1,16 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
+import { supabase } from "../config/supabaseClient.js";
 
 const router = Router();
 router.use(authRequired);
 router.use(requireRoles("admin"));
 
 function handleActivityLogsDbError(err, res, next, meta = {}) {
-  // OLD: if (err?.code === "ER_NO_SUCH_TABLE") {
-  // OLD:   const message =
-  // OLD:     "Activity logs table is missing. Run the migration in database/Activities logs migration.sql and restart the backend.";
-  // OLD:
-  // OLD:   // Keep the UI usable in dev even if migrations haven't been run yet.
-  // OLD:   if (process.env.NODE_ENV !== "production") {
-  // OLD:     return res.json({
-  // OLD:       logs: [],
-  // OLD:       total: 0,
-  // OLD:       limit: meta.limit ?? 100,
-  // OLD:       offset: meta.offset ?? 0,
-  // OLD:       warning: message,
-  // OLD:     });
-  // OLD:   }
-  // OLD:
-  // OLD:   return res.status(500).json({ message });
-  // OLD: }
   const msg = String(err?.message || "");
   const isMissingActivityLogsTable =
-    err?.code === "ER_NO_SUCH_TABLE" ||
+    err?.code === "PGRST205" ||
     (msg.includes("activity_logs") && (msg.includes("doesn't exist") || msg.includes("does not exist")));
 
   if (isMissingActivityLogsTable) {
@@ -48,13 +31,6 @@ function handleActivityLogsDbError(err, res, next, meta = {}) {
     return res.status(500).json({ message });
   }
 
-  if (err?.code === "ER_BAD_FIELD_ERROR") {
-    return res.status(500).json({
-      message:
-        "Activity logs schema mismatch. Re-run database/Activities logs migration.sql to update your DB schema.",
-    });
-  }
-
   return next(err);
 }
 
@@ -65,37 +41,33 @@ router.get("/", async (req, res, next) => {
   let offset;
   try {
     const { schoolId } = req.user;
-    // OLD: const limit  = Math.min(parseInt(req.query.limit)  || 100, 500);
-    // OLD: const offset = parseInt(req.query.offset) || 0;
     limit  = Math.min(parseInt(req.query.limit)  || 100, 500);
     offset = parseInt(req.query.offset) || 0;
     const action = req.query.action || null;
     const role   = req.query.role   || null;
 
-    const filters = ["l.school_id = ?"];
-    const params  = [schoolId];
+    // OLD: Raw SQL with pool.query replaced with Supabase
+    let q = supabase
+      .from('activity_logs')
+      .select('log_id, action, entity, entity_id, description, role, ip_address, created_at, users(full_name)', { count: 'exact' })
+      .eq('school_id', schoolId);
+    
+    if (action) { q = q.ilike('action', `${action}%`); }
+    if (role)   { q = q.eq('role', role); }
+    
+    const { data: rows, count: total, error } = await q
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (error) throw error;
 
-    if (action) { filters.push("l.action LIKE ?"); params.push(`${action}%`); }
-    if (role)   { filters.push("l.role = ?");       params.push(role); }
+    // Flatten user data
+    const logs = (rows || []).map(r => ({
+      ...r,
+      user_name: r.users?.full_name,
+      users: undefined
+    }));
 
-    const { data: rows } = await pool.query(
-      `SELECT l.log_id, l.action, l.entity, l.entity_id, l.description,
-              l.role, l.ip_address, l.created_at,
-              u.full_name AS user_name
-        FROM activity_logs l
-        LEFT JOIN users u ON u.user_id = l.user_id
-        WHERE ${filters.join(" AND ")}
-        ORDER BY l.created_at DESC
-        LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
-    );
-
-    const { data: [{ total }] } = await pool.query(
-      `SELECT COUNT(*) AS total FROM activity_logs l WHERE ${filters.join(" AND ")}`,
-      params
-    );
-
-    res.json({ logs: rows, total: Number(total), limit, offset });
+    res.json({ logs, total: total || 0, limit, offset });
   } catch (err) {
     handleActivityLogsDbError(err, res, next, { limit, offset });
   }
@@ -106,17 +78,28 @@ router.get("/", async (req, res, next) => {
 router.get("/summary", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { data: rows } = await pool.query(
-      `SELECT action, COUNT(*) AS count
-        FROM activity_logs
-        WHERE school_id = ?
-          AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-        GROUP BY action
-        ORDER BY count DESC
-        LIMIT 20`,
-      [schoolId]
-    );
-    res.json(rows);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const { data: rows, error } = await supabase
+      .from('activity_logs')
+      .select('action')
+      .eq('school_id', schoolId)
+      .gte('created_at', thirtyDaysAgo.toISOString());
+    if (error) throw error;
+    
+    // Count actions manually since Supabase doesn't have a simple group by count
+    const counts = {};
+    rows?.forEach(r => {
+      counts[r.action] = (counts[r.action] || 0) + 1;
+    });
+    
+    const result = Object.entries(counts)
+      .map(([action, count]) => ({ action, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20);
+    
+    res.json(result);
   } catch (err) { handleActivityLogsDbError(err, res, next); }
 });
 

@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
-import { supabase } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
 import { agentLog } from "../utils/agentDebugLog.js";
@@ -48,9 +47,6 @@ router.post("/initialize", async (req, res, next) => {
     if (stuErr) throw stuErr;
     if (!stu) return res.status(404).json({ message: "Student not found" });
 
-    // OLD: await pool.query(`INSERT INTO payments ...`, [...]);
-    // NEW: Supabase insert (avoid MySQL fallback). If duplicate reference exists,
-    // fall back to updating it to pending.
     const today = new Date().toISOString().slice(0, 10);
     const paymentRow = {
       school_id: schoolId,
@@ -107,13 +103,12 @@ router.get("/verify/:reference", async (req, res, next) => {
     agentLog({sessionId:"cdda91",runId:"verify",hypothesisId:"H6",location:"backend/src/routes/paystack.routes.js:110",message:"paystack verify success; updating payment",data:{schoolId,reference,paidAmount,channel},timestamp:Date.now()});
     // #endregion
 
-    // OLD: await pool.query(`UPDATE payments SET status='paid'...`, [...]); // could hit MySQL fallback
-    const { error: updErr } = await supabase
+    const { data: paymentData, error } = await supabase
       .from("payments")
       .update({ status: "paid", amount: paidAmount })
       .eq("school_id", schoolId)
       .eq("reference_number", reference);
-    if (updErr) throw updErr;
+    if (error) throw error;
 
     res.json({ verified: true, amount: paidAmount, channel, reference });
   } catch (err) { next(err); }
@@ -142,21 +137,24 @@ router.post("/webhook", async (req, res, next) => {
     }
 
     // Verify payment belongs to the correct school before updating
-    const [paymentCheck] = await pool.query(
-      `SELECT school_id FROM payments WHERE reference_number = ? AND school_id = ? LIMIT 1`,
-      [reference, schoolId]
-    );
+    const { data: paymentCheck, error: checkError } = await supabase
+      .from('payments')
+      .select('school_id')
+      .eq('reference_number', reference)
+      .eq('school_id', schoolId)
+      .maybeSingle();
     
-    if (!paymentCheck.length) {
+    if (checkError || !paymentCheck) {
       console.error("SECURITY: Cross-tenant webhook attempt", { reference, webhookSchoolId: schoolId });
       return res.status(403).json({ message: "Payment not found for this school" });
     }
 
-    await pool.query(
-      `UPDATE payments SET status='paid', amount=?, updated_at=CURRENT_TIMESTAMP
-       WHERE reference_number=? AND school_id=?`,
-      [paidAmount, reference, schoolId]
-    );
+    const { error: updErr } = await supabase
+      .from('payments')
+      .update({ status: 'paid', amount: paidAmount, updated_at: new Date().toISOString() })
+      .eq('reference_number', reference)
+      .eq('school_id', schoolId);
+    if (updErr) throw updErr;
     res.sendStatus(200);
   } catch (err) { next(err); }
 });
@@ -180,21 +178,23 @@ router.get("/callback", async (req, res, next) => {
         return res.status(400).json({ message: "Invalid payment metadata" });
       }
       
-      const [paymentCheck] = await pool.query(
-        // OLD:
-        // `SELECT school_id FROM payments WHERE reference_number = ? LIMIT 1`,
-        `SELECT school_id FROM payments WHERE reference_number = ? AND school_id = ? LIMIT 1`,
-        [reference, schoolId]
-      );
+      const { data: paymentCheck, error: checkError } = await supabase
+        .from('payments')
+        .select('school_id')
+        .eq('reference_number', reference)
+        .eq('school_id', schoolId)
+        .maybeSingle();
       
-      if (!paymentCheck.length) {
+      if (checkError || !paymentCheck) {
         return res.status(404).json({ message: "Payment not found" });
       }
       
-      await pool.query(
-        `UPDATE payments SET status='paid', updated_at=CURRENT_TIMESTAMP WHERE reference_number=? AND school_id=?`,
-        [reference, paymentCheck[0].school_id]
-      );
+      const { error: updErr } = await supabase
+        .from('payments')
+        .update({ status: 'paid', updated_at: new Date().toISOString() })
+        .eq('reference_number', reference)
+        .eq('school_id', schoolId);
+      if (updErr) throw updErr;
     }
     res.json({ status: data.data?.status, reference });
   } catch (err) { next(err); }

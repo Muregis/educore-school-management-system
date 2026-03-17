@@ -2,7 +2,8 @@ import { Router } from "express";
 // OLD: import { pgPool } from "../config/pg.js";
 import { authRequired } from "../middleware/auth.js";
 import { env } from "../config/env.js";
-import { supabase } from "../config/db.js";
+// OLD: import { supabase } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 
 const router = Router();
 

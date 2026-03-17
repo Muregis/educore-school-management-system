@@ -1,6 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { pool } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
@@ -12,14 +12,15 @@ router.use(requireRoles("admin"));
 router.get("/users", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { data: rows } = await pool.query(
-      `SELECT user_id, full_name, email, phone, role, status, created_at
-      FROM users
-      WHERE school_id = ? AND is_deleted = 0
-      ORDER BY role, full_name`,
-      [schoolId]
-    );
-    res.json(rows);
+    const { data: rows, error } = await supabase
+      .from('users')
+      .select('user_id, full_name, email, phone, role, status, created_at')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .order('role')
+      .order('full_name');
+    if (error) throw error;
+    res.json(rows || []);
   } catch (err) { next(err); }
 });
 
@@ -29,20 +30,15 @@ router.get("/users", async (req, res, next) => {
 router.get("/staff", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    // OLD: const [rows] = await pool.query(
-    // OLD:   `SELECT user_id, full_name, email, phone, role, status, created_at
-    // OLD:   FROM users
-    // OLD:   WHERE school_id = ? AND role IN ('admin','teacher','finance') AND is_deleted = 0
-    // OLD:   ORDER BY role, full_name`,
-    // OLD:   [schoolId]
-    // OLD: );
-    const { data: rows } = await pool.query(
-      `SELECT user_id, full_name, email, phone, role, status, created_at
-      FROM users
-      WHERE school_id = ? AND role IN ('admin','teacher','finance') AND is_deleted = 0
-      ORDER BY role, full_name`,
-      [schoolId]
-    );
+    const { data: rows, error } = await supabase
+      .from('users')
+      .select('user_id, full_name, email, phone, role, status, created_at')
+      .eq('school_id', schoolId)
+      .in('role', ['admin', 'teacher', 'finance'])
+      .eq('is_deleted', false)
+      .order('role')
+      .order('full_name');
+    if (error) throw error;
     res.json(rows || []);
   } catch (err) { next(err); }
 });
@@ -61,14 +57,28 @@ router.post("/staff", async (req, res, next) => {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
 
     const hash = await bcrypt.hash(password, 10);
-    const [result] = await pool.query(
-      `INSERT INTO users (school_id, full_name, email, phone, password_hash, role, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [schoolId, name, email, phone || null, hash, role, status]
-    );
-    res.status(201).json({ userId: result.insertId, message: "Staff account created" });
+    const { data: inserted, error: insertError } = await supabase
+      .from('users')
+      .insert({
+        school_id: schoolId,
+        full_name: name,
+        email,
+        phone: phone || null,
+        password_hash: hash,
+        role,
+        status
+      })
+      .select('user_id')
+      .single();
+    if (insertError) {
+      if (insertError.code === '23505' || insertError.message?.includes('duplicate')) {
+        return res.status(409).json({ message: "An account with this email already exists" });
+      }
+      throw insertError;
+    }
+    res.status(201).json({ userId: inserted.user_id, message: "Staff account created" });
   } catch (err) {
-    if (err.code === "ER_DUP_ENTRY")
+    if (err.code === "ER_DUP_ENTRY" || err.message?.includes("duplicate"))
       return res.status(409).json({ message: "An account with this email already exists" });
     next(err);
   }
@@ -84,34 +94,44 @@ router.patch("/staff/:id", async (req, res, next) => {
       if (password.length < 6)
         return res.status(400).json({ message: "Password must be at least 6 characters" });
       const hash = await bcrypt.hash(password, 10);
-      await pool.query(
-        `UPDATE users SET password_hash=?, updated_at=CURRENT_TIMESTAMP
-        WHERE user_id=? AND school_id=? AND role IN ('admin','teacher','finance') AND is_deleted=0`,
-        [hash, req.params.id, schoolId]
-      );
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ password_hash: hash, updated_at: new Date().toISOString() })
+        .eq('user_id', req.params.id)
+        .eq('school_id', schoolId)
+        .in('role', ['admin', 'teacher', 'finance'])
+        .eq('is_deleted', false);
+      if (updateError) throw updateError;
     }
 
-    // Update other fields if provided
-    const fields = [];
-    const vals   = [];
-    if (name)   { fields.push("full_name=?");  vals.push(name); }
-    if (email)  { fields.push("email=?");       vals.push(email); }
-    if (phone !== undefined) { fields.push("phone=?"); vals.push(phone || null); }
-    if (role && ["admin","teacher","finance"].includes(role)) { fields.push("role=?"); vals.push(role); }
-    if (status && ["active","inactive"].includes(status)) { fields.push("status=?"); vals.push(status); }
+    // Build update object
+    const updateData = {};
+    if (name) updateData.full_name = name;
+    if (email) updateData.email = email;
+    if (phone !== undefined) updateData.phone = phone || null;
+    if (role && ["admin","teacher","finance"].includes(role)) updateData.role = role;
+    if (status && ["active","inactive"].includes(status)) updateData.status = status;
 
-    if (fields.length) {
-      vals.push(req.params.id, schoolId);
-      await pool.query(
-        `UPDATE users SET ${fields.join(", ")}, updated_at=CURRENT_TIMESTAMP
-        WHERE user_id=? AND school_id=? AND role IN ('admin','teacher','finance') AND is_deleted=0`,
-        vals
-      );
+    if (Object.keys(updateData).length > 0) {
+      updateData.updated_at = new Date().toISOString();
+      const { error: updateError } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('user_id', req.params.id)
+        .eq('school_id', schoolId)
+        .in('role', ['admin', 'teacher', 'finance'])
+        .eq('is_deleted', false);
+      if (updateError) {
+        if (updateError.code === '23505' || updateError.message?.includes('duplicate')) {
+          return res.status(409).json({ message: "Email already in use" });
+        }
+        throw updateError;
+      }
     }
 
     res.json({ updated: true });
   } catch (err) {
-    if (err.code === "ER_DUP_ENTRY")
+    if (err.code === "ER_DUP_ENTRY" || err.message?.includes("duplicate"))
       return res.status(409).json({ message: "Email already in use" });
     next(err);
   }
@@ -124,12 +144,16 @@ router.delete("/staff/:id", async (req, res, next) => {
     if (String(req.params.id) === String(userId))
       return res.status(400).json({ message: "You cannot delete your own account" });
 
-    const [result] = await pool.query(
-      `UPDATE users SET is_deleted=1, updated_at=CURRENT_TIMESTAMP
-      WHERE user_id=? AND school_id=? AND role IN ('admin','teacher','finance')`,
-      [req.params.id, schoolId]
-    );
-    if (!result.affectedRows) return res.status(404).json({ message: "Staff account not found" });
+    const { data: updated, error } = await supabase
+      .from('users')
+      .update({ is_deleted: true, updated_at: new Date().toISOString() })
+      .eq('user_id', req.params.id)
+      .eq('school_id', schoolId)
+      .in('role', ['admin', 'teacher', 'finance'])
+      .select('user_id')
+      .single();
+    if (error) throw error;
+    if (!updated) return res.status(404).json({ message: "Staff account not found" });
     res.json({ deleted: true });
   } catch (err) { next(err); }
 });
@@ -140,29 +164,50 @@ router.delete("/staff/:id", async (req, res, next) => {
 router.get("/portal", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    // OLD: const [rows] = await pool.query(
-    // OLD:   `SELECT u.user_id, u.full_name, u.email, u.role, u.status, u.student_id,
-    // OLD:           CONCAT(s.first_name,' ',s.last_name) AS student_name,
-    // OLD:           s.admission_number, s.class_name
-    // OLD:   FROM users u
-    // OLD:   LEFT JOIN students s ON s.student_id = u.student_id 
-    // OLD:   WHERE u.school_id = ? AND u.role IN ('parent','student') AND u.is_deleted = 0 
-    // OLD:     AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
-    // OLD:   ORDER BY u.role, u.full_name`,
-    // OLD:   [schoolId]
-    // OLD: );
-    const { data: rows } = await pool.query(
-      `SELECT u.user_id, u.full_name, u.email, u.role, u.status, u.student_id,
-              CONCAT(s.first_name,' ',s.last_name) AS student_name,
-              s.admission_number, s.class_name
-      FROM users u
-      LEFT JOIN students s ON s.student_id = u.student_id 
-      WHERE u.school_id = ? AND u.role IN ('parent','student') AND u.is_deleted = 0 
-        AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
-      ORDER BY u.role, u.full_name`,
-      [schoolId]
-    );
-    res.json(rows || []);
+    
+    // Get users first
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('user_id, full_name, email, role, status, student_id')
+      .eq('school_id', schoolId)
+      .in('role', ['parent', 'student'])
+      .eq('is_deleted', false)
+      .order('role')
+      .order('full_name');
+    if (usersError) throw usersError;
+    
+    // Get student IDs that need lookup
+    const studentIds = (users || []).map(u => u.student_id).filter(Boolean);
+    
+    // Fetch students data separately if there are any student_ids
+    let studentsMap = new Map();
+    if (studentIds.length > 0) {
+      const { data: students, error: studentsError } = await supabase
+        .from('students')
+        .select('student_id, first_name, last_name, admission_number, class_name, is_deleted')
+        .in('student_id', studentIds)
+        .eq('is_deleted', false);
+      if (studentsError) throw studentsError;
+      (students || []).forEach(s => studentsMap.set(s.student_id, s));
+    }
+    
+    // Join data manually
+    const rows = (users || []).map(u => {
+      const student = u.student_id ? studentsMap.get(u.student_id) : null;
+      return {
+        user_id: u.user_id,
+        full_name: u.full_name,
+        email: u.email,
+        role: u.role,
+        status: u.status,
+        student_id: u.student_id,
+        student_name: student ? `${student.first_name} ${student.last_name}` : null,
+        admission_number: student?.admission_number || null,
+        class_name: student?.class_name || null
+      };
+    }).filter(u => !u.student_id || studentsMap.has(u.student_id));
+    
+    res.json(rows);
   } catch (err) { next(err); }
 });
 
@@ -179,33 +224,49 @@ router.post("/portal", async (req, res, next) => {
     if (password.length < 6)
       return res.status(400).json({ message: "Password must be at least 6 characters" });
 
-    const [students] = await pool.query(
-      `SELECT student_id, first_name, last_name, admission_number
-      FROM students WHERE student_id=? AND school_id=? AND is_deleted=0 LIMIT 1`,
-      [studentId, schoolId]
-    );
-    if (!students.length) return res.status(404).json({ message: "Student not found" });
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('student_id, first_name, last_name, admission_number')
+      .eq('student_id', studentId)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+    if (studentError || !student) return res.status(404).json({ message: "Student not found" });
 
-    const student  = students[0];
     const fullName = name?.trim() || (role === "parent"
       ? `Parent of ${student.first_name} ${student.last_name}`
       : `${student.first_name} ${student.last_name}`);
     const email    = `${student.admission_number.toLowerCase()}.${role}@portal`;
     const hash     = await bcrypt.hash(password, 10);
 
-    const [existing] = await pool.query(
-      `SELECT user_id FROM users WHERE school_id=? AND student_id=? AND role=? AND is_deleted=0 LIMIT 1`,
-      [schoolId, studentId, role]
-    );
-    if (existing.length)
+    // Check existing
+    const { data: existing, error: existingError } = await supabase
+      .from('users')
+      .select('user_id')
+      .eq('school_id', schoolId)
+      .eq('student_id', studentId)
+      .eq('role', role)
+      .eq('is_deleted', false)
+      .maybeSingle();
+    if (existingError && existingError.code !== 'PGRST116') throw existingError;
+    if (existing)
       return res.status(409).json({ message: `A ${role} account already exists for this student` });
 
-    const [result] = await pool.query(
-      `INSERT INTO users (school_id, student_id, full_name, email, password_hash, role, status)
-      VALUES (?, ?, ?, ?, ?, ?, 'active')`,
-      [schoolId, studentId, fullName, email, hash, role]
-    );
-    res.status(201).json({ userId: result.insertId, message: "Account created" });
+    const { data: inserted, error: insertError } = await supabase
+      .from('users')
+      .insert({
+        school_id: schoolId,
+        student_id: studentId,
+        full_name: fullName,
+        email,
+        password_hash: hash,
+        role,
+        status: 'active'
+      })
+      .select('user_id')
+      .single();
+    if (insertError) throw insertError;
+    res.status(201).json({ userId: inserted.user_id, message: "Account created" });
   } catch (err) { next(err); }
 });
 
@@ -219,22 +280,26 @@ router.patch("/portal/:id", async (req, res, next) => {
       if (password.length < 6)
         return res.status(400).json({ message: "Password must be at least 6 characters" });
       const hash = await bcrypt.hash(password, 10);
-      await pool.query(
-        `UPDATE users SET password_hash=?, updated_at=CURRENT_TIMESTAMP
-        WHERE user_id=? AND school_id=? AND is_deleted=0`,
-        [hash, req.params.id, schoolId]
-      );
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ password_hash: hash, updated_at: new Date().toISOString() })
+        .eq('user_id', req.params.id)
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false);
+      if (updateError) throw updateError;
       return res.json({ updated: true });
     }
 
     if (status) {
       if (!["active","inactive"].includes(status))
         return res.status(400).json({ message: "status must be active or inactive" });
-      await pool.query(
-        `UPDATE users SET status=?, updated_at=CURRENT_TIMESTAMP
-        WHERE user_id=? AND school_id=? AND is_deleted=0`,
-        [status, req.params.id, schoolId]
-      );
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('user_id', req.params.id)
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false);
+      if (updateError) throw updateError;
       return res.json({ updated: true });
     }
 
@@ -246,11 +311,13 @@ router.patch("/portal/:id", async (req, res, next) => {
 router.delete("/portal/:id", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    await pool.query(
-      `UPDATE users SET is_deleted=1, updated_at=CURRENT_TIMESTAMP
-      WHERE user_id=? AND school_id=? AND role IN ('parent','student')`,
-      [req.params.id, schoolId]
-    );
+    const { error } = await supabase
+      .from('users')
+      .update({ is_deleted: true, updated_at: new Date().toISOString() })
+      .eq('user_id', req.params.id)
+      .eq('school_id', schoolId)
+      .in('role', ['parent', 'student']);
+    if (error) throw error;
     res.json({ deleted: true });
   } catch (err) { next(err); }
 });

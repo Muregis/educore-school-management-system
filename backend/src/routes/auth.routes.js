@@ -1,10 +1,8 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { hybridAuthLogin, migrateUserToSupabase } from "../services/hybrid-auth.js";
-// OLD: MySQL import (commented for safety)
-// import { mysqlPool } from "../config/db.js";
-import { pool } from "../config/db.js";
+import { authLogin, migrateUserToSupabase } from "../services/hybrid-auth.js";
+import { supabase } from "../config/supabaseClient.js";
 import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
 import { authRateLimit } from "../middleware/rateLimit.js";
@@ -30,8 +28,8 @@ router.post("/login", authRateLimit, async (req, res, next) => {
     if (!email || !password)
       return res.status(400).json({ message: "email and password are required" });
 
-    // Use hybrid authentication
-    const authResult = await hybridAuthLogin(email, password, schoolId);
+    // Use Supabase authentication
+    const authResult = await authLogin(email, password, schoolId);
     
     if (!authResult) {
       // Log authentication failure
@@ -39,14 +37,8 @@ router.post("/login", authRateLimit, async (req, res, next) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const { user, source } = authResult;
-    console.log(`🔐 User authenticated via ${source}:`, { email, source });
-
-    // OLD: MySQL migration logic (commented for safety - no longer needed)
-    // if (source === 'mysql') {
-    //   console.log('🔄 Migrating user from MySQL to Supabase...');
-    //   await migrateUserToSupabase(user);
-    // }
+    const { user } = authResult;
+    console.log(`🔐 User authenticated:`, { email, userId: user.user_id });
 
     if (user.status !== "active") return res.status(403).json({ message: "Account inactive" });
 
@@ -89,33 +81,19 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       return res.status(400).json({ message: "admissionNumber and password are required" });
 
     // Use Supabase for student lookup
-    const { data: students, error } = await pool
-      .query('students', {
-        select: 'student_id, first_name, last_name, school_id, admission_number',
-        where: { admission_number: admissionNumber, is_deleted: false },
-        schoolId: schoolId,
-        limit: 1
-      });
+    const { data: student, error } = await supabase
+      .from('students')
+      .select('student_id, first_name, last_name, school_id, admission_number')
+      .eq('admission_number', admissionNumber)
+      .eq('is_deleted', false)
+      .single();
     
-    if (error || !students.data || students.data.length === 0) {
+    if (error || !student) {
       return res.status(401).json({ message: "Invalid admission number" });
     }
 
-    const student = students.data[0];
-
-    // OLD: MySQL student lookup (commented for safety)
-    // const [students] = await mysqlPool.query(
-    //   `SELECT student_id, first_name, last_name, school_id, admission_number
-    //    FROM students
-    //    WHERE admission_number = ? AND school_id = ? AND is_deleted = 0 LIMIT 1`,
-    //   [admissionNumber, schoolId]
-    // );
-    
-    // if (!students.length) return res.status(401).json({ message: "Invalid admission number" });
-    // const student = students[0];
-
-    // Find portal user using hybrid auth
-    const authResult = await hybridAuthLogin(
+    // Find portal user using Supabase auth
+    const authResult = await authLogin(
       role === "parent" ? `${admissionNumber}.parent@portal` : `${admissionNumber}.student@portal`,
       password,
       schoolId
@@ -125,12 +103,6 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
 
     const user = authResult.user;
     if (user.status !== "active") return res.status(403).json({ message: "Account inactive" });
-
-    // OLD: MySQL migration logic (commented for safety - no longer needed)
-    // if (authResult.source === 'mysql') {
-    //   console.log('🔄 Migrating portal user from MySQL to Supabase...');
-    //   await migrateUserToSupabase(user);
-    // }
 
     const name = role === "parent"
       ? `Parent of ${student.first_name} ${student.last_name}`

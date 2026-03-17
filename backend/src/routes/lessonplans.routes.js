@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { pool }   from "../config/db.js";
 import { env }    from "../config/env.js";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired }  from "../middleware/auth.js";
@@ -49,12 +48,6 @@ router.get("/", async (req, res, next) => {
     const { schoolId, userId, role } = req.user;
     const status = req.query.status || null;
     const type   = req.query.type   || null;
-
-    // OLD: const filters = ["p.school_id = ?", "p.is_deleted = false"];
-    // OLD: const params  = [schoolId];
-    // OLD: ... build SQL join ...
-    // OLD: const { data: rows } = await pool.query(`SELECT ...`, params);
-    // OLD: res.json(rows);
 
     let q = supabase
       .from("lesson_plans")
@@ -116,18 +109,25 @@ router.get("/", async (req, res, next) => {
 router.get("/:id", async (req, res, next) => {
   try {
     const { schoolId, userId, role } = req.user;
-    const [[plan]] = await pool.query(
-      `SELECT p.*, u.full_name AS teacher_name, r.full_name AS reviewer_name
-         FROM lesson_plans p
-         JOIN users u ON u.user_id = p.teacher_id
-         LEFT JOIN users r ON r.user_id = p.reviewed_by
-        WHERE p.plan_id = $1 AND p.school_id = $2 AND p.is_deleted = false`,
-      [req.params.id, schoolId]
-    );
-    if (!plan) return res.status(404).json({ message: "Plan not found" });
+    const { data: plan, error } = await supabase
+      .from('lesson_plans')
+      .select('*, teacher:users!teacher_id(full_name), reviewer:users!reviewed_by(full_name)')
+      .eq('plan_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+    if (error || !plan) return res.status(404).json({ message: "Plan not found" });
     if (role === "teacher" && plan.teacher_id !== userId)
       return res.status(403).json({ message: "Access denied" });
-    res.json(plan);
+    // Flatten joined user data
+    const result = {
+      ...plan,
+      teacher_name: plan.teacher?.full_name,
+      reviewer_name: plan.reviewer?.full_name,
+      teacher: undefined,
+      reviewer: undefined
+    };
+    res.json(result);
   } catch (err) { handleLessonPlansDbError(err, res, next); }
 });
 
@@ -230,20 +230,33 @@ router.post("/", requireRoles("teacher", "admin"), async (req, res, next) => {
 
     const finalStatus = ["draft", "pending"].includes(status) ? status : "draft";
 
-    const [result] = await pool.query(
-      `INSERT INTO lesson_plans
-         (school_id, teacher_id, type, subject, class_name, term, week, topic, duration, content, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [schoolId, userId, type, subject, class_name, term, week || null, topic, duration || null, content, finalStatus]
-    );
+    const { data: inserted, error: insertError } = await supabase
+      .from('lesson_plans')
+      .insert({
+        school_id: schoolId,
+        teacher_id: userId,
+        type,
+        subject,
+        class_name,
+        term,
+        week: week || null,
+        topic,
+        duration: duration || null,
+        content,
+        status: finalStatus
+      })
+      .select('plan_id')
+      .single();
+
+    if (insertError) throw insertError;
 
     logActivity(req, {
       action: `lesson_plan.${finalStatus}`,
-      entity: "lesson_plan", entityId: result.insertId,
+      entity: "lesson_plan", entityId: inserted.plan_id,
       description: `${type === "scheme" ? "Scheme of Work" : "Lesson plan"}: ${subject} ${class_name} — ${topic}`,
     });
 
-    res.status(201).json({ planId: result.insertId, status: finalStatus });
+    res.status(201).json({ planId: inserted.plan_id, status: finalStatus });
   } catch (err) { next(err); }
 });
 
@@ -253,11 +266,15 @@ router.put("/:id", requireRoles("teacher", "admin"), async (req, res, next) => {
     const { schoolId, userId, role } = req.user;
     const { content, status, subject, class_name, term, week, topic, duration } = req.body;
 
-    const [[plan]] = await pool.query(
-      `SELECT * FROM lesson_plans WHERE plan_id=$1 AND school_id=$2 AND is_deleted=false`,
-      [req.params.id, schoolId]
-    );
-    if (!plan) return res.status(404).json({ message: "Plan not found" });
+    // OLD: const [[plan]] = await pool.query(`SELECT * FROM lesson_plans WHERE plan_id=$1 AND school_id=$2 AND is_deleted=false`, [req.params.id, schoolId]);
+    const { data: plan, error: fetchError } = await supabase
+      .from('lesson_plans')
+      .select('*')
+      .eq('plan_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+    if (fetchError || !plan) return res.status(404).json({ message: "Plan not found" });
     if (role === "teacher" && plan.teacher_id !== userId)
       return res.status(403).json({ message: "Access denied" });
     if (plan.status === "approved")
@@ -265,18 +282,27 @@ router.put("/:id", requireRoles("teacher", "admin"), async (req, res, next) => {
 
     const newStatus = status === "pending" ? "pending" : "draft";
 
-    await pool.query(
-      `UPDATE lesson_plans
-          SET content=?, status=?, subject=COALESCE(?,subject), class_name=COALESCE(?,class_name),
-              term=COALESCE(?,term), week=COALESCE(?,week), topic=COALESCE(?,topic),
-              duration=COALESCE(?,duration),
-              ai_score=NULL, ai_missing=NULL, ai_weak=NULL,
-              ai_recommendations=NULL, ai_feedback_draft=NULL,
-              updated_at=NOW()
-        WHERE plan_id=?`,
-      [content, newStatus, subject||null, class_name||null, term||null,
-       week||null, topic||null, duration||null, req.params.id]
-    );
+    const { error: updateError } = await supabase
+      .from('lesson_plans')
+      .update({
+        content,
+        status: newStatus,
+        subject: subject || plan.subject,
+        class_name: class_name || plan.class_name,
+        term: term || plan.term,
+        week: week || plan.week,
+        topic: topic || plan.topic,
+        duration: duration || plan.duration,
+        ai_score: null,
+        ai_missing: null,
+        ai_weak: null,
+        ai_recommendations: null,
+        ai_feedback_draft: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('plan_id', req.params.id);
+
+    if (updateError) throw updateError;
 
     logActivity(req, {
       action: `lesson_plan.${newStatus === "pending" ? "resubmit" : "edit"}`,
@@ -292,11 +318,14 @@ router.put("/:id", requireRoles("teacher", "admin"), async (req, res, next) => {
 router.post("/:id/analyze", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [[plan]] = await pool.query(
-      `SELECT * FROM lesson_plans WHERE plan_id=$1 AND school_id=$2 AND is_deleted=false`,
-      [req.params.id, schoolId]
-    );
-    if (!plan) return res.status(404).json({ message: "Plan not found" });
+    const { data: plan, error: fetchError } = await supabase
+      .from('lesson_plans')
+      .select('*')
+      .eq('plan_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+    if (fetchError || !plan) return res.status(404).json({ message: "Plan not found" });
 
     const prompt = `You are reviewing a lesson plan written for a Kenyan school.
 
@@ -342,19 +371,19 @@ Respond in EXACTLY this JSON format (no markdown, no extra text):
       };
     }
 
-    await pool.query(
-      `UPDATE lesson_plans
-          SET ai_score=?, ai_missing=?, ai_weak=?, ai_recommendations=?, ai_feedback_draft=?, updated_at=NOW()
-        WHERE plan_id=?`,
-      [
-        analysis.score ?? null,
-        JSON.stringify(analysis.missing_sections || []),
-        JSON.stringify(analysis.weak_areas || []),
-        JSON.stringify(analysis.recommendations || []),
-        analysis.feedback_for_teacher || null,
-        req.params.id,
-      ]
-    );
+    // OLD: await pool.query(`UPDATE lesson_plans SET ai_score=?, ai_missing=?, ai_weak=?, ai_recommendations=?, ai_feedback_draft=?, updated_at=NOW() WHERE plan_id=?`, [...]);
+    const { error: updateError } = await supabase
+      .from('lesson_plans')
+      .update({
+        ai_score: analysis.score ?? null,
+        ai_missing: analysis.missing_sections || [],
+        ai_weak: analysis.weak_areas || [],
+        ai_recommendations: analysis.recommendations || [],
+        ai_feedback_draft: analysis.feedback_for_teacher || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('plan_id', req.params.id);
+    if (updateError) throw updateError;
 
     res.json({ analysis, planId: Number(req.params.id) });
   } catch (err) { next(err); }
@@ -364,12 +393,18 @@ Respond in EXACTLY this JSON format (no markdown, no extra text):
 router.post("/:id/approve", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
-    await pool.query(
-      `UPDATE lesson_plans
-          SET status='approved', reviewed_by=?, reviewed_at=NOW(), updated_at=NOW()
-        WHERE plan_id=$1 AND school_id=$2 AND is_deleted=false`,
-      [userId, req.params.id, schoolId]
-    );
+    const { error } = await supabase
+      .from('lesson_plans')
+      .update({
+        status: 'approved',
+        reviewed_by: userId,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('plan_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
+    if (error) throw error;
     logActivity(req, { action: "lesson_plan.approve", entity: "lesson_plan", entityId: Number(req.params.id) });
     res.json({ approved: true });
   } catch (err) { next(err); }
@@ -382,12 +417,19 @@ router.post("/:id/reject", requireRoles("admin"), async (req, res, next) => {
     const { feedback } = req.body;
     if (!feedback?.trim()) return res.status(400).json({ message: "Feedback is required when rejecting" });
 
-    await pool.query(
-      `UPDATE lesson_plans
-          SET status='rejected', admin_feedback=?, reviewed_by=?, reviewed_at=NOW(), updated_at=NOW()
-        WHERE plan_id=$1 AND school_id=$2 AND is_deleted=false`,
-      [feedback, userId, req.params.id, schoolId]
-    );
+    const { error } = await supabase
+      .from('lesson_plans')
+      .update({
+        status: 'rejected',
+        admin_feedback: feedback,
+        reviewed_by: userId,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('plan_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
+    if (error) throw error;
     logActivity(req, { action: "lesson_plan.reject", entity: "lesson_plan", entityId: Number(req.params.id), description: feedback.slice(0, 80) });
     res.json({ rejected: true });
   } catch (err) { next(err); }
@@ -397,20 +439,27 @@ router.post("/:id/reject", requireRoles("admin"), async (req, res, next) => {
 router.delete("/:id", async (req, res, next) => {
   try {
     const { schoolId, userId, role } = req.user;
-    const [[plan]] = await pool.query(
-      `SELECT * FROM lesson_plans WHERE plan_id=$1 AND school_id=$2 AND is_deleted=false`,
-      [req.params.id, schoolId]
-    );
-    if (!plan) return res.status(404).json({ message: "Not found" });
+    const { data: plan, error: fetchError } = await supabase
+      .from('lesson_plans')
+      .select('*')
+      .eq('plan_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+    if (fetchError || !plan) return res.status(404).json({ message: "Not found" });
     if (role === "teacher" && plan.teacher_id !== userId)
       return res.status(403).json({ message: "Access denied" });
     if (plan.status === "approved" && role !== "admin")
       return res.status(400).json({ message: "Cannot delete approved plans" });
 
-    await pool.query(
-      `UPDATE lesson_plans SET is_deleted=1, updated_at=NOW() WHERE plan_id=?`,
-      [req.params.id]
-    );
+    const { error: updateError } = await supabase
+      .from('lesson_plans')
+      .update({
+        is_deleted: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('plan_id', req.params.id);
+    if (updateError) throw updateError;
     res.json({ deleted: true });
   } catch (err) { next(err); }
 });

@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
-// OLD: import { pool } from "../config/db.js";
 
 const router = Router();
 router.use(authRequired);
@@ -98,19 +97,6 @@ router.post("/bulk", async (req, res, next) => {
 
     const resolvedClassId = await resolveClassId(schoolId, classId);
 
-    // OLD: await pool.query(
-    // OLD:   `DELETE FROM attendance WHERE school_id=? AND class_id=? AND attendance_date=?`,
-    // OLD:   [schoolId, resolvedClassId, date]
-    // OLD: );
-    // OLD: const values = records.map(r => [
-    // OLD:   schoolId, r.studentId ?? r.student_id, resolvedClassId, date,
-    // OLD:   r.status || "present", userId || null
-    // OLD: ]);
-    // OLD: await pool.query(
-    // OLD:   `INSERT INTO attendance (school_id, student_id, class_id, attendance_date, status, marked_by_user_id) VALUES ?`,
-    // OLD:   [values]
-    // OLD: );
-
     // Soft-delete existing records for this class + date instead of hard DELETE
     const { error: delError } = await supabase
       .from('attendance')
@@ -151,13 +137,6 @@ router.post("/", async (req, res, next) => {
 
     const resolvedClassId = await resolveClassId(schoolId, classId);
 
-    // OLD: await pool.query(
-    // OLD:   `INSERT INTO attendance (school_id, student_id, class_id, attendance_date, status, marked_by_user_id)
-    // OLD:   VALUES (?, ?, ?, ?, ?, ?)
-    // OLD:   ON DUPLICATE KEY UPDATE status=VALUES(status), updated_at=CURRENT_TIMESTAMP`,
-    // OLD:   [schoolId, studentId, resolvedClassId, date, status, userId || null]
-    // OLD: );
-
     const { error } = await supabase
       .from('attendance')
       .upsert(
@@ -184,13 +163,6 @@ router.put("/:id", async (req, res, next) => {
     const { schoolId } = req.user;
     const { status, date } = req.body;
 
-    // OLD: const [result] = await pool.query(
-    // OLD:   `UPDATE attendance SET status=?, attendance_date=?, updated_at=CURRENT_TIMESTAMP
-    // OLD:   WHERE attendance_id=? AND school_id=?`,
-    // OLD:   [status, date, req.params.id, schoolId]
-    // OLD: );
-    // OLD: if (!result.affectedRows) return res.status(404).json({ message: "Record not found" });
-
     const { data: updated, error } = await supabase
       .from('attendance')
       .update({ status, attendance_date: date })
@@ -210,11 +182,6 @@ router.put("/:id", async (req, res, next) => {
 router.delete("/:id", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-
-    // OLD: await pool.query(
-    // OLD:   `UPDATE attendance SET is_deleted=1 WHERE attendance_id=? AND school_id=?`,
-    // OLD:   [req.params.id, schoolId]
-    // OLD: );
 
     const { error } = await supabase
       .from('attendance')

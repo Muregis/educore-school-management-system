@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
+// OLD: import { pool } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
@@ -59,36 +60,54 @@ router.post("/mpesa/callback", async (req, res, next) => {
 
     let studentId = null;
     if (billRef) {
-      const [studentRows] = await pool.query(
-        `SELECT student_id FROM students WHERE school_id = ? AND admission_number = ? AND is_deleted = 0 LIMIT 1`,
-        [schoolId, billRef]
-      );
-      if (studentRows.length) studentId = studentRows[0].student_id;
+      const { data: studentRows, error: studentError } = await supabase
+        .from('students')
+        .select('student_id')
+        .eq('school_id', schoolId)
+        .eq('admission_number', billRef)
+        .eq('is_deleted', false)
+        .maybeSingle();
+      if (!studentError && studentRows) studentId = studentRows.student_id;
     }
 
     // Check for duplicate payments
-    const [existing] = await pool.query(
-      `SELECT payment_id FROM payments WHERE reference_number = ? AND school_id = ? LIMIT 1`,
-      [referenceNumber, schoolId]
-    );
+    const { data: existing, error: existingError } = await supabase
+      .from('payments')
+      .select('payment_id')
+      .eq('reference_number', referenceNumber)
+      .eq('school_id', schoolId)
+      .maybeSingle();
     
-    if (existing.length) {
-      return res.json({ ok: true, duplicate: true, paymentId: existing[0].payment_id });
+    if (!existingError && existing) {
+      return res.json({ ok: true, duplicate: true, paymentId: existing.payment_id });
     }
 
-    const [result] = await pool.query(
-      `INSERT INTO payments (school_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status, term)
-       VALUES (?, ?, ?, 'tuition', 'mpesa', ?, ?, 'paid', 'Term 2')`,
-      [schoolId, studentId, amount, referenceNumber, paymentDate]
-    );
+    const { data: inserted, error: insertError } = await supabase
+      .from('payments')
+      .insert({
+        school_id: schoolId,
+        student_id: studentId,
+        amount,
+        fee_type: 'tuition',
+        payment_method: 'mpesa',
+        reference_number: referenceNumber,
+        payment_date: paymentDate,
+        status: 'paid',
+        term: 'Term 2'
+      })
+      .select('payment_id')
+      .single();
+    if (insertError) throw insertError;
 
-    await pool.query(
-      `INSERT INTO sms_logs (school_id, recipient, message, channel, status, sent_at)
-       VALUES (?, ?, ?, 'sms', 'sent', NOW())`,
-      [schoolId, msisdn || "unknown", `Mpesa payment received: ${amount} (ref: ${referenceNumber})`]
-    );
+    await supabase.from('sms_logs').insert({
+      school_id: schoolId,
+      recipient: msisdn || "unknown",
+      message: `Mpesa payment received: ${amount} (ref: ${referenceNumber})`,
+      channel: 'sms',
+      status: 'sent'
+    });
 
-    res.json({ ok: true, paymentId: result.insertId });
+    res.json({ ok: true, paymentId: inserted.payment_id });
   } catch (err) {
     next(err);
   }
@@ -117,18 +136,27 @@ router.post("/bank/reconcile", authRequired, requireRoles("admin", "finance"), a
 
       if (!admission || !amount) { skipped++; continue; }
 
-      const [studentRows] = await pool.query(
-        `SELECT student_id FROM students WHERE school_id = ? AND admission_number = ? AND is_deleted = 0 LIMIT 1`,
-        [schoolId, admission]
-      );
+      const { data: studentRow, error: studentError } = await supabase
+        .from('students')
+        .select('student_id')
+        .eq('school_id', schoolId)
+        .eq('admission_number', admission)
+        .eq('is_deleted', false)
+        .maybeSingle();
 
-      if (!studentRows.length) { skipped++; continue; }
+      if (studentError || !studentRow) { skipped++; continue; }
 
-      await pool.query(
-        `INSERT INTO payments (school_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status, term)
-         VALUES (?, ?, ?, ?, 'bank', ?, ?, 'paid', ?)`,
-        [schoolId, studentRows[0].student_id, amount, feeType, reference, paymentDate, term]
-      );
+      await supabase.from('payments').insert({
+        school_id: schoolId,
+        student_id: studentRow.student_id,
+        amount,
+        fee_type: feeType,
+        payment_method: 'bank',
+        reference_number: reference,
+        payment_date: paymentDate,
+        status: 'paid',
+        term
+      });
       inserted++;
     }
 

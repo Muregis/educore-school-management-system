@@ -4,32 +4,14 @@ import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { requireRoles } from "../middleware/roles.js";
-// OLD: import { pool } from "../config/db.js";
-// OLD: import { pgPool } from "../config/pg.js";
 
 const router = Router();
 router.use(authRequired);
-
-// OLD: const usePgStudentsGet =
-// OLD:   String(process.env.USE_PG_STUDENTS_GET || "").toLowerCase() === "true";
 
 // ─── GET / — list all students for this school ────────────────────────────────
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-
-    // OLD: if (usePgStudentsGet) {
-    // OLD:   const { rows } = await pgPool.query(
-    // OLD:     `SELECT s.student_id, ... FROM students s WHERE s.school_id=$1 AND s.is_deleted=false ORDER BY s.class_name, s.first_name`,
-    // OLD:     [schoolId]
-    // OLD:   );
-    // OLD:   return res.json(rows);
-    // OLD: }
-    // OLD: const [rows] = await pool.query(
-    // OLD:   `SELECT s.student_id, ... FROM students s WHERE s.school_id=$1 AND s.is_deleted=false ORDER BY s.class_name, s.first_name`,
-    // OLD:   [schoolId]
-    // OLD: );
-    // OLD: res.json(rows);
 
     const { data: rows, error } = await supabase
       .from('students')
@@ -164,14 +146,6 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
       dateOfBirth, phone, parentName, parentPhone, email, address, status
     } = req.body;
 
-    // OLD: let resolvedClassId = classId || null;
-    // OLD: if (className && !classId) {
-    // OLD:   const { rows } = await pool.query(
-    // OLD:     `SELECT class_id FROM classes WHERE school_id=$1 AND class_name=$2 LIMIT 1`,
-    // OLD:     [schoolId, className]
-    // OLD:   );
-    // OLD:   if (rows.length) resolvedClassId = rows[0].class_id;
-    // OLD: }
     let resolvedClassId = classId || null;
     if (className && !classId) {
       const { data: cls } = await supabase
@@ -184,17 +158,6 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
       if (cls) resolvedClassId = cls.class_id;
     }
 
-    // OLD: const { rows } = await pool.query(
-    // OLD:   `UPDATE students SET first_name=$1, last_name=$2, gender=$3, class_id=$4, class_name=$5,
-    // OLD:   date_of_birth=$6, phone=$7, email=$8, address=$9, parent_name=$10, parent_phone=$11,
-    // OLD:   status=$12, updated_at=CURRENT_TIMESTAMP
-    // OLD:   WHERE student_id=$13 AND school_id=$14 AND is_deleted=false`,
-    // OLD:   [firstName, lastName, gender, resolvedClassId, className||null,
-    // OLD:   dateOfBirth||null, phone||null, email||null, address||null,
-    // OLD:   parentName||null, parentPhone||null, status||"active",
-    // OLD:   req.params.id, schoolId]
-    // OLD: );
-    // OLD: if (!rows.length) return res.status(404).json({ message: "Student not found" });
     const { data: updated, error } = await supabase
       .from('students')
       .update({
@@ -230,12 +193,6 @@ router.delete("/:id", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 
-    // OLD: const { rows } = await pool.query(
-    // OLD:   `UPDATE students SET is_deleted=true, updated_at=CURRENT_TIMESTAMP
-    // OLD:   WHERE student_id=$1 AND school_id=$2`,
-    // OLD:   [req.params.id, schoolId]
-    // OLD: );
-    // OLD: if (!rows.length) return res.status(404).json({ message: "Student not found" });
     const { data: deleted, error } = await supabase
       .from('students')
       .update({ is_deleted: true })

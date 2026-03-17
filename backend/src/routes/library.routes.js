@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
-import { supabase } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
@@ -11,11 +10,6 @@ router.use(authRequired);
 router.get("/books", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    // OLD: const { rows } = await pool.query(
-    // OLD:   `SELECT * FROM books WHERE school_id=$1 AND is_deleted=false ORDER BY title`,
-    // OLD:   [schoolId]
-    // OLD: );
-    // OLD: res.json(rows);
 
     const { data: rows, error } = await supabase
       .from("books")
@@ -36,16 +30,33 @@ router.post("/books", requireRoles("admin","librarian"), async (req, res, next) 
     if (!title || !author) return res.status(400).json({ message: "title and author are required" });
 
     const qty = Number(quantityTotal) || 1;
-    const result = await pool.query(
-      `INSERT INTO books (school_id, title, author, category, isbn, quantity_total, quantity_available, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
-       RETURNING book_id`,
-      [schoolId, title, author, category, isbn, qty, qty]
-    );
-    // OLD:
-    // const [row] = await pool.query(`SELECT * FROM books WHERE book_id=?`, [result.insertId]);
-    const { rows } = await pool.query(`SELECT * FROM books WHERE book_id=$1 AND school_id=$2`, [result.rows[0].book_id, schoolId]);
-    res.status(201).json(rows[0]);
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('books')
+      .insert({
+        school_id: schoolId,
+        title,
+        author,
+        category,
+        isbn,
+        quantity_total: qty,
+        quantity_available: qty,
+        status: 'active'
+      })
+      .select('book_id')
+      .single();
+
+    if (insertError) throw insertError;
+
+    const { data: row, error: selectError } = await supabase
+      .from('books')
+      .select('*')
+      .eq('book_id', inserted.book_id)
+      .eq('school_id', schoolId)
+      .single();
+
+    if (selectError) throw selectError;
+    res.status(201).json(row);
   } catch (err) { next(err); }
 });
 
@@ -54,20 +65,34 @@ router.put("/books/:id", requireRoles("admin","librarian"), async (req, res, nex
   try {
     const { schoolId } = req.user;
     const { title, author, category, isbn, quantityTotal } = req.body;
-    const { rows } = await pool.query(`SELECT * FROM books WHERE book_id=$1 AND school_id=$2`, [req.params.id, schoolId]);
-    if (!rows.length) return res.status(404).json({ message: "Book not found" });
+    const { data: book, error: fetchError } = await supabase
+      .from('books')
+      .select('*')
+      .eq('book_id', req.params.id)
+      .eq('school_id', schoolId)
+      .single();
 
-    const book = rows[0];
+    if (fetchError || !book) return res.status(404).json({ message: "Book not found" });
+
     const newTotal = Number(quantityTotal) || book.quantity_total;
     const checkedOut = book.quantity_total - book.quantity_available;
     const newAvailable = Math.max(0, newTotal - checkedOut);
 
-    await pool.query(
-      `UPDATE books SET title=$1, author=$2, category=$3, isbn=$4, quantity_total=$5, quantity_available=$6, updated_at=CURRENT_TIMESTAMP
-       WHERE book_id=$7 AND school_id=$8`,
-      [title||book.title, author||book.author, category||book.category, isbn??book.isbn,
-       newTotal, newAvailable, req.params.id, schoolId]
-    );
+    const { error: updateError } = await supabase
+      .from('books')
+      .update({
+        title: title || book.title,
+        author: author || book.author,
+        category: category || book.category,
+        isbn: isbn ?? book.isbn,
+        quantity_total: newTotal,
+        quantity_available: newAvailable,
+        updated_at: new Date().toISOString()
+      })
+      .eq('book_id', req.params.id)
+      .eq('school_id', schoolId);
+
+    if (updateError) throw updateError;
     res.json({ updated: true });
   } catch (err) { next(err); }
 });
@@ -76,7 +101,14 @@ router.put("/books/:id", requireRoles("admin","librarian"), async (req, res, nex
 router.delete("/books/:id", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    await pool.query(`UPDATE books SET is_deleted=true WHERE book_id=$1 AND school_id=$2`, [req.params.id, schoolId]);
+
+    const { error: updateError } = await supabase
+      .from('books')
+      .update({ is_deleted: true, updated_at: new Date().toISOString() })
+      .eq('book_id', req.params.id)
+      .eq('school_id', schoolId);
+
+    if (updateError) throw updateError;
     res.json({ deleted: true });
   } catch (err) { next(err); }
 });
@@ -107,10 +139,8 @@ router.get("/borrows", async (req, res, next) => {
     }
 
     sql += " ORDER BY br.borrow_date DESC, br.borrow_id DESC";
-    // OLD: const { rows } = await pool.query(sql, params);
-    // OLD: res.json(rows);
 
-    // NEW: Supabase-native query (no raw SQL / no $1 placeholders)
+    // Supabase-native query (no raw SQL / no $1 placeholders)
     let q = supabase
       .from("borrow_records")
       .select("borrow_id, book_id, borrower_id, borrower_type, borrow_date, due_date, return_date, status, notes")
@@ -185,40 +215,68 @@ router.post("/borrows", requireRoles("admin","librarian","teacher"), async (req,
     if (!dueDate)    return res.status(400).json({ message: "dueDate is required" });
 
     // Check book exists and has copies available
-    const { rows } = await pool.query(
-      `SELECT * FROM books WHERE book_id=$1 AND school_id=$2 AND is_deleted=false LIMIT 1`,
-      [bookId, schoolId]
-    );
-    const books = rows;
-    if (!books.length) return res.status(404).json({ message: "Book not found" });
-    const book = books[0];
+    const { data: book, error: bookError } = await supabase
+      .from('books')
+      .select('*')
+      .eq('book_id', bookId)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (bookError || !book) return res.status(404).json({ message: "Book not found" });
     if (book.quantity_available < 1)
       return res.status(400).json({ message: `No copies available for "${book.title}"` });
 
     // Verify borrower exists
     if (borrowerType === "student") {
-      const { rows } = await pool.query(`SELECT student_id FROM students WHERE student_id=$1 AND school_id=$2 AND is_deleted=false`, [borrowerId, schoolId]);
-      if (!rows.length) return res.status(404).json({ message: "Student not found" });
+      const { data: student, error: studentError } = await supabase
+        .from('students')
+        .select('student_id')
+        .eq('student_id', borrowerId)
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false)
+        .single();
+      if (studentError || !student) return res.status(404).json({ message: "Student not found" });
     } else {
-      const { rows } = await pool.query(`SELECT teacher_id FROM teachers WHERE teacher_id=$1 AND school_id=$2 AND is_deleted=false`, [borrowerId, schoolId]);
-      if (!rows.length) return res.status(404).json({ message: "Staff member not found" });
+      const { data: teacher, error: teacherError } = await supabase
+        .from('teachers')
+        .select('teacher_id')
+        .eq('teacher_id', borrowerId)
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false)
+        .single();
+      if (teacherError || !teacher) return res.status(404).json({ message: "Staff member not found" });
     }
 
     // Insert borrow record
-    const result = await pool.query(
-      `INSERT INTO borrow_records (school_id, book_id, borrower_id, borrower_type, borrow_date, due_date, notes, status, issued_by_user_id)
-       VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, $6, 'borrowed', $7)
-       RETURNING borrow_id`,
-      [schoolId, bookId, borrowerId, borrowerType, dueDate, notes, userId]
-    );
+    const { data: inserted, error: insertError } = await supabase
+      .from('borrow_records')
+      .insert({
+        school_id: schoolId,
+        book_id: bookId,
+        borrower_id: borrowerId,
+        borrower_type: borrowerType,
+        borrow_date: new Date().toISOString().slice(0, 10),
+        due_date: dueDate,
+        notes,
+        status: 'borrowed',
+        issued_by_user_id: userId
+      })
+      .select('borrow_id')
+      .single();
+
+    if (insertError) throw insertError;
 
     // Decrement available count
-    await pool.query(
-      `UPDATE books SET quantity_available = quantity_available - 1 WHERE book_id=$1 AND school_id=$2`,
-      [bookId, schoolId]
-    );
+    const { error: updateError } = await supabase
+      .from('books')
+      .update({ quantity_available: book.quantity_available - 1 })
+      .eq('book_id', bookId)
+      .eq('school_id', schoolId);
 
-    res.status(201).json({ borrowId: result.rows[0].borrow_id });
+    if (updateError) throw updateError;
+
+    res.status(201).json({ borrowId: inserted.borrow_id });
   } catch (err) { next(err); }
 });
 
@@ -227,27 +285,48 @@ router.put("/borrows/:id/return", requireRoles("admin","librarian"), async (req,
   try {
     const { schoolId, userId } = req.user;
 
-    const { rows } = await pool.query(
-      `SELECT * FROM borrow_records WHERE borrow_id=$1 AND school_id=$2 AND is_deleted=false LIMIT 1`,
-      [req.params.id, schoolId]
-    );
-    const records = rows;
-    if (!records.length) return res.status(404).json({ message: "Borrow record not found" });
-    const record = records[0];
+    const { data: record, error: fetchError } = await supabase
+      .from('borrow_records')
+      .select('*')
+      .eq('borrow_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (fetchError || !record) return res.status(404).json({ message: "Borrow record not found" });
     if (record.status === "returned") return res.status(400).json({ message: "Already returned" });
 
     // Mark returned
-    await pool.query(
-      `UPDATE borrow_records SET status='returned', return_date=CURRENT_DATE, returned_to_user_id=$1, updated_at=CURRENT_TIMESTAMP
-       WHERE borrow_id=$2 AND school_id=$3`,
-      [userId, req.params.id, schoolId]
-    );
+    const { error: updateError } = await supabase
+      .from('borrow_records')
+      .update({
+        status: 'returned',
+        return_date: new Date().toISOString().slice(0, 10),
+        returned_to_user_id: userId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('borrow_id', req.params.id)
+      .eq('school_id', schoolId);
+
+    if (updateError) throw updateError;
 
     // Increment available count
-    await pool.query(
-      `UPDATE books SET quantity_available = quantity_available + 1 WHERE book_id=$1 AND school_id=$2`,
-      [record.book_id, schoolId]
-    );
+    const { data: book, error: bookError } = await supabase
+      .from('books')
+      .select('quantity_available')
+      .eq('book_id', record.book_id)
+      .eq('school_id', schoolId)
+      .single();
+
+    if (bookError) throw bookError;
+
+    const { error: bookUpdateError } = await supabase
+      .from('books')
+      .update({ quantity_available: book.quantity_available + 1 })
+      .eq('book_id', record.book_id)
+      .eq('school_id', schoolId);
+
+    if (bookUpdateError) throw bookUpdateError;
 
     res.json({ returned: true });
   } catch (err) { next(err); }

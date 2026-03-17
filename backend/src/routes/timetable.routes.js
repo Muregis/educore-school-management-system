@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { pgPool } from "../config/pg.js";
-import { supabase } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js"; 
 const router = Router();
@@ -34,21 +33,6 @@ router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { className, teacherId } = req.query;
-
-    // OLD: let sql = `SELECT te.timetable_id, te.class_id, te.subject_name, te.teacher_id,
-    // OLD:         te.day_of_week, te.start_time, te.end_time, te.room, te.school_id,
-    // OLD:         COALESCE(c.class_name, '') AS class_name,
-    // OLD:         CONCAT(t.first_name, ' ', t.last_name) AS teacher_name
-    // OLD:   FROM timetable_entries te
-    // OLD:   LEFT JOIN classes  c ON c.class_id  = te.class_id
-    // OLD:   LEFT JOIN teachers t ON t.teacher_id = te.teacher_id
-    // OLD:   WHERE te.school_id = $1 AND te.is_deleted = false`;
-    // OLD: const params = [schoolId];
-    // OLD: if (className) { sql += " AND c.class_name = $2"; params.push(className); }
-    // OLD: if (teacherId) { sql += " AND te.teacher_id = ?"; params.push(teacherId); }
-    // OLD: sql += " ORDER BY FIELD(te.day_of_week,'Mon','Tue','Wed','Thu','Fri','Sat','Sun'), te.start_time";
-    // OLD: const [rows] = await pool.query(sql, params);
-    // OLD: res.json(rows.map(normalise));
 
     let classId = null;
     if (className) {
@@ -117,21 +101,34 @@ router.post("/", requireRoles("admin"), async (req, res, next) => {
       return res.status(400).json({ message: "className, dayOfWeek, subject, startTime, endTime are required" });
 
     // Resolve class_id from class_name
-    const { rows } = await pgPool.query(
-      `SELECT class_id FROM classes WHERE school_id = $1 AND class_name = $2 AND is_deleted = false LIMIT 1`,
-      [schoolId, className]
-    );
-    if (!rows.length) return res.status(404).json({ message: `Class "${className}" not found` });
+    const { data: cls, error: clsErr } = await supabase
+      .from('classes')
+      .select('class_id')
+      .eq('school_id', schoolId)
+      .eq('class_name', className)
+      .eq('is_deleted', false)
+      .single();
+    if (clsErr) throw clsErr;
+    if (!cls) return res.status(404).json({ message: `Class "${className}" not found` });
 
-    const abbrevDay = DAY_MAP[dayOfWeek] ?? dayOfWeek; // accept both full and abbrev
+    const abbrevDay = DAY_MAP[dayOfWeek] ?? dayOfWeek;
 
-    const { rows: result } = await pgPool.query(
-      `INSERT INTO timetable_entries
-        (school_id, class_id, subject_name, teacher_id, day_of_week, start_time, end_time, room)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [schoolId, cls[0].class_id, subject, teacherId || null, abbrevDay, startTime, endTime, period || null]
-    );
-    res.status(201).json({ timetableId: result[0].id });
+    const { data: inserted, error: insErr } = await supabase
+      .from('timetable_entries')
+      .insert({
+        school_id: schoolId,
+        class_id: cls.class_id,
+        subject_name: subject,
+        teacher_id: teacherId || null,
+        day_of_week: abbrevDay,
+        start_time: startTime,
+        end_time: endTime,
+        room: period || null
+      })
+      .select('timetable_id')
+      .single();
+    if (insErr) throw insErr;
+    res.status(201).json({ timetableId: inserted.timetable_id });
   } catch (err) { next(err); }
 });
 
@@ -143,28 +140,40 @@ router.put("/:id", requireRoles("admin"), async (req, res, next) => {
 
     let classId = null;
     if (className) {
-      const [cls] = await pool.query(
-        `SELECT class_id FROM classes WHERE school_id = ? AND class_name = ? AND is_deleted = 0 LIMIT 1`,
-        [schoolId, className]
-      );
-      if (!cls.length) return res.status(404).json({ message: `Class "${className}" not found` });
-      classId = cls[0].class_id;
+      const { data: cls, error: clsErr } = await supabase
+        .from('classes')
+        .select('class_id')
+        .eq('school_id', schoolId)
+        .eq('class_name', className)
+        .eq('is_deleted', false)
+        .single();
+      if (clsErr) throw clsErr;
+      if (!cls) return res.status(404).json({ message: `Class "${className}" not found` });
+      classId = cls.class_id;
     }
 
     const abbrevDay = dayOfWeek ? (DAY_MAP[dayOfWeek] ?? dayOfWeek) : undefined;
 
-    const [result] = await pool.query(
-      `UPDATE timetable_entries
-      SET class_id=COALESCE(?,class_id), subject_name=COALESCE(?,subject_name),
-            teacher_id=?, day_of_week=COALESCE(?,day_of_week),
-            start_time=COALESCE(?,start_time), end_time=COALESCE(?,end_time),
-            room=?, updated_at=CURRENT_TIMESTAMP
-        WHERE timetable_id=? AND school_id=? AND is_deleted=0`,
-      [classId, subject || null, teacherId ?? null, abbrevDay || null,
-      startTime || null, endTime || null, period ?? null,
-      req.params.id, schoolId]
-    );
-    if (!result.affectedRows) return res.status(404).json({ message: "Entry not found" });
+    const updateData = {};
+    if (classId) updateData.class_id = classId;
+    if (subject) updateData.subject_name = subject;
+    if (teacherId !== undefined) updateData.teacher_id = teacherId;
+    if (abbrevDay) updateData.day_of_week = abbrevDay;
+    if (startTime) updateData.start_time = startTime;
+    if (endTime) updateData.end_time = endTime;
+    if (period !== undefined) updateData.room = period;
+    updateData.updated_at = new Date().toISOString();
+
+    const { data: updated, error: updErr } = await supabase
+      .from('timetable_entries')
+      .update(updateData)
+      .eq('timetable_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .select('timetable_id')
+      .single();
+    if (updErr) throw updErr;
+    if (!updated) return res.status(404).json({ message: "Entry not found" });
     res.json({ updated: true });
   } catch (err) { next(err); }
 });
@@ -173,12 +182,15 @@ router.put("/:id", requireRoles("admin"), async (req, res, next) => {
 router.delete("/:id", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [result] = await pool.query(
-      `UPDATE timetable_entries SET is_deleted=1, updated_at=CURRENT_TIMESTAMP
-      WHERE timetable_id=? AND school_id=?`,
-      [req.params.id, schoolId]
-    );
-    if (!result.affectedRows) return res.status(404).json({ message: "Entry not found" });
+    const { data: updated, error } = await supabase
+      .from('timetable_entries')
+      .update({ is_deleted: true, updated_at: new Date().toISOString() })
+      .eq('timetable_id', req.params.id)
+      .eq('school_id', schoolId)
+      .select('timetable_id')
+      .single();
+    if (error) throw error;
+    if (!updated) return res.status(404).json({ message: "Entry not found" });
     res.json({ deleted: true });
   } catch (err) { next(err); }
 });

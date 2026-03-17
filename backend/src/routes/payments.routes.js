@@ -5,7 +5,6 @@ import { requireRoles } from "../middleware/roles.js";
 import { sendEmail, isEmailConfigured, templates } from "../services/email.service.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
-// OLD: import { pool } from "../config/db.js";
 
 const router = Router();
 router.use(authRequired);
@@ -15,16 +14,6 @@ router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 
-    // OLD: const { data: rows } = await pool.query(
-    // OLD:   `SELECT p.payment_id, p.student_id, p.amount, p.fee_type, p.payment_method,
-    // OLD:           p.reference_number, p.payment_date, p.status, p.paid_by,
-    // OLD:           s.first_name, s.last_name, s.class_name
-    // OLD:   FROM payments p
-    // OLD:   LEFT JOIN students s ON s.student_id = p.student_id AND s.is_deleted = false
-    // OLD:   WHERE p.school_id = ? AND p.is_deleted = false
-    // OLD:   ORDER BY p.payment_date DESC, p.payment_id DESC`,
-    // OLD:   [schoolId]
-    // OLD: );
     const { data: rows, error } = await supabase
       .from('payments')
       .select(`
@@ -61,12 +50,6 @@ router.get("/fee-structures", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 
-    // OLD: const { data: rows } = await pool.query(
-    // OLD:   `SELECT fee_structure_id, class_name, term, tuition, activity, misc
-    // OLD:   FROM fee_structures WHERE school_id = ? AND is_deleted = false
-    // OLD:   ORDER BY class_name`,
-    // OLD:   [schoolId]
-    // OLD: );
     const { data: rows, error } = await supabase
       .from('fee_structures')
       .select('fee_structure_id, class_name, term, tuition, activity, misc')
@@ -86,16 +69,6 @@ router.post("/fee-structures", requireRoles("admin", "finance"), async (req, res
     const { className, term = "Term 2", tuition = 0, activity = 0, misc = 0 } = req.body;
     if (!className) return res.status(400).json({ message: "className is required" });
 
-    // OLD: const { data: rows } = await pool.query(
-    // OLD:   `INSERT INTO fee_structures (school_id, class_name, term, tuition, activity, misc)
-    // OLD:   VALUES (?, ?, ?, ?, ?, ?)
-    // OLD:   ON DUPLICATE KEY UPDATE 
-    // OLD:     tuition = VALUES(tuition), 
-    // OLD:     activity = VALUES(activity), 
-    // OLD:     misc = VALUES(misc), 
-    // OLD:     updated_at = CURRENT_TIMESTAMP`,
-    // OLD:   [schoolId, className, term, tuition, activity, misc]
-    // OLD: );
     const { error } = await supabase
       .from('fee_structures')
       .upsert(
@@ -127,11 +100,6 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
     if (!studentId || !amount || !paymentDate)
       return res.status(400).json({ message: "studentId, amount and paymentDate are required" });
 
-    // OLD: const { data: rows } = await pool.query(
-    // OLD:   `INSERT INTO payments (school_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status, term, paid_by)
-    // OLD:   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    // OLD:   [schoolId, studentId, amount, feeType, paymentMethod, referenceNumber, paymentDate, status, term, paidBy]
-    // OLD: );
     const { data: inserted, error: insertError } = await supabase
       .from('payments')
       .insert({
@@ -155,7 +123,6 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
     // ── Email notification (fire-and-forget) ──
     if (isEmailConfigured()) {
       try {
-        // OLD: const { data: studentRows } = await pool.query(...) — replaced with Supabase
         const { data: studentRow } = await supabase
           .from('students')
           .select('first_name, last_name, parent_name')
@@ -208,12 +175,6 @@ router.put("/:id", requireRoles("admin", "finance"), async (req, res, next) => {
     const { schoolId } = req.user;
     const { amount, feeType, paymentMethod, referenceNumber, paymentDate, status, paidBy } = req.body;
 
-    // OLD: const { data: rows } = await pool.query(
-    // OLD:   `UPDATE payments SET amount=?, fee_type=?, payment_method=?, reference_number=?,
-    // OLD:   payment_date=?, status=?, paid_by=?, updated_at=CURRENT_TIMESTAMP
-    // OLD:   WHERE payment_id=? AND school_id=? AND is_deleted=false`,
-    // OLD:   [amount, feeType, paymentMethod, referenceNumber||null, paymentDate, status||"paid", paidBy||null, req.params.id, schoolId]
-    // OLD: );
     const { data: updated, error } = await supabase
       .from('payments')
       .update({
@@ -250,11 +211,6 @@ router.delete("/:id", requireRoles("admin", "finance"), async (req, res, next) =
   try {
     const { schoolId } = req.user;
 
-    // OLD: const { data: rows } = await pool.query(
-    // OLD:   `UPDATE payments SET is_deleted=true, updated_at=CURRENT_TIMESTAMP
-    // OLD:   WHERE payment_id=? AND school_id=?`,
-    // OLD:   [req.params.id, schoolId]
-    // OLD: );
     const { data: deleted, error } = await supabase
       .from('payments')
       .update({ is_deleted: true })
