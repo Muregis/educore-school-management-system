@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
 
@@ -18,11 +18,14 @@ async function getMpesaToken() {
 // Helper: log SMS
 async function sendSmsLog(schoolId, recipient, message, userId) {
   try {
-    await pool.query(
-      `INSERT INTO sms_logs (school_id, recipient, message, channel, status, sent_by_user_id, sent_at)
-      VALUES (?, ?, ?, 'sms', 'sent', ?, NOW())`,
-      [schoolId, recipient, message, userId || null]
-    );
+    await supabase.from('sms_logs').insert({
+      school_id: schoolId,
+      recipient,
+      message,
+      channel: 'sms',
+      status: 'sent',
+      sent_by_user_id: userId || null
+    });
   } catch (_) { /* non-fatal */ }
 }
 
@@ -62,11 +65,16 @@ router.post("/stk-push", authRequired, async (req, res, next) => {
     if (data.ResponseCode !== "0")
       return res.status(400).json({ message: data.ResponseDescription || "STK push failed" });
 
-    await pool.query(
-      `INSERT INTO payments (school_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status)
-      VALUES (?, ?, ?, 'tuition', 'mpesa', ?, CURDATE(), 'pending')`,
-      [schoolId, studentId, amount, data.CheckoutRequestID]
-    );
+    await supabase.from('payments').insert({
+      school_id: schoolId,
+      student_id: studentId,
+      amount,
+      fee_type: 'tuition',
+      payment_method: 'mpesa',
+      reference_number: data.CheckoutRequestID,
+      payment_date: new Date().toISOString().slice(0, 10),
+      status: 'pending'
+    });
 
     res.json({ ok: true, checkoutRequestId: data.CheckoutRequestID, message: "STK push sent to phone" });
   } catch (err) { next(err); }
@@ -81,21 +89,20 @@ router.post("/callback", async (req, res, next) => {
 
     if (String(resultCode) !== "0") {
       if (checkoutReqId) {
-        // Get school_id from the payment before updating to prevent cross-school access
-        const [paymentCheck] = await pool.query(
-          // OLD:
-          // `SELECT school_id FROM payments WHERE reference_number = ? LIMIT 1`,
-          `SELECT school_id FROM payments WHERE reference_number = ? AND school_id IS NOT NULL LIMIT 1`,
-          [checkoutReqId]
-        );
+        // Get school_id from the payment before updating to prevent cross-tenant access
+        const { data: paymentCheck, error: checkError } = await supabase
+          .from('payments')
+          .select('school_id')
+          .eq('reference_number', checkoutReqId)
+          .not('school_id', 'is', null)
+          .maybeSingle();
         
-        if (paymentCheck.length) {
-          await pool.query(
-            // OLD:
-            // `UPDATE payments SET status='failed', updated_at=CURRENT_TIMESTAMP WHERE reference_number=?`,
-            `UPDATE payments SET status='failed', updated_at=CURRENT_TIMESTAMP WHERE reference_number=? AND school_id=?`,
-            [checkoutReqId, paymentCheck[0].school_id]
-          );
+        if (!checkError && paymentCheck) {
+          await supabase
+            .from('payments')
+            .update({ status: 'failed', updated_at: new Date().toISOString() })
+            .eq('reference_number', checkoutReqId)
+            .eq('school_id', paymentCheck.school_id);
         }
       }
       return res.json({ ok: true });
@@ -108,39 +115,35 @@ router.post("/callback", async (req, res, next) => {
     const phone     = String(get("PhoneNumber") || "");
 
     // Update the pending payment row with the real Mpesa receipt number
-    // Get school_id from the payment before updating to prevent cross-school access
-    const [paymentCheck] = await pool.query(
-      // OLD:
-      // `SELECT school_id FROM payments WHERE reference_number = ? LIMIT 1`,
-      `SELECT school_id FROM payments WHERE reference_number = ? AND school_id IS NOT NULL LIMIT 1`,
-      [checkoutReqId]
-    );
+    // Get school_id from the payment before updating to prevent cross-tenant access
+    const { data: paymentCheck, error: checkError } = await supabase
+      .from('payments')
+      .select('school_id')
+      .eq('reference_number', checkoutReqId)
+      .not('school_id', 'is', null)
+      .maybeSingle();
     
-    if (paymentCheck.length) {
-      await pool.query(
-        // OLD:
-        // `UPDATE payments SET status='paid', reference_number=?, updated_at=CURRENT_TIMESTAMP
-        //  WHERE reference_number=? AND status='pending'`,
-        `UPDATE payments SET status='paid', reference_number=?, updated_at=CURRENT_TIMESTAMP
-         WHERE reference_number=? AND status='pending' AND school_id=?`,
-        [mpesaCode, checkoutReqId, paymentCheck[0].school_id]
-      );
+    if (!checkError && paymentCheck) {
+      await supabase
+        .from('payments')
+        .update({ status: 'paid', reference_number: mpesaCode, updated_at: new Date().toISOString() })
+        .eq('reference_number', checkoutReqId)
+        .eq('status', 'pending')
+        .eq('school_id', paymentCheck.school_id);
     }
 
     // Fetch student info for SMS confirmation
-    const [pending] = await pool.query(
-      `SELECT p.school_id, p.student_id, s.phone AS parentPhone, s.first_name, s.last_name
-      FROM payments p
-      LEFT JOIN students s ON s.student_id = p.student_id
-      WHERE p.reference_number = ? LIMIT 1`,
-      [mpesaCode]
-    );
+    const { data: pending, error: pendingError } = await supabase
+      .from('payments')
+      .select('school_id, student_id, students(phone, first_name, last_name)')
+      .eq('reference_number', mpesaCode)
+      .maybeSingle();
 
-    if (pending.length && pending[0].parentPhone) {
-      const { school_id, first_name, last_name, parentPhone } = pending[0];
-      const name = `${first_name || ""} ${last_name || ""}`.trim();
+    if (!pendingError && pending && pending.students?.phone) {
+      const { school_id, student_id, students } = pending;
+      const name = `${students.first_name || ""} ${students.last_name || ""}`.trim();
       const msg  = `Dear parent, payment of KES ${amount} received for ${name}. Mpesa Ref: ${mpesaCode}. Thank you.`;
-      await sendSmsLog(school_id, parentPhone, msg);
+      await sendSmsLog(school_id, students.phone, msg);
     }
 
     res.json({ ok: true });
@@ -188,34 +191,36 @@ router.post("/c2b/confirm", async (req, res, next) => {
     }
 
     // Find student by admission number
-    const [studentRows] = await pool.query(
-      // OLD:
-      // `SELECT student_id, school_id, first_name, last_name, phone, parent_phone
-      // FROM students WHERE admission_number = ? AND is_deleted = 0 LIMIT 1`,
-      `SELECT student_id, school_id, first_name, last_name, phone, parent_phone
-      FROM students WHERE admission_number = ? AND school_id IS NOT NULL AND is_deleted = 0 LIMIT 1`,
-      [billRef]
-    );
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('student_id, school_id, first_name, last_name, phone, parent_phone')
+      .eq('admission_number', billRef)
+      .not('school_id', 'is', null)
+      .eq('is_deleted', false)
+      .maybeSingle();
 
     // If no student found, skip insert to avoid null FK and broken reports
-    if (!studentRows.length) {
+    if (studentError || !student) {
       console.warn(`[C2B Confirm] No student for billRef: ${billRef}. TransID: ${transId}`);
       return res.json({ ok: true, warning: "Student not found, payment not recorded" });
     }
 
-    const student   = studentRows[0];
     const schoolId  = student.school_id;
     const studentId = student.student_id;
     const phone     = msisdn || student.parent_phone || student.phone || "";
     const name      = `${student.first_name} ${student.last_name}`;
 
     // Idempotent insert — ignore duplicate TransID
-    await pool.query(
-      `INSERT INTO payments (school_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status)
-      VALUES (?, ?, ?, 'tuition', 'mpesa', ?, ?, 'paid')
-      ON DUPLICATE KEY UPDATE status='paid', updated_at=CURRENT_TIMESTAMP`,
-      [schoolId, studentId, amount, transId, paymentDate]
-    );
+    await supabase.from('payments').upsert({
+      school_id: schoolId,
+      student_id: studentId,
+      amount,
+      fee_type: 'tuition',
+      payment_method: 'mpesa',
+      reference_number: transId,
+      payment_date: paymentDate,
+      status: 'paid'
+    }, { onConflict: 'reference_number' });
 
     if (phone) {
       const msg = `Dear parent, payment of KES ${amount} received for ${name}. Mpesa Ref: ${transId}.`;
@@ -230,12 +235,14 @@ router.post("/c2b/confirm", async (req, res, next) => {
 router.get("/status/:checkoutRequestId", authRequired, async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
-      `SELECT status, reference_number, amount FROM payments WHERE reference_number = ? AND school_id = ? LIMIT 1`,
-      [req.params.checkoutRequestId, schoolId]
-    );
-    if (!rows.length) return res.status(404).json({ message: "Payment not found" });
-    res.json(rows[0]);
+    const { data: payment, error } = await supabase
+      .from('payments')
+      .select('status, reference_number, amount')
+      .eq('reference_number', req.params.checkoutRequestId)
+      .eq('school_id', schoolId)
+      .maybeSingle();
+    if (error || !payment) return res.status(404).json({ message: "Payment not found" });
+    res.json(payment);
   } catch (err) { next(err); }
 });
 

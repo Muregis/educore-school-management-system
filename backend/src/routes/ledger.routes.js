@@ -2,7 +2,7 @@ import { Router } from "express";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { LedgerService } from "../services/ledger.service.js";
-import { pgPool } from "../config/pg.js";
+import { supabase } from "../config/supabaseClient.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 
 const router = Router();
@@ -16,14 +16,15 @@ router.get("/student/:studentId", async (req, res, next) => {
     const { limit = 50, offset = 0 } = req.query;
 
     // Verify student belongs to school
-    const studentResult = await pgPool.query(
-      `SELECT student_id, first_name, last_name FROM students 
-       WHERE student_id = $1 AND school_id = $2 AND is_deleted = false`,
-      [studentId, schoolId]
-    );
-    const [student] = studentResult.rows;
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('student_id, first_name, last_name')
+      .eq('student_id', studentId)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
 
-    if (!student) {
+    if (studentError || !student) {
       return res.status(404).json({ message: "Student not found" });
     }
 
@@ -52,14 +53,15 @@ router.get("/student/:studentId/statement", async (req, res, next) => {
     const { term } = req.query;
 
     // Verify student belongs to school
-    const studentResult = await pgPool.query(
-      `SELECT student_id, first_name, last_name FROM students 
-       WHERE student_id = $1 AND school_id = $2 AND is_deleted = false`,
-      [studentId, schoolId]
-    );
-    const [student] = studentResult.rows;
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('student_id, first_name, last_name')
+      .eq('student_id', studentId)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
 
-    if (!student) {
+    if (studentError || !student) {
       return res.status(404).json({ message: "Student not found" });
     }
 
@@ -87,16 +89,17 @@ router.post("/assess-fees",
       }
 
       // Verify class belongs to school
-      const classResult = await pgPool.query(
-        `SELECT class_id, class_name FROM classes 
-         WHERE class_id = $1 AND school_id = $2 AND is_deleted = false`,
-        [classId, schoolId]
-      );
-      const [cls] = classResult.rows;
+    const { data: cls, error: classError } = await supabase
+      .from('classes')
+      .select('class_id, class_name')
+      .eq('class_id', classId)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
 
-      if (!cls) {
-        return res.status(404).json({ message: "Class not found" });
-      }
+    if (classError || !cls) {
+      return res.status(404).json({ message: "Class not found" });
+    }
 
       const results = await LedgerService.assessFeesForClass(
         schoolId, classId, feeStructureId, term, academicYear
@@ -124,38 +127,50 @@ router.get("/balances",
       const { schoolId } = req.user;
       const { classId, status } = req.query;
 
-      let whereClause = `WHERE s.school_id = $1 AND s.is_deleted = false`;
-      const params = [schoolId];
+      // Get all students for this school
+      let studentQuery = supabase
+        .from('students')
+        .select('student_id, admission_number, first_name, last_name, class_name')
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false);
 
       if (classId) {
-        whereClause += ` AND s.class_id = $${params.length + 1}`;
-        params.push(classId);
+        studentQuery = studentQuery.eq('class_id', classId);
       }
 
-      // Get students with their latest balance
-      const studentsResult = await pgPool.query(
-        `SELECT s.student_id, s.admission_number, s.first_name, s.last_name, s.class_name,
-                COALESCE(sl.balance_after, 0) as balance,
-                sl.created_at as last_transaction_date
-         FROM students s
-         LEFT JOIN (
-           SELECT student_id, balance_after, created_at,
-                  ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY ledger_id DESC) as rn
-           FROM student_ledger
-           WHERE school_id = $1
-         ) sl ON sl.student_id = s.student_id AND sl.rn = 1
-         ${whereClause}
-         ORDER BY s.class_name, s.first_name`,
-        [schoolId, ...params.slice(1)]
-      );
-      const students = studentsResult.rows;
+      const { data: students, error: studentError } = await studentQuery.order('class_name').order('first_name');
+      if (studentError) throw studentError;
+
+      // Get latest ledger entries for each student
+      const { data: ledgerEntries, error: ledgerError } = await supabase
+        .from('student_ledger')
+        .select('student_id, balance_after, created_at')
+        .eq('school_id', schoolId)
+        .order('ledger_id', { ascending: false });
+
+      if (ledgerError) throw ledgerError;
+
+      // Map latest balance for each student
+      const latestBalanceMap = new Map();
+      for (const entry of ledgerEntries || []) {
+        if (!latestBalanceMap.has(entry.student_id)) {
+          latestBalanceMap.set(entry.student_id, entry);
+        }
+      }
+
+      // Build student list with balances
+      let studentsWithBalance = (students || []).map(s => ({
+        ...s,
+        balance: latestBalanceMap.get(s.student_id)?.balance_after || 0,
+        last_transaction_date: latestBalanceMap.get(s.student_id)?.created_at || null
+      }));
 
       // Filter by balance status if requested
-      let filteredStudents = students;
+      let filteredStudents = studentsWithBalance;
       if (status === 'owing') {
-        filteredStudents = students.filter(s => s.balance > 0);
+        filteredStudents = studentsWithBalance.filter(s => s.balance > 0);
       } else if (status === 'paid') {
-        filteredStudents = students.filter(s => s.balance <= 0);
+        filteredStudents = studentsWithBalance.filter(s => s.balance <= 0);
       }
 
       // Calculate summary
@@ -192,62 +207,69 @@ router.post("/adjustment",
       }
 
       // Verify student belongs to school
-      const studentResult = await pgPool.query(
-        `SELECT student_id, first_name, last_name FROM students 
-         WHERE student_id = $1 AND school_id = $2 AND is_deleted = false`,
-        [studentId, schoolId]
-      );
-      const [student] = studentResult.rows;
+      const { data: student, error: studentError } = await supabase
+        .from('students')
+        .select('student_id, first_name, last_name')
+        .eq('student_id', studentId)
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false)
+        .single();
 
-      if (!student) {
+      if (studentError || !student) {
         return res.status(404).json({ message: "Student not found" });
       }
 
       try {
-        await pgPool.query('BEGIN');
-
         // Get current balance
-        const balanceResult = await pgPool.query(
-          `SELECT balance_after FROM student_ledger 
-           WHERE student_id = $1 AND school_id = $2 
-           ORDER BY ledger_id DESC LIMIT 1`,
-          [studentId, schoolId]
-        );
-        const [currentBalance] = balanceResult.rows;
+        const { data: latestLedger, error: balanceError } = await supabase
+          .from('student_ledger')
+          .select('balance_after')
+          .eq('student_id', studentId)
+          .eq('school_id', schoolId)
+          .order('ledger_id', { ascending: false })
+          .limit(1)
+          .single();
 
-        const previousBalance = currentBalance?.balance_after || 0;
+        if (balanceError && balanceError.code !== 'PGRST116') throw balanceError; // PGRST116 = no rows
+
+        const previousBalance = latestLedger?.balance_after || 0;
         const newBalance = previousBalance + Number(amount);
 
         // Insert adjustment entry
-        const result = await pgPool.query(
-          `INSERT INTO student_ledger 
-           (school_id, student_id, transaction_type, amount, balance_after, 
-            reference_type, reference_id, description)
-           VALUES ($1, $2, 'adjustment', $3, $4, 'adjustment', NULL, $5)
-           RETURNING ledger_id`,
-          [schoolId, studentId, amount, newBalance, description]
-        );
+        const { data: inserted, error: insertError } = await supabase
+          .from('student_ledger')
+          .insert({
+            school_id: schoolId,
+            student_id: studentId,
+            transaction_type: 'adjustment',
+            amount: amount,
+            balance_after: newBalance,
+            reference_type: 'adjustment',
+            reference_id: null,
+            description: description
+          })
+          .select('ledger_id')
+          .single();
+
+        if (insertError) throw insertError;
 
         // Log adjustment for audit
         await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_UPDATE, {
-          entityId: result.rows[0].ledger_id,
+          entityId: inserted.ledger_id,
           entityType: 'ledger_adjustment',
           description: `Ledger adjustment for student ${studentId}: ${amount} (${description})`,
           newValues: { studentId, amount, previousBalance, newBalance, description }
         });
 
-        await pgPool.query('COMMIT');
-
         res.json({
           message: "Adjustment recorded successfully",
-          adjustmentId: result.rows[0].ledger_id,
+          adjustmentId: inserted.ledger_id,
           previousBalance,
           newBalance,
           amount
         });
 
       } catch (error) {
-        await pgPool.query('ROLLBACK');
         throw error;
       }
 

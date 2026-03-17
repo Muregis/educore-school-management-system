@@ -1,6 +1,4 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
-import { pgPool } from "../config/pg.js";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
@@ -8,9 +6,6 @@ import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 
 const router = Router();
 router.use(authRequired);
-
-const usePgGradesGet =
-  String(process.env.USE_PG_GRADES_GET || "").toLowerCase() === "true";
 
 // ─── Helper: map DB result row → camelCase shape the frontend expects ─────────
 function normalise(r) {
@@ -33,11 +28,6 @@ router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId, term, classId } = req.query;
-
-    // OLD: if (usePgGradesGet) { ... raw SQL join ... }
-    // OLD: let sql = `SELECT ... FROM results r JOIN students s ... WHERE r.school_id = ? ...`;
-    // OLD: const { data: rows } = await pool.query(sql, params);
-    // OLD: res.json((rows || []).map(normalise));
 
     let q = supabase
       .from("results")
@@ -83,32 +73,23 @@ router.get("/", async (req, res, next) => {
 router.get("/:id", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    // OLD: const [rows] = await pool.query(
-    // OLD: `SELECT r.result_id, r.student_id, r.marks, r.total_marks, r.grade,
-    // OLD:         r.teacher_comment, r.term,
-    // OLD:         r.subject,
-    // OLD:         s.first_name, s.last_name,
-    // OLD:         s.class_name
-    // OLD:     FROM results r
-    // OLD:     JOIN students s   ON s.student_id  = r.student_id
-    // OLD:     LEFT JOIN classes c ON c.class_id = r.class_id
-    // OLD:     WHERE r.result_id = ? AND r.school_id = ? AND r.is_deleted = 0 LIMIT 1`,
-    // OLD:     [req.params.id, schoolId]
-    // OLD: );
-    const { data: rows } = await pool.query(
-      `SELECT r.result_id, r.student_id, r.marks, r.total_marks, r.grade,
-              r.teacher_comment, r.term,
-              r.subject,
-              s.first_name, s.last_name,
-              s.class_name
-          FROM results r
-          JOIN students s   ON s.student_id  = r.student_id
-          LEFT JOIN classes c ON c.class_id = r.class_id
-          WHERE r.result_id = ? AND r.school_id = ? AND r.is_deleted = 0 LIMIT 1`,
-      [req.params.id, schoolId]
-    );
-    if (!rows?.length) return res.status(404).json({ message: "Result not found" });
-    res.json(normalise(rows[0]));
+    const { data: result, error } = await supabase
+      .from('results')
+      .select('result_id, student_id, marks, total_marks, grade, teacher_comment, term, subject, students(first_name, last_name, class_name)')
+      .eq('result_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+    if (error || !result) return res.status(404).json({ message: "Result not found" });
+    // Flatten joined data
+    const row = {
+      ...result,
+      first_name: result.students?.first_name,
+      last_name: result.students?.last_name,
+      class_name: result.students?.class_name,
+      students: undefined
+    };
+    res.json(normalise(row));
   } catch (err) { next(err); }
 });
 
@@ -122,30 +103,45 @@ try {
     return res.status(400).json({ message: "studentId and subjects[] are required" });
 
     // Verify student belongs to this school
-    const [stuRows] = await pool.query(
-    `SELECT student_id, class_id FROM students WHERE student_id = ? AND school_id = ? AND is_deleted = 0 LIMIT 1`,
-    [studentId, schoolId]
-    );
-    if (!stuRows.length) return res.status(404).json({ message: "Student not found" });
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('student_id, class_id')
+      .eq('student_id', studentId)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+    if (studentError || !student) return res.status(404).json({ message: "Student not found" });
 
-    const resolvedClassId = classId || stuRows[0].class_id;
+    const resolvedClassId = classId || student.class_id;
 
     // Resolve or create a default exam for the term if not provided
     let resolvedExamId = examId;
     if (!resolvedExamId) {
-    const [exRows] = await pool.query(
-        `SELECT exam_id FROM exams WHERE school_id = ? AND term = ? AND is_deleted = 0 LIMIT 1`,
-        [schoolId, term]
-    );
-        if (exRows.length) {
-        resolvedExamId = exRows[0].exam_id;
-    } else {
-        const [ins] = await pool.query(
-            `INSERT INTO exams (school_id, exam_name, term, academic_year, status) VALUES (?, ?, ?, YEAR(CURDATE()), 'published')`,
-            [schoolId, `${term} Exam`, term]
-        );
-        resolvedExamId = ins.insertId;
-    }
+      const { data: exam, error: examError } = await supabase
+        .from('exams')
+        .select('exam_id')
+        .eq('school_id', schoolId)
+        .eq('term', term)
+        .eq('is_deleted', false)
+        .single();
+      if (!examError && exam) {
+        resolvedExamId = exam.exam_id;
+      } else {
+        const currentYear = new Date().getFullYear();
+        const { data: inserted, error: insertError } = await supabase
+          .from('exams')
+          .insert({
+            school_id: schoolId,
+            exam_name: `${term} Exam`,
+            term,
+            academic_year: currentYear,
+            status: 'published'
+          })
+          .select('exam_id')
+          .single();
+        if (insertError) throw insertError;
+        resolvedExamId = inserted.exam_id;
+      }
     }
 
     const calcGrade = (marks, total) => {
@@ -162,36 +158,54 @@ try {
         if (!subject || marks === undefined || marks === null || marks === "") continue;
 
       // Resolve subject_id — find or create the subject
-        let [subRows] = await pool.query(
-        `SELECT subject_id FROM subjects WHERE school_id = ? AND subject_name = ? AND is_deleted = 0 LIMIT 1`,
-        [schoolId, subject]
-    );
+        let { data: subjectRow, error: subjectError } = await supabase
+          .from('subjects')
+          .select('subject_id')
+          .eq('school_id', schoolId)
+          .eq('subject_name', subject)
+          .eq('is_deleted', false)
+          .single();
         let subjectId;
-        if (subRows.length) {
-        subjectId = subRows[0].subject_id;
-    } else {
-        const code = subject.substring(0, 10).toUpperCase().replace(/\s+/g, "_");
-        const [ins] = await pool.query(
-            `INSERT INTO subjects (school_id, subject_name, code) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE subject_id=LAST_INSERT_ID(subject_id)`,
-            [schoolId, subject, code]
-        );
-        subjectId = ins.insertId;
-    }
+        if (!subjectError && subjectRow) {
+          subjectId = subjectRow.subject_id;
+        } else {
+          const code = subject.substring(0, 10).toUpperCase().replace(/\s+/g, "_");
+          const { data: inserted, error: upsertError } = await supabase
+            .from('subjects')
+            .upsert({
+              school_id: schoolId,
+              subject_name: subject,
+              code
+            }, { onConflict: 'school_id,subject_name' })
+            .select('subject_id')
+            .single();
+          if (upsertError) throw upsertError;
+          subjectId = inserted.subject_id;
+        }
 
     const grade = calcGrade(marks, totalMarks);
 
       // Upsert — update if already exists for this student/subject combo
-    const [res] = await pool.query(
-        `INSERT INTO results (school_id, student_id, subject, class_id, marks, total_marks, grade, term)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE marks=VALUES(marks), total_marks=VALUES(total_marks), grade=VALUES(grade), is_deleted=0, updated_at=CURRENT_TIMESTAMP`,
-        [schoolId, studentId, subject, resolvedClassId, Number(marks), Number(totalMarks), grade, term]
-    );
-        saved.push({ subjectId, resultId: res.insertId || res.info });
+        const { data: upserted, error: upsertError } = await supabase
+          .from('results')
+          .upsert({
+            school_id: schoolId,
+            student_id: studentId,
+            subject,
+            class_id: resolvedClassId,
+            marks: Number(marks),
+            total_marks: Number(totalMarks),
+            grade,
+            term
+          }, { onConflict: 'school_id,student_id,subject,term' })
+          .select('result_id')
+          .single();
+        if (upsertError) throw upsertError;
+        saved.push({ subjectId, resultId: upserted.result_id });
         
         // NEW: Log grade creation/update
         await logAuditEvent(req, AUDIT_ACTIONS.GRADE_CREATE, {
-          entityId: res.insertId || res.info,
+          entityId: upserted.result_id,
           entityType: 'result',
           description: `Grade recorded for student ${studentId} in ${subject}: ${marks}/${totalMarks} (${grade})`,
           newValues: { studentId, subject, marks, totalMarks: totalMarks, grade, term }
@@ -213,25 +227,39 @@ try {
     const pct = (m / (t || 1)) * 100;
     const grade = pct >= 80 ? "EE" : pct >= 65 ? "ME" : pct >= 50 ? "AE" : "BE";
 
+    // Build update data
+    const updateData = {
+      marks: m,
+      total_marks: t,
+      grade,
+      term,
+      teacher_comment: teacherComment || null,
+      updated_at: new Date().toISOString()
+    };
+
     // If subject name provided, resolve subject_id
-    let subjectClause = "";
-    const params = [m, t, grade, term, teacherComment || null];
     if (subject) {
-    const [subRows] = await pool.query(
-        `SELECT subject_id FROM subjects WHERE school_id = ? AND subject_name = ? AND is_deleted = 0 LIMIT 1`,
-        [schoolId, subject]
-    );
-        if (subRows.length) { subjectClause = ", subject_id=?"; params.push(subRows[0].subject_id); }
-    }
-
-    params.push(req.params.id, schoolId);
-
-    const [result] = await pool.query(
-        `UPDATE results SET marks=?, total_marks=?, grade=?, term=?, teacher_comment=?${subjectClause}, updated_at=CURRENT_TIMESTAMP
-        WHERE result_id=? AND school_id=? AND is_deleted=0`,
-        params
-    );
-    if (!result.affectedRows) return res.status(404).json({ message: "Result not found" });
+      const { data: subjectRow, error: subjectError } = await supabase
+        .from('subjects')
+        .select('subject_id')
+        .eq('school_id', schoolId)
+        .eq('subject_name', subject)
+        .eq('is_deleted', false)
+        .single();
+      if (!subjectError && subjectRow) {
+        updateData.subject_id = subjectRow.subject_id;
+      }
+    // OLD: const [result] = await pool.query(`UPDATE results SET marks=?, total_marks=?, grade=?, term=?, teacher_comment=?${subjectClause}, updated_at=CURRENT_TIMESTAMP WHERE result_id=? AND school_id=? AND is_deleted=0`, params);
+    const { data: updated, error: updateError } = await supabase
+      .from('results')
+      .update(updateData)
+      .eq('result_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .select('result_id')
+      .single();
+    if (updateError) throw updateError;
+    if (!updated) return res.status(404).json({ message: "Result not found" });
     
     // NEW: Log grade update
     await logAuditEvent(req, AUDIT_ACTIONS.GRADE_UPDATE, {
@@ -249,11 +277,15 @@ try {
 router.delete("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
 try {
     const { schoolId } = req.user;
-    const [result] = await pool.query(
-    `UPDATE results SET is_deleted=1, updated_at=CURRENT_TIMESTAMP WHERE result_id=? AND school_id=?`,
-    [req.params.id, schoolId]
-    );
-    if (!result.affectedRows) return res.status(404).json({ message: "Result not found" });
+    const { data: updated, error } = await supabase
+      .from('results')
+      .update({ is_deleted: true, updated_at: new Date().toISOString() })
+      .eq('result_id', req.params.id)
+      .eq('school_id', schoolId)
+      .select('result_id')
+      .single();
+    if (error) throw error;
+    if (!updated) return res.status(404).json({ message: "Result not found" });
     
     // NEW: Log grade deletion
     await logAuditEvent(req, AUDIT_ACTIONS.GRADE_DELETE, {

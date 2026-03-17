@@ -1,39 +1,135 @@
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
-// OLD: import { agentLog } from "../utils/agentDebugLog.js";
+
+// Generate request ID for tracing
+function generateRequestId() {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Structured security logger
+function logAuthEvent(level, event, details) {
+  const timestamp = new Date().toISOString();
+  const logEntry = {
+    timestamp,
+    level,
+    component: "auth",
+    event,
+    ...details
+  };
+  
+  if (level === "ERROR" || level === "WARN") {
+    console.error(`[AUTH ${level}] ${event}:`, JSON.stringify(logEntry));
+  } else {
+    console.log(`[AUTH ${level}] ${event}:`, JSON.stringify(logEntry));
+  }
+}
 
 export function authRequired(req, res, next) {
+  // Attach request ID for tracing
+  req.requestId = generateRequestId();
+  
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
 
   if (!token) {
-    // #region agent log
-    // OLD: fetch('http://127.0.0.1:7316/ingest/69a2e703-a35d-4b5d-8b01-2ade717190dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cdda91'},body:JSON.stringify({sessionId:'cdda91',runId:'analysis-pre',hypothesisId:'H1',location:'backend/src/middleware/auth.js:11',message:'authRequired missing token',data:{hasAuthHeader:Boolean(header),path:req.path,method:req.method},timestamp:Date.now()})}).catch(()=>{});
-    // OLD: agentLog({sessionId:"cdda91",runId:"pre-fix",hypothesisId:"H1",location:"backend/src/middleware/auth.js:11",message:"authRequired missing token",data:{hasAuthHeader:Boolean(header),path:req.path,method:req.method},timestamp:Date.now()});
-    // #endregion
-    return res.status(401).json({ message: "Missing auth token" });
+    logAuthEvent("WARN", "MISSING_TOKEN", {
+      requestId: req.requestId,
+      path: req.path,
+      method: req.method,
+      ip: req.ip,
+      hasAuthHeader: Boolean(header)
+    });
+    return res.status(401).json({ 
+      error: "Missing auth token",
+      code: "AUTH_MISSING_TOKEN",
+      requestId: req.requestId
+    });
   }
 
   try {
     const payload = jwt.verify(token, env.jwtSecret);
-    req.user = payload;
-    // #region agent log
-    // OLD: fetch('http://127.0.0.1:7316/ingest/69a2e703-a35d-4b5d-8b01-2ade717190dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cdda91'},body:JSON.stringify({sessionId:'cdda91',runId:'analysis-pre',hypothesisId:'H1',location:'backend/src/middleware/auth.js:20',message:'authRequired verified jwt',data:{path:req.path,method:req.method,payloadKeys:Object.keys(payload||{}),school_id:payload?.school_id,schoolId:payload?.schoolId,user_id:payload?.user_id,userId:payload?.userId},timestamp:Date.now()})}).catch(()=>{});
-    // OLD: agentLog({sessionId:"cdda91",runId:"pre-fix",hypothesisId:"H1",location:"backend/src/middleware/auth.js:20",message:"authRequired verified jwt",data:{path:req.path,method:req.method,payloadKeys:Object.keys(payload||{}),school_id:payload?.school_id,schoolId:payload?.schoolId,user_id:payload?.user_id,userId:payload?.userId},timestamp:Date.now()});
-    // #endregion
-    // Ensure backward compatibility during transition
-    if (payload.school_id) {
-      req.user.schoolId = payload.school_id;
+    
+    // Validate required claims
+    if (!payload.user_id && !payload.userId) {
+      logAuthEvent("ERROR", "JWT_MISSING_USER_ID", {
+        requestId: req.requestId,
+        path: req.path,
+        payloadKeys: Object.keys(payload)
+      });
+      return res.status(401).json({ 
+        error: "Invalid token: missing user identification",
+        code: "AUTH_INVALID_TOKEN",
+        requestId: req.requestId
+      });
     }
-    if (payload.user_id) {
-      req.user.userId = payload.user_id;
+
+    if (!payload.school_id && !payload.schoolId) {
+      logAuthEvent("ERROR", "JWT_MISSING_SCHOOL_ID", {
+        requestId: req.requestId,
+        path: req.path,
+        userId: payload.user_id || payload.userId
+      });
+      return res.status(401).json({ 
+        error: "Invalid token: missing school identification",
+        code: "AUTH_INVALID_TOKEN",
+        requestId: req.requestId
+      });
     }
+
+    // Normalize payload for consistent access
+    req.user = {
+      ...payload,
+      user_id: payload.user_id || payload.userId,
+      userId: payload.user_id || payload.userId,
+      school_id: Number(payload.school_id || payload.schoolId),
+      schoolId: Number(payload.school_id || payload.schoolId)
+    };
+
+    // Calculate token expiration warning (if exp exists)
+    const now = Math.floor(Date.now() / 1000);
+    const exp = payload.exp;
+    const tokenAge = now - (payload.iat || now);
+    
+    if (exp && exp - now < 3600) { // Less than 1 hour remaining
+      logAuthEvent("INFO", "TOKEN_NEAR_EXPIRY", {
+        requestId: req.requestId,
+        userId: req.user.user_id,
+        schoolId: req.user.school_id,
+        expiresIn: exp - now,
+        tokenAge
+      });
+      res.setHeader("X-Token-Expires-In", exp - now);
+    }
+
+    logAuthEvent("INFO", "AUTH_SUCCESS", {
+      requestId: req.requestId,
+      path: req.path,
+      method: req.method,
+      userId: req.user.user_id,
+      schoolId: req.user.school_id,
+      role: req.user.role,
+      tokenAge
+    });
+
     return next();
-  } catch {
-    // #region agent log
-    // OLD: fetch('http://127.0.0.1:7316/ingest/69a2e703-a35d-4b5d-8b01-2ade717190dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cdda91'},body:JSON.stringify({sessionId:'cdda91',runId:'analysis-pre',hypothesisId:'H2',location:'backend/src/middleware/auth.js:37',message:'authRequired jwt verify failed',data:{path:req.path,method:req.method},timestamp:Date.now()})}).catch(()=>{});
-    // OLD: agentLog({sessionId:"cdda91",runId:"pre-fix",hypothesisId:"H1",location:"backend/src/middleware/auth.js:37",message:"authRequired jwt verify failed",data:{path:req.path,method:req.method},timestamp:Date.now()});
-    // #endregion
-    return res.status(401).json({ message: "Invalid or expired token" });
+  } catch (err) {
+    const errorType = err.name === "TokenExpiredError" ? "EXPIRED" : "INVALID";
+    
+    logAuthEvent("WARN", `JWT_${errorType}`, {
+      requestId: req.requestId,
+      path: req.path,
+      method: req.method,
+      ip: req.ip,
+      errorName: err.name,
+      expiredAt: err.expiredAt
+    });
+    
+    return res.status(401).json({ 
+      error: errorType === "EXPIRED" 
+        ? "Token expired. Please login again." 
+        : "Invalid or expired token",
+      code: errorType === "EXPIRED" ? "AUTH_TOKEN_EXPIRED" : "AUTH_INVALID_TOKEN",
+      requestId: req.requestId
+    });
   }
 }

@@ -108,36 +108,21 @@ export const database = {
     // #endregion
 
     if (isRawSQL) {
-      // For now, fall back to MySQL for raw SQL queries
-      // TODO: Implement proper RPC function for Supabase
-      try {
-        const mysql = await import('mysql2/promise');
-        const env = await import('./env.js');
-        
-        const mysqlPool = mysql.createPool({
-          host: env.env.dbHost,
-          port: env.env.dbPort,
-          user: env.env.dbUser,
-          password: env.env.dbPassword,
-          database: env.env.dbName,
-          waitForConnections: true,
-          connectionLimit: 10,
-          queueLimit: 0
-        });
-        
-        console.log('🔄 Falling back to MySQL for raw SQL query:', sqlOrTable.substring(0, 50) + '...');
-        const [rows] = await mysqlPool.execute(sqlOrTable, paramsOrOptions);
-        await mysqlPool.end();
-        
-        return { data: rows, error: null };
-      } catch (err) {
-        // #region agent log
-        // OLD: fetch('http://127.0.0.1:7316/ingest/69a2e703-a35d-4b5d-8b01-2ade717190dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cdda91'},body:JSON.stringify({sessionId:'cdda91',runId:'pre-fix',hypothesisId:'H3',location:'backend/src/config/supabaseClient.js:145',message:'MySQL fallback failed',data:{errMessage:err?.message,sqlPreview:typeof sqlOrTable==='string'?sqlOrTable.slice(0,80):null},timestamp:Date.now()})}).catch(()=>{});
-        // OLD: agentLog({sessionId:"cdda91",runId:"pre-fix",hypothesisId:"H3",location:"backend/src/config/supabaseClient.js:145",message:"MySQL fallback failed",data:{errMessage:err?.message,sqlPreview:typeof sqlOrTable==="string"?sqlOrTable.slice(0,80):null},timestamp:Date.now()});
-        // #endregion
-        console.error('MySQL fallback failed:', err.message);
-        throw new Error(`SQL execution failed: ${err.message}`);
-      }
+      // OLD: MySQL fallback - REMOVED. All queries must now use Supabase builder API
+      // OLD: const mysql = await import('mysql2/promise');
+      // OLD: const env = await import('./env.js');
+      // OLD: const mysqlPool = mysql.createPool({...});
+      // OLD: console.log('🔄 Falling back to MySQL for raw SQL query:', sqlOrTable.substring(0, 50) + '...');
+      // OLD: const [rows] = await mysqlPool.execute(sqlOrTable, paramsOrOptions);
+      // OLD: await mysqlPool.end();
+      // OLD: return { data: rows, error: null };
+      
+      // NEW: Raw SQL no longer supported - use Supabase RPC for complex queries
+      throw new Error(
+        `Raw SQL queries are no longer supported. ` +
+        `Use Supabase builder API (.from('table').select()) or create an RPC function. ` +
+        `Query: ${sqlOrTable?.substring(0, 50)}...`
+      );
     } else {
       // Handle structured query (original logic)
       let query = supabase.from(sqlOrTable);

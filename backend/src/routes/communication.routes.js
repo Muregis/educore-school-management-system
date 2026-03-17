@@ -1,6 +1,4 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
-import { pgPool } from "../config/pg.js";
 import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
@@ -9,9 +7,6 @@ import { supabase } from "../config/supabaseClient.js";
 
 const router = Router();
 router.use(authRequired);
-
-const usePgSmsLogsGet =
-  String(process.env.USE_PG_SMS_LOGS_GET || "").toLowerCase() === "true";
 
 // ─── Africa's Talking SMS sender ─────────────────────────────────────────────
 async function sendViaSms(recipients, message, schoolId, sentByUserId = null) {
@@ -43,11 +38,15 @@ async function sendViaSms(recipients, message, schoolId, sentByUserId = null) {
 
       for (const r of atRecipients) {
         const status = r.status === "Success" ? "sent" : "failed";
-        await pool.query(
-          `INSERT INTO sms_logs (school_id, recipient, message, channel, status, sent_by_user_id, sent_at, provider_response)
-          VALUES (?, ?, ?, 'sms', ?, ?, NOW(), ?)`,
-          [schoolId, r.number, message, status, sentByUserId, JSON.stringify(r)]
-        );
+        await supabase.from('sms_logs').insert({
+          school_id: schoolId,
+          recipient: r.number,
+          message,
+          channel: 'sms',
+          status,
+          sent_by_user_id: sentByUserId,
+          provider_response: JSON.stringify(r)
+        });
         logs.push({ phone: r.number, status });
       }
 
@@ -55,11 +54,14 @@ async function sendViaSms(recipients, message, schoolId, sentByUserId = null) {
       const atNumbers = atRecipients.map(r => r.number);
       for (const phone of recipients) {
         if (!atNumbers.includes(phone)) {
-          await pool.query(
-            `INSERT INTO sms_logs (school_id, recipient, message, channel, status, sent_by_user_id, sent_at)
-             VALUES (?, ?, ?, 'sms', 'failed', ?, NOW())`,
-            [schoolId, phone, message, sentByUserId]
-          );
+          await supabase.from('sms_logs').insert({
+            school_id: schoolId,
+            recipient: phone,
+            message,
+            channel: 'sms',
+            status: 'failed',
+            sent_by_user_id: sentByUserId
+          });
           logs.push({ phone, status: "failed" });
         }
       }
@@ -76,11 +78,14 @@ async function sendViaSms(recipients, message, schoolId, sentByUserId = null) {
 
   // Fallback — queued (AT not configured)
   for (const phone of recipients) {
-    await pool.query(
-      `INSERT INTO sms_logs (school_id, recipient, message, channel, status, sent_by_user_id, sent_at)
-      VALUES (?, ?, ?, 'sms', 'queued', ?, NOW())`,
-      [schoolId, phone, message, sentByUserId]
-    );
+    await supabase.from('sms_logs').insert({
+      school_id: schoolId,
+      recipient: phone,
+      message,
+      channel: 'sms',
+      status: 'queued',
+      sent_by_user_id: sentByUserId
+    });
     logs.push({ phone, status: "queued" });
   }
   return { sent: 0, failed: 0, queued: logs.length, logs };
@@ -101,31 +106,15 @@ router.get("/sms-logs", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 
-    if (usePgSmsLogsGet) {
-      const { rows } = await pgPool.query(
-        `SELECT sms_id, recipient, message, channel, status, sent_at, provider_response
-        FROM sms_logs
-        WHERE school_id=$1 AND is_deleted=false
-        ORDER BY sent_at DESC NULLS LAST, sms_id DESC
-        LIMIT 300`,
-        [schoolId]
-      );
-      return res.json(rows);
-    }
-
-    // OLD: const [rows] = await pool.query(
-    // OLD:   `SELECT sms_id, recipient, message, channel, status, sent_at, provider_response
-    // OLD:   FROM sms_logs WHERE school_id=? AND is_deleted=0
-    // OLD:   ORDER BY sent_at DESC LIMIT 300`,
-    // OLD:   [schoolId]
-    // OLD: );
-    const { data: rows } = await pool.query(
-      `SELECT sms_id, recipient, message, channel, status, sent_at, provider_response
-      FROM sms_logs WHERE school_id=? AND is_deleted=0
-      ORDER BY sent_at DESC LIMIT 300`,
-      [schoolId]
-    );
-    res.json(rows || []);
+    const { data: rows, error } = await supabase
+      .from('sms_logs')
+      .select('sms_id, recipient, message, channel, status, sent_at, provider_response')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .order('sent_at', { ascending: false })
+      .limit(300);
+    if (error) throw error;
+    return res.json(rows || []);
   } catch (err) { next(err); }
 });
 
@@ -148,22 +137,6 @@ router.post("/sms/bulk", requireRoles("admin", "teacher"), async (req, res, next
     const { schoolId, userId } = req.user;
     const { className, message } = req.body;
     if (!message) return res.status(400).json({ message: "message is required" });
-
-    // OLD: let sql      = `SELECT DISTINCT parent_phone AS phone FROM students
-    // OLD:                 WHERE school_id=? AND is_deleted=0
-    // OLD:                 AND parent_phone IS NOT NULL AND parent_phone != ''`;
-    // OLD: const params = [schoolId];
-    // OLD: if (className && className !== "all") {
-    // OLD:   sql += " AND class_name=?";
-    // OLD:   params.push(className);
-    // OLD: }
-    // OLD: const queryResult = await pool.query(sql, params);
-    // OLD: const rows = Array.isArray(queryResult)
-    // OLD:   ? (queryResult[0] || [])
-    // OLD:   : (queryResult?.data || queryResult?.rows || []);
-    // OLD: if (!rows.length)
-    // OLD:   return res.status(404).json({ message: "No parent phone numbers found for this class" });
-    // OLD: const phones = rows.map(r => r.phone);
 
     let q = supabase
       .from("students")
@@ -197,10 +170,12 @@ router.patch("/sms-logs/:id/status", requireRoles("admin"), async (req, res, nex
   try {
     const { schoolId } = req.user;
     const { status } = req.body;
-    await pool.query(
-      `UPDATE sms_logs SET status=? WHERE sms_id=? AND school_id=?`,
-      [status, req.params.id, schoolId]
-    );
+    const { error } = await supabase
+      .from('sms_logs')
+      .update({ status })
+      .eq('sms_id', req.params.id)
+      .eq('school_id', schoolId);
+    if (error) throw error;
     res.json({ updated: true });
   } catch (err) { next(err); }
 });
@@ -236,23 +211,26 @@ router.post("/email/bulk", requireRoles("admin", "teacher"), async (req, res, ne
     const { className, subject, message } = req.body;
     if (!subject || !message) return res.status(400).json({ message: "subject and message are required" });
 
-    let sql = `SELECT s.student_id, s.first_name, s.last_name,
-              u.email, s.parent_name
-              FROM students s
-              LEFT JOIN users u ON u.student_id = s.student_id AND u.role = 'parent'
-              WHERE s.school_id=? AND s.is_deleted=0 
-                AND (u.is_deleted = 0 OR u.is_deleted IS NULL)
-                AND u.email IS NOT NULL AND u.email != ''`;
-    const params = [schoolId];
-    if (className && className !== "all") { sql += " AND s.class_name=?"; params.push(className); }
-
-    const [rows] = await pool.query(sql, params);
-    if (!rows.length) return res.status(404).json({ message: "No email addresses found for this class" });
+    let q = supabase
+      .from('students')
+      .select('student_id, first_name, last_name, parent_name, class_name, users!inner(email, role, is_deleted)')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .eq('users.role', 'parent')
+      .eq('users.is_deleted', false)
+      .not('users.email', 'is', null);
+    if (className && className !== "all") {
+      q = q.eq('class_name', className);
+    }
+    const { data: rows, error } = await q;
+    if (error) throw error;
+    
+    if (!rows?.length) return res.status(404).json({ message: "No email addresses found for this class" });
 
     const recipients = rows.map(r => ({
-      email: r.email,
+      email: r.users?.email,
       name:  r.parent_name || `${r.first_name} ${r.last_name}`,
-    }));
+    })).filter(r => r.email);
 
     const result = await sendBulkEmail({
       recipients, subject,
@@ -271,28 +249,83 @@ router.post("/email/fee-reminder", requireRoles("admin", "finance"), async (req,
     const { className } = req.body;
 
     // Find parents with outstanding balances who have emails
-    let sql = `SELECT s.first_name, s.last_name, s.parent_name, s.class_name,
-              u.email,
-              COALESCE(SUM(i.amount_due),0) - COALESCE(SUM(p.paid),0) AS balance
-              FROM students s
-              LEFT JOIN users u ON u.student_id = s.student_id AND u.role = 'parent'
-              LEFT JOIN invoices i ON i.student_id = s.student_id AND i.school_id = s.school_id
-              LEFT JOIN (SELECT invoice_id, SUM(amount) AS paid FROM payments WHERE school_id=? AND is_deleted=0 GROUP BY invoice_id) p
-              ON p.invoice_id = i.invoice_id
-              WHERE s.school_id=? AND s.is_deleted=0 
-                AND (u.is_deleted = 0 OR u.is_deleted IS NULL)
-                AND (i.is_deleted = 0 OR i.is_deleted IS NULL)
-                AND u.email IS NOT NULL AND u.email != ''`;
-    const params = [schoolId, schoolId];
-    if (className && className !== "all") { sql += " AND s.class_name=?"; params.push(className); }
-    sql += " GROUP BY s.student_id, u.email HAVING balance > 0";
-
-    const [rows] = await pool.query(sql, params);
-    if (!rows.length) return res.json({ message: "No fee defaulters with email found", sent: 0 });
+    // OLD: Complex SQL query replaced with Supabase query + in-memory calculation
+    // Get students with parent users
+    let studentQuery = supabase
+      .from('students')
+      .select('student_id, first_name, last_name, parent_name, class_name, users!inner(email, role, is_deleted)')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .eq('users.role', 'parent')
+      .eq('users.is_deleted', false)
+      .not('users.email', 'is', null);
+    if (className && className !== "all") {
+      studentQuery = studentQuery.eq('class_name', className);
+    }
+    const { data: students, error: studentError } = await studentQuery;
+    if (studentError) throw studentError;
+    
+    // Get invoices for these students
+    const studentIds = (students || []).map(s => s.student_id);
+    if (!studentIds.length) {
+      return res.json({ message: "No fee defaulters with email found", sent: 0 });
+    }
+    
+    const { data: invoices, error: invoiceError } = await supabase
+      .from('invoices')
+      .select('invoice_id, student_id, amount_due')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .in('student_id', studentIds);
+    if (invoiceError) throw invoiceError;
+    
+    // Get payments for these invoices
+    const invoiceIds = (invoices || []).map(i => i.invoice_id);
+    let payments = [];
+    if (invoiceIds.length) {
+      const { data: paymentData } = await supabase
+        .from('payments')
+        .select('invoice_id, amount')
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false)
+        .in('invoice_id', invoiceIds);
+      payments = paymentData || [];
+    }
+    
+    // Calculate balances per student
+    const invoiceMap = {};
+    for (const inv of invoices || []) {
+      invoiceMap[inv.invoice_id] = inv;
+      if (!inv.studentBalance) inv.studentBalance = 0;
+      inv.studentBalance += Number(inv.amount_due || 0);
+    }
+    for (const pay of payments) {
+      const inv = invoiceMap[pay.invoice_id];
+      if (inv) {
+        inv.studentBalance -= Number(pay.amount || 0);
+      }
+    }
+    
+    const balanceByStudent = {};
+    for (const inv of invoices || []) {
+      balanceByStudent[inv.student_id] = (balanceByStudent[inv.student_id] || 0) + inv.studentBalance;
+    }
+    
+    // Filter to defaulters only
+    const defaulters = (students || [])
+      .filter(s => balanceByStudent[s.student_id] > 0)
+      .map(s => ({
+        email: s.users?.email,
+        name: s.parent_name || `${s.first_name} ${s.last_name}`,
+        balance: balanceByStudent[s.student_id],
+        studentName: `${s.first_name} ${s.last_name}`
+      })).filter(d => d.email);
+    
+    if (!defaulters.length) return res.json({ message: "No fee defaulters with email found", sent: 0 });
 
     const subject = "Outstanding Fee Balance — Action Required";
     const result = await sendBulkEmail({
-      recipients: rows.map(r => ({ email: r.email, name: r.parent_name || `${r.first_name} ${r.last_name}`, balance: r.balance, studentName: `${r.first_name} ${r.last_name}` })),
+      recipients: defaulters,
       subject,
       htmlFn: (r) => templates.custom({
         recipientName: r.name, subject,

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pool } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
@@ -14,11 +14,15 @@ const HR_ROLES = ["admin","hr"];
 router.get("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { data: rows } = await pool.query(
-      `SELECT * FROM hr_staff WHERE school_id=? AND is_deleted=0 ORDER BY department, full_name`,
-      [schoolId]
-    );
-    res.json(rows);
+    const { data: rows, error } = await supabase
+      .from('hr_staff')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .order('department')
+      .order('full_name');
+    if (error) throw error;
+    res.json(rows || []);
   } catch (err) { next(err); }
 });
 
@@ -27,16 +31,33 @@ router.post("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
     const { schoolId } = req.user;
     const { fullName, email, phone, department, jobTitle, contractType, startDate, salary, status, nationalId, notes } = req.body;
     if (!fullName || !jobTitle) return res.status(400).json({ message: "fullName and jobTitle are required" });
-    const { data: result } = await pool.query(
-      `INSERT INTO hr_staff (school_id, full_name, email, phone, department, job_title, contract_type, start_date, salary, status, national_id, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [schoolId, fullName, email||null, phone||null, department||"Academic", jobTitle,
-      contractType||"Permanent", startDate||null, salary||0, status||"active", nationalId||null, notes||null]
-    );
-    // OLD:
-    // const [row] = await pool.query(`SELECT * FROM hr_staff WHERE staff_id=?`, [result.insertId]);
-    const { data: row } = await pool.query(`SELECT * FROM hr_staff WHERE staff_id=? AND school_id=?`, [result.insertId, schoolId]);
-    res.status(201).json(row[0]);
+    const { data: inserted, error: insertError } = await supabase
+      .from('hr_staff')
+      .insert({
+        school_id: schoolId,
+        full_name: fullName,
+        email: email || null,
+        phone: phone || null,
+        department: department || 'Academic',
+        job_title: jobTitle,
+        contract_type: contractType || 'Permanent',
+        start_date: startDate || null,
+        salary: salary || 0,
+        status: status || 'active',
+        national_id: nationalId || null,
+        notes: notes || null
+      })
+      .select('staff_id')
+      .single();
+    if (insertError) throw insertError;
+    const { data: row, error: selectError } = await supabase
+      .from('hr_staff')
+      .select('*')
+      .eq('staff_id', inserted.staff_id)
+      .eq('school_id', schoolId)
+      .single();
+    if (selectError) throw selectError;
+    res.status(201).json(row);
   } catch (err) { next(err); }
 });
 
@@ -44,14 +65,29 @@ router.put("/staff/:id", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { fullName, email, phone, department, jobTitle, contractType, startDate, salary, status, nationalId, notes } = req.body;
-    const { data: result } = await pool.query(
-      `UPDATE hr_staff SET full_name=?, email=?, phone=?, department=?, job_title=?, contract_type=?,
-      start_date=?, salary=?, status=?, national_id=?, notes=?, updated_at=CURRENT_TIMESTAMP
-      WHERE staff_id=? AND school_id=? AND is_deleted=0`,
-      [fullName, email||null, phone||null, department, jobTitle, contractType,
-      startDate||null, salary||0, status, nationalId||null, notes||null, req.params.id, schoolId]
-    );
-    if (!result.affectedRows) return res.status(404).json({ message: "Staff not found" });
+    const { data: updated, error } = await supabase
+      .from('hr_staff')
+      .update({
+        full_name: fullName,
+        email: email || null,
+        phone: phone || null,
+        department,
+        job_title: jobTitle,
+        contract_type: contractType,
+        start_date: startDate || null,
+        salary: salary || 0,
+        status,
+        national_id: nationalId || null,
+        notes: notes || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('staff_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .select('staff_id')
+      .single();
+    if (error) throw error;
+    if (!updated) return res.status(404).json({ message: "Staff not found" });
     res.json({ updated: true });
   } catch (err) { next(err); }
 });
@@ -59,7 +95,12 @@ router.put("/staff/:id", requireRoles(...HR_ROLES), async (req, res, next) => {
 router.delete("/staff/:id", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    await pool.query(`UPDATE hr_staff SET is_deleted=1 WHERE staff_id=? AND school_id=?`, [req.params.id, schoolId]);
+    const { error } = await supabase
+      .from('hr_staff')
+      .update({ is_deleted: true, updated_at: new Date().toISOString() })
+      .eq('staff_id', req.params.id)
+      .eq('school_id', schoolId);
+    if (error) throw error;
     res.json({ deleted: true });
   } catch (err) { next(err); }
 });
@@ -70,14 +111,20 @@ router.delete("/staff/:id", requireRoles(...HR_ROLES), async (req, res, next) =>
 router.get("/leave", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { data: rows } = await pool.query(
-      `SELECT l.*, s.full_name AS staff_name, s.department, s.job_title
-      FROM hr_leave l
-      JOIN hr_staff s ON s.staff_id = l.staff_id
-      WHERE l.school_id=? AND l.is_deleted=0
-      ORDER BY l.created_at DESC`,
-      [schoolId]
-    );
+    const { data: leaves, error: leaveError } = await supabase
+      .from('hr_leave')
+      .select('*, hr_staff(full_name, department, job_title)')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false });
+    if (leaveError) throw leaveError;
+    const rows = (leaves || []).map(l => ({
+      ...l,
+      staff_name: l.hr_staff?.full_name,
+      department: l.hr_staff?.department,
+      job_title: l.hr_staff?.job_title,
+      hr_staff: undefined
+    }));
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -88,12 +135,21 @@ router.post("/leave", requireRoles(...HR_ROLES), async (req, res, next) => {
     const { staffId, leaveType, fromDate, toDate, reason } = req.body;
     if (!staffId || !fromDate || !toDate)
       return res.status(400).json({ message: "staffId, fromDate, toDate are required" });
-    const { data: result } = await pool.query(
-      `INSERT INTO hr_leave (school_id, staff_id, leave_type, from_date, to_date, reason)
-      VALUES (?, ?, ?, ?, ?, ?)`,
-      [schoolId, staffId, leaveType||"Annual", fromDate, toDate, reason||null]
-    );
-    res.status(201).json({ leaveId: result.insertId });
+    const { data: inserted, error } = await supabase
+      .from('hr_leave')
+      .insert({
+        school_id: schoolId,
+        staff_id: staffId,
+        leave_type: leaveType || 'Annual',
+        from_date: fromDate,
+        to_date: toDate,
+        reason: reason || null,
+        status: 'pending'
+      })
+      .select('leave_id')
+      .single();
+    if (error) throw error;
+    res.status(201).json({ leaveId: inserted.leave_id });
   } catch (err) { next(err); }
 });
 
@@ -103,15 +159,25 @@ router.patch("/leave/:id", requireRoles(...HR_ROLES), async (req, res, next) => 
     const { status } = req.body;
     if (!["approved","rejected","pending"].includes(status))
       return res.status(400).json({ message: "Invalid status" });
-    await pool.query(
-      `UPDATE hr_leave SET status=?, updated_at=CURRENT_TIMESTAMP WHERE leave_id=? AND school_id=?`,
-      [status, req.params.id, schoolId]
-    );
+    const { error: updateError } = await supabase
+      .from('hr_leave')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('leave_id', req.params.id)
+      .eq('school_id', schoolId);
+    if (updateError) throw updateError;
     // If approved — update staff status to on-leave
     if (status === "approved") {
-      const { data: leave } = await pool.query(`SELECT staff_id FROM hr_leave WHERE leave_id=?`, [req.params.id]);
-      if (leave.length) {
-        await pool.query(`UPDATE hr_staff SET status='on-leave' WHERE staff_id=? AND school_id=?`, [leave[0].staff_id, schoolId]);
+      const { data: leave, error: fetchError } = await supabase
+        .from('hr_leave')
+        .select('staff_id')
+        .eq('leave_id', req.params.id)
+        .single();
+      if (!fetchError && leave) {
+        await supabase
+          .from('hr_staff')
+          .update({ status: 'on-leave' })
+          .eq('staff_id', leave.staff_id)
+          .eq('school_id', schoolId);
       }
     }
     res.json({ updated: true });
@@ -126,21 +192,35 @@ router.get("/attendance", requireRoles(...HR_ROLES), async (req, res, next) => {
     const { schoolId } = req.user;
     const { date, from, to, staffId, department } = req.query;
 
-    let sql = `
-      SELECT a.*, s.full_name AS staff_name, s.department, s.job_title
-      FROM hr_attendance a
-      JOIN hr_staff s ON s.staff_id = a.staff_id
-      WHERE a.school_id=? AND a.is_deleted=0`;
-    const params = [schoolId];
+    let query = supabase
+      .from('hr_attendance')
+      .select('*, hr_staff(full_name, department, job_title)')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
 
-    if (staffId)    { sql += " AND a.staff_id=?";         params.push(staffId); }
-    if (department) { sql += " AND s.department=?";       params.push(department); }
-    if (date)       { sql += " AND a.attendance_date=?";  params.push(date); }
-    if (from)       { sql += " AND a.attendance_date>=?"; params.push(from); }
-    if (to)         { sql += " AND a.attendance_date<=?"; params.push(to); }
+    if (staffId) query = query.eq('staff_id', staffId);
+    if (date) query = query.eq('attendance_date', date);
+    if (from) query = query.gte('attendance_date', from);
+    if (to) query = query.lte('attendance_date', to);
 
-    sql += " ORDER BY a.attendance_date DESC, s.full_name";
-    const { data: rows } = await pool.query(sql, params);
+    const { data: attendance, error } = await query.order('attendance_date', { ascending: false });
+    if (error) throw error;
+
+    // Filter by department in memory if needed (since it's on the joined table)
+    let rows = attendance || [];
+    if (department) {
+      rows = rows.filter(a => a.hr_staff?.department === department);
+    }
+
+    // Flatten the joined data
+    rows = rows.map(a => ({
+      ...a,
+      staff_name: a.hr_staff?.full_name,
+      department: a.hr_staff?.department,
+      job_title: a.hr_staff?.job_title,
+      hr_staff: undefined
+    }));
+
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -154,22 +234,29 @@ router.post("/attendance/bulk", requireRoles(...HR_ROLES), async (req, res, next
     if (!date || !Array.isArray(records) || !records.length)
       return res.status(400).json({ message: "date and records array are required" });
 
-    // Delete existing for this date then re-insert
-    await pool.query(
-      `DELETE FROM hr_attendance WHERE school_id=? AND attendance_date=?`,
-      [schoolId, date]
-    );
+    const { error: deleteError } = await supabase
+      .from('hr_attendance')
+      .delete()
+      .eq('school_id', schoolId)
+      .eq('attendance_date', date);
+    if (deleteError) throw deleteError;
 
-    const values = records.map(r => [
-      schoolId, r.staffId, date,
-      r.checkIn || null, r.checkOut || null,
-      r.status || "present", r.notes || null, userId
-    ]);
+    const insertData = records.map(r => ({
+      school_id: schoolId,
+      staff_id: r.staffId,
+      attendance_date: date,
+      check_in: r.checkIn || null,
+      check_out: r.checkOut || null,
+      status: r.status || 'present',
+      notes: r.notes || null,
+      marked_by: userId
+    }));
 
-    await pool.query(
-      `INSERT INTO hr_attendance (school_id, staff_id, attendance_date, check_in, check_out, status, notes, marked_by) VALUES ?`,
-      [values]
-    );
+    const { error: insertError } = await supabase
+      .from('hr_attendance')
+      .insert(insertData);
+    if (insertError) throw insertError;
+
     res.status(201).json({ saved: records.length });
   } catch (err) { next(err); }
 });
@@ -180,13 +267,22 @@ router.post("/attendance", requireRoles(...HR_ROLES), async (req, res, next) => 
     const { schoolId, userId } = req.user;
     const { staffId, date, checkIn, checkOut, status = "present", notes } = req.body;
     if (!staffId || !date) return res.status(400).json({ message: "staffId and date are required" });
-    await pool.query(
-      `INSERT INTO hr_attendance (school_id, staff_id, attendance_date, check_in, check_out, status, notes, marked_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE check_in=VALUES(check_in), check_out=VALUES(check_out),
-      status=VALUES(status), notes=VALUES(notes), updated_at=CURRENT_TIMESTAMP`,
-      [schoolId, staffId, date, checkIn||null, checkOut||null, status, notes||null, userId]
-    );
+
+    const { error } = await supabase
+      .from('hr_attendance')
+      .upsert({
+        school_id: schoolId,
+        staff_id: staffId,
+        attendance_date: date,
+        check_in: checkIn || null,
+        check_out: checkOut || null,
+        status,
+        notes: notes || null,
+        marked_by: userId,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'school_id,staff_id,attendance_date' });
+
+    if (error) throw error;
     res.status(201).json({ saved: true });
   } catch (err) { next(err); }
 });
@@ -199,19 +295,31 @@ router.get("/payslips", requireRoles(...HR_ROLES), async (req, res, next) => {
     const { schoolId } = req.user;
     const { month, year, staffId } = req.query;
 
-    let sql = `
-      SELECT p.*, s.full_name AS staff_name, s.department, s.job_title, s.national_id
-      FROM hr_payslips p
-      JOIN hr_staff s ON s.staff_id = p.staff_id
-      WHERE p.school_id=? AND p.is_deleted=0`;
-    const params = [schoolId];
+    let query = supabase
+      .from('hr_payslips')
+      .select('*, hr_staff(full_name, department, job_title, national_id)')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
 
-    if (month)   { sql += " AND p.month=?";    params.push(month); }
-    if (year)    { sql += " AND p.year=?";     params.push(year); }
-    if (staffId) { sql += " AND p.staff_id=?"; params.push(staffId); }
+    if (month) query = query.eq('month', month);
+    if (year) query = query.eq('year', year);
+    if (staffId) query = query.eq('staff_id', staffId);
 
-    sql += " ORDER BY p.year DESC, p.month DESC, s.full_name";
-    const { data: rows } = await pool.query(sql, params);
+    const { data: payslips, error } = await query
+      .order('year', { ascending: false })
+      .order('month', { ascending: false });
+
+    if (error) throw error;
+
+    const rows = (payslips || []).map(p => ({
+      ...p,
+      staff_name: p.hr_staff?.full_name,
+      department: p.hr_staff?.department,
+      job_title: p.hr_staff?.job_title,
+      national_id: p.hr_staff?.national_id,
+      hr_staff: undefined
+    }));
+
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -223,13 +331,17 @@ router.post("/payslips/generate", requireRoles(...HR_ROLES), async (req, res, ne
     const { month, year, allowances = 0, notes } = req.body;
     if (!month || !year) return res.status(400).json({ message: "month and year are required" });
 
-    const { data: activeStaff } = await pool.query(
-      `SELECT * FROM hr_staff WHERE school_id=? AND is_deleted=0 AND status='active'`,
-      [schoolId]
-    );
+    const { data: activeStaff, error: staffError } = await supabase
+      .from('hr_staff')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .eq('status', 'active');
+
+    if (staffError) throw staffError;
 
     let generated = 0;
-    for (const s of activeStaff) {
+    for (const s of activeStaff || []) {
       const basic    = Number(s.salary) || 0;
       const allow    = Number(allowances) || 0;
       // Simplified KE statutory deductions
@@ -239,15 +351,28 @@ router.post("/payslips/generate", requireRoles(...HR_ROLES), async (req, res, ne
       const deduct   = paye + nhif + nssf;
       const netPay   = basic + allow - deduct;
 
-      await pool.query(
-        `INSERT INTO hr_payslips (school_id, staff_id, month, year, basic_salary, allowances, deductions, net_pay, paye, nhif, nssf, notes, status, generated_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)
-        ON DUPLICATE KEY UPDATE basic_salary=VALUES(basic_salary), allowances=VALUES(allowances),
-        deductions=VALUES(deductions), net_pay=VALUES(net_pay), paye=VALUES(paye),
-        nhif=VALUES(nhif), nssf=VALUES(nssf), updated_at=CURRENT_TIMESTAMP`,
-        [schoolId, s.staff_id, month, year, basic, allow, deduct, netPay, paye, nhif, nssf, notes||null, userId]
-      );
-      generated++;
+      const { error: upsertError } = await supabase
+        .from('hr_payslips')
+        .upsert({
+          school_id: schoolId,
+          staff_id: s.staff_id,
+          month,
+          year,
+          basic_salary: basic,
+          allowances: allow,
+          deductions: deduct,
+          net_pay: netPay,
+          paye,
+          nhif,
+          nssf,
+          notes: notes || null,
+          status: 'draft',
+          generated_by: userId,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'school_id,staff_id,month,year' });
+
+      if (upsertError) console.error('Payslip upsert error:', upsertError);
+      else generated++;
     }
     res.status(201).json({ generated });
   } catch (err) { next(err); }
@@ -258,11 +383,15 @@ router.patch("/payslips/approve", requireRoles(...HR_ROLES), async (req, res, ne
   try {
     const { schoolId } = req.user;
     const { month, year } = req.body;
-    await pool.query(
-      `UPDATE hr_payslips SET status='approved', updated_at=CURRENT_TIMESTAMP
-      WHERE school_id=? AND month=? AND year=? AND status='draft' AND is_deleted=0`,
-      [schoolId, month, year]
-    );
+    const { error } = await supabase
+      .from('hr_payslips')
+      .update({ status: 'approved', updated_at: new Date().toISOString() })
+      .eq('school_id', schoolId)
+      .eq('month', month)
+      .eq('year', year)
+      .eq('status', 'draft')
+      .eq('is_deleted', false);
+    if (error) throw error;
     res.json({ approved: true });
   } catch (err) { next(err); }
 });
@@ -272,11 +401,19 @@ router.patch("/payslips/mark-paid", requireRoles(...HR_ROLES), async (req, res, 
   try {
     const { schoolId } = req.user;
     const { month, year } = req.body;
-    await pool.query(
-      `UPDATE hr_payslips SET status='paid', paid_date=CURDATE(), updated_at=CURRENT_TIMESTAMP
-      WHERE school_id=? AND month=? AND year=? AND status='approved' AND is_deleted=0`,
-      [schoolId, month, year]
-    );
+    const { error } = await supabase
+      .from('hr_payslips')
+      .update({
+        status: 'paid',
+        paid_date: new Date().toISOString().slice(0, 10),
+        updated_at: new Date().toISOString()
+      })
+      .eq('school_id', schoolId)
+      .eq('month', month)
+      .eq('year', year)
+      .eq('status', 'approved')
+      .eq('is_deleted', false);
+    if (error) throw error;
     res.json({ paid: true });
   } catch (err) { next(err); }
 });
@@ -286,17 +423,33 @@ router.put("/payslips/:id", requireRoles(...HR_ROLES), async (req, res, next) =>
   try {
     const { schoolId } = req.user;
     const { allowances, deductions, notes, status } = req.body;
-    const { data: rows } = await pool.query(`SELECT * FROM hr_payslips WHERE payslip_id=? AND school_id=?`, [req.params.id, schoolId]);
-    if (!rows.length) return res.status(404).json({ message: "Payslip not found" });
-    const p = rows[0];
+    const { data: p, error: fetchError } = await supabase
+      .from('hr_payslips')
+      .select('*')
+      .eq('payslip_id', req.params.id)
+      .eq('school_id', schoolId)
+      .single();
+
+    if (fetchError || !p) return res.status(404).json({ message: "Payslip not found" });
+
     const allow  = allowances !== undefined ? Number(allowances) : Number(p.allowances);
     const deduct = deductions !== undefined ? Number(deductions) : Number(p.deductions);
     const net    = Number(p.basic_salary) + allow - deduct;
-    await pool.query(
-      `UPDATE hr_payslips SET allowances=?, deductions=?, net_pay=?, notes=?, status=COALESCE(?,status), updated_at=CURRENT_TIMESTAMP
-      WHERE payslip_id=? AND school_id=?`,
-      [allow, deduct, net, notes||p.notes, status||null, req.params.id, schoolId]
-    );
+
+    const { error: updateError } = await supabase
+      .from('hr_payslips')
+      .update({
+        allowances: allow,
+        deductions: deduct,
+        net_pay: net,
+        notes: notes || p.notes,
+        status: status || p.status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('payslip_id', req.params.id)
+      .eq('school_id', schoolId);
+
+    if (updateError) throw updateError;
     res.json({ updated: true });
   } catch (err) { next(err); }
 });
