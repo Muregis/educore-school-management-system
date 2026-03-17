@@ -1,10 +1,12 @@
 import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
+// OLD: import { pool } from "../config/db.js";
 
 const router = Router();
 router.use(authRequired);
 
+// ─── GET / — list attendance records (already Supabase, unchanged) ────────────
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -13,7 +15,7 @@ router.get("/", async (req, res, next) => {
     let query = supabase
       .from('attendance')
       .select(`
-        attendance_id, 
+        attendance_id,
         student_id,
         attendance_date,
         status,
@@ -35,34 +37,32 @@ router.get("/", async (req, res, next) => {
     if (from)      { query = query.gte('attendance_date', from); }
     if (to)        { query = query.lte('attendance_date', to); }
 
-    query = query.order('attendance_date', { ascending: false })
-                   .order('attendance_id', { ascending: false });
+    query = query
+      .order('attendance_date', { ascending: false })
+      .order('attendance_id',   { ascending: false });
 
     const { data, error } = await query;
-    
     if (error) throw error;
-    
-    // Transform the data to match expected format
+
     const transformedData = data?.map(item => ({
-      attendance_id: item.attendance_id,
-      student_id: item.student_id,
-      student_name: `${item.students.first_name} ${item.students.last_name}`,
+      attendance_id:   item.attendance_id,
+      student_id:      item.student_id,
+      student_name:    `${item.students.first_name} ${item.students.last_name}`,
       admission_number: item.students.admission_number,
-      class_name: item.students.class_name,
+      class_name:      item.students.class_name,
       attendance_date: item.attendance_date,
-      status: item.status,
-      class_id: item.class_id
+      status:          item.status,
+      class_id:        item.class_id,
     })) || [];
-    
+
     res.json(transformedData);
   } catch (err) { next(err); }
 });
 
-// ── Helper: resolve classId from either numeric ID or class_name string ───────
+// ── Helper: resolve classId from numeric ID or class_name string ──────────────
 async function resolveClassId(schoolId, classId) {
-  // Already a number
   if (!isNaN(Number(classId)) && Number(classId) > 0) return Number(classId);
-  // Try looking up by name
+
   const { data: cls } = await supabase
     .from('classes')
     .select('class_id')
@@ -72,21 +72,22 @@ async function resolveClassId(schoolId, classId) {
     .limit(1)
     .single();
   if (cls) return cls.class_id;
-  // Class not in classes table — auto-create a placeholder so FK is satisfied
+
+  // Auto-create placeholder class so FK is satisfied
   const { data: result } = await supabase
     .from('classes')
     .insert({
-      school_id: schoolId,
-      class_name: classId,
+      school_id:     schoolId,
+      class_name:    classId,
       academic_year: new Date().getFullYear(),
-      status: 'active'
+      status:        'active',
     })
     .select('class_id')
     .single();
   return result.class_id;
 }
 
-// ── Bulk attendance save ──────────────────────────────────────────────────────
+// ─── POST /bulk — save full class attendance for a date ───────────────────────
 router.post("/bulk", async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
@@ -97,71 +98,131 @@ router.post("/bulk", async (req, res, next) => {
 
     const resolvedClassId = await resolveClassId(schoolId, classId);
 
-    // Delete existing for this class+date then re-insert
-    await pool.query(
-      `DELETE FROM attendance WHERE school_id=? AND class_id=? AND attendance_date=?`,
-      [schoolId, resolvedClassId, date]
-    );
+    // OLD: await pool.query(
+    // OLD:   `DELETE FROM attendance WHERE school_id=? AND class_id=? AND attendance_date=?`,
+    // OLD:   [schoolId, resolvedClassId, date]
+    // OLD: );
+    // OLD: const values = records.map(r => [
+    // OLD:   schoolId, r.studentId ?? r.student_id, resolvedClassId, date,
+    // OLD:   r.status || "present", userId || null
+    // OLD: ]);
+    // OLD: await pool.query(
+    // OLD:   `INSERT INTO attendance (school_id, student_id, class_id, attendance_date, status, marked_by_user_id) VALUES ?`,
+    // OLD:   [values]
+    // OLD: );
 
-    const values = records.map(r => [
-      schoolId,
-      r.studentId ?? r.student_id,
-      resolvedClassId,
-      date,
-      r.status || "present",
-      userId || null
-    ]);
+    // Soft-delete existing records for this class + date instead of hard DELETE
+    const { error: delError } = await supabase
+      .from('attendance')
+      .update({ is_deleted: true })
+      .eq('school_id', schoolId)
+      .eq('class_id', resolvedClassId)
+      .eq('attendance_date', date);
+    if (delError) throw delError;
 
-    await pool.query(
-      `INSERT INTO attendance (school_id, student_id, class_id, attendance_date, status, marked_by_user_id) VALUES ?`,
-      [values]
-    );
+    // Build insert payload
+    const rows = records.map(r => ({
+      school_id:          schoolId,
+      student_id:         r.studentId ?? r.student_id,
+      class_id:           resolvedClassId,
+      attendance_date:    date,
+      status:             r.status || 'present',
+      marked_by_user_id:  userId || null,
+      is_deleted:         false,
+    }));
+
+    const { error: insError } = await supabase
+      .from('attendance')
+      .insert(rows);
+    if (insError) throw insError;
 
     res.status(201).json({ saved: records.length });
   } catch (err) { next(err); }
 });
 
-// ── Single attendance record ──────────────────────────────────────────────────
+// ─── POST / — single attendance record (upsert) ───────────────────────────────
 router.post("/", async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const { studentId, classId, date, status = "present" } = req.body;
+
     if (!studentId || !classId || !date)
       return res.status(400).json({ message: "studentId, classId and date are required" });
 
     const resolvedClassId = await resolveClassId(schoolId, classId);
 
-    await pool.query(
-      `INSERT INTO attendance (school_id, student_id, class_id, attendance_date, status, marked_by_user_id)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE status=VALUES(status), updated_at=CURRENT_TIMESTAMP`,
-      [schoolId, studentId, resolvedClassId, date, status, userId || null]
-    );
+    // OLD: await pool.query(
+    // OLD:   `INSERT INTO attendance (school_id, student_id, class_id, attendance_date, status, marked_by_user_id)
+    // OLD:   VALUES (?, ?, ?, ?, ?, ?)
+    // OLD:   ON DUPLICATE KEY UPDATE status=VALUES(status), updated_at=CURRENT_TIMESTAMP`,
+    // OLD:   [schoolId, studentId, resolvedClassId, date, status, userId || null]
+    // OLD: );
+
+    const { error } = await supabase
+      .from('attendance')
+      .upsert(
+        {
+          school_id:         schoolId,
+          student_id:        studentId,
+          class_id:          resolvedClassId,
+          attendance_date:   date,
+          status,
+          marked_by_user_id: userId || null,
+          is_deleted:        false,
+        },
+        { onConflict: 'school_id,student_id,class_id,attendance_date' }
+      );
+    if (error) throw error;
+
     res.status(201).json({ saved: true });
   } catch (err) { next(err); }
 });
 
+// ─── PUT /:id — update a single attendance record ────────────────────────────
 router.put("/:id", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { status, date } = req.body;
-    const [result] = await pool.query(
-      `UPDATE attendance SET status=?, attendance_date=?, updated_at=CURRENT_TIMESTAMP
-      WHERE attendance_id=? AND school_id=?`,
-      [status, date, req.params.id, schoolId]
-    );
-    if (!result.affectedRows) return res.status(404).json({ message: "Record not found" });
+
+    // OLD: const [result] = await pool.query(
+    // OLD:   `UPDATE attendance SET status=?, attendance_date=?, updated_at=CURRENT_TIMESTAMP
+    // OLD:   WHERE attendance_id=? AND school_id=?`,
+    // OLD:   [status, date, req.params.id, schoolId]
+    // OLD: );
+    // OLD: if (!result.affectedRows) return res.status(404).json({ message: "Record not found" });
+
+    const { data: updated, error } = await supabase
+      .from('attendance')
+      .update({ status, attendance_date: date })
+      .eq('attendance_id', req.params.id)
+      .eq('school_id', schoolId)
+      .select('attendance_id')
+      .single();
+
+    if (error) throw error;
+    if (!updated) return res.status(404).json({ message: "Record not found" });
+
     res.json({ updated: true });
   } catch (err) { next(err); }
 });
 
+// ─── DELETE /:id — soft delete attendance record ──────────────────────────────
 router.delete("/:id", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    await pool.query(
-      `UPDATE attendance SET is_deleted=1 WHERE attendance_id=? AND school_id=?`,
-      [req.params.id, schoolId]
-    );
+
+    // OLD: await pool.query(
+    // OLD:   `UPDATE attendance SET is_deleted=1 WHERE attendance_id=? AND school_id=?`,
+    // OLD:   [req.params.id, schoolId]
+    // OLD: );
+
+    const { error } = await supabase
+      .from('attendance')
+      .update({ is_deleted: true })
+      .eq('attendance_id', req.params.id)
+      .eq('school_id', schoolId);
+    if (error) throw error;
+
     res.json({ deleted: true });
   } catch (err) { next(err); }
 });

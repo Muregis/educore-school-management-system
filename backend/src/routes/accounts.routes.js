@@ -29,14 +29,21 @@ router.get("/users", async (req, res, next) => {
 router.get("/staff", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
+    // OLD: const [rows] = await pool.query(
+    // OLD:   `SELECT user_id, full_name, email, phone, role, status, created_at
+    // OLD:   FROM users
+    // OLD:   WHERE school_id = ? AND role IN ('admin','teacher','finance') AND is_deleted = 0
+    // OLD:   ORDER BY role, full_name`,
+    // OLD:   [schoolId]
+    // OLD: );
+    const { data: rows } = await pool.query(
       `SELECT user_id, full_name, email, phone, role, status, created_at
       FROM users
       WHERE school_id = ? AND role IN ('admin','teacher','finance') AND is_deleted = 0
       ORDER BY role, full_name`,
       [schoolId]
     );
-    res.json(rows);
+    res.json(rows || []);
   } catch (err) { next(err); }
 });
 
@@ -133,7 +140,18 @@ router.delete("/staff/:id", async (req, res, next) => {
 router.get("/portal", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
+    // OLD: const [rows] = await pool.query(
+    // OLD:   `SELECT u.user_id, u.full_name, u.email, u.role, u.status, u.student_id,
+    // OLD:           CONCAT(s.first_name,' ',s.last_name) AS student_name,
+    // OLD:           s.admission_number, s.class_name
+    // OLD:   FROM users u
+    // OLD:   LEFT JOIN students s ON s.student_id = u.student_id 
+    // OLD:   WHERE u.school_id = ? AND u.role IN ('parent','student') AND u.is_deleted = 0 
+    // OLD:     AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
+    // OLD:   ORDER BY u.role, u.full_name`,
+    // OLD:   [schoolId]
+    // OLD: );
+    const { data: rows } = await pool.query(
       `SELECT u.user_id, u.full_name, u.email, u.role, u.status, u.student_id,
               CONCAT(s.first_name,' ',s.last_name) AS student_name,
               s.admission_number, s.class_name
@@ -144,7 +162,7 @@ router.get("/portal", async (req, res, next) => {
       ORDER BY u.role, u.full_name`,
       [schoolId]
     );
-    res.json(rows);
+    res.json(rows || []);
   } catch (err) { next(err); }
 });
 

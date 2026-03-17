@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { pgPool } from "../config/pg.js";
+import { supabase } from "../config/db.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js"; 
 const router = Router();
@@ -34,28 +35,74 @@ router.get("/", async (req, res, next) => {
     const { schoolId } = req.user;
     const { className, teacherId } = req.query;
 
-    let sql = `SELECT te.timetable_id, te.class_id, te.subject_name, te.teacher_id,
-            te.day_of_week, te.start_time, te.end_time, te.room, te.school_id,
-            COALESCE(c.class_name, '') AS class_name,
-            CONCAT(t.first_name, ' ', t.last_name) AS teacher_name
-      FROM timetable_entries te
-      LEFT JOIN classes  c ON c.class_id  = te.class_id
-      LEFT JOIN teachers t ON t.teacher_id = te.teacher_id
-      WHERE te.school_id = $1 AND te.is_deleted = false`;
-    const params = [schoolId];
+    // OLD: let sql = `SELECT te.timetable_id, te.class_id, te.subject_name, te.teacher_id,
+    // OLD:         te.day_of_week, te.start_time, te.end_time, te.room, te.school_id,
+    // OLD:         COALESCE(c.class_name, '') AS class_name,
+    // OLD:         CONCAT(t.first_name, ' ', t.last_name) AS teacher_name
+    // OLD:   FROM timetable_entries te
+    // OLD:   LEFT JOIN classes  c ON c.class_id  = te.class_id
+    // OLD:   LEFT JOIN teachers t ON t.teacher_id = te.teacher_id
+    // OLD:   WHERE te.school_id = $1 AND te.is_deleted = false`;
+    // OLD: const params = [schoolId];
+    // OLD: if (className) { sql += " AND c.class_name = $2"; params.push(className); }
+    // OLD: if (teacherId) { sql += " AND te.teacher_id = ?"; params.push(teacherId); }
+    // OLD: sql += " ORDER BY FIELD(te.day_of_week,'Mon','Tue','Wed','Thu','Fri','Sat','Sun'), te.start_time";
+    // OLD: const [rows] = await pool.query(sql, params);
+    // OLD: res.json(rows.map(normalise));
 
+    let classId = null;
     if (className) {
-      sql += " AND c.class_name = $2";
-      params.push(className);
-    }
-    if (teacherId) {
-      sql += " AND te.teacher_id = ?";
-      params.push(teacherId);
+      const { data: cls, error: clsErr } = await supabase
+        .from("classes")
+        .select("class_id")
+        .eq("school_id", schoolId)
+        .eq("class_name", className)
+        .eq("is_deleted", false)
+        .limit(1)
+        .maybeSingle();
+      if (clsErr) throw clsErr;
+      classId = cls?.class_id ?? null;
+      if (!classId) return res.json([]);
     }
 
-    sql += " ORDER BY FIELD(te.day_of_week,'Mon','Tue','Wed','Thu','Fri','Sat','Sun'), te.start_time";
+    let q = supabase
+      .from("timetable_entries")
+      .select("timetable_id, class_id, subject_name, teacher_id, day_of_week, start_time, end_time, room, school_id")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false);
 
-    const [rows] = await pool.query(sql, params);
+    if (classId) q = q.eq("class_id", classId);
+    if (teacherId) q = q.eq("teacher_id", teacherId);
+
+    const { data: entries, error: entErr } = await q;
+    if (entErr) throw entErr;
+
+    const classIds = Array.from(new Set((entries || []).map(e => e.class_id).filter(Boolean)));
+    const teacherIds = Array.from(new Set((entries || []).map(e => e.teacher_id).filter(Boolean)));
+
+    const [{ data: classes, error: cErr }, { data: teachers, error: tErr }] = await Promise.all([
+      classIds.length
+        ? supabase.from("classes").select("class_id, class_name").eq("school_id", schoolId).in("class_id", classIds)
+        : Promise.resolve({ data: [], error: null }),
+      teacherIds.length
+        ? supabase.from("teachers").select("teacher_id, first_name, last_name").eq("school_id", schoolId).in("teacher_id", teacherIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (cErr) throw cErr;
+    if (tErr) throw tErr;
+
+    const classMap = new Map((classes || []).map(c => [String(c.class_id), c.class_name]));
+    const teacherMap = new Map((teachers || []).map(t => [String(t.teacher_id), `${t.first_name || ""} ${t.last_name || ""}`.trim()]));
+
+    const dayOrder = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+    const rows = (entries || [])
+      .map(e => ({
+        ...e,
+        class_name: classMap.get(String(e.class_id)) ?? "",
+        teacher_name: teacherMap.get(String(e.teacher_id)) ?? "",
+      }))
+      .sort((a, b) => (dayOrder[a.day_of_week] || 99) - (dayOrder[b.day_of_week] || 99) || String(a.start_time).localeCompare(String(b.start_time)));
+
     res.json(rows.map(normalise));
   } catch (err) { next(err); }
 });

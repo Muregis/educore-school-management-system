@@ -1,10 +1,30 @@
 import { Router } from "express";
 import { pool } from "../config/db.js";
+import { supabase } from "../config/db.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
 const router = Router();
 router.use(authRequired);
+
+// NEW: GET /api/settings/users (frontend expects this path)
+router.get("/users", requireRoles("admin"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+
+    // Prefer Supabase fluent API (no raw SQL, no MySQL fallback)
+    const { data, error } = await supabase
+      .from("users")
+      .select("user_id, full_name, email, phone, role, status, created_at")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .order("role")
+      .order("full_name");
+    if (error) throw error;
+
+    res.json(data || []);
+  } catch (err) { next(err); }
+});
 
 async function ensurePermissionsTable() {
   await pool.query(

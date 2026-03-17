@@ -44,8 +44,9 @@ router.get("/", async (req, res, next) => {
 
     sql += " ORDER BY d.incident_date DESC, d.discipline_id DESC";
 
-    const [rows] = await pool.query(sql, params);
-    res.json(rows);
+    // OLD: const [rows] = await pool.query(sql, params);
+    const { data: rows } = await pool.query(sql, params);
+    res.json(rows || []);
   } catch (err) { next(err); }
 });
 

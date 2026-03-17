@@ -1,5 +1,6 @@
 import { pool } from "../config/db.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
+// OLD: import { agentLog } from "../utils/agentDebugLog.js";
 
 // NEW: Tenant context middleware for automatic tenant isolation
 export function tenantContext(req, res, next) {
@@ -8,13 +9,29 @@ export function tenantContext(req, res, next) {
     return next();
   }
 
+  // #region agent log
+  // OLD: fetch('http://127.0.0.1:7316/ingest/69a2e703-a35d-4b5d-8b01-2ade717190dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cdda91'},body:JSON.stringify({sessionId:'cdda91',runId:'analysis-pre',hypothesisId:'H1',location:'backend/src/middleware/tenantContext.js:15',message:'tenantContext entry',data:{path:req.path,method:req.method,hasUser:Boolean(req.user),userKeys:Object.keys(req.user||{}),school_id:req.user?.school_id,schoolId:req.user?.schoolId},timestamp:Date.now()})}).catch(()=>{});
+  // OLD: agentLog({sessionId:"cdda91",runId:"pre-fix",hypothesisId:"H1",location:"backend/src/middleware/tenantContext.js:15",message:"tenantContext entry",data:{path:req.path,method:req.method,hasUser:Boolean(req.user),userKeys:Object.keys(req.user||{}),school_id:req.user?.school_id,schoolId:req.user?.schoolId},timestamp:Date.now()});
+  // #endregion
+
   // Verify user exists and has school_id
-  if (!req.user || !req.user.school_id) {
+  // OLD: if (!req.user || !req.user.school_id) {
+  // OLD:   return res.status(401).json({ error: "Invalid tenant context" });
+  // OLD: }
+  const resolvedSchoolId =
+    req.user?.school_id ?? req.user?.schoolId ?? req.schoolId ?? null;
+
+  if (!req.user || resolvedSchoolId == null) {
+    // #region agent log
+    // OLD: fetch('http://127.0.0.1:7316/ingest/69a2e703-a35d-4b5d-8b01-2ade717190dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cdda91'},body:JSON.stringify({sessionId:'cdda91',runId:'analysis-pre',hypothesisId:'H3',location:'backend/src/middleware/tenantContext.js:22',message:'tenantContext invalid (missing school_id)',data:{path:req.path,method:req.method,hasUser:Boolean(req.user),school_id:req.user?.school_id,schoolId:req.user?.schoolId},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     return res.status(401).json({ error: "Invalid tenant context" });
   }
 
   // Ensure consistent schoolId access
-  req.schoolId = req.user.school_id;
+  req.user.school_id = resolvedSchoolId;
+  req.user.schoolId = resolvedSchoolId;
+  req.schoolId = resolvedSchoolId;
   
   next();
 }
@@ -29,7 +46,13 @@ export function tenantSecurityCheck(req, res, next) {
   // Check for suspicious cross-school access attempts
   const requestedSchoolId = req.body.school_id || req.query.school_id || req.params.school_id;
   
-  if (requestedSchoolId && requestedSchoolId !== req.schoolId) {
+  // OLD: if (requestedSchoolId && requestedSchoolId !== req.schoolId) {
+  // OLD:   ...
+  // OLD: }
+  if (
+    requestedSchoolId != null &&
+    String(requestedSchoolId) !== String(req.schoolId)
+  ) {
     // Log security event (implement actual logging)
     console.error('SECURITY: Cross-tenant access attempt', {
       userId: req.user.user_id,

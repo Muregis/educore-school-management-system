@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "../config/db.js";
 import { pgPool } from "../config/pg.js";
+import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
@@ -33,48 +34,48 @@ router.get("/", async (req, res, next) => {
     const { schoolId } = req.user;
     const { studentId, term, classId } = req.query;
 
-    if (usePgGradesGet) {
-      let sql = `SELECT r.result_id, r.student_id, r.marks, r.total_marks, r.grade,
-            r.teacher_comment, r.term,
-            r.subject,
-            s.first_name, s.last_name,
-            s.class_name
-        FROM results r
-        JOIN students s  ON s.student_id  = r.student_id
-        LEFT JOIN classes c ON c.class_id = r.class_id
-        WHERE r.school_id = ? AND r.is_deleted = false`;
-      const params = [schoolId];
+    // OLD: if (usePgGradesGet) { ... raw SQL join ... }
+    // OLD: let sql = `SELECT ... FROM results r JOIN students s ... WHERE r.school_id = ? ...`;
+    // OLD: const { data: rows } = await pool.query(sql, params);
+    // OLD: res.json((rows || []).map(normalise));
 
-      if (studentId) { sql += ` AND r.student_id = ?`; params.push(studentId); }
-      if (term)      { sql += ` AND r.term = ?`;       params.push(term); }
-      if (classId)   { sql += ` AND r.class_id = ?`;   params.push(classId); }
+    let q = supabase
+      .from("results")
+      .select("result_id,student_id,class_id,marks,total_marks,grade,teacher_comment,term,subject,school_id,is_deleted")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .order("result_id", { ascending: false });
 
-      sql += " ORDER BY r.result_id DESC";
+    if (studentId) q = q.eq("student_id", studentId);
+    if (term) q = q.eq("term", term);
+    if (classId) q = q.eq("class_id", classId);
 
-      const { data: rows } = await pool.query(sql, params);
-      return res.json(rows.map(normalise));
-    }
+    const { data: resultRows, error: resultsErr } = await q;
+    if (resultsErr) throw resultsErr;
 
-    let sql = `
-        SELECT r.result_id, r.student_id, r.marks, r.total_marks, r.grade,
-            r.teacher_comment, r.term,
-            r.subject,
-            s.first_name, s.last_name,
-            s.class_name
-    FROM results r
-    JOIN students s  ON s.student_id  = r.student_id
-    LEFT JOIN classes c ON c.class_id = r.class_id
-    WHERE r.school_id = ? AND r.is_deleted = 0`;
-    const params = [schoolId];
+    const studentIds = [...new Set((resultRows || []).map(r => r.student_id).filter(Boolean))];
+    const { data: studentRows, error: studentsErr } = studentIds.length
+      ? await supabase
+          .from("students")
+          .select("student_id,first_name,last_name,class_name,school_id,is_deleted")
+          .eq("school_id", schoolId)
+          .eq("is_deleted", false)
+          .in("student_id", studentIds)
+      : { data: [], error: null };
+    if (studentsErr) throw studentsErr;
 
-    if (studentId) { sql += " AND r.student_id = ?"; params.push(studentId); }
-    if (term)      { sql += " AND r.term = ?";       params.push(term); }
-    if (classId)   { sql += " AND r.class_id = ?";   params.push(classId); }
+    const studentById = new Map((studentRows || []).map(s => [s.student_id, s]));
+    const merged = (resultRows || []).map(r => {
+      const s = studentById.get(r.student_id) || {};
+      return {
+        ...r,
+        first_name: s.first_name,
+        last_name: s.last_name,
+        class_name: s.class_name,
+      };
+    });
 
-    sql += " ORDER BY r.result_id DESC";
-
-    const [rows] = await pool.query(sql, params);
-    res.json(rows.map(normalise));
+    res.json(merged.map(normalise));
 } catch (err) { next(err); }
 });
 
@@ -82,19 +83,31 @@ router.get("/", async (req, res, next) => {
 router.get("/:id", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
-    `SELECT r.result_id, r.student_id, r.marks, r.total_marks, r.grade,
-            r.teacher_comment, r.term,
-            r.subject,
-            s.first_name, s.last_name,
-            s.class_name
-        FROM results r
-        JOIN students s   ON s.student_id  = r.student_id
-        LEFT JOIN classes c ON c.class_id = r.class_id
-        WHERE r.result_id = ? AND r.school_id = ? AND r.is_deleted = 0 LIMIT 1`,
-        [req.params.id, schoolId]
+    // OLD: const [rows] = await pool.query(
+    // OLD: `SELECT r.result_id, r.student_id, r.marks, r.total_marks, r.grade,
+    // OLD:         r.teacher_comment, r.term,
+    // OLD:         r.subject,
+    // OLD:         s.first_name, s.last_name,
+    // OLD:         s.class_name
+    // OLD:     FROM results r
+    // OLD:     JOIN students s   ON s.student_id  = r.student_id
+    // OLD:     LEFT JOIN classes c ON c.class_id = r.class_id
+    // OLD:     WHERE r.result_id = ? AND r.school_id = ? AND r.is_deleted = 0 LIMIT 1`,
+    // OLD:     [req.params.id, schoolId]
+    // OLD: );
+    const { data: rows } = await pool.query(
+      `SELECT r.result_id, r.student_id, r.marks, r.total_marks, r.grade,
+              r.teacher_comment, r.term,
+              r.subject,
+              s.first_name, s.last_name,
+              s.class_name
+          FROM results r
+          JOIN students s   ON s.student_id  = r.student_id
+          LEFT JOIN classes c ON c.class_id = r.class_id
+          WHERE r.result_id = ? AND r.school_id = ? AND r.is_deleted = 0 LIMIT 1`,
+      [req.params.id, schoolId]
     );
-    if (!rows.length) return res.status(404).json({ message: "Result not found" });
+    if (!rows?.length) return res.status(404).json({ message: "Result not found" });
     res.json(normalise(rows[0]));
   } catch (err) { next(err); }
 });
