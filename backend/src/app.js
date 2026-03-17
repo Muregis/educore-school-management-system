@@ -25,7 +25,7 @@ import invoicesRoutes      from "./routes/invoices.routes.js";
 import reportcardsRoutes   from "./routes/reportcards.routes.js";
 import analyticsRoutes     from "./routes/analytics.routes.js";
 import hrRoutes            from "./routes/hr.routes.js";
-import libraryRoutes       from "./routes/library.routes.js";
+// OLD: import libraryRoutes       from "./routes/library.routes.js";
 import analysisRoutes      from "./routes/analysis.routes.js";
 import activityRoutes      from "./routes/activity.routes.js";
 import adminRoutes         from "./routes/admin.routes.js";
@@ -68,13 +68,13 @@ app.use(apiRateLimit); // Apply rate limiting to all API routes
 
 // NEW: Apply tenant context middleware globally (after auth, before routes)
 // Note: auth routes are excluded from global auth and handled separately
+app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api", authRequired);
 app.use("/api", tenantContext);
 app.use("/api", tenantSecurityCheck);
 
-app.use("/api",               healthRoutes);
-app.use("/api/students",      studentsRoutes);
+app.use("/api",               studentsRoutes);
 app.use("/api/teachers",      teachersRoutes);
 app.use("/api/attendance",    attendanceRoutes);
 app.use("/api/grades",        gradesRoutes);
@@ -94,7 +94,7 @@ app.use("/api/invoices",      invoicesRoutes);
 app.use("/api/reportcards",   reportcardsRoutes);
 app.use("/api/analytics",     analyticsRoutes);
 app.use("/api/hr",            hrRoutes);
-app.use("/api/library",       libraryRoutes);
+// OLD: app.use("/api/library",       libraryRoutes);
 app.use("/api/analysis",      analysisRoutes);
 app.use("/api/activity-logs", activityRoutes);
 app.use("/api/admin",         adminRoutes);

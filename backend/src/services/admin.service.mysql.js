@@ -1,3 +1,6 @@
+// OLD: MySQL-specific Admin Service (commented for safety)
+// This file used MySQL-specific syntax and is replaced by admin.service.js which uses Supabase
+/*
 import { pool } from "../config/db.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import bcrypt from "bcryptjs";
@@ -408,3 +411,4 @@ export class AdminService {
 }
 
 export default AdminService;
+*/

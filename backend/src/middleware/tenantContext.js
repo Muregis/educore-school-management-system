@@ -1,4 +1,4 @@
-import { pgPool } from "../config/pg.js";
+import { pool } from "../config/db.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 
 // NEW: Tenant context middleware for automatic tenant isolation

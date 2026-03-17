@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { pgPool } from "../config/pg.js";
+import { pool } from "../config/db.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { sendEmail, isEmailConfigured, templates } from "../services/email.service.js";
@@ -13,13 +13,13 @@ router.use(authRequired);
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { rows } = await pgPool.query(
+    const { data: rows } = await pool.query(
       `SELECT p.payment_id, p.student_id, p.amount, p.fee_type, p.payment_method,
               p.reference_number, p.payment_date, p.status, p.paid_by,
               s.first_name, s.last_name, s.class_name
       FROM payments p
       LEFT JOIN students s ON s.student_id = p.student_id AND s.is_deleted = false
-      WHERE p.school_id = $1 AND p.is_deleted = false
+      WHERE p.school_id = ? AND p.is_deleted = false
       ORDER BY p.payment_date DESC, p.payment_id DESC`,
       [schoolId]
     );
@@ -31,9 +31,9 @@ router.get("/", async (req, res, next) => {
 router.get("/fee-structures", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { rows } = await pgPool.query(
+    const { data: rows } = await pool.query(
       `SELECT fee_structure_id, class_name, term, tuition, activity, misc
-      FROM fee_structures WHERE school_id = $1 AND is_deleted = false
+      FROM fee_structures WHERE school_id = ? AND is_deleted = false
       ORDER BY class_name`,
       [schoolId]
     );
@@ -48,13 +48,13 @@ router.post("/fee-structures", requireRoles("admin", "finance"), async (req, res
     const { className, term = "Term 2", tuition = 0, activity = 0, misc = 0 } = req.body;
     if (!className) return res.status(400).json({ message: "className is required" });
 
-    await pgPool.query(
+    const { data: rows } = await pool.query(
       `INSERT INTO fee_structures (school_id, class_name, term, tuition, activity, misc)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      ON CONFLICT (school_id, class_name, term) DO UPDATE SET 
-        tuition = EXCLUDED.tuition, 
-        activity = EXCLUDED.activity, 
-        misc = EXCLUDED.misc, 
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE 
+        tuition = VALUES(tuition), 
+        activity = VALUES(activity), 
+        misc = VALUES(misc), 
         updated_at = CURRENT_TIMESTAMP`,
       [schoolId, className, term, tuition, activity, misc]
     );
@@ -81,10 +81,9 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
     if (!studentId || !amount || !paymentDate)
       return res.status(400).json({ message: "studentId, amount and paymentDate are required" });
 
-    const { rows } = await pgPool.query(
+    const { data: rows } = await pool.query(
       `INSERT INTO payments (school_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status, term, paid_by)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING payment_id`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [schoolId, studentId, amount, feeType, paymentMethod, referenceNumber, paymentDate, status, term, paidBy]
     );
     const result = rows[0];
@@ -92,15 +91,15 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
     // ── Email notification (fire-and-forget) ──
     if (isEmailConfigured()) {
       try {
-        const { rows: studentRows } = await pgPool.query(
+        const { data: studentRows } = await pool.query(
           `SELECT s.first_name, s.last_name, s.parent_name,
           u.email,
           COALESCE(SUM(i.amount_due),0) - COALESCE(SUM(p2.paid),0) AS balance
           FROM students s
           LEFT JOIN users u ON u.student_id = s.student_id AND u.role = 'parent'
           LEFT JOIN invoices i ON i.student_id = s.student_id AND i.school_id = s.school_id
-          LEFT JOIN (SELECT invoice_id, SUM(amount) AS paid FROM payments WHERE school_id=$1 AND is_deleted=false GROUP BY invoice_id) p2 ON p2.invoice_id = i.invoice_id
-          WHERE s.student_id = $2 AND s.school_id = $3
+          LEFT JOIN (SELECT invoice_id, SUM(amount) AS paid FROM payments WHERE school_id=? AND is_deleted=false GROUP BY invoice_id) p2 ON p2.invoice_id = i.invoice_id
+          WHERE s.student_id = ? AND s.school_id = ?
             AND (u.is_deleted = false OR u.is_deleted IS NULL)
             AND (i.is_deleted = false OR i.is_deleted IS NULL)
           GROUP BY s.student_id, u.email`, [schoolId, studentId, schoolId]
@@ -140,11 +139,10 @@ router.put("/:id", requireRoles("admin", "finance"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { amount, feeType, paymentMethod, referenceNumber, paymentDate, status, paidBy } = req.body;
-    const { rows } = await pgPool.query(
-      `UPDATE payments SET amount=$1, fee_type=$2, payment_method=$3, reference_number=$4,
-      payment_date=$5, status=$6, paid_by=$7, updated_at=CURRENT_TIMESTAMP
-      WHERE payment_id=$8 AND school_id=$9 AND is_deleted=false
-      RETURNING *`,
+    const { data: rows } = await pool.query(
+      `UPDATE payments SET amount=?, fee_type=?, payment_method=?, reference_number=?,
+      payment_date=?, status=?, paid_by=?, updated_at=CURRENT_TIMESTAMP
+      WHERE payment_id=? AND school_id=? AND is_deleted=false`,
       [amount, feeType, paymentMethod, referenceNumber||null, paymentDate, status||"paid", paidBy||null, req.params.id, schoolId]
     );
     const result = rows[0];
@@ -166,10 +164,9 @@ router.put("/:id", requireRoles("admin", "finance"), async (req, res, next) => {
 router.delete("/:id", requireRoles("admin", "finance"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { rows } = await pgPool.query(
+    const { data: rows } = await pool.query(
       `UPDATE payments SET is_deleted=true, updated_at=CURRENT_TIMESTAMP
-      WHERE payment_id=$1 AND school_id=$2
-      RETURNING *`,
+      WHERE payment_id=? AND school_id=?`,
       [req.params.id, schoolId]
     );
     const result = rows[0];

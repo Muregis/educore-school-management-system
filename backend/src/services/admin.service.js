@@ -1,4 +1,4 @@
-import { pgPool } from "../config/pg.js";
+import { database } from "../config/db.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -9,16 +9,14 @@ export class AdminService {
   // Reset user password
   static async resetPassword(adminUser, targetUserId, newPassword, req) {
     try {
-      await pgPool.query('BEGIN');
+      // Get target user info using Supabase
+      const { data: users } = await database.query('users', {
+        select: 'user_id, school_id, full_name, email, role',
+        where: { user_id: targetUserId, is_deleted: false },
+        limit: 1
+      });
 
-      // Get target user info
-      const { rows } = await pgPool.query(
-        `SELECT user_id, school_id, full_name, email, role FROM users 
-         WHERE user_id = $1 AND is_deleted = false`,
-        [targetUserId]
-      );
-      const [targetUser] = rows;
-
+      const targetUser = users?.[0];
       if (!targetUser) {
         throw new Error('User not found');
       }
@@ -31,11 +29,13 @@ export class AdminService {
       // Hash new password
       const hash = await bcrypt.hash(newPassword, 10);
 
-      // Update password
-      await pgPool.query(
-        `UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP 
-         WHERE user_id = $2`,
-        [hash, targetUserId]
+      // Update password using Supabase
+      await database.update('users', 
+        { 
+          password_hash: hash, 
+          updated_at: new Date().toISOString() 
+        },
+        { user_id: targetUserId }
       );
 
       // Log password reset
@@ -46,80 +46,77 @@ export class AdminService {
         newValues: { action: 'password_reset', performedBy: adminUser.user_id }
       });
 
-      await pgPool.query('COMMIT');
-      
-      return {
-        success: true,
-        userId: targetUserId,
-        userName: targetUser.full_name,
-        message: 'Password reset successfully'
-      };
-
+      return { success: true, message: 'Password reset successfully' };
     } catch (error) {
-      await pgPool.query('ROLLBACK');
-      throw error;
+      console.error('Password reset error:', error);
+      throw new Error(`Failed to reset password: ${error.message}`);
     }
   }
 
   // Generate impersonation token
   static async generateImpersonationToken(adminUser, targetUserId, req) {
-    // Get target user info
-    const { rows } = await pgPool.query(
-      `SELECT user_id, school_id, full_name, email, role, student_id FROM users 
-       WHERE user_id = $1 AND is_deleted = false`,
-      [targetUserId]
-    );
-    const [targetUser] = rows;
+    try {
+      // Get target user info using Supabase
+      const { data: users } = await database.query('users', {
+        select: 'user_id, school_id, full_name, email, role, student_id',
+        where: { user_id: targetUserId, is_deleted: false },
+        limit: 1
+      });
 
-    if (!targetUser) {
-      throw new Error('User not found');
-    }
-
-    // Verify admin can impersonate this user (same school)
-    if (targetUser.school_id !== adminUser.school_id) {
-      throw new Error('Cannot impersonate user from different school');
-    }
-
-    // Create impersonation payload
-    const impersonationPayload = {
-      user_id: targetUser.user_id,
-      school_id: targetUser.school_id,
-      role: targetUser.role,
-      name: targetUser.full_name,
-      email: targetUser.email,
-      student_id: targetUser.student_id,
-      impersonated_by: adminUser.user_id,
-      impersonated_by_name: adminUser.full_name,
-      is_impersonation: true
-    };
-
-    // Generate short-lived token (1 hour)
-    const token = jwt.sign(impersonationPayload, env.jwtSecret, {
-      expiresIn: '1h'
-    });
-
-    // Log impersonation
-    await logAuditEvent(req, AUDIT_ACTIONS.ADMIN_ACTION, {
-      entityId: targetUserId,
-      entityType: 'user',
-      description: `User impersonation: ${adminUser.full_name} impersonating ${targetUser.full_name}`,
-      newValues: { 
-        targetUserId: targetUser.user_id,
-        targetRole: targetUser.role,
-        impersonationToken: token.substring(0, 20) + '...'
+      const targetUser = users?.[0];
+      if (!targetUser) {
+        throw new Error('User not found');
       }
-    });
 
-    return {
-      token,
-      targetUser: {
-        userId: targetUser.user_id,
-        name: targetUser.full_name,
+      // Verify admin can impersonate this user (same school)
+      if (targetUser.school_id !== adminUser.school_id) {
+        throw new Error('Cannot impersonate user from different school');
+      }
+
+      // Create impersonation payload
+      const impersonationPayload = {
+        user_id: targetUser.user_id,
+        school_id: targetUser.school_id,
         role: targetUser.role,
-        email: targetUser.email
-      },
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString()
-    };
+        name: targetUser.full_name,
+        email: targetUser.email,
+        student_id: targetUser.student_id,
+        impersonated_by: adminUser.user_id,
+        impersonated_by_name: adminUser.full_name,
+        is_impersonation: true
+      };
+
+      // Generate short-lived token (1 hour)
+      const token = jwt.sign(impersonationPayload, env.jwtSecret, {
+        expiresIn: '1h'
+      });
+
+      // Log impersonation
+      await logAuditEvent(req, AUDIT_ACTIONS.ADMIN_ACTION, {
+        entityId: targetUserId,
+        entityType: 'user',
+        description: `User impersonation: ${adminUser.full_name} impersonating ${targetUser.full_name}`,
+        newValues: { 
+          targetUserId: targetUser.user_id,
+          targetRole: targetUser.role,
+          impersonationToken: token.substring(0, 20) + '...'
+        }
+      });
+
+      return {
+        token,
+        targetUser: {
+          userId: targetUser.user_id,
+          name: targetUser.full_name,
+          role: targetUser.role,
+          email: targetUser.email
+        },
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString()
+      };
+    } catch (error) {
+      console.error('Impersonation error:', error);
+      throw new Error(`Failed to generate impersonation token: ${error.message}`);
+    }
   }
 
   // Get system health metrics
@@ -128,216 +125,208 @@ export class AdminService {
 
     // Database connection test
     try {
-      await pgPool.query('SELECT 1');
+      await database.query('users', { select: '1', limit: 1 });
       metrics.database = { status: 'healthy', latency: Date.now() };
     } catch (error) {
       metrics.database = { status: 'unhealthy', error: error.message };
     }
 
-    // User counts
-    const userResult = await pgPool.query(
-      `SELECT 
-         COUNT(*) as total_users,
-         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_users,
-         SUM(CASE WHEN last_login_at > NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END) as recent_logins
-       FROM users WHERE school_id = $1 AND is_deleted = false`,
-      [schoolId]
-    );
-    const [userCounts] = userResult.rows;
+    // User counts using Supabase
+    try {
+      const { data: activeUsers } = await database.query('users', {
+        select: 'status, last_login_at',
+        where: { school_id: schoolId, is_deleted: false }
+      });
 
-    metrics.users = userCounts;
+      const totalUsers = activeUsers?.length || 0;
+      const activeCount = activeUsers?.filter(u => u.status === 'active').length || 0;
+      const recentLogins = activeUsers?.filter(u => {
+        const lastLogin = new Date(u.last_login_at);
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        return lastLogin > weekAgo;
+      }).length || 0;
 
-    // Student counts
-    const studentResult = await pgPool.query(
-      `SELECT 
-         COUNT(*) as total_students,
-         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_students
-       FROM students WHERE school_id = $1 AND is_deleted = false`,
-      [schoolId]
-    );
-    const [studentCounts] = studentResult.rows;
+      metrics.users = {
+        total_users: totalUsers,
+        active_users: activeCount,
+        recent_logins: recentLogins
+      };
+    } catch (error) {
+      metrics.users = { error: error.message };
+    }
 
-    metrics.students = studentCounts;
+    // Student counts using Supabase
+    try {
+      const { data: students } = await database.query('students', {
+        select: 'status',
+        where: { school_id: schoolId, is_deleted: false }
+      });
 
-    // Payment summary
-    const paymentResult = await pgPool.query(
-      `SELECT 
-         COUNT(*) as total_payments,
-         SUM(amount) as total_amount,
-         SUM(CASE WHEN payment_date > NOW() - INTERVAL '30 days' THEN amount ELSE 0 END) as recent_amount
-       FROM payments WHERE school_id = $1 AND is_deleted = false`,
-      [schoolId]
-    );
-    const [paymentSummary] = paymentResult.rows;
+      const totalStudents = students?.length || 0;
+      const activeStudents = students?.filter(s => s.status === 'active').length || 0;
 
-    metrics.payments = paymentSummary;
+      metrics.students = {
+        total_students: totalStudents,
+        active_students: activeStudents
+      };
+    } catch (error) {
+      metrics.students = { error: error.message };
+    }
 
-    // Storage usage (approximate)
-    const storageResult = await pgPool.query(
-      `SELECT 
-         COUNT(*) as total_records,
-         SUM(LENGTH(first_name) + LENGTH(last_name) + LENGTH(email)) as data_size
-       FROM students WHERE school_id = $1 AND is_deleted = false`,
-      [schoolId]
-    );
-    const [storageUsage] = storageResult.rows;
+    // Payment summary using Supabase
+    try {
+      const { data: payments } = await database.query('payments', {
+        select: 'amount, payment_date',
+        where: { school_id: schoolId, is_deleted: false }
+      });
 
-    metrics.storage = {
-      totalRecords: storageUsage.total_records,
-      estimatedSizeKB: Math.round((storageUsage.data_size || 0) / 1024)
-    };
+      const totalPayments = payments?.length || 0;
+      const totalAmount = payments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const recentAmount = payments?.filter(p => new Date(p.payment_date) > thirtyDaysAgo)
+        .reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+
+      metrics.payments = {
+        total_payments: totalPayments,
+        total_amount: totalAmount,
+        recent_amount: recentAmount
+      };
+    } catch (error) {
+      metrics.payments = { error: error.message };
+    }
 
     return metrics;
   }
 
   // Get activity logs with pagination
   static async getActivityLogs(schoolId, filters = {}, page = 1, limit = 50) {
-    const offset = (page - 1) * limit;
-    
-    let whereClause = `WHERE al.school_id = $1`;
-    const params = [schoolId];
+    try {
+      const offset = (page - 1) * limit;
+      
+      // Build query conditions
+      const whereConditions = { school_id: schoolId };
+      if (filters.userId) whereConditions.user_id = filters.userId;
+      if (filters.action) whereConditions.action = filters.action;
+      if (filters.dateFrom) whereConditions.created_at = { gte: filters.dateFrom };
+      if (filters.dateTo) whereConditions.created_at = { lte: filters.dateTo };
 
-    if (filters.userId) {
-      whereClause += ` AND al.user_id = $${params.length + 1}`;
-      params.push(filters.userId);
-    }
+      // Get logs using Supabase
+      const { data: logs, error } = await database.rpc('get_activity_logs_paginated', {
+        p_school_id: schoolId,
+        p_filters: whereConditions,
+        p_limit: limit,
+        p_offset: offset
+      });
 
-    if (filters.action) {
-      whereClause += ` AND al.action = $${params.length + 1}`;
-      params.push(filters.action);
-    }
+      if (error) {
+        // Fallback to simple query if RPC not available
+        const { data: simpleLogs } = await database.query('activity_logs', {
+          where: whereConditions,
+          order: { column: 'created_at', ascending: false },
+          limit: limit,
+          offset: offset
+        });
 
-    if (filters.dateFrom) {
-      whereClause += ` AND al.created_at >= $${params.length + 1}`;
-      params.push(filters.dateFrom);
-    }
-
-    if (filters.dateTo) {
-      whereClause += ` AND al.created_at <= $${params.length + 1}`;
-      params.push(filters.dateTo);
-    }
-
-    // Get logs
-    const logsResult = await pgPool.query(
-      `SELECT al.*, u.full_name, u.role
-       FROM activity_logs al
-       LEFT JOIN users u ON u.user_id = al.user_id
-       ${whereClause}
-       ORDER BY al.created_at DESC
-       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-      [...params, limit, offset]
-    );
-    const logs = logsResult.rows;
-
-    // Get total count
-    const countResult = await pgPool.query(
-      `SELECT COUNT(*) as total FROM activity_logs al ${whereClause}`,
-      params
-    );
-    const [countResultRow] = countResult.rows;
-
-    return {
-      logs,
-      pagination: {
-        page,
-        limit,
-        total: countResultRow.total,
-        pages: Math.ceil(countResultRow.total / limit)
+        return {
+          logs: simpleLogs || [],
+          pagination: { page, limit, total: simpleLogs?.length || 0, pages: 1 }
+        };
       }
-    };
+
+      return {
+        logs: logs || [],
+        pagination: { page, limit, total: logs?.length || 0, pages: 1 }
+      };
+    } catch (error) {
+      console.error('Activity logs error:', error);
+      throw new Error(`Failed to get activity logs: ${error.message}`);
+    }
   }
 
   // Get audit logs with pagination
   static async getAuditLogs(schoolId, filters = {}, page = 1, limit = 50) {
-    const offset = (page - 1) * limit;
-    
-    let whereClause = `WHERE al.school_id = $1`;
-    const params = [schoolId];
+    try {
+      const offset = (page - 1) * limit;
+      
+      // Build query conditions
+      const whereConditions = { school_id: schoolId };
+      if (filters.userId) whereConditions.user_id = filters.userId;
+      if (filters.action) whereConditions.action = filters.action;
+      if (filters.entityType) whereConditions.entity_type = filters.entityType;
+      if (filters.dateFrom) whereConditions.timestamp = { gte: filters.dateFrom };
+      if (filters.dateTo) whereConditions.timestamp = { lte: filters.dateTo };
 
-    if (filters.userId) {
-      whereClause += ` AND al.user_id = $${params.length + 1}`;
-      params.push(filters.userId);
-    }
+      // Get logs using Supabase
+      const { data: logs, error } = await database.rpc('get_audit_logs_paginated', {
+        p_school_id: schoolId,
+        p_filters: whereConditions,
+        p_limit: limit,
+        p_offset: offset
+      });
 
-    if (filters.action) {
-      whereClause += ` AND al.action = $${params.length + 1}`;
-      params.push(filters.action);
-    }
+      if (error) {
+        // Fallback to simple query
+        const { data: simpleLogs } = await database.query('audit_logs', {
+          where: whereConditions,
+          order: { column: 'timestamp', ascending: false },
+          limit: limit,
+          offset: offset
+        });
 
-    if (filters.entityType) {
-      whereClause += ` AND al.entity_type = $${params.length + 1}`;
-      params.push(filters.entityType);
-    }
-
-    if (filters.dateFrom) {
-      whereClause += ` AND al.timestamp >= $${params.length + 1}`;
-      params.push(filters.dateFrom);
-    }
-
-    if (filters.dateTo) {
-      whereClause += ` AND al.timestamp <= $${params.length + 1}`;
-      params.push(filters.dateTo);
-    }
-
-    // Get logs
-    const logsResult = await pgPool.query(
-      `SELECT al.*, u.full_name, u.role
-       FROM audit_logs al
-       LEFT JOIN users u ON u.user_id = al.user_id
-       ${whereClause}
-       ORDER BY al.timestamp DESC
-       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-      [...params, limit, offset]
-    );
-    const logs = logsResult.rows;
-
-    // Get total count
-    const countResult = await pgPool.query(
-      `SELECT COUNT(*) as total FROM audit_logs al ${whereClause}`,
-      params
-    );
-    const [countResultRow] = countResult.rows;
-
-    return {
-      logs,
-      pagination: {
-        page,
-        limit,
-        total: countResultRow.total,
-        pages: Math.ceil(countResultRow.total / limit)
+        return {
+          logs: simpleLogs || [],
+          pagination: { page, limit, total: simpleLogs?.length || 0, pages: 1 }
+        };
       }
-    };
+
+      return {
+        logs: logs || [],
+        pagination: { page, limit, total: logs?.length || 0, pages: 1 }
+      };
+    } catch (error) {
+      console.error('Audit logs error:', error);
+      throw new Error(`Failed to get audit logs: ${error.message}`);
+    }
   }
 
   // Get user management data
   static async getUserManagementData(schoolId) {
-    const userStatsResult = await pgPool.query(
-      `SELECT 
-         role,
-         COUNT(*) as total,
-         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
-         SUM(CASE WHEN last_login_at > NOW() - INTERVAL '7 days' THEN 1 ELSE 0 END) as recent_logins
-       FROM users 
-       WHERE school_id = $1 AND is_deleted = false
-       GROUP BY role`,
-      [schoolId]
-    );
-    const [userStats] = userStatsResult.rows;
+    try {
+      // Get user stats using Supabase
+      const { data: users } = await database.query('users', {
+        select: 'role, status, last_login_at',
+        where: { school_id: schoolId, is_deleted: false }
+      });
 
-    const recentUsersResult = await pgPool.query(
-      `SELECT u.user_id, u.full_name, u.email, u.role, u.status, u.last_login_at, u.created_at
-       FROM users u
-       WHERE u.school_id = $1 AND u.is_deleted = false
-       ORDER BY u.created_at DESC
-       LIMIT 10`,
-      [schoolId]
-    );
-    const recentUsers = recentUsersResult.rows;
+      const userStats = {};
+      users?.forEach(user => {
+        if (!userStats[user.role]) {
+          userStats[user.role] = { total: 0, active: 0, recent_logins: 0 };
+        }
+        userStats[user.role].total++;
+        if (user.status === 'active') userStats[user.role].active++;
+        
+        const lastLogin = new Date(user.last_login_at);
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        if (lastLogin > weekAgo) userStats[user.role].recent_logins++;
+      });
 
-    return {
-      stats: userStats,
-      recentUsers
-    };
+      // Get recent users
+      const { data: recentUsers } = await database.query('users', {
+        select: 'user_id, full_name, email, role, status, last_login_at, created_at',
+        where: { school_id: schoolId, is_deleted: false },
+        order: { column: 'created_at', ascending: false },
+        limit: 10
+      });
+
+      return {
+        stats: Object.entries(userStats).map(([role, stats]) => ({ role, ...stats })),
+        recentUsers: recentUsers || []
+      };
+    } catch (error) {
+      console.error('User management data error:', error);
+      throw new Error(`Failed to get user management data: ${error.message}`);
+    }
   }
 
   // Bulk user operations
@@ -345,48 +334,28 @@ export class AdminService {
     const results = { updated: [], errors: [] };
 
     try {
-      await pgPool.query('BEGIN');
-
       for (const userId of userIds) {
         try {
-          // Verify user belongs to school
-          const userResult = await pgPool.query(
-            `SELECT user_id, full_name, role FROM users 
-             WHERE user_id = $1 AND school_id = $2 AND is_deleted = false`,
-            [userId, schoolId]
-          );
-          const [user] = userResult.rows;
+          // Verify user belongs to school using Supabase
+          const { data: users } = await database.query('users', {
+            select: 'user_id, full_name, role',
+            where: { user_id: userId, school_id: schoolId, is_deleted: false },
+            limit: 1
+          });
 
+          const user = users?.[0];
           if (!user) {
             results.errors.push({ userId, message: 'User not found' });
             continue;
           }
 
-          // Build update query
-          const updateFields = [];
-          const updateValues = [];
-
-          if (updates.status) {
-            updateFields.push('status = $1');
-            updateValues.push(updates.status);
-          }
-
-          if (updates.role) {
-            updateFields.push('role = $2');
-            updateValues.push(updates.role);
-          }
-
-          if (updateFields.length === 0) {
-            results.errors.push({ userId, message: 'No valid updates provided' });
-            continue;
-          }
-
-          updateFields.push('updated_at = CURRENT_TIMESTAMP');
-          updateValues.push(userId);
-
-          await pgPool.query(
-            `UPDATE users SET ${updateFields.join(', ')} WHERE user_id = $${updateValues.length}`,
-            updateValues
+          // Update user using Supabase
+          await database.update('users', 
+            { 
+              ...updates,
+              updated_at: new Date().toISOString() 
+            },
+            { user_id: userId }
           );
 
           // Log bulk update
@@ -404,12 +373,10 @@ export class AdminService {
         }
       }
 
-      await pgPool.query('COMMIT');
       return results;
-
     } catch (error) {
-      await pgPool.query('ROLLBACK');
-      throw error;
+      console.error('Bulk update error:', error);
+      throw new Error(`Failed to bulk update users: ${error.message}`);
     }
   }
 }

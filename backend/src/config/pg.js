@@ -48,11 +48,35 @@ pgPool.on('acquire', (client) => {
 });
 
 export async function testPgConnection() {
-  const client = await pgPool.connect();
+  // Use Supabase client with service role key to bypass RLS for connection test
+  const { createClient } = await import('@supabase/supabase-js');
+  
+  const supabaseAdmin = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY, // service_role key bypasses RLS
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+      }
+    }
+  );
+
   try {
-    await client.query("SELECT 1 AS ok");
+    // Simple test query that doesn't hit RLS-protected tables
+    const { data, error } = await supabaseAdmin
+      .from('schools')
+      .select('school_id')
+      .limit(1);
+
+    if (error) {
+      throw new Error(`Supabase test failed: ${error.message}`);
+    }
+    
+    console.log(`✅ Supabase test query succeeded (rows: ${data.length})`);
   } finally {
-    client.release();
+    // No need to manually close Supabase client
   }
 }
 

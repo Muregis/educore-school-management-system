@@ -14,7 +14,7 @@ const HR_ROLES = ["admin","hr"];
 router.get("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
+    const { data: rows } = await pool.query(
       `SELECT * FROM hr_staff WHERE school_id=? AND is_deleted=0 ORDER BY department, full_name`,
       [schoolId]
     );
@@ -27,7 +27,7 @@ router.post("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
     const { schoolId } = req.user;
     const { fullName, email, phone, department, jobTitle, contractType, startDate, salary, status, nationalId, notes } = req.body;
     if (!fullName || !jobTitle) return res.status(400).json({ message: "fullName and jobTitle are required" });
-    const [result] = await pool.query(
+    const { data: result } = await pool.query(
       `INSERT INTO hr_staff (school_id, full_name, email, phone, department, job_title, contract_type, start_date, salary, status, national_id, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [schoolId, fullName, email||null, phone||null, department||"Academic", jobTitle,
@@ -35,7 +35,7 @@ router.post("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
     );
     // OLD:
     // const [row] = await pool.query(`SELECT * FROM hr_staff WHERE staff_id=?`, [result.insertId]);
-    const [row] = await pool.query(`SELECT * FROM hr_staff WHERE staff_id=? AND school_id=?`, [result.insertId, schoolId]);
+    const { data: row } = await pool.query(`SELECT * FROM hr_staff WHERE staff_id=? AND school_id=?`, [result.insertId, schoolId]);
     res.status(201).json(row[0]);
   } catch (err) { next(err); }
 });
@@ -44,7 +44,7 @@ router.put("/staff/:id", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { fullName, email, phone, department, jobTitle, contractType, startDate, salary, status, nationalId, notes } = req.body;
-    const [result] = await pool.query(
+    const { data: result } = await pool.query(
       `UPDATE hr_staff SET full_name=?, email=?, phone=?, department=?, job_title=?, contract_type=?,
       start_date=?, salary=?, status=?, national_id=?, notes=?, updated_at=CURRENT_TIMESTAMP
       WHERE staff_id=? AND school_id=? AND is_deleted=0`,
@@ -70,7 +70,7 @@ router.delete("/staff/:id", requireRoles(...HR_ROLES), async (req, res, next) =>
 router.get("/leave", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
+    const { data: rows } = await pool.query(
       `SELECT l.*, s.full_name AS staff_name, s.department, s.job_title
       FROM hr_leave l
       JOIN hr_staff s ON s.staff_id = l.staff_id
@@ -88,7 +88,7 @@ router.post("/leave", requireRoles(...HR_ROLES), async (req, res, next) => {
     const { staffId, leaveType, fromDate, toDate, reason } = req.body;
     if (!staffId || !fromDate || !toDate)
       return res.status(400).json({ message: "staffId, fromDate, toDate are required" });
-    const [result] = await pool.query(
+    const { data: result } = await pool.query(
       `INSERT INTO hr_leave (school_id, staff_id, leave_type, from_date, to_date, reason)
       VALUES (?, ?, ?, ?, ?, ?)`,
       [schoolId, staffId, leaveType||"Annual", fromDate, toDate, reason||null]
@@ -109,7 +109,7 @@ router.patch("/leave/:id", requireRoles(...HR_ROLES), async (req, res, next) => 
     );
     // If approved — update staff status to on-leave
     if (status === "approved") {
-      const [leave] = await pool.query(`SELECT staff_id FROM hr_leave WHERE leave_id=?`, [req.params.id]);
+      const { data: leave } = await pool.query(`SELECT staff_id FROM hr_leave WHERE leave_id=?`, [req.params.id]);
       if (leave.length) {
         await pool.query(`UPDATE hr_staff SET status='on-leave' WHERE staff_id=? AND school_id=?`, [leave[0].staff_id, schoolId]);
       }
@@ -140,7 +140,7 @@ router.get("/attendance", requireRoles(...HR_ROLES), async (req, res, next) => {
     if (to)         { sql += " AND a.attendance_date<=?"; params.push(to); }
 
     sql += " ORDER BY a.attendance_date DESC, s.full_name";
-    const [rows] = await pool.query(sql, params);
+    const { data: rows } = await pool.query(sql, params);
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -211,7 +211,7 @@ router.get("/payslips", requireRoles(...HR_ROLES), async (req, res, next) => {
     if (staffId) { sql += " AND p.staff_id=?"; params.push(staffId); }
 
     sql += " ORDER BY p.year DESC, p.month DESC, s.full_name";
-    const [rows] = await pool.query(sql, params);
+    const { data: rows } = await pool.query(sql, params);
     res.json(rows);
   } catch (err) { next(err); }
 });
@@ -223,7 +223,7 @@ router.post("/payslips/generate", requireRoles(...HR_ROLES), async (req, res, ne
     const { month, year, allowances = 0, notes } = req.body;
     if (!month || !year) return res.status(400).json({ message: "month and year are required" });
 
-    const [activeStaff] = await pool.query(
+    const { data: activeStaff } = await pool.query(
       `SELECT * FROM hr_staff WHERE school_id=? AND is_deleted=0 AND status='active'`,
       [schoolId]
     );
@@ -286,7 +286,7 @@ router.put("/payslips/:id", requireRoles(...HR_ROLES), async (req, res, next) =>
   try {
     const { schoolId } = req.user;
     const { allowances, deductions, notes, status } = req.body;
-    const [rows] = await pool.query(`SELECT * FROM hr_payslips WHERE payslip_id=? AND school_id=?`, [req.params.id, schoolId]);
+    const { data: rows } = await pool.query(`SELECT * FROM hr_payslips WHERE payslip_id=? AND school_id=?`, [req.params.id, schoolId]);
     if (!rows.length) return res.status(404).json({ message: "Payslip not found" });
     const p = rows[0];
     const allow  = allowances !== undefined ? Number(allowances) : Number(p.allowances);

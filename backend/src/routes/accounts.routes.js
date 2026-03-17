@@ -12,7 +12,7 @@ router.use(requireRoles("admin"));
 router.get("/users", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
+    const { data: rows } = await pool.query(
       `SELECT user_id, full_name, email, phone, role, status, created_at
       FROM users
       WHERE school_id = ? AND is_deleted = 0
