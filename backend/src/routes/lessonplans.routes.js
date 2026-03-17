@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool }   from "../config/db.js";
 import { env }    from "../config/env.js";
+import { supabase } from "../config/supabaseClient.js";
 import { authRequired }  from "../middleware/auth.js";
 import { requireRoles }  from "../middleware/roles.js";
 import { logActivity }   from "../helpers/activity.logger.js";
@@ -49,31 +50,65 @@ router.get("/", async (req, res, next) => {
     const status = req.query.status || null;
     const type   = req.query.type   || null;
 
-    const filters = ["p.school_id = ?", "p.is_deleted = false"];
-    const params  = [schoolId];
+    // OLD: const filters = ["p.school_id = ?", "p.is_deleted = false"];
+    // OLD: const params  = [schoolId];
+    // OLD: ... build SQL join ...
+    // OLD: const { data: rows } = await pool.query(`SELECT ...`, params);
+    // OLD: res.json(rows);
 
-    if (role === "teacher") {
-      filters.push("p.teacher_id = ?");
-      params.push(userId);
-    }
-    if (status) { filters.push("p.status = ?");     params.push(status); }
-    if (type)   { filters.push("p.type = ?");       params.push(type); }
+    let q = supabase
+      .from("lesson_plans")
+      .select("plan_id,type,subject,class_name,term,week,topic,duration,status,ai_score,created_at,updated_at,reviewed_at,teacher_id,reviewed_by,school_id,is_deleted")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .order("updated_at", { ascending: false })
+      .limit(200);
 
-    const { data: rows } = await pool.query(
-      `SELECT p.plan_id, p.type, p.subject, p.class_name, p.term, p.week,
-              p.topic, p.duration, p.status, p.ai_score,
-              p.created_at, p.updated_at, p.reviewed_at,
-              u.full_name AS teacher_name,
-              r.full_name AS reviewer_name
-         FROM lesson_plans p
-         JOIN users u ON u.user_id = p.teacher_id
-         LEFT JOIN users r ON r.user_id = p.reviewed_by
-        WHERE ${filters.join(" AND ")}
-        ORDER BY p.updated_at DESC
-        LIMIT 200`,
-      params
-    );
-    res.json(rows);
+    if (role === "teacher") q = q.eq("teacher_id", userId);
+    if (status) q = q.eq("status", status);
+    if (type) q = q.eq("type", type);
+
+    const { data: planRows, error: plansErr } = await q;
+    if (plansErr) throw plansErr;
+
+    const userIds = [
+      ...new Set(
+        (planRows || [])
+          .flatMap(p => [p.teacher_id, p.reviewed_by])
+          .filter(Boolean)
+      ),
+    ];
+
+    const { data: usersRows, error: usersErr } = userIds.length
+      ? await supabase
+          .from("users")
+          .select("user_id,full_name,school_id,is_deleted")
+          .eq("school_id", schoolId)
+          .eq("is_deleted", false)
+          .in("user_id", userIds)
+      : { data: [], error: null };
+    if (usersErr) throw usersErr;
+
+    const userById = new Map((usersRows || []).map(u => [u.user_id, u]));
+    const merged = (planRows || []).map(p => ({
+      plan_id: p.plan_id,
+      type: p.type,
+      subject: p.subject,
+      class_name: p.class_name,
+      term: p.term,
+      week: p.week,
+      topic: p.topic,
+      duration: p.duration,
+      status: p.status,
+      ai_score: p.ai_score,
+      created_at: p.created_at,
+      updated_at: p.updated_at,
+      reviewed_at: p.reviewed_at,
+      teacher_name: userById.get(p.teacher_id)?.full_name || null,
+      reviewer_name: userById.get(p.reviewed_by)?.full_name || null,
+    }));
+
+    res.json(merged);
   } catch (err) { handleLessonPlansDbError(err, res, next); }
 });
 

@@ -10,7 +10,15 @@ router.use(authRequired);
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
+    // OLD: const [rows] = await pool.query(
+    // OLD:   `SELECT i.*, CONCAT(s.first_name,' ',s.last_name) AS student_name, s.class_name, s.admission_number
+    // OLD:    FROM invoices i
+    // OLD:    JOIN students s ON s.student_id = i.student_id
+    // OLD:    WHERE i.school_id=? AND i.is_deleted=0
+    // OLD:    ORDER BY i.created_at DESC`,
+    // OLD:   [schoolId]
+    // OLD: );
+    const { data: rows } = await pool.query(
       `SELECT i.*, CONCAT(s.first_name,' ',s.last_name) AS student_name, s.class_name, s.admission_number
        FROM invoices i
        JOIN students s ON s.student_id = i.student_id
@@ -18,7 +26,7 @@ router.get("/", async (req, res, next) => {
        ORDER BY i.created_at DESC`,
       [schoolId]
     );
-    res.json(rows);
+    res.json(rows || []);
   } catch (err) { next(err); }
 });
 

@@ -3,6 +3,10 @@ import { pool } from "../config/db.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
+// NEW: reports route expects a `database` interface (Supabase wrapper)
+// Use the unified `pool` export (now backed by Supabase) for compatibility.
+const database = pool;
+
 const router = Router();
 router.use(authRequired);
 router.use(requireRoles("admin", "teacher", "finance"));
@@ -93,9 +97,15 @@ router.get("/attendance-rate", async (req, res, next) => {
     const { schoolId } = req.user;
     
     // Get attendance data using Supabase
-    const { data: attendance } = await database.rpc('get_attendance_rate_by_class', {
-      p_school_id: schoolId
-    });
+    // OLD: const { data: attendance } = await database.rpc('get_attendance_rate_by_class', { p_school_id: schoolId });
+    let attendance = null;
+    try {
+      const { data } = await database.rpc('get_attendance_rate_by_class', { p_school_id: schoolId });
+      attendance = data;
+    } catch {
+      // RPC missing/unavailable — fall back below
+      attendance = null;
+    }
     
     // Fallback to simpler query if RPC not available
     if (!attendance) {
@@ -146,9 +156,15 @@ router.get("/fee-defaulters", async (req, res, next) => {
     const { schoolId } = req.user;
     
     // Get fee defaulters using Supabase
-    const { data: students } = await database.rpc('get_fee_defaulters', {
-      p_school_id: schoolId
-    });
+    // OLD: const { data: students } = await database.rpc('get_fee_defaulters', { p_school_id: schoolId });
+    let students = null;
+    try {
+      const { data } = await database.rpc('get_fee_defaulters', { p_school_id: schoolId });
+      students = data;
+    } catch {
+      // RPC missing/unavailable — fall back below
+      students = null;
+    }
     
     // Fallback to simpler query if RPC not available
     if (!students) {
@@ -193,14 +209,24 @@ router.get("/grade-distribution", async (req, res, next) => {
     const { schoolId } = req.user;
     
     // Get grade distribution using Supabase
-    const { data: grades } = await database.rpc('get_grade_distribution', {
-      p_school_id: schoolId
-    });
+    // OLD: const { data: grades } = await database.rpc('get_grade_distribution', { p_school_id: schoolId });
+    let grades = null;
+    try {
+      const { data } = await database.rpc('get_grade_distribution', { p_school_id: schoolId });
+      grades = data;
+    } catch {
+      // RPC missing/unavailable — fall back below
+      grades = null;
+    }
     
     // Fallback to simpler query if RPC not available
     if (!grades) {
+      // OLD: const { data: results } = await database.query('results', {
+      // OLD:   select: 'subject, marks_obtained',
+      // OLD:   where: { school_id: schoolId, is_deleted: false }
+      // OLD: });
       const { data: results } = await database.query('results', {
-        select: 'subject, marks_obtained',
+        select: 'subject, marks',
         where: { school_id: schoolId, is_deleted: false }
       });
       
@@ -209,7 +235,8 @@ router.get("/grade-distribution", async (req, res, next) => {
         if (!subjectStats[result.subject]) {
           subjectStats[result.subject] = { scores: [], entries: 0 };
         }
-        subjectStats[result.subject].scores.push(Number(result.marks_obtained));
+        // OLD: subjectStats[result.subject].scores.push(Number(result.marks_obtained));
+        subjectStats[result.subject].scores.push(Number(result.marks));
         subjectStats[result.subject].entries++;
       });
       
@@ -245,8 +272,13 @@ router.get("/student/:studentId", async (req, res, next) => {
     if (!student) return res.status(404).json({ message: "Student not found" });
 
     // Get grades using Supabase
+    // OLD: const { data: grades } = await database.query('results', {
+    // OLD:   select: 'subject, term, marks_obtained, total_marks, grade, teacher_comment',
+    // OLD:   where: { student_id: studentId, school_id: schoolId, is_deleted: false },
+    // OLD:   order: [{ column: 'term', ascending: true }, { column: 'subject', ascending: true }]
+    // OLD: });
     const { data: grades } = await database.query('results', {
-      select: 'subject, term, marks_obtained, total_marks, grade, teacher_comment',
+      select: 'subject, term, marks, total_marks, grade, teacher_comment',
       where: { student_id: studentId, school_id: schoolId, is_deleted: false },
       order: [{ column: 'term', ascending: true }, { column: 'subject', ascending: true }]
     });

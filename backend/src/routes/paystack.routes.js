@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { pool } from "../config/db.js";
+import { supabase } from "../config/db.js";
 import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
+import { agentLog } from "../utils/agentDebugLog.js";
 
 const router = Router();
 router.use(authRequired);
@@ -34,13 +36,47 @@ router.post("/initialize", async (req, res, next) => {
     const data = await response.json();
     if (!data.status) return res.status(400).json({ message: data.message || "Paystack init failed" });
 
-    await pool.query(
-      `INSERT INTO payments
-        (school_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status)
-       VALUES (?, ?, ?, ?, 'paystack', ?, CURDATE(), 'pending')
-       ON DUPLICATE KEY UPDATE status='pending', updated_at=CURRENT_TIMESTAMP`,
-      [schoolId, studentId, amount, feeType, data.data.reference]
-    );
+    // Ensure student exists in Supabase before creating payment record
+    const { data: stu, error: stuErr } = await supabase
+      .from("students")
+      .select("student_id")
+      .eq("school_id", schoolId)
+      .eq("student_id", studentId)
+      .eq("is_deleted", false)
+      .limit(1)
+      .maybeSingle();
+    if (stuErr) throw stuErr;
+    if (!stu) return res.status(404).json({ message: "Student not found" });
+
+    // OLD: await pool.query(`INSERT INTO payments ...`, [...]);
+    // NEW: Supabase insert (avoid MySQL fallback). If duplicate reference exists,
+    // fall back to updating it to pending.
+    const today = new Date().toISOString().slice(0, 10);
+    const paymentRow = {
+      school_id: schoolId,
+      student_id: studentId,
+      amount: Number(amount),
+      fee_type: feeType,
+      payment_method: "paystack",
+      reference_number: data.data.reference,
+      payment_date: today,
+      status: "pending",
+    };
+
+    const { error: insErr } = await supabase.from("payments").insert(paymentRow);
+    if (insErr) {
+      // Postgres unique violation
+      if (insErr.code === "23505") {
+        const { error: updErr } = await supabase
+          .from("payments")
+          .update({ status: "pending", amount: paymentRow.amount, payment_date: today })
+          .eq("school_id", schoolId)
+          .eq("reference_number", paymentRow.reference_number);
+        if (updErr) throw updErr;
+      } else {
+        throw insErr;
+      }
+    }
 
     res.json({
       authorizationUrl: data.data.authorization_url,
@@ -67,11 +103,17 @@ router.get("/verify/:reference", async (req, res, next) => {
     const paidAmount = data.data.amount / 100;
     const channel    = data.data.channel || "card";
 
-    await pool.query(
-      `UPDATE payments SET status='paid', amount=?, updated_at=CURRENT_TIMESTAMP
-       WHERE reference_number=? AND school_id=?`,
-      [paidAmount, reference, schoolId]
-    );
+    // #region agent log
+    agentLog({sessionId:"cdda91",runId:"verify",hypothesisId:"H6",location:"backend/src/routes/paystack.routes.js:110",message:"paystack verify success; updating payment",data:{schoolId,reference,paidAmount,channel},timestamp:Date.now()});
+    // #endregion
+
+    // OLD: await pool.query(`UPDATE payments SET status='paid'...`, [...]); // could hit MySQL fallback
+    const { error: updErr } = await supabase
+      .from("payments")
+      .update({ status: "paid", amount: paidAmount })
+      .eq("school_id", schoolId)
+      .eq("reference_number", reference);
+    if (updErr) throw updErr;
 
     res.json({ verified: true, amount: paidAmount, channel, reference });
   } catch (err) { next(err); }

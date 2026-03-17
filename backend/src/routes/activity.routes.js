@@ -8,7 +8,29 @@ router.use(authRequired);
 router.use(requireRoles("admin"));
 
 function handleActivityLogsDbError(err, res, next, meta = {}) {
-  if (err?.code === "ER_NO_SUCH_TABLE") {
+  // OLD: if (err?.code === "ER_NO_SUCH_TABLE") {
+  // OLD:   const message =
+  // OLD:     "Activity logs table is missing. Run the migration in database/Activities logs migration.sql and restart the backend.";
+  // OLD:
+  // OLD:   // Keep the UI usable in dev even if migrations haven't been run yet.
+  // OLD:   if (process.env.NODE_ENV !== "production") {
+  // OLD:     return res.json({
+  // OLD:       logs: [],
+  // OLD:       total: 0,
+  // OLD:       limit: meta.limit ?? 100,
+  // OLD:       offset: meta.offset ?? 0,
+  // OLD:       warning: message,
+  // OLD:     });
+  // OLD:   }
+  // OLD:
+  // OLD:   return res.status(500).json({ message });
+  // OLD: }
+  const msg = String(err?.message || "");
+  const isMissingActivityLogsTable =
+    err?.code === "ER_NO_SUCH_TABLE" ||
+    (msg.includes("activity_logs") && (msg.includes("doesn't exist") || msg.includes("does not exist")));
+
+  if (isMissingActivityLogsTable) {
     const message =
       "Activity logs table is missing. Run the migration in database/Activities logs migration.sql and restart the backend.";
 
@@ -39,10 +61,14 @@ function handleActivityLogsDbError(err, res, next, meta = {}) {
 // ── GET /api/activity-logs ────────────────────────────────────────────────────
 // Recent activity, paginated. Admin only.
 router.get("/", async (req, res, next) => {
+  let limit;
+  let offset;
   try {
     const { schoolId } = req.user;
-    const limit  = Math.min(parseInt(req.query.limit)  || 100, 500);
-    const offset = parseInt(req.query.offset) || 0;
+    // OLD: const limit  = Math.min(parseInt(req.query.limit)  || 100, 500);
+    // OLD: const offset = parseInt(req.query.offset) || 0;
+    limit  = Math.min(parseInt(req.query.limit)  || 100, 500);
+    offset = parseInt(req.query.offset) || 0;
     const action = req.query.action || null;
     const role   = req.query.role   || null;
 

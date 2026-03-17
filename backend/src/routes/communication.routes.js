@@ -5,6 +5,7 @@ import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { sendEmail, sendBulkEmail, isEmailConfigured, templates } from "../services/email.service.js";
+import { supabase } from "../config/supabaseClient.js";
 
 const router = Router();
 router.use(authRequired);
@@ -112,13 +113,19 @@ router.get("/sms-logs", async (req, res, next) => {
       return res.json(rows);
     }
 
-    const [rows] = await pool.query(
+    // OLD: const [rows] = await pool.query(
+    // OLD:   `SELECT sms_id, recipient, message, channel, status, sent_at, provider_response
+    // OLD:   FROM sms_logs WHERE school_id=? AND is_deleted=0
+    // OLD:   ORDER BY sent_at DESC LIMIT 300`,
+    // OLD:   [schoolId]
+    // OLD: );
+    const { data: rows } = await pool.query(
       `SELECT sms_id, recipient, message, channel, status, sent_at, provider_response
       FROM sms_logs WHERE school_id=? AND is_deleted=0
       ORDER BY sent_at DESC LIMIT 300`,
       [schoolId]
     );
-    res.json(rows);
+    res.json(rows || []);
   } catch (err) { next(err); }
 });
 
@@ -142,20 +149,43 @@ router.post("/sms/bulk", requireRoles("admin", "teacher"), async (req, res, next
     const { className, message } = req.body;
     if (!message) return res.status(400).json({ message: "message is required" });
 
-    let sql      = `SELECT DISTINCT parent_phone AS phone FROM students
-                    WHERE school_id=? AND is_deleted=0
-                    AND parent_phone IS NOT NULL AND parent_phone != ''`;
-    const params = [schoolId];
+    // OLD: let sql      = `SELECT DISTINCT parent_phone AS phone FROM students
+    // OLD:                 WHERE school_id=? AND is_deleted=0
+    // OLD:                 AND parent_phone IS NOT NULL AND parent_phone != ''`;
+    // OLD: const params = [schoolId];
+    // OLD: if (className && className !== "all") {
+    // OLD:   sql += " AND class_name=?";
+    // OLD:   params.push(className);
+    // OLD: }
+    // OLD: const queryResult = await pool.query(sql, params);
+    // OLD: const rows = Array.isArray(queryResult)
+    // OLD:   ? (queryResult[0] || [])
+    // OLD:   : (queryResult?.data || queryResult?.rows || []);
+    // OLD: if (!rows.length)
+    // OLD:   return res.status(404).json({ message: "No parent phone numbers found for this class" });
+    // OLD: const phones = rows.map(r => r.phone);
+
+    let q = supabase
+      .from("students")
+      .select("parent_phone")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .not("parent_phone", "is", null);
     if (className && className !== "all") {
-      sql += " AND class_name=?";
-      params.push(className);
+      q = q.eq("class_name", className);
+    }
+    const { data: studentRows, error: studentsErr } = await q;
+    if (studentsErr) throw studentsErr;
+
+    const phones = [...new Set(
+      (studentRows || [])
+        .map(r => (r?.parent_phone ?? "").trim())
+        .filter(Boolean)
+    )];
+    if (!phones.length) {
+      return res.status(404).json({ message: "No parent phone numbers found for this class" });
     }
 
-    const [rows] = await pool.query(sql, params);
-    if (!rows.length)
-      return res.status(404).json({ message: "No parent phone numbers found for this class" });
-
-    const phones = rows.map(r => r.phone);
     const result = await sendViaSms(phones, message, schoolId, userId);
 
     res.json({ ...result, total: phones.length, recipients: phones });

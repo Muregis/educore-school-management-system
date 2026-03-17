@@ -1,11 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 import { env } from './env.js';
+// OLD: import { agentLog } from "../utils/agentDebugLog.js";
 
 // Supabase configuration validation
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
+  // #region agent log
+  // OLD: fetch('http://127.0.0.1:7316/ingest/69a2e703-a35d-4b5d-8b01-2ade717190dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cdda91'},body:JSON.stringify({sessionId:'cdda91',runId:'pre-fix',hypothesisId:'H2',location:'backend/src/config/supabaseClient.js:12',message:'Missing Supabase env',data:{hasUrl:Boolean(supabaseUrl),hasServiceKey:Boolean(supabaseServiceKey)},timestamp:Date.now()})}).catch(()=>{});
+  // OLD: agentLog({sessionId:"cdda91",runId:"pre-fix",hypothesisId:"H2",location:"backend/src/config/supabaseClient.js:12",message:"Missing Supabase env",data:{hasUrl:Boolean(supabaseUrl),hasServiceKey:Boolean(supabaseServiceKey)},timestamp:Date.now()});
+  // #endregion
   throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in environment variables');
 }
 
@@ -97,6 +102,11 @@ export const database = {
        sqlOrTable.toUpperCase().includes('UPDATE') || 
        sqlOrTable.toUpperCase().includes('DELETE'));
     
+    // #region agent log
+    // OLD: fetch('http://127.0.0.1:7316/ingest/69a2e703-a35d-4b5d-8b01-2ade717190dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cdda91'},body:JSON.stringify({sessionId:'cdda91',runId:'pre-fix',hypothesisId:'H3',location:'backend/src/config/supabaseClient.js:110',message:'database.query called',data:{argType:typeof sqlOrTable,isRawSQL,tableOrSqlPreview:typeof sqlOrTable==='string'?sqlOrTable.slice(0,80):null,optionsType:Array.isArray(paramsOrOptions)?'array':'object',hasSchoolId:!!(paramsOrOptions&&paramsOrOptions.schoolId)},timestamp:Date.now()})}.catch(()=>{});
+    // OLD: agentLog({sessionId:"cdda91",runId:"pre-fix",hypothesisId:"H3",location:"backend/src/config/supabaseClient.js:110",message:"database.query called",data:{argType:typeof sqlOrTable,isRawSQL,tableOrSqlPreview:typeof sqlOrTable==="string"?sqlOrTable.slice(0,80):null,optionsType:Array.isArray(paramsOrOptions)?"array":"object",hasSchoolId:!!(paramsOrOptions&&paramsOrOptions.schoolId)},timestamp:Date.now()});
+    // #endregion
+
     if (isRawSQL) {
       // For now, fall back to MySQL for raw SQL queries
       // TODO: Implement proper RPC function for Supabase
@@ -121,6 +131,10 @@ export const database = {
         
         return { data: rows, error: null };
       } catch (err) {
+        // #region agent log
+        // OLD: fetch('http://127.0.0.1:7316/ingest/69a2e703-a35d-4b5d-8b01-2ade717190dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cdda91'},body:JSON.stringify({sessionId:'cdda91',runId:'pre-fix',hypothesisId:'H3',location:'backend/src/config/supabaseClient.js:145',message:'MySQL fallback failed',data:{errMessage:err?.message,sqlPreview:typeof sqlOrTable==='string'?sqlOrTable.slice(0,80):null},timestamp:Date.now()})}).catch(()=>{});
+        // OLD: agentLog({sessionId:"cdda91",runId:"pre-fix",hypothesisId:"H3",location:"backend/src/config/supabaseClient.js:145",message:"MySQL fallback failed",data:{errMessage:err?.message,sqlPreview:typeof sqlOrTable==="string"?sqlOrTable.slice(0,80):null},timestamp:Date.now()});
+        // #endregion
         console.error('MySQL fallback failed:', err.message);
         throw new Error(`SQL execution failed: ${err.message}`);
       }
@@ -131,6 +145,10 @@ export const database = {
       
       // Apply tenant filtering if schoolId is provided
       if (options.schoolId) {
+        // #region agent log
+        // OLD: fetch('http://127.0.0.1:7316/ingest/69a2e703-a35d-4b5d-8b01-2ade717190dd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'cdda91'},body:JSON.stringify({sessionId:'cdda91',runId:'pre-fix',hypothesisId:'H4',location:'backend/src/config/supabaseClient.js:156',message:'database.query applying tenant filter',data:{table:sqlOrTable,schoolId:options.schoolId},timestamp:Date.now()})}).catch(()=>{});
+        // OLD: agentLog({sessionId:"cdda91",runId:"pre-fix",hypothesisId:"H4",location:"backend/src/config/supabaseClient.js:156",message:"database.query applying tenant filter",data:{table:sqlOrTable,schoolId:options.schoolId},timestamp:Date.now()});
+        // #endregion
         query = withTenantFilter(query, options.schoolId);
       }
       

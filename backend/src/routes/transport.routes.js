@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { pgPool } from "../config/pg.js";
+import { supabase } from "../config/db.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
@@ -9,14 +10,21 @@ router.use(authRequired);
 router.get("/routes", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const [rows] = await pool.query(
-      `SELECT transport_id, route_name, driver_name, vehicle_number, fee, status
-       FROM transport_routes
-       WHERE school_id = ? AND is_deleted = 0
-       ORDER BY transport_id DESC`,
-      [schoolId]
-    );
-    res.json(rows);
+    // OLD: const [rows] = await pool.query(
+    // OLD:   `SELECT transport_id, route_name, driver_name, vehicle_number, fee, status
+    // OLD:    FROM transport_routes
+    // OLD:    WHERE school_id = ? AND is_deleted = 0
+    // OLD:    ORDER BY transport_id DESC`,
+    // OLD:   [schoolId]
+    // OLD: );
+    const { data: rows, error } = await supabase
+      .from("transport_routes")
+      .select("transport_id, route_name, driver_name, vehicle_number, fee, status")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .order("transport_id", { ascending: false });
+    if (error) throw error;
+    res.json(rows || []);
   } catch (err) {
     next(err);
   }
@@ -49,14 +57,23 @@ router.post("/routes", requireRoles("admin"), async (req, res, next) => {
 router.get("/assignments", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { rows } = await pgPool.query(
-      `SELECT id, student_id, transport_id, start_date, end_date, status
-       FROM student_transport
-       WHERE school_id = $1 AND is_deleted = false
-       ORDER BY id DESC`,
-      [schoolId]
-    );
-    res.json(rows);
+    // OLD: const { rows } = await pgPool.query(
+    // OLD:   `SELECT id, student_id, transport_id, start_date, end_date, status
+    // OLD:    FROM student_transport
+    // OLD:    WHERE school_id = $1 AND is_deleted = false
+    // OLD:    ORDER BY id DESC`,
+    // OLD:   [schoolId]
+    // OLD: );
+    // OLD: res.json(rows);
+
+    const { data: rows, error } = await supabase
+      .from("student_transport")
+      .select("id, student_id, transport_id, start_date, end_date, status")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .order("id", { ascending: false });
+    if (error) throw error;
+    res.json(rows || []);
   } catch (err) {
     next(err);
   }

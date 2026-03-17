@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { pool } from "../config/db.js";
+import { supabase } from "../config/db.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
@@ -10,11 +11,20 @@ router.use(authRequired);
 router.get("/books", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { rows } = await pool.query(
-      `SELECT * FROM books WHERE school_id=$1 AND is_deleted=false ORDER BY title`,
-      [schoolId]
-    );
-    res.json(rows);
+    // OLD: const { rows } = await pool.query(
+    // OLD:   `SELECT * FROM books WHERE school_id=$1 AND is_deleted=false ORDER BY title`,
+    // OLD:   [schoolId]
+    // OLD: );
+    // OLD: res.json(rows);
+
+    const { data: rows, error } = await supabase
+      .from("books")
+      .select("*")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .order("title");
+    if (error) throw error;
+    res.json(rows || []);
   } catch (err) { next(err); }
 });
 
@@ -97,7 +107,69 @@ router.get("/borrows", async (req, res, next) => {
     }
 
     sql += " ORDER BY br.borrow_date DESC, br.borrow_id DESC";
-    const { rows } = await pool.query(sql, params);
+    // OLD: const { rows } = await pool.query(sql, params);
+    // OLD: res.json(rows);
+
+    // NEW: Supabase-native query (no raw SQL / no $1 placeholders)
+    let q = supabase
+      .from("borrow_records")
+      .select("borrow_id, book_id, borrower_id, borrower_type, borrow_date, due_date, return_date, status, notes")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .order("borrow_date", { ascending: false })
+      .order("borrow_id", { ascending: false });
+
+    if (role === "student" && studentId) {
+      q = q.eq("borrower_type", "student").eq("borrower_id", studentId);
+    }
+
+    const { data: borrows, error: bErr } = await q;
+    if (bErr) throw bErr;
+
+    const bookIds = Array.from(new Set((borrows || []).map(r => r.book_id).filter(Boolean)));
+    const borrowerIds = Array.from(new Set((borrows || []).map(r => r.borrower_id).filter(Boolean)));
+
+    const [{ data: books, error: booksErr }, { data: students, error: stuErr }, { data: teachers, error: teaErr }] =
+      await Promise.all([
+        bookIds.length
+          ? supabase.from("books").select("book_id, title, category").eq("school_id", schoolId).in("book_id", bookIds)
+          : Promise.resolve({ data: [], error: null }),
+        borrowerIds.length
+          ? supabase.from("students").select("student_id, admission_number").eq("school_id", schoolId).in("student_id", borrowerIds)
+          : Promise.resolve({ data: [], error: null }),
+        borrowerIds.length
+          ? supabase.from("teachers").select("teacher_id, staff_number").eq("school_id", schoolId).in("teacher_id", borrowerIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+    if (booksErr) throw booksErr;
+    if (stuErr) throw stuErr;
+    if (teaErr) throw teaErr;
+
+    const bookMap = new Map((books || []).map(b => [String(b.book_id), b]));
+    const studentMap = new Map((students || []).map(s => [String(s.student_id), s.admission_number]));
+    const teacherMap = new Map((teachers || []).map(t => [String(t.teacher_id), t.staff_number]));
+
+    const rows = (borrows || []).map(br => {
+      const book = bookMap.get(String(br.book_id));
+      return {
+        borrow_id: br.borrow_id,
+        book_id: br.book_id,
+        book_title: book?.title ?? null,
+        category: book?.category ?? null,
+        borrower_id: br.borrower_id,
+        borrower_type: br.borrower_type,
+        borrow_date: br.borrow_date,
+        due_date: br.due_date,
+        return_date: br.return_date,
+        status: br.status,
+        notes: br.notes,
+        borrower_ref:
+          br.borrower_type === "student"
+            ? studentMap.get(String(br.borrower_id)) ?? null
+            : teacherMap.get(String(br.borrower_id)) ?? null,
+      };
+    });
+
     res.json(rows);
   } catch (err) { next(err); }
 });

@@ -9,8 +9,12 @@ export async function apiFetch(
   if (body != null) {
     headers["Content-Type"] = "application/json";
   }
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  // OLD: if (token) {
+  // OLD:   headers["Authorization"] = `Bearer ${token}`;
+  // OLD: }
+  const resolvedToken = token || localStorage.getItem("token") || null;
+  if (resolvedToken) {
+    headers["Authorization"] = `Bearer ${resolvedToken}`;
   }
 
   const controller = new AbortController();

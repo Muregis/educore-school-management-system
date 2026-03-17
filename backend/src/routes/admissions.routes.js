@@ -15,8 +15,9 @@ router.get("/", async (req, res, next) => {
     const params = [schoolId];
     if (status) { sql += " AND status=?"; params.push(status); }
     sql += " ORDER BY created_at DESC";
-    const [rows] = await pool.query(sql, params);
-    res.json(rows);
+    // OLD: const [rows] = await pool.query(sql, params);
+    const { data: rows } = await pool.query(sql, params);
+    res.json(rows || []);
   } catch (err) { next(err); }
 });
 
