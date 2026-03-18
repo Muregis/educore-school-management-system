@@ -218,7 +218,7 @@ try {
 
 // ─── PUT /api/grades/:id — update a single result ────────────────────────────
 router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
-try {
+  try {
     const { schoolId } = req.user;
     const { marks, totalMarks, subject, term, teacherComment } = req.body;
 
@@ -249,7 +249,7 @@ try {
       if (!subjectError && subjectRow) {
         updateData.subject_id = subjectRow.subject_id;
       }
-    // OLD: const [result] = await pool.query(`UPDATE results SET marks=?, total_marks=?, grade=?, term=?, teacher_comment=?${subjectClause}, updated_at=CURRENT_TIMESTAMP WHERE result_id=? AND school_id=? AND is_deleted=0`, params);
+    }
     const { data: updated, error: updateError } = await supabase
       .from('results')
       .update(updateData)
@@ -270,12 +270,12 @@ try {
     });
     
     res.json({ updated: true });
-} catch (err) { next(err); }
+  } catch (err) { next(err); }
 });
 
 // ─── DELETE /api/grades/:id — soft delete ────────────────────────────────────
 router.delete("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
-try {
+  try {
     const { schoolId } = req.user;
     const { data: updated, error } = await supabase
       .from('results')
@@ -295,7 +295,7 @@ try {
     });
     
     res.json({ deleted: true });
-} catch (err) { next(err); }
+  } catch (err) { next(err); }
 });
 
 export default router;

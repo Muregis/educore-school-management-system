@@ -11,7 +11,7 @@ import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { Msg } from "../components/Helpers";
 
-// Inline helpers
+// Inline helpers (unchanged)
 function csv(filename, headers, rows) {
   const content = [headers, ...rows].map(r => r.join(",")).join("\n");
   const a = document.createElement("a");
@@ -63,7 +63,7 @@ function normaliseFeeStruct(f) {
   };
 }
 
-// Load Paystack inline script once
+// Load Paystack inline script once (unchanged)
 function loadPaystackScript() {
   return new Promise(resolve => {
     if (window.PaystackPop) { resolve(); return; }
@@ -101,7 +101,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     setPayments(data.map(normalisePayment));
   }, [auth, setPayments]);
 
-  // Auto-verify Paystack when redirected back
+  // Auto-verify Paystack when redirected back (unchanged)
   useEffect(() => {
     const ref    = localStorage.getItem("ps_pending_ref");
     const name   = localStorage.getItem("ps_pending_name");
@@ -112,9 +112,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       localStorage.removeItem("ps_pending_ref");
       localStorage.removeItem("ps_pending_name");
       localStorage.removeItem("ps_pending_amount");
-      // Clear query params from URL
       window.history.replaceState({}, "", window.location.pathname);
-      apiFetch(`/paystack/verify/${urlRef}`, { token: auth.token })
+      apiFetch(`/paystack/verify/${urlRef}`, { token: auth?.token })
         .then(result => {
           reloadPayments();
           setReceipt({
@@ -129,8 +128,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         })
         .catch(() => toast("Payment received but verification failed — contact admin", "warning"));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth]);
+  }, [auth, reloadPayments, toast]);
 
   useEffect(() => {
     if (auth?.token) {
@@ -173,7 +171,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   const initiatePaystack = async () => {
     if (!paystackForm.email) return toast("Parent email is required for Paystack", "error");
-    if (!paystackForm.amount || Number(paystackForm.amount) <= 0) return toast("Enter a valid amount", "error");
+    const amount = Number(paystackForm.amount);
+    if (!amount || amount <= 0) return toast("Enter a valid amount", "error");
+    if (amount > paystackTarget.balance) return toast("Cannot exceed outstanding balance", "error");
 
     setPaystackLoading(true);
     try {
@@ -181,7 +181,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         method: "POST",
         body: {
           email:           paystackForm.email,
-          amount:          Number(paystackForm.amount),
+          amount,          // ← now custom amount
           studentId:       paystackTarget.studentId,
           studentName:     paystackTarget.name,
           admissionNumber: paystackTarget.admissionNumber,
@@ -189,14 +189,11 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         token: auth?.token,
       });
 
-      // Save reference so we can verify when user returns
       localStorage.setItem("ps_pending_ref",   data.reference);
       localStorage.setItem("ps_pending_name",  paystackTarget.name);
-      localStorage.setItem("ps_pending_amount", paystackForm.amount);
+      localStorage.setItem("ps_pending_amount", amount);
 
-      // Redirect to Paystack hosted checkout page
       window.location.href = data.authorizationUrl;
-
     } catch (err) {
       toast(err.message || "Paystack init failed", "error");
     }
@@ -213,21 +210,24 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   const initiateMpesa = async () => {
     if (!mpesaForm.phone) return toast("Phone number required (e.g. 0712345678)", "error");
-    if (!mpesaForm.amount || Number(mpesaForm.amount) <= 0) return toast("Enter a valid amount", "error");
+    const amount = Number(mpesaForm.amount);
+    if (!amount || amount <= 0) return toast("Enter a valid amount", "error");
+    if (amount > mpesaTarget.balance) return toast("Cannot exceed outstanding balance", "error");
+
     setMpesaLoading(true);
     setMpesaStatus(null);
     try {
-      // Normalize phone to 2547XXXXXXXX format
       let phone = mpesaForm.phone.trim().replace(/\s+/g, "");
+      if (!phone) return toast("Phone number required", "error");
       if (phone.startsWith("+")) phone = phone.slice(1);
-      if (phone.startsWith("0"))  phone = "254" + phone.slice(1);
+      if (phone.startsWith("0")) phone = "254" + phone.slice(1);
       if (!phone.startsWith("254")) phone = "254" + phone;
 
       const data = await apiFetch("/mpesa/stk-push", {
         method: "POST",
         body: {
           phone,
-          amount:      Number(mpesaForm.amount),
+          amount,
           studentId:   mpesaTarget.studentId,
           studentName: mpesaTarget.name,
         },
@@ -260,18 +260,36 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     const sid = Number(paymentForm.studentId);
     const s   = students.find(x => (x.id ?? x.student_id) === sid);
     const amt = Number(paymentForm.amount);
+    const balance = balances.find(b => b.studentId === sid)?.balance || 0;
+
     if (!s)   return toast("Select student", "error");
-    if (!amt) return toast("Amount required", "error");
+    if (!amt || amt <= 0) return toast("Amount required", "error");
+    if (amt > balance) return toast("Cannot exceed outstanding balance", "error");
+
     try {
       await apiFetch("/payments", {
         method: "POST",
-        body: { studentId: sid, amount: amt, feeType: paymentForm.feeType, paymentMethod: paymentForm.method, paymentDate: paymentForm.date, status: paymentForm.status, paidBy: paymentForm.paidBy || null },
+        body: { 
+          studentId: sid, 
+          amount: amt, 
+          feeType: paymentForm.feeType, 
+          paymentMethod: paymentForm.method, 
+          paymentDate: paymentForm.date, 
+          status: paymentForm.status, 
+          paidBy: paymentForm.paidBy || null 
+        },
         token: auth?.token,
       });
       await reloadPayments();
       setShowPayment(false);
       const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
-      setReceipt({ studentName: name, amount: amt, reference: `CASH-${Date.now()}`, method: paymentForm.method, date: paymentForm.date });
+      setReceipt({ 
+        studentName: name, 
+        amount: amt, 
+        reference: `CASH-${Date.now()}`, 
+        method: paymentForm.method, 
+        date: paymentForm.date 
+      });
       setShowReceipt(true);
       toast("Payment recorded", "success");
     } catch (err) { toast(err.message || "Payment failed", "error"); }
@@ -306,16 +324,37 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     if (!w) return;
     w.document.write(`
       <html><head><title>Receipt</title>
-      <style>body{font-family:sans-serif;padding:32px;max-width:400px;margin:auto}h2{margin-bottom:4px}.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee}@media print{button{display:none}}</style>
+      <style>
+        body {
+          font-family: sans-serif;
+          padding: 32px;
+          max-width: 400px;
+          margin: auto
+        }
+        h2 {
+          margin-bottom: 4px
+        }
+        .row {
+          display: flex;
+          justify-content: space-between;
+          padding: 8px 0;
+          border-bottom: 1px solid #eee
+        }
+        @media print {
+          button {
+            display: none
+          }
+        }
+      </style>
       </head><body>
-        <h2>Payment Receipt</h2><p style="color:#888">EduCore School Management</p>
+        <h2>Payment Receipt</h2><p style="color: #888">EduCore School Management</p>
         <div class="row"><span>Student</span><strong>${receipt?.studentName}</strong></div>
         <div class="row"><span>Amount</span><strong>KES ${Number(receipt?.amount).toLocaleString()}</strong></div>
         <div class="row"><span>Method</span><strong>${receipt?.method}</strong></div>
         <div class="row"><span>Reference</span><strong>${receipt?.reference}</strong></div>
         <div class="row"><span>Date</span><strong>${receipt?.date}</strong></div>
-        <p style="margin-top:24px;color:#888;font-size:12px">Thank you for your payment.</p>
-        <button onclick="window.print()" style="margin-top:16px;padding:8px 16px;cursor:pointer">Print</button>
+        <p style="margin-top: 24px; color: #888; font-size: 12px">Thank you for your payment.</p>
+        <button onclick="window.print()" style="margin-top: 16px; padding: 8px 16px; cursor: pointer">Print</button>
       </body></html>
     `);
     w.document.close();
@@ -382,9 +421,21 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 ? <Badge key="bdg" text="no structure" tone="info" />
                 : <Badge key="bdg" text={b.balance>0?"pending":"cleared"} tone={b.balance>0?"warning":"success"} />,
               b.expected > 0 && b.balance > 0 ? (
-                <div key="pay" style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  <Btn onClick={()=>openPaystack(b)}>💳 Paystack</Btn>
-                  <Btn variant="ghost" onClick={()=>openMpesa(b)}>📱 Mpesa</Btn>
+                <div key="pay" style={{display:"flex",flexDirection:"column",gap:6}}>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    <Btn size="small" onClick={() => openPaystack(b)}>💳 Paystack</Btn>
+                    <Btn variant="ghost" size="small" onClick={() => openMpesa(b)}>📱 Mpesa</Btn>
+                  </div>
+                  <Btn variant="ghost" size="small" onClick={() => {
+                    setPaymentForm({
+                      ...paymentForm,
+                      studentId: b.studentId,
+                      amount: String(b.balance),
+                    });
+                    setShowPayment(true);
+                  }}>
+                    Pay Custom Amount
+                  </Btn>
                 </div>
               ) : "—"
             ])}
@@ -421,12 +472,28 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
               <input style={inputStyle} value={paystackForm.email} onChange={e=>setPaystackForm({...paystackForm,email:e.target.value})} placeholder="parent@email.com" />
             </Field>
             <Field label="Amount (KES)">
-              <input type="number" style={inputStyle} value={paystackForm.amount} onChange={e=>setPaystackForm({...paystackForm,amount:e.target.value})} />
+              <input 
+                type="number" 
+                min="100" 
+                max={paystackTarget.balance} 
+                style={inputStyle} 
+                value={paystackForm.amount} 
+                onChange={e=>setPaystackForm({...paystackForm,amount:e.target.value})} 
+              />
+              {Number(paystackForm.amount) > paystackTarget.balance && (
+                <p style={{color:"red",fontSize:12,marginTop:4}}>Cannot exceed balance</p>
+              )}
+              {Number(paystackForm.amount) < 100 && (
+                <p style={{color:"red",fontSize:12,marginTop:4}}>Minimum KSh 100</p>
+              )}
             </Field>
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:12}}>
             <Btn variant="ghost" onClick={()=>setShowPaystack(false)}>Cancel</Btn>
-            <Btn onClick={initiatePaystack} disabled={paystackLoading}>
+            <Btn 
+              onClick={initiatePaystack} 
+              disabled={paystackLoading || !paystackForm.email || Number(paystackForm.amount) < 100 || Number(paystackForm.amount) > paystackTarget.balance}
+            >
               {paystackLoading ? "Opening..." : "Open Payment"}
             </Btn>
           </div>
@@ -445,14 +512,29 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
             <div>
               <div style={{fontSize:12,color:C.textMuted,marginBottom:4}}>Phone Number</div>
-              <input style={{...inputStyle,width:"100%"}} value={mpesaForm.phone}
+              <input 
+                style={{...inputStyle,width:"100%"}} 
+                value={mpesaForm.phone}
                 onChange={e=>setMpesaForm({...mpesaForm,phone:e.target.value})}
-                placeholder="0712345678 or 254712345678" />
+                placeholder="0712345678 or 254712345678" 
+              />
             </div>
             <div>
               <div style={{fontSize:12,color:C.textMuted,marginBottom:4}}>Amount (KES)</div>
-              <input type="number" style={{...inputStyle,width:"100%"}} value={mpesaForm.amount}
-                onChange={e=>setMpesaForm({...mpesaForm,amount:e.target.value})} />
+              <input 
+                type="number" 
+                min="100" 
+                max={mpesaTarget.balance} 
+                style={{...inputStyle,width:"100%"}} 
+                value={mpesaForm.amount}
+                onChange={e=>setMpesaForm({...mpesaForm,amount:e.target.value})} 
+              />
+              {Number(mpesaForm.amount) > mpesaTarget.balance && (
+                <p style={{color:"red",fontSize:12,marginTop:4}}>Cannot exceed balance</p>
+              )}
+              {Number(mpesaForm.amount) < 100 && (
+                <p style={{color:"red",fontSize:12,marginTop:4}}>Minimum KSh 100</p>
+              )}
             </div>
           </div>
           {mpesaStatus?.ok && (
@@ -466,7 +548,10 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
             <Btn variant="ghost" onClick={()=>setShowMpesa(false)}>Cancel</Btn>
             {!mpesaStatus?.ok && (
-              <Btn onClick={initiateMpesa} disabled={mpesaLoading}>
+              <Btn 
+                onClick={initiateMpesa} 
+                disabled={mpesaLoading || !mpesaForm.phone || Number(mpesaForm.amount) < 100 || Number(mpesaForm.amount) > mpesaTarget.balance}
+              >
                 {mpesaLoading ? "Sending..." : "Send STK Push"}
               </Btn>
             )}
@@ -478,21 +563,66 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       {showPayment && (
         <Modal title="Record Manual Payment" onClose={()=>setShowPayment(false)}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <Field label="Student"><select style={inputStyle} value={paymentForm.studentId} onChange={e=>setPaymentForm({...paymentForm,studentId:Number(e.target.value)})}>
-              {students.map(s=>{ const sid=s.id??s.student_id; const name=s.firstName?`${s.firstName} ${s.lastName}`:`${s.first_name} ${s.last_name}`; return <option key={sid} value={sid}>{name}</option>; })}
-            </select></Field>
-            <Field label="Amount"><input type="number" style={inputStyle} value={paymentForm.amount} onChange={e=>setPaymentForm({...paymentForm,amount:e.target.value})} /></Field>
-            <Field label="Type"><select style={inputStyle} value={paymentForm.feeType} onChange={e=>setPaymentForm({...paymentForm,feeType:e.target.value})}><option value="tuition">Tuition</option><option value="activity">Activity</option><option value="misc">Misc</option></select></Field>
-            <Field label="Method"><select style={inputStyle} value={paymentForm.method} onChange={e=>setPaymentForm({...paymentForm,method:e.target.value})}><option value="cash">Cash</option><option value="mpesa">Mpesa</option><option value="bank">Bank</option></select></Field>
-            <Field label="Date"><input type="date" style={inputStyle} value={paymentForm.date} onChange={e=>setPaymentForm({...paymentForm,date:e.target.value})} /></Field>
-            <Field label="Status"><select style={inputStyle} value={paymentForm.status} onChange={e=>setPaymentForm({...paymentForm,status:e.target.value})}><option value="paid">Paid</option><option value="pending">Pending</option></select></Field>
+            <Field label="Student">
+              <select style={inputStyle} value={paymentForm.studentId} onChange={e=>setPaymentForm({...paymentForm,studentId:Number(e.target.value)})}>
+                {students.map(s=>{ 
+                  const sid=s.id??s.student_id; 
+                  const name=s.firstName?`${s.firstName} ${s.lastName}`:`${s.first_name} ${s.last_name}`; 
+                  return <option key={sid} value={sid}>{name}</option>; 
+                })}
+              </select>
+            </Field>
+            <Field label="Amount (KES)">
+              <input 
+                type="number" 
+                min="100" 
+                max={balances.find(b => b.studentId === paymentForm.studentId)?.balance || 100000} 
+                style={inputStyle} 
+                value={paymentForm.amount} 
+                onChange={e=>setPaymentForm({...paymentForm,amount:e.target.value})} 
+              />
+              {Number(paymentForm.amount) > (balances.find(b => b.studentId === paymentForm.studentId)?.balance || 0) && (
+                <p style={{color:"red",fontSize:12,marginTop:4}}>Cannot exceed outstanding balance</p>
+              )}
+              {Number(paymentForm.amount) < 100 && (
+                <p style={{color:"red",fontSize:12,marginTop:4}}>Minimum KSh 100</p>
+              )}
+            </Field>
+            <Field label="Type">
+              <select style={inputStyle} value={paymentForm.feeType} onChange={e=>setPaymentForm({...paymentForm,feeType:e.target.value})}>
+                <option value="tuition">Tuition</option>
+                <option value="activity">Activity</option>
+                <option value="misc">Misc</option>
+              </select>
+            </Field>
+            <Field label="Method">
+              <select style={inputStyle} value={paymentForm.method} onChange={e=>setPaymentForm({...paymentForm,method:e.target.value})}>
+                <option value="cash">Cash</option>
+                <option value="mpesa">Mpesa</option>
+                <option value="bank">Bank</option>
+              </select>
+            </Field>
+            <Field label="Date">
+              <input type="date" style={inputStyle} value={paymentForm.date} onChange={e=>setPaymentForm({...paymentForm,date:e.target.value})} />
+            </Field>
+            <Field label="Status">
+              <select style={inputStyle} value={paymentForm.status} onChange={e=>setPaymentForm({...paymentForm,status:e.target.value})}>
+                <option value="paid">Paid</option>
+                <option value="pending">Pending</option>
+              </select>
+            </Field>
             <Field label="Paid By (parent/guardian/sponsor)" style={{gridColumn:"1 / -1"}}>
               <input style={inputStyle} value={paymentForm.paidBy} onChange={e=>setPaymentForm({...paymentForm,paidBy:e.target.value})} placeholder="e.g. John Kamau (Father)" />
             </Field>
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:10}}>
             <Btn variant="ghost" onClick={()=>setShowPayment(false)}>Cancel</Btn>
-            <Btn onClick={savePayment}>Save</Btn>
+            <Btn 
+              disabled={Number(paymentForm.amount) <= 0 || !paymentForm.studentId || Number(paymentForm.amount) > (balances.find(b => b.studentId === paymentForm.studentId)?.balance || 0)}
+              onClick={savePayment}
+            >
+              Save
+            </Btn>
           </div>
         </Modal>
       )}
@@ -501,10 +631,20 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       {showStruct && (
         <Modal title={editStruct?"Edit Fee Structure":"Set Fee Structure"} onClose={()=>setShowStruct(false)}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <Field label="Class"><select style={inputStyle} value={structForm.className} onChange={e=>setStructForm({...structForm,className:e.target.value})}>{ALL_CLASSES.map(c=><option key={c}>{c}</option>)}</select></Field>
-            <Field label="Tuition"><input type="number" style={inputStyle} value={structForm.tuition} onChange={e=>setStructForm({...structForm,tuition:e.target.value})} /></Field>
-            <Field label="Activity"><input type="number" style={inputStyle} value={structForm.activity} onChange={e=>setStructForm({...structForm,activity:e.target.value})} /></Field>
-            <Field label="Misc"><input type="number" style={inputStyle} value={structForm.misc} onChange={e=>setStructForm({...structForm,misc:e.target.value})} /></Field>
+            <Field label="Class">
+              <select style={inputStyle} value={structForm.className} onChange={e=>setStructForm({...structForm,className:e.target.value})}>
+                {ALL_CLASSES.map(c=><option key={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Tuition">
+              <input type="number" style={inputStyle} value={structForm.tuition} onChange={e=>setStructForm({...structForm,tuition:e.target.value})} />
+            </Field>
+            <Field label="Activity">
+              <input type="number" style={inputStyle} value={structForm.activity} onChange={e=>setStructForm({...structForm,activity:e.target.value})} />
+            </Field>
+            <Field label="Misc">
+              <input type="number" style={inputStyle} value={structForm.misc} onChange={e=>setStructForm({...structForm,misc:e.target.value})} />
+            </Field>
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:10}}>
             <Btn variant="ghost" onClick={()=>setShowStruct(false)}>Cancel</Btn>
@@ -521,14 +661,14 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
               <div style={{fontSize:32}}>✅</div>
               <div style={{fontWeight:800,fontSize:18,color:C.text}}>Payment Confirmed</div>
             </div>
-            {[["Student",receipt.studentName],["Amount",`KES ${Number(receipt.amount).toLocaleString()}`],["Method",receipt.method],["Reference",receipt.reference],["Date",receipt.date]].map(([label,value])=>(
-              <div key={label} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
-                <span style={{color:C.textSub}}>{label}</span>
-                <strong style={{color:C.text}}>{value}</strong>
-              </div>
-            ))}
+            <div className="row"><span>Student</span><strong>{receipt?.studentName}</strong></div>
+            <div className="row"><span>Amount</span><strong>KES {Number(receipt?.amount).toLocaleString()}</strong></div>
+            <div className="row"><span>Method</span><strong>{receipt?.method}</strong></div>
+            <div className="row"><span>Reference</span><strong>{receipt?.reference}</strong></div>
+            <div className="row"><span>Date</span><strong>{receipt?.date}</strong></div>
+            <p style={{marginTop: 24, color: "rgb(136, 136, 136)", fontSize: 12}}>Thank you for your payment.</p>
           </div>
-          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:12}}>
+          <div style={{display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12}}>
             <Btn variant="ghost" onClick={()=>setShowReceipt(false)}>Close</Btn>
             <Btn onClick={printReceipt}>🖨 Print</Btn>
           </div>

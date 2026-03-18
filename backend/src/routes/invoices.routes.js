@@ -1,7 +1,7 @@
 import { Router } from "express";
-// OLD: import { pool } from "../config/db.js";
-import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
+import { env } from "../config/env.js";
+import { supabase } from "../config/supabaseClient.js";
 import { requireRoles } from "../middleware/roles.js";
 
 const router = Router();
@@ -11,7 +11,6 @@ router.use(authRequired);
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    // OLD: const [rows] = await pool.query(`SELECT i.*, CONCAT(s.first_name,' ',s.last_name) AS student_name, s.class_name, s.admission_number FROM invoices i JOIN students s ON s.student_id = i.student_id WHERE i.school_id=? AND i.is_deleted=0 ORDER BY i.created_at DESC`, [schoolId]);
     const { data: invoices, error } = await supabase
       .from('invoices')
       .select('*, students(first_name, last_name, class_name, admission_number)')
@@ -39,7 +38,6 @@ router.post("/", requireRoles("admin","finance"), async (req, res, next) => {
     if (!studentId) return res.status(400).json({ message: "studentId is required" });
 
     const invoiceNumber = `INV-${schoolId}-${studentId}-${Date.now()}`;
-    // OLD: const [result] = await pool.query(`INSERT INTO invoices (school_id, student_id, invoice_number, term, academic_year, tuition, activity, misc, transport, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [schoolId, studentId, invoiceNumber, term, academicYear, tuition, activity, misc, transport, dueDate||null]);
     const { data: inserted, error: insertError } = await supabase
       .from('invoices')
       .insert({

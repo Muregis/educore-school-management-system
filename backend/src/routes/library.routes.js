@@ -175,7 +175,7 @@ router.get("/borrows", async (req, res, next) => {
     if (stuErr) throw stuErr;
     if (teaErr) throw teaErr;
 
-    const bookMap = new Map((books || []).map(b => [String(b.book_id), b]));
+    const bookMap = new Map((books || []).map(b => [String(b.book_id), { title: b.title, category: b.category }]));
     const studentMap = new Map((students || []).map(s => [String(s.student_id), s.admission_number]));
     const teacherMap = new Map((teachers || []).map(t => [String(t.teacher_id), t.staff_number]));
 
@@ -202,6 +202,13 @@ router.get("/borrows", async (req, res, next) => {
 
     res.json(rows);
   } catch (err) { next(err); }
+});
+
+// ── GET all borrow records (alias for frontend compatibility) ───────────────────
+router.get("/borrow-records", async (req, res, next) => {
+  // Forward to the existing borrows endpoint
+  req.url = req.url.replace('/borrow-records', '/borrows');
+  return req.app._router.handle(req, res, next);
 });
 
 // ── POST issue book ───────────────────────────────────────────────────────────

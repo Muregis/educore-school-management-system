@@ -1,5 +1,4 @@
 import { Router } from "express";
-// OLD: import { pool } from "../config/db.js";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 
@@ -46,9 +45,33 @@ router.get("/:id", async (req, res, next) => {
 router.post("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { classId, term, academicYear, isActive = 1 } = req.body;
+    const { 
+      classId, 
+      term, 
+      academicYear, 
+      isActive = 1,
+      tuition = 0,
+      activity = 0,
+      misc = 0,
+      transport = 0
+    } = req.body;
+    
     if (!classId || !term || !academicYear) {
       return res.status(400).json({ message: "classId, term and academicYear required" });
+    }
+    
+    // Kenyan school fee validation (minimum amounts)
+    const totalFees = Number(tuition || 0) + Number(activity || 0) + Number(misc || 0) + Number(transport || 0);
+    if (totalFees < 500) {
+      return res.status(400).json({ 
+        message: "Total fees must be at least KES 500 for Kenyan schools" 
+      });
+    }
+    
+    if (totalFees > 200000) {
+      return res.status(400).json({ 
+        message: "Total fees exceed reasonable limit for Kenyan schools (KES 200,000)" 
+      });
     }
     const { data: inserted, error } = await supabase
       .from('fee_structures')
@@ -57,6 +80,10 @@ router.post("/", async (req, res, next) => {
         class_id: classId,
         term,
         academic_year: academicYear,
+        tuition: Number(tuition || 0),
+        activity: Number(activity || 0),
+        misc: Number(misc || 0),
+        transport: Number(transport || 0),
         is_active: isActive
       })
       .select('fee_structure_id')

@@ -266,7 +266,6 @@ router.put("/:id", requireRoles("teacher", "admin"), async (req, res, next) => {
     const { schoolId, userId, role } = req.user;
     const { content, status, subject, class_name, term, week, topic, duration } = req.body;
 
-    // OLD: const [[plan]] = await pool.query(`SELECT * FROM lesson_plans WHERE plan_id=$1 AND school_id=$2 AND is_deleted=false`, [req.params.id, schoolId]);
     const { data: plan, error: fetchError } = await supabase
       .from('lesson_plans')
       .select('*')
@@ -371,7 +370,6 @@ Respond in EXACTLY this JSON format (no markdown, no extra text):
       };
     }
 
-    // OLD: await pool.query(`UPDATE lesson_plans SET ai_score=?, ai_missing=?, ai_weak=?, ai_recommendations=?, ai_feedback_draft=?, updated_at=NOW() WHERE plan_id=?`, [...]);
     const { error: updateError } = await supabase
       .from('lesson_plans')
       .update({

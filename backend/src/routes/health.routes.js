@@ -1,5 +1,4 @@
 import { Router } from "express";
-// OLD: import { pool } from "../config/db.js";
 import { supabase } from "../config/supabaseClient.js";
 
 const router = Router();

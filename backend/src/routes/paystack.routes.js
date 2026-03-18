@@ -2,16 +2,34 @@ import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
-import { agentLog } from "../utils/agentDebugLog.js";
+import africastalking from "africastalking"; // NEW: for SMS receipts
+import { sendPaymentReceipt } from "../utils/smsUtils.js";
+import paymentConfigService from "../services/payment-config.service.js";
 
 const router = Router();
-router.use(authRequired);
 
+// NEW: Africa's Talking instance (central account)
+const at = africastalking({
+  username: env.atUsername,
+  apiKey: env.atApiKey,
+});
+
+// Helper: get Mpesa OAuth token (unchanged, not used here)
+async function getMpesaToken() {
+  const creds = Buffer.from(`${env.mpesaConsumerKey}:${env.mpesaConsumerSecret}`).toString("base64");
+  const res = await fetch(`${env.mpesaBaseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
+    headers: { Authorization: `Basic ${creds}` },
+  });
+  const data = await res.json();
+  return data.access_token;
+}
+
+// NEW: SMS receipt helper
 // ── Initialize transaction ────────────────────────────────────────────────────
-router.post("/initialize", async (req, res, next) => {
+router.post("/initialize", authRequired, async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { email, amount, studentId, studentName, admissionNumber, feeType = "tuition" } = req.body;
+    const { email, amount, studentId, studentName, admissionNumber, feeType = "tuition", parentPhone } = req.body; // NEW: parentPhone optional
 
     if (!email || !amount || !studentId)
       return res.status(400).json({ message: "email, amount and studentId are required" });
@@ -19,16 +37,21 @@ router.post("/initialize", async (req, res, next) => {
     const amountKobo = Math.ceil(Number(amount) * 100);
     const reference  = `EDU-${schoolId}-${studentId}-${Date.now()}`;
 
+    // Get Paystack config for this school
+    const paystackConfig = await paymentConfigService.getPaystackConfig(schoolId);
+
     const response = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${env.paystackSecretKey}`,
+        // OLD: Authorization: `Bearer ${env.paystackSecretKey}`,
+        Authorization: `Bearer ${paystackConfig.secretKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         email, amount: amountKobo, reference,
-        metadata: { schoolId, studentId, studentName, admissionNumber, feeType },
-        callback_url: `${env.paystackCallbackUrl}`,
+        metadata: { schoolId, studentId, studentName, admissionNumber, feeType, parentPhone }, // NEW: added parentPhone
+        // OLD: callback_url: `${env.paystackCallbackUrl}`,
+        callback_url: paystackConfig.callbackUrl || `${env.paystackCallbackUrl}`,
       }),
     });
 
@@ -83,13 +106,19 @@ router.post("/initialize", async (req, res, next) => {
 });
 
 // ── Verify transaction (called by frontend after popup closes) ────────────────
-router.get("/verify/:reference", async (req, res, next) => {
+router.get("/verify/:reference", authRequired, async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { reference } = req.params;
 
+    // Get Paystack config for this school
+    const paystackConfig = await paymentConfigService.getPaystackConfig(schoolId);
+
+    // OLD: const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+    // OLD:   headers: { Authorization: `Bearer ${env.paystackSecretKey}` },
+    // OLD: });
     const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-      headers: { Authorization: `Bearer ${env.paystackSecretKey}` },
+      headers: { Authorization: `Bearer ${paystackConfig.secretKey}` },
     });
     const data = await response.json();
 
@@ -99,16 +128,27 @@ router.get("/verify/:reference", async (req, res, next) => {
     const paidAmount = data.data.amount / 100;
     const channel    = data.data.channel || "card";
 
-    // #region agent log
-    agentLog({sessionId:"cdda91",runId:"verify",hypothesisId:"H6",location:"backend/src/routes/paystack.routes.js:110",message:"paystack verify success; updating payment",data:{schoolId,reference,paidAmount,channel},timestamp:Date.now()});
-    // #endregion
+    const { data: paymentCheck, error: checkError } = await supabase
+      .from('payments')
+      .select('school_id, student_id, students(first_name, last_name, parent_phone)')
+      .eq('reference_number', reference)
+      .eq('school_id', schoolId)
+      .maybeSingle();
 
-    const { data: paymentData, error } = await supabase
-      .from("payments")
-      .update({ status: "paid", amount: paidAmount })
-      .eq("school_id", schoolId)
-      .eq("reference_number", reference);
-    if (error) throw error;
+    if (checkError || !paymentCheck) return res.status(404).json({ message: "Payment not found" });
+
+    const { error: updErr } = await supabase
+      .from('payments')
+      .update({ status: 'paid', amount: paidAmount, updated_at: new Date().toISOString() })
+      .eq('reference_number', reference)
+      .eq('school_id', schoolId);
+    if (updErr) throw updErr;
+
+    // NEW: Send SMS receipt on success
+    if (paymentCheck.students?.parent_phone) {
+      const name = `${paymentCheck.students.first_name || ""} ${paymentCheck.students.last_name || ""}`.trim() || "student";
+      await sendPaymentReceipt(schoolId, paymentCheck.students.parent_phone, paidAmount, reference, name);
+    }
 
     res.json({ verified: true, amount: paidAmount, channel, reference });
   } catch (err) { next(err); }
@@ -118,23 +158,28 @@ router.get("/verify/:reference", async (req, res, next) => {
 router.post("/webhook", async (req, res, next) => {
   try {
     const crypto = await import("crypto");
-    const secret = env.paystackSecretKey || "";
-    const hash   = crypto.createHmac("sha512", secret).update(req.body).digest("hex");
-    if (hash !== req.headers["x-paystack-signature"])
-      return res.status(400).json({ message: "Invalid signature" });
-
+    
+    // Extract school_id from metadata first to get correct config
     const event = JSON.parse(req.body.toString());
     if (event.event !== "charge.success") return res.sendStatus(200);
 
     const { reference, amount, metadata } = event.data;
-    const paidAmount = amount / 100;
-    const { schoolId } = metadata || {};
-
-    // NEW: Validate webhook tenant safety
+    const { schoolId, studentId, parentPhone, studentName } = metadata || {};
+    
     if (!schoolId) {
       console.error("SECURITY: Missing school_id in Paystack webhook metadata", { reference });
       return res.status(400).json({ message: "Invalid payment metadata" });
     }
+    
+    // Get Paystack config for this school
+    const paystackConfig = await paymentConfigService.getPaystackConfig(schoolId);
+    
+    const secret = paystackConfig.secretKey || "";
+    const hash   = crypto.createHmac("sha512", secret).update(req.body).digest("hex");
+    if (hash !== req.headers["x-paystack-signature"])
+      return res.status(400).json({ message: "Invalid signature" });
+
+    const paidAmount = amount / 100;
 
     // Verify payment belongs to the correct school before updating
     const { data: paymentCheck, error: checkError } = await supabase
@@ -155,6 +200,12 @@ router.post("/webhook", async (req, res, next) => {
       .eq('reference_number', reference)
       .eq('school_id', schoolId);
     if (updErr) throw updErr;
+
+    // NEW: Send SMS receipt on success
+    if (parentPhone) {
+      await sendPaymentReceipt(schoolId, parentPhone, paidAmount, reference, studentName || "student");
+    }
+
     res.sendStatus(200);
   } catch (err) { next(err); }
 });
@@ -165,18 +216,31 @@ router.get("/callback", async (req, res, next) => {
     const { reference } = req.query;
     if (!reference) return res.status(400).json({ message: "No reference" });
 
-    const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-      headers: { Authorization: `Bearer ${env.paystackSecretKey}` },
+    // First verify the transaction to get metadata
+    const tempResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      headers: { Authorization: `Bearer ${env.paystackSecretKey}` }, // Use global for initial lookup
     });
-    const data = await response.json();
-
-    if (data.data?.status === "success") {
+    const tempData = await tempResponse.json();
+    
+    if (tempData.data?.status === "success") {
       // Extract school_id from payment metadata to prevent cross-school updates
-      const { schoolId } = data.data.metadata || {};
+      const { schoolId } = tempData.data.metadata || {};
       if (!schoolId) {
         console.error("Missing school_id in webhook metadata");
         return res.status(400).json({ message: "Invalid payment metadata" });
       }
+      
+      // Get Paystack config for this school
+      const paystackConfig = await paymentConfigService.getPaystackConfig(schoolId);
+      
+      // Re-verify with school-specific config
+      // OLD: const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      // OLD:   headers: { Authorization: `Bearer ${env.paystackSecretKey}` },
+      // OLD: });
+      const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+        headers: { Authorization: `Bearer ${paystackConfig.secretKey}` },
+      });
+      const data = await response.json();
       
       const { data: paymentCheck, error: checkError } = await supabase
         .from('payments')
@@ -195,6 +259,11 @@ router.get("/callback", async (req, res, next) => {
         .eq('reference_number', reference)
         .eq('school_id', schoolId);
       if (updErr) throw updErr;
+
+      // NEW: Send SMS receipt on success (if phone in metadata)
+      if (data.data.metadata?.parentPhone) {
+        await sendPaymentReceipt(schoolId, data.data.metadata.parentPhone, data.data.amount / 100, reference, data.data.metadata.studentName || "student");
+      }
     }
     res.json({ status: data.data?.status, reference });
   } catch (err) { next(err); }

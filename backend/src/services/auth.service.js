@@ -1,5 +1,5 @@
 import '../config/env.js';
-import { supabase } from '../config/db.js';
+import { supabase } from '../config/supabaseClient.js';
 
 /**
  * Supabase-only authentication service
@@ -31,13 +31,5 @@ export async function authLogin(email, password, schoolId = 1) {
   }
 }
 
-// OLD: MySQL migration function - no longer needed as all data is in Supabase
-// Keeping for backward compatibility during transition period
-export async function migrateUserToSupabase(mysqlUser) {
-  // Migration complete - all users already in Supabase
-  console.log('Migration not needed - user already in Supabase:', mysqlUser?.user_id);
-  return true;
-}
-
 console.log('✅ Supabase auth service ready');
-console.log('� All authentication via Supabase PostgreSQL with RLS');
+console.log('🔒 All authentication via Supabase PostgreSQL with RLS');

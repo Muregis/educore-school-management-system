@@ -5,9 +5,17 @@ import { requireRoles } from "../middleware/roles.js";
 import { sendEmail, isEmailConfigured, templates } from "../services/email.service.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
+import { env } from "../config/env.js";
+import africastalking from "africastalking"; // NEW: import for SMS
 
 const router = Router();
 router.use(authRequired);
+
+// NEW: Africa's Talking instance (central account from .env)
+const at = africastalking({
+  username: env.atUsername,
+  apiKey: env.atApiKey,
+});
 
 // ─── GET all payments (with student name) ────────────────────────────────────
 router.get("/", async (req, res, next) => {
@@ -81,7 +89,7 @@ router.post("/fee-structures", requireRoles("admin", "finance"), async (req, res
   } catch (err) { next(err); }
 });
 
-// ─── POST record manual payment ──────────────────────────────────────────────
+// ─── POST record manual payment (updated for custom amount + SMS receipt) ──────────────────────────────────────────────
 router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -95,10 +103,24 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
       status       = "paid",
       term         = "Term 2",
       paidBy       = null,
+      parentPhone,  // NEW: optional, for SMS receipt
     } = req.body;
 
     if (!studentId || !amount || !paymentDate)
       return res.status(400).json({ message: "studentId, amount and paymentDate are required" });
+
+    if (amount < 100) return res.status(400).json({ message: "Amount must be at least KSh 100" });
+
+    // NEW: Validate against outstanding balance
+    const { data: fee, error: feeError } = await supabase
+      .from('fees')
+      .select('amount_due')
+      .eq('student_id', studentId)
+      .eq('school_id', schoolId)
+      .single();
+
+    if (feeError || !fee) return res.status(400).json({ message: "Fee record not found" });
+    if (amount > fee.amount_due) return res.status(400).json({ message: "Amount exceeds outstanding balance" });
 
     const { data: inserted, error: insertError } = await supabase
       .from('payments')
@@ -120,7 +142,14 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
     if (insertError) throw insertError;
     const paymentId = inserted.payment_id;
 
-    // ── Email notification (fire-and-forget) ──
+    // NEW: Update balance in fees table
+    await supabase
+      .from('fees')
+      .update({ amount_due: fee.amount_due - amount })
+      .eq('student_id', studentId)
+      .eq('school_id', schoolId);
+
+    // ── Email notification (fire-and-forget) ── (unchanged)
     if (isEmailConfigured()) {
       try {
         const { data: studentRow } = await supabase
@@ -148,12 +177,52 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
             html: templates.paymentReceived({
               parentName:  studentRow.parent_name || "Parent/Guardian",
               studentName: `${studentRow.first_name} ${studentRow.last_name}`,
-              amount, term, balance: null,
+              amount, term, balance: fee.amount_due - amount,
             }),
             schoolId,
           }).catch(() => {});
         }
       } catch (_) {}
+    }
+
+    // NEW: SMS receipt (if parentPhone provided)
+    if (parentPhone) {
+      try {
+        const { data: school } = await supabase
+          .from('schools')
+          .select('sms_sender_id')
+          .eq('id', schoolId)
+          .single();
+
+        const senderId = school?.sms_sender_id || 'EDUCORE';
+
+        const message = `Payment Receipt\n` +
+          `Amount: KSh ${amount.toLocaleString()}\n` +
+          `Date: ${new Date(paymentDate).toLocaleDateString()}\n` +
+          `Reference: ${referenceNumber || paymentId}\n` +
+          `Balance Due: KSh ${(fee.amount_due - amount).toLocaleString()}\n` +
+          `Paid to: Your School\n` +
+          `Thank you!`;
+
+        const response = await at.SMS.send({
+          to: parentPhone.startsWith('+') ? parentPhone : `+254${parentPhone.replace(/^0/, '')}`,
+          message,
+          from: senderId
+        });
+
+        // Log SMS
+        await supabase.from('sms_logs').insert({
+          school_id: schoolId,
+          recipient: parentPhone,
+          message,
+          status: response.SMSMessageData?.Recipients?.[0]?.status || 'Sent',
+          cost_estimate: response.SMSMessageData?.Recipients?.[0]?.cost || 0,
+          type: 'payment_receipt'
+        });
+      } catch (smsErr) {
+        console.error('SMS receipt failed:', smsErr);
+        // Don't fail the payment - just log
+      }
     }
 
     logActivity(req, { action:"payment.create", entity:"payment", entityId:paymentId, description:`KES ${amount} recorded for student ${studentId}` });

@@ -8,15 +8,29 @@ import { supabase } from "../config/supabaseClient.js";
 const router = Router();
 router.use(authRequired);
 
-// ─── Africa's Talking SMS sender ─────────────────────────────────────────────
+// ─── Africa's Talking SMS sender with Kenyan validation ───────────────────────────
 async function sendViaSms(recipients, message, schoolId, sentByUserId = null) {
   const logs = [];
+
+  // Validate Kenyan phone numbers
+  const validRecipients = recipients.filter(phone => {
+    if (!/^2547[0-9]{8}$/.test(phone)) {
+      console.warn(`[Kenyan SMS] Invalid phone format: ${phone}`);
+      return false;
+    }
+    return true;
+  });
+
+  if (!validRecipients.length) {
+    console.warn('[Kenyan SMS] No valid Kenyan phone numbers provided');
+    return { sent: 0, failed: recipients.length, queued: 0, logs };
+  }
 
   if (env.atApiKey && env.atUsername) {
     try {
       const params = new URLSearchParams({
         username: env.atUsername,
-        to:       recipients.join(","),
+        to:       validRecipients.join(","),
         message,
         from:     env.atSenderId || "EduCore",
       });
@@ -249,7 +263,6 @@ router.post("/email/fee-reminder", requireRoles("admin", "finance"), async (req,
     const { className } = req.body;
 
     // Find parents with outstanding balances who have emails
-    // OLD: Complex SQL query replaced with Supabase query + in-memory calculation
     // Get students with parent users
     let studentQuery = supabase
       .from('students')

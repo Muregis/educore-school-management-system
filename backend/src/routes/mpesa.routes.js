@@ -2,20 +2,31 @@ import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
+import africastalking from "africastalking"; // NEW: for SMS receipts
+import { sendPaymentReceipt } from "../utils/smsUtils.js";
+import paymentConfigService from "../services/payment-config.service.js";
 
 const router = Router();
 
-// Helper: get Mpesa OAuth token
-async function getMpesaToken() {
-  const creds = Buffer.from(`${env.mpesaConsumerKey}:${env.mpesaConsumerSecret}`).toString("base64");
-  const res = await fetch(`${env.mpesaBaseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
+// NEW: Africa's Talking instance (central account)
+const at = africastalking({
+  username: env.atUsername,
+  apiKey: env.atApiKey,
+});
+
+// Helper: get Mpesa OAuth token (updated for multi-tenant)
+async function getMpesaToken(schoolId) {
+  // OLD: const creds = Buffer.from(`${env.mpesaConsumerKey}:${env.mpesaConsumerSecret}`).toString("base64");
+  const mpesaConfig = await paymentConfigService.getMpesaConfig(schoolId);
+  const creds = Buffer.from(`${mpesaConfig.consumerKey}:${mpesaConfig.consumerSecret}`).toString("base64");
+  const res = await fetch(`${mpesaConfig.baseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
     headers: { Authorization: `Basic ${creds}` },
   });
   const data = await res.json();
   return data.access_token;
 }
 
-// Helper: log SMS
+// Helper: log SMS (unchanged, already good)
 async function sendSmsLog(schoolId, recipient, message, userId) {
   try {
     await supabase.from('sms_logs').insert({
@@ -29,7 +40,7 @@ async function sendSmsLog(schoolId, recipient, message, userId) {
   } catch (_) { /* non-fatal */ }
 }
 
-// STK Push
+// STK Push (updated with SMS receipt prep)
 router.post("/stk-push", authRequired, async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -37,25 +48,31 @@ router.post("/stk-push", authRequired, async (req, res, next) => {
     if (!phone || !amount || !studentId)
       return res.status(400).json({ message: "phone, amount and studentId are required" });
 
-    const token     = await getMpesaToken();
+    const mpesaConfig = await paymentConfigService.getMpesaConfig(schoolId);
+    const token     = await getMpesaToken(schoolId);
     const timestamp = new Date().toISOString().replace(/[-:T.Z]/g, "").slice(0, 14);
-    const password  = Buffer.from(`${env.mpesaShortcode}${env.mpesaPasskey}${timestamp}`).toString("base64");
+    // OLD: const password  = Buffer.from(`${env.mpesaShortcode}${env.mpesaPasskey}${timestamp}`).toString("base64");
+    const password  = Buffer.from(`${mpesaConfig.shortcode}${mpesaConfig.passkey}${timestamp}`).toString("base64");
 
     const body = {
-      BusinessShortCode: env.mpesaShortcode,
+      // OLD: BusinessShortCode: env.mpesaShortcode,
+      BusinessShortCode: mpesaConfig.shortcode,
       Password: password,
       Timestamp: timestamp,
       TransactionType: "CustomerPayBillOnline",
       Amount: Math.ceil(Number(amount)),
       PartyA: phone,
-      PartyB: env.mpesaShortcode,
+      // OLD: PartyB: env.mpesaShortcode,
+      PartyB: mpesaConfig.shortcode,
       PhoneNumber: phone,
-      CallBackURL: `${env.mpesaCallbackBaseUrl}/api/mpesa/callback`,
+      // OLD: CallBackURL: `${env.mpesaCallbackBaseUrl}/api/mpesa/callback`,
+      CallBackURL: `${mpesaConfig.callbackBaseUrl}/api/mpesa/callback`,
       AccountReference: `School fees - ${studentName || studentId}`,
       TransactionDesc:  `School fees - ${studentName || studentId}`,
     };
 
-    const mpesaRes = await fetch(`${env.mpesaBaseUrl}/mpesa/stkpush/v1/processrequest`, {
+    // OLD: const mpesaRes = await fetch(`${env.mpesaBaseUrl}/mpesa/stkpush/v1/processrequest`, {
+    const mpesaRes = await fetch(`${mpesaConfig.baseUrl}/mpesa/stkpush/v1/processrequest`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
@@ -80,7 +97,7 @@ router.post("/stk-push", authRequired, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// STK Callback
+// STK Callback (updated with SMS receipt on success)
 router.post("/callback", async (req, res, next) => {
   try {
     const body          = req.body?.Body?.stkCallback || req.body;
@@ -115,10 +132,9 @@ router.post("/callback", async (req, res, next) => {
     const phone     = String(get("PhoneNumber") || "");
 
     // Update the pending payment row with the real Mpesa receipt number
-    // Get school_id from the payment before updating to prevent cross-tenant access
     const { data: paymentCheck, error: checkError } = await supabase
       .from('payments')
-      .select('school_id')
+      .select('school_id, student_id, students(first_name, last_name)')
       .eq('reference_number', checkoutReqId)
       .not('school_id', 'is', null)
       .maybeSingle();
@@ -130,37 +146,35 @@ router.post("/callback", async (req, res, next) => {
         .eq('reference_number', checkoutReqId)
         .eq('status', 'pending')
         .eq('school_id', paymentCheck.school_id);
-    }
 
-    // Fetch student info for SMS confirmation
-    const { data: pending, error: pendingError } = await supabase
-      .from('payments')
-      .select('school_id, student_id, students(phone, first_name, last_name)')
-      .eq('reference_number', mpesaCode)
-      .maybeSingle();
-
-    if (!pendingError && pending && pending.students?.phone) {
-      const { school_id, student_id, students } = pending;
-      const name = `${students.first_name || ""} ${students.last_name || ""}`.trim();
-      const msg  = `Dear parent, payment of KES ${amount} received for ${name}. Mpesa Ref: ${mpesaCode}. Thank you.`;
-      await sendSmsLog(school_id, students.phone, msg);
+      // NEW: Send SMS receipt on success
+      if (phone && paymentCheck.students) {
+        const name = `${paymentCheck.students.first_name || ""} ${paymentCheck.students.last_name || ""}`.trim() || "student";
+        await sendPaymentReceipt(paymentCheck.school_id, phone, amount, mpesaCode, name);
+      }
     }
 
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
 
-// C2B Register URLs
+// C2B Register URLs (updated for multi-tenant)
 router.post("/register", authRequired, async (req, res, next) => {
   try {
-    const token = await getMpesaToken();
+    const { schoolId } = req.user;
+    const mpesaConfig = await paymentConfigService.getMpesaConfig(schoolId);
+    const token = await getMpesaToken(schoolId);
     const body = {
-      ShortCode:       env.mpesaShortcode,
-      ResponseType:    "Completed",
-      ConfirmationURL: `${env.mpesaCallbackBaseUrl}/api/mpesa/c2b/confirm`,
-      ValidationURL:   `${env.mpesaCallbackBaseUrl}/api/mpesa/c2b/validate`,
+      // OLD: ShortCode: env.mpesaShortcode,
+      ShortCode: mpesaConfig.shortcode,
+      ResponseType: "Completed",
+      // OLD: ConfirmationURL: `${env.mpesaCallbackBaseUrl}/api/mpesa/c2b/confirm`,
+      // OLD: ValidationURL: `${env.mpesaCallbackBaseUrl}/api/mpesa/c2b/validate`,
+      ConfirmationURL: `${mpesaConfig.callbackBaseUrl}/api/mpesa/c2b/confirm`,
+      ValidationURL: `${mpesaConfig.callbackBaseUrl}/api/mpesa/c2b/validate`,
     };
-    const mpesaRes = await fetch(`${env.mpesaBaseUrl}/mpesa/c2b/v1/registerurl`, {
+    // OLD: const mpesaRes = await fetch(`${env.mpesaBaseUrl}/mpesa/c2b/v1/registerurl`, {
+    const mpesaRes = await fetch(`${mpesaConfig.baseUrl}/mpesa/c2b/v1/registerurl`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
@@ -170,12 +184,12 @@ router.post("/register", authRequired, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// C2B Validation
+// C2B Validation (unchanged)
 router.post("/c2b/validate", async (_req, res) => {
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 });
 
-// C2B Confirmation
+// C2B Confirmation (updated with SMS receipt)
 router.post("/c2b/confirm", async (req, res, next) => {
   try {
     const b         = req.body || {};
@@ -208,7 +222,7 @@ router.post("/c2b/confirm", async (req, res, next) => {
     const schoolId  = student.school_id;
     const studentId = student.student_id;
     const phone     = msisdn || student.parent_phone || student.phone || "";
-    const name      = `${student.first_name} ${student.last_name}`;
+    const name      = `${student.first_name} ${student.last_name}`.trim() || "student";
 
     // Idempotent insert — ignore duplicate TransID
     await supabase.from('payments').upsert({
@@ -222,16 +236,16 @@ router.post("/c2b/confirm", async (req, res, next) => {
       status: 'paid'
     }, { onConflict: 'reference_number' });
 
+    // NEW: Send SMS receipt
     if (phone) {
-      const msg = `Dear parent, payment of KES ${amount} received for ${name}. Mpesa Ref: ${transId}.`;
-      await sendSmsLog(schoolId, phone, msg);
+      await sendPaymentReceipt(schoolId, phone, amount, transId, name);
     }
 
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
 
-// Check payment status
+// Check payment status (unchanged)
 router.get("/status/:checkoutRequestId", authRequired, async (req, res, next) => {
   try {
     const { schoolId } = req.user;

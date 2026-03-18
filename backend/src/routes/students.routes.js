@@ -61,6 +61,19 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
     if (!admissionNumber || !firstName || !lastName || !gender)
       return res.status(400).json({ message: "admissionNumber, firstName, lastName, gender are required" });
 
+    // Kenyan phone number validation
+    if (phone && !/^2547[0-9]{8}$/.test(phone)) {
+      return res.status(400).json({ 
+        message: "Invalid Kenyan phone number format. Use format: 2547xxxxxxxx" 
+      });
+    }
+    
+    if (parentPhone && !/^2547[0-9]{8}$/.test(parentPhone)) {
+      return res.status(400).json({ 
+        message: "Invalid Kenyan parent phone number format. Use format: 2547xxxxxxxx" 
+      });
+    }
+
     // Resolve classId from className if not provided
     let resolvedClassId = classId;
     const resolvedClassName = className || null;

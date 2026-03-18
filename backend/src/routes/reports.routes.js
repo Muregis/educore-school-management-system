@@ -12,7 +12,6 @@ router.get("/summary", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     
-    // OLD: const { data: students } = await pool.query('SELECT 1 FROM students WHERE school_id = ? AND is_deleted = false LIMIT 1', [schoolId]);
     const { count: totalStudents, error: stuErr } = await supabase
       .from('students')
       .select('*', { count: 'exact', head: true })
@@ -20,7 +19,6 @@ router.get("/summary", async (req, res, next) => {
       .eq('is_deleted', false);
     if (stuErr) throw stuErr;
 
-    // OLD: const { data: teachers } = await pool.query('SELECT 1 FROM teachers WHERE school_id = ? AND is_deleted = false LIMIT 1', [schoolId]);
     const { count: totalTeachers, error: teaErr } = await supabase
       .from('teachers')
       .select('*', { count: 'exact', head: true })
@@ -28,7 +26,6 @@ router.get("/summary", async (req, res, next) => {
       .eq('is_deleted', false);
     if (teaErr) throw teaErr;
 
-    // OLD: const { data: paidPayments } = await pool.query('SELECT amount FROM payments WHERE school_id = ? AND status = ? AND is_deleted = false', [schoolId, 'paid']);
     const { data: paidPayments, error: paidErr } = await supabase
       .from('payments')
       .select('amount')

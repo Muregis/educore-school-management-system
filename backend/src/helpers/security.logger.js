@@ -1,4 +1,4 @@
-import { pool } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 
 /**
  * Security event logging for audit trails and threat detection
@@ -11,7 +11,7 @@ import { pool } from "../config/db.js";
  *     details: { email, ip, userAgent }
  *   });
  */
-export function logSecurityEvent(req, { eventType, severity = "medium", description, details = {} }) {
+export async function logSecurityEvent(req, { eventType, severity = "medium", description, details = {} }) {
   try {
     const schoolId = req.user?.schoolId ?? null;
     const userId   = req.user?.userId   ?? null;
@@ -21,7 +21,7 @@ export function logSecurityEvent(req, { eventType, severity = "medium", descript
                   || null;
     const userAgent = req.get("User-Agent") || null;
 
-    pool
+    const { error } = await supabase
       .from('security_logs')
       .insert({
         school_id: schoolId,
@@ -34,8 +34,11 @@ export function logSecurityEvent(req, { eventType, severity = "medium", descript
         user_agent: userAgent,
         details: JSON.stringify(details),
         created_at: new Date().toISOString()
-      })
-      .catch(err => console.error("[security_log] DB error:", err.message));
+      });
+    
+    if (error) {
+      console.error("[security_log] DB error:", error.message);
+    }
   } catch (err) {
     console.error("[security_log] Unexpected error:", err.message);
   }

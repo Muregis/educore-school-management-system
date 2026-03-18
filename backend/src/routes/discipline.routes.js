@@ -69,7 +69,6 @@ router.put("/:id", requireRoles("admin","teacher"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { status, actionTaken } = req.body;
-    // OLD: const [result] = await pool.query(`UPDATE discipline_records SET status=?, action_taken=?, updated_at=CURRENT_TIMESTAMP WHERE discipline_id=? AND school_id=? AND is_deleted=0`, [status, actionTaken || null, req.params.id, schoolId]);
     const { data: updated, error } = await supabase
       .from('discipline_records')
       .update({ status, action_taken: actionTaken || null, updated_at: new Date().toISOString() })

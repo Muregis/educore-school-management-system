@@ -1,6 +1,4 @@
 import { Router } from "express";
-// OLD: import { pool } from "../config/db.js";
-// OLD: import { supabase } from "../config/db.js";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";

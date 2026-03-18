@@ -1,4 +1,4 @@
-import { pool } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 
 // NEW: Enhanced audit logging for sensitive actions
 export async function logAuditEvent(req, action, details = {}) {
@@ -6,7 +6,7 @@ export async function logAuditEvent(req, action, details = {}) {
     const { user_id, school_id } = req.user || {};
     const { entityId, entityType, oldValues, newValues, description } = details;
 
-    await pool
+    await supabase
       .from('audit_logs')
       .insert({
         user_id: user_id || null,

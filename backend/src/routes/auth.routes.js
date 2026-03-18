@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { authLogin, migrateUserToSupabase } from "../services/hybrid-auth.js";
+import { authLogin } from "../services/auth.service.js";
 import { supabase } from "../config/supabaseClient.js";
 import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";

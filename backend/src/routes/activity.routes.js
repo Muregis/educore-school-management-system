@@ -46,7 +46,6 @@ router.get("/", async (req, res, next) => {
     const action = req.query.action || null;
     const role   = req.query.role   || null;
 
-    // OLD: Raw SQL with pool.query replaced with Supabase
     let q = supabase
       .from('activity_logs')
       .select('log_id, action, entity, entity_id, description, role, ip_address, created_at, users(full_name)', { count: 'exact' })

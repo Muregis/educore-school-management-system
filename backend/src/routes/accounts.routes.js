@@ -6,10 +6,10 @@ import { requireRoles } from "../middleware/roles.js";
 
 const router = Router();
 router.use(authRequired);
-router.use(requireRoles("admin"));
 
-// GET /api/accounts/users — list all portal users in this school (admin-only)
-router.get("/users", async (req, res, next) => {
+// Apply admin-only to specific routes that need it
+// GET /api/accounts/users — list all portal users in this school (admin/teacher/finance)
+router.get("/users", requireRoles("admin", "teacher", "finance"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { data: rows, error } = await supabase
@@ -43,8 +43,8 @@ router.get("/staff", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/accounts/staff — create a new staff account
-router.post("/staff", async (req, res, next) => {
+// POST /api/accounts/staff — create a new staff account (admin-only)
+router.post("/staff", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { name, email, phone, role, password, status = "active" } = req.body;
@@ -137,8 +137,8 @@ router.patch("/staff/:id", async (req, res, next) => {
   }
 });
 
-// DELETE /api/accounts/staff/:id — soft delete (cannot delete yourself)
-router.delete("/staff/:id", async (req, res, next) => {
+// DELETE /api/accounts/staff/:id — soft delete (admin-only, cannot delete yourself)
+router.delete("/staff/:id", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     if (String(req.params.id) === String(userId))
@@ -211,8 +211,8 @@ router.get("/portal", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/accounts/portal
-router.post("/portal", async (req, res, next) => {
+// POST /api/accounts/portal (admin-only)
+router.post("/portal", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId, role, password, name } = req.body;
@@ -307,8 +307,8 @@ router.patch("/portal/:id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// DELETE /api/accounts/portal/:id
-router.delete("/portal/:id", async (req, res, next) => {
+// DELETE /api/accounts/portal/:id (admin-only)
+router.delete("/portal/:id", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { error } = await supabase

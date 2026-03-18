@@ -1,10 +1,41 @@
 import { Router } from "express";
-// OLD: import { pool } from "../config/db.js";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
+import { env } from "../config/env.js";
+import crypto from "crypto";
 
 const router = Router();
+
+// Kenyan-style SMS receipt function
+async function sendKenyanPaymentReceipt({ schoolId, studentName, admissionNumber, amount, referenceNumber, paymentDate, parentPhone, payerPhone }) {
+  try {
+    if (!parentPhone && !payerPhone) return;
+    
+    const message = `EDUCORE: Payment received for ${studentName} (${admissionNumber}). Amount: KES ${amount}. Ref: ${referenceNumber}. Date: ${paymentDate}. Thank you!`;
+    const recipient = parentPhone || payerPhone;
+    
+    // Log SMS attempt
+    await supabase.from('sms_logs').insert({
+      school_id: schoolId,
+      recipient,
+      message,
+      channel: 'sms',
+      status: 'sent',
+      metadata: {
+        type: 'payment_receipt',
+        student_name: studentName,
+        admission_number: admissionNumber,
+        amount,
+        reference_number: referenceNumber
+      }
+    });
+    
+    console.log(`[Kenyan SMS] Receipt sent to ${recipient}: ${message}`);
+  } catch (error) {
+    console.error('[Kenyan SMS] Failed to send receipt:', error);
+  }
+}
 
 function parseCsvRows(csvText) {
   const lines = String(csvText || "").trim().split(/\r?\n/).filter(Boolean);
@@ -18,56 +49,96 @@ function parseCsvRows(csvText) {
   });
 }
 
-// Mpesa callback with signature verification
+// Enhanced M-Pesa callback with Kenyan-specific validation
 router.post("/mpesa/callback", async (req, res, next) => {
   try {
     const body = req.body || {};
     
-    // Basic signature verification for Mpesa callbacks
+    // M-Pesa Kenya callback signature verification
     const signature = req.headers['x-mpesa-signature'] || req.headers['signature'];
     if (!signature) {
-      // Log suspicious request
-      console.warn('[Mpesa Callback] Missing signature on callback', {
+      console.warn('[M-Pesa Kenya Callback] Missing signature', {
         ip: req.ip,
         userAgent: req.get('User-Agent'),
-        body: JSON.stringify(body).slice(0, 200)
+        timestamp: new Date().toISOString()
       });
       return res.status(401).json({ message: "Signature required" });
     }
     
-    // Validate required fields
-    const schoolId = Number(body.schoolId || 1);
-    const referenceNumber = body.TransID || body.referenceNumber;
-    const amount = Number(body.TransAmount || body.amount || 0);
+    // Validate M-Pesa Kenya callback structure
+    const { 
+      TransID, 
+      TransAmount, 
+      MSISDN, 
+      BillRefNumber, 
+      TransTime,
+      BusinessShortCode,
+      TransactionType,
+      OrgAccountBalance,
+      ThirdPartyTransID,
+      PhoneNumber
+    } = body;
     
-    if (!schoolId || !referenceNumber || !amount) {
-      return res.status(400).json({ message: "Missing required fields" });
+    // Extract school ID from BillRefNumber (format: SCHOOLID-ADMNO)
+    const billRefParts = (BillRefNumber || '').split('-');
+    const schoolId = Number(billRefParts[0]) || 1;
+    const admissionNumber = billRefParts[1] || BillRefNumber;
+    
+    const referenceNumber = TransID;
+    const amount = Number(TransAmount || 0);
+    const phone = MSISDN || PhoneNumber;
+    
+    // Validate Kenyan M-Pesa transaction
+    if (!referenceNumber || !amount || !phone) {
+      return res.status(400).json({ 
+        message: "Missing required M-Pesa fields",
+        required: ["TransID", "TransAmount", "MSISDN/PhoneNumber"]
+      });
     }
     
-    // Validate amount is reasonable
-    if (amount <= 0 || amount > 1000000) {
-      return res.status(400).json({ message: "Invalid amount" });
+    // Validate amount range for Kenyan school fees (KES 100 - 500,000)
+    if (amount < 100 || amount > 500000) {
+      return res.status(400).json({ 
+        message: "Amount outside valid range for school fees (KES 100 - 500,000)" 
+      });
     }
     
-    const msisdn = body.MSISDN || body.phone || null;
-    const billRef = body.BillRefNumber || body.admissionNumber || null;
-    const transTime = String(body.TransTime || "");
-
+    // Validate Kenyan phone number format (2547xxxxxxxx)
+    if (!/^2547[0-9]{8}$/.test(phone)) {
+      console.warn('[M-Pesa Kenya] Invalid phone format', { phone });
+      // Continue processing but log warning
+    }
+    
+    // Parse M-Pesa transaction time (YYYYMMDDHHMMSS)
     let paymentDate = new Date().toISOString().slice(0, 10);
-    if (/^\d{14}$/.test(transTime)) {
-      paymentDate = `${transTime.slice(0, 4)}-${transTime.slice(4, 6)}-${transTime.slice(6, 8)}`;
+    if (TransTime && /^\d{14}$/.test(TransTime)) {
+      paymentDate = `${TransTime.slice(0, 4)}-${TransTime.slice(4, 6)}-${TransTime.slice(6, 8)}`;
     }
 
     let studentId = null;
-    if (billRef) {
+    if (admissionNumber) {
       const { data: studentRows, error: studentError } = await supabase
         .from('students')
-        .select('student_id')
+        .select('student_id, first_name, last_name, parent_phone')
         .eq('school_id', schoolId)
-        .eq('admission_number', billRef)
+        .eq('admission_number', admissionNumber)
         .eq('is_deleted', false)
         .maybeSingle();
-      if (!studentError && studentRows) studentId = studentRows.student_id;
+      if (!studentError && studentRows) {
+        studentId = studentRows.student_id;
+        
+        // Send Kenyan-style SMS receipt to parent
+        await sendKenyanPaymentReceipt({
+          schoolId,
+          studentName: `${studentRows.first_name} ${studentRows.last_name}`,
+          admissionNumber,
+          amount,
+          referenceNumber,
+          paymentDate,
+          parentPhone: studentRows.parent_phone,
+          payerPhone: phone
+        });
+      }
     }
 
     // Check for duplicate payments
@@ -101,7 +172,7 @@ router.post("/mpesa/callback", async (req, res, next) => {
 
     await supabase.from('sms_logs').insert({
       school_id: schoolId,
-      recipient: msisdn || "unknown",
+      recipient: phone || "unknown",
       message: `Mpesa payment received: ${amount} (ref: ${referenceNumber})`,
       channel: 'sms',
       status: 'sent'

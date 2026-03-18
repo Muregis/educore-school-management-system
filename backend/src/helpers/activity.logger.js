@@ -1,4 +1,4 @@
-import { pool } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 
 /**
  * Log an activity — fire-and-forget, never throws, never blocks.
@@ -6,7 +6,7 @@ import { pool } from "../config/db.js";
  * Usage inside any route handler:
  *   logActivity(req, { action: "payment.create", entity: "payment", entityId: id, description: "KES 5,000 received" });
  */
-export function logActivity(req, { action, entity = null, entityId = null, description = null }) {
+export async function logActivity(req, { action, entity = null, entityId = null, description = null }) {
   try {
     const schoolId = req.user?.schoolId ?? null;
     const userId   = req.user?.userId   ?? null;
@@ -15,7 +15,7 @@ export function logActivity(req, { action, entity = null, entityId = null, descr
                   || req.socket?.remoteAddress
                   || null;
 
-    pool
+    const { error } = await supabase
       .from('activity_logs')
       .insert({
         school_id: schoolId,
@@ -26,8 +26,11 @@ export function logActivity(req, { action, entity = null, entityId = null, descr
         entity_id: entityId,
         description: description,
         ip_address: ip
-      })
-      .catch(err => console.error("[activity_log] DB error:", err.message));
+      });
+    
+    if (error) {
+      console.error("[activity_log] DB error:", error.message);
+    }
   } catch (err) {
     console.error("[activity_log] Unexpected error:", err.message);
   }
