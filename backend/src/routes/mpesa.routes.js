@@ -2,8 +2,11 @@ import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { env } from "../config/env.js";
-// OLD AFRICAS TALKING CODE
+// OLD AFRICA'S TALKING CODE - MIGRATED TO WHATSAPP BUSINESS PER SCHOOL
 // import africastalking from "africastalking"; // NEW: for SMS receipts
+// All SMS functionality replaced with WhatsApp Business per-school mobile app
+// Payment receipts now sent via wa.me links to school's WhatsApp number
+// Zero cost solution using school's existing WhatsApp Business app
 import { sendPaymentReceipt } from "../utils/smsUtils.js";
 import paymentConfigService from "../services/payment-config.service.js";
 
