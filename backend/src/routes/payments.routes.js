@@ -7,7 +7,19 @@ import { logActivity } from "../helpers/activity.logger.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import { env } from "../config/env.js";
 import { sendWhatsAppPaymentReceipt } from "../services/whatsappService.js";
-import { upload } from "../app.js";
+import multer from "multer";
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    cb(null, allowedTypes.includes(file.mimetype));
+  }
+});
 
 const router = Router();
 router.use(authRequired);
