@@ -11,7 +11,7 @@ import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { Msg } from "../components/Helpers";
 
-// Inline helpers (unchanged)
+// Inline helpers
 function csv(filename, headers, rows) {
   const content = [headers, ...rows].map(r => r.join(",")).join("\n");
   const a = document.createElement("a");
@@ -63,7 +63,7 @@ function normaliseFeeStruct(f) {
   };
 }
 
-// Load Paystack inline script once (unchanged)
+// Load Paystack inline script once
 function loadPaystackScript() {
   return new Promise(resolve => {
     if (window.PaystackPop) { resolve(); return; }
@@ -94,6 +94,12 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [page, setPage]               = useState(1);
   const [paymentForm, setPaymentForm] = useState({ studentId: students[0]?.id || "", amount: "", feeType: "tuition", method: "cash", date: new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
   const [structForm, setStructForm]   = useState({ className: "Grade 7", tuition: "", activity: "", misc: "" });
+  const [bankDetails, setBankDetails] = useState(null);
+  const [schoolWhatsApp, setSchoolWhatsApp] = useState("");
+  const [bankDepositTarget, setBankDepositTarget] = useState(null);
+  const [showBankDeposit, setShowBankDeposit] = useState(false);
+  const [bankDepositForm, setBankDepositForm] = useState({ studentId: "", amount: "", proofFile: null });
+  const [bankDepositLoading, setBankDepositLoading] = useState(false);
 
   const reloadPayments = useCallback(async () => {
     if (!auth?.token) return;
@@ -101,7 +107,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     setPayments(data.map(normalisePayment));
   }, [auth, setPayments]);
 
-  // Auto-verify Paystack when redirected back (unchanged)
+  // Auto-verify Paystack when redirected back
   useEffect(() => {
     const ref    = localStorage.getItem("ps_pending_ref");
     const name   = localStorage.getItem("ps_pending_name");
@@ -136,6 +142,15 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         .then(data => setFeeStructures(data.map(normaliseFeeStruct)))
         .catch(e => console.warn("Fee structures:", e));
       reloadPayments().catch(e => console.warn("Payments:", e));
+      
+      // Load bank details and school WhatsApp number
+      apiFetch("/settings/payment-config", { token: auth.token })
+        .then(data => setBankDetails(data))
+        .catch(e => console.warn("Bank details:", e));
+        
+      apiFetch("/settings/school", { token: auth.token })
+        .then(data => setSchoolWhatsApp(data?.whatsapp_business_number || ""))
+        .catch(e => console.warn("School settings:", e));
     }
   }, [auth, setFeeStructures, reloadPayments]);
 
@@ -162,7 +177,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const { pages, rows }  = pager(filteredPayments, page);
   useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
 
-  // ─── Paystack payment ───────────────────────────────────────────────────────
+  // ─── Paystack payment ───────────────────────────────────────────────
   const openPaystack = (b) => {
     setPaystackTarget(b);
     setPaystackForm({ email: b.email || "", amount: String(b.balance) });
@@ -200,7 +215,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     setPaystackLoading(false);
   };
 
-  // ─── Mpesa STK Push ──────────────────────────────────────────────────────────
+  // ─── Mpesa STK Push ──────────────────────────────────────────────────
   const openMpesa = (b) => {
     setMpesaTarget(b);
     setMpesaForm({ phone:"", amount:String(b.balance) });
@@ -255,7 +270,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     } catch { toast("Could not check status", "error"); }
   };
 
-  // ─── Manual payment ─────────────────────────────────────────────────────────
+  // ─── Manual payment ───────────────────────────────────────────────────────
   const savePayment = async () => {
     const sid = Number(paymentForm.studentId);
     const s   = students.find(x => (x.id ?? x.student_id) === sid);
@@ -317,6 +332,150 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       setPayments(prev => prev.filter(p => (p.id ?? p.payment_id) !== id));
       toast("Deleted", "success");
     } catch (err) { toast(err.message || "Delete failed", "error"); }
+  };
+
+  // ─── Bank Deposit ──────────────────────────────────────────────────────────
+  const openBankDeposit = (b) => {
+    setBankDepositTarget(b);
+    setBankDepositForm({ studentId: b.studentId, amount: String(b.balance) });
+    setShowBankDeposit(true);
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type (image or PDF)
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+      if (!allowedTypes.includes(file.type)) {
+        toast("Please upload an image (JPG/PNG) or PDF file", "error");
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast("File size must be less than 5MB", "error");
+        return;
+      }
+      setBankDepositForm({ ...bankDepositForm, proofFile: file });
+    }
+  };
+
+  const saveBankDeposit = async () => {
+    const sid = Number(bankDepositForm.studentId);
+    const s = students.find(x => (x.id ?? x.student_id) === sid);
+    const amt = Number(bankDepositForm.amount);
+    const balance = balances.find(b => b.studentId === sid)?.balance || 0;
+
+    if (!s) return toast("Select student", "error");
+    if (!amt || amt <= 0) return toast("Amount required", "error");
+    if (amt > balance) return toast("Cannot exceed outstanding balance", "error");
+    if (!bankDepositForm.proofFile) return toast("Proof of payment is required", "error");
+
+    setBankDepositLoading(true);
+    try {
+      // Upload proof to Supabase Storage
+      const formData = new FormData();
+      formData.append('file', bankDepositForm.proofFile);
+      formData.append('studentId', sid);
+      formData.append('amount', amt);
+      
+      const uploadResponse = await fetch('/api/payments/upload-proof', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${auth.token}`,
+        },
+        body: formData
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload proof');
+      }
+      
+      const { proofUrl } = await uploadResponse.json();
+      
+      // Record payment with proof URL
+      await apiFetch("/payments", {
+        method: "POST",
+        body: {
+          studentId: sid,
+          amount: amt,
+          feeType: "tuition",
+          paymentMethod: "bank",
+          paymentDate: new Date().toISOString().slice(0,10),
+          status: "pending",
+          paidBy: "Bank Deposit",
+          proofUrl: proofUrl
+        },
+        token: auth?.token,
+      });
+      
+      await reloadPayments();
+      setShowBankDeposit(false);
+      setBankDepositForm({ studentId: "", amount: "", proofFile: null });
+      
+      const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
+      setReceipt({
+        studentName: name,
+        amount: amt,
+        reference: `BANK-${Date.now()}`,
+        method: "Bank Deposit",
+        date: new Date().toLocaleDateString(),
+        proofUrl: proofUrl
+      });
+      setShowReceipt(true);
+      toast("Bank deposit recorded pending verification", "success");
+    } catch (err) {
+      toast(err.message || "Bank deposit failed", "error");
+    }
+    setBankDepositLoading(false);
+  };
+
+  const sendWhatsAppProof = (receiptData) => {
+    if (!schoolWhatsApp) {
+      toast("School WhatsApp number not configured. Please contact admin.", "error");
+      return;
+    }
+
+    const student = students.find(s => (s.id ?? s.student_id) === receiptData.studentId);
+    const studentName = student?.name || "Student";
+    
+    const message = encodeURIComponent(
+      "🏦 BANK DEPOSIT NOTIFICATION\n" +
+      "📚 School: " + (student?.className || 'N/A') + "\n" +
+      "👤 Student: " + studentName + "\n" +
+      "💰 Amount: KES " + Number(receiptData.amount).toLocaleString() + "\n" +
+      "📋 Reference: " + receiptData.reference + "\n" +
+      "📅 Date: " + receiptData.date + "\n" +
+      "📎 Proof: " + (receiptData.proofUrl ? 'View attachment' : 'No proof uploaded') + "\n" +
+      "\n✅ Please confirm and approve this bank deposit."
+    );
+
+    const cleanWhatsAppNumber = schoolWhatsApp.replace(/[^\d]/g, '');
+    const waMeLink = `https://wa.me/${cleanWhatsAppNumber}?text=${message}`;
+    window.open(waMeLink, '_blank');
+    toast("Opening WhatsApp...", "success");
+  };
+
+  const sendWhatsAppReceipt = (receiptData) => {
+    if (!schoolWhatsApp) {
+      toast("School WhatsApp number not configured. Please contact admin.", "error");
+      return;
+    }
+
+    const message = encodeURIComponent(
+      "💰 PAYMENT RECEIPT\n" +
+      "📚 " + (receiptData.studentName || 'Student') + "\n" +
+      "💳 Amount: KES " + Number(receiptData.amount).toLocaleString() + "\n" +
+      "🔹 Method: " + receiptData.method + "\n" +
+      "📋 Reference: " + receiptData.reference + "\n" +
+      "📅 Date: " + receiptData.date + "\n" +
+      "\n✅ Payment received successfully!\n" +
+      "Thank you for your payment."
+    );
+
+    const cleanWhatsAppNumber = schoolWhatsApp.replace(/[^\d]/g, '');
+    const waMeLink = `https://wa.me/${cleanWhatsAppNumber}?text=${message}`;
+    window.open(waMeLink, '_blank');
+    toast("Opening WhatsApp...", "success");
   };
 
   const printReceipt = () => {
@@ -410,7 +569,39 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       ))}
 
       {/* Balances Tab */}
-      {tab==="balances" && (balances.length===0 ? <Msg text="No balances available." /> : (
+      {tab==="balances" && (
+        <>
+          {/* Bank Instructions */}
+          {bankDetails && (bankDetails.bank_name || bankDetails.bank_account_number) && (
+            <div style={{ background:"#0f172a", border:"1px solid #1e3a5f", borderRadius:10, padding:16, marginBottom:16, fontSize:13, color:"#60a5fa" }}>
+              <div style={{ fontWeight:700, marginBottom:8, color:"#93c5fd" }}>🏦 Bank Deposit Instructions</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+                <div>
+                  <div style={{ fontSize:12, color:"#94a3b8", marginBottom:4 }}>Bank Name</div>
+                  <div style={{ fontWeight:600, color:"#e2e8f0" }}>{bankDetails.bank_name || "Not set"}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize:12, color:"#94a3b8", marginBottom:4 }}>Account Number</div>
+                  <div style={{ fontWeight:600, color:"#e2e8f0" }}>{bankDetails.bank_account_number || "Not set"}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize:12, color:"#94a3b8", marginBottom:4 }}>Account Name</div>
+                  <div style={{ fontWeight:600, color:"#e2e8f0" }}>{bankDetails.account_name || "Not set"}</div>
+                </div>
+                {bankDetails.bank_branch && (
+                  <div>
+                    <div style={{ fontSize:12, color:"#94a3b8", marginBottom:4 }}>Branch</div>
+                    <div style={{ fontWeight:600, color:"#e2e8f0" }}>{bankDetails.bank_branch}</div>
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize:11, color:"#64748b", marginTop:8 }}>
+                💡 Make deposits to this account and record them below with proof of payment
+              </div>
+            </div>
+          )}
+
+          {balances.length===0 ? <Msg text="No balances available." /> : (
         <div style={{ overflowX: "auto" }}>
           <Table
             headers={["Student","Class","Expected","Paid","Balance","Status","Pay"]}
@@ -425,6 +616,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                     <Btn size="small" onClick={() => openPaystack(b)}>💳 Paystack</Btn>
                     <Btn variant="ghost" size="small" onClick={() => openMpesa(b)}>📱 Mpesa</Btn>
+                    {canEdit && (
+                      <Btn variant="primary" size="small" onClick={() => openBankDeposit(b)}>🏦 Bank Deposit</Btn>
+                    )}
                   </div>
                   <Btn variant="ghost" size="small" onClick={() => {
                     setPaymentForm({
@@ -441,7 +635,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             ])}
           />
         </div>
-      ))}
+      )}
+        </>
+      )}
 
       {/* Fee Structure Tab */}
       {tab==="structure" && (normalisedStructures.length===0 ? <Msg text="No fee structures set." /> : (
@@ -507,7 +703,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             Outstanding balance: <strong style={{color:C.text}}>{money(mpesaTarget.balance)}</strong>
           </div>
           <div style={{background:"#052e16",border:"1px solid #16a34a",borderRadius:10,padding:12,marginBottom:12,fontSize:12,color:"#86efac"}}>
-            📱 An STK push will be sent to the parent&apos;s phone. They will enter their Mpesa PIN to complete payment.
+            📱 An STK push will be sent to parent&apos;s phone. They will enter their Mpesa PIN to complete payment.
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
             <div>
@@ -671,6 +867,67 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           <div style={{display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12}}>
             <Btn variant="ghost" onClick={()=>setShowReceipt(false)}>Close</Btn>
             <Btn onClick={printReceipt}>🖨 Print</Btn>
+            <Btn variant="ghost" onClick={() => sendWhatsAppReceipt(receipt)}>📱 Send Receipt via WhatsApp</Btn>
+            {receipt?.proofUrl && (
+              <Btn variant="ghost" onClick={() => sendWhatsAppProof(receipt)}>📱 Send Proof via WhatsApp</Btn>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* Bank Deposit Modal */}
+      {showBankDeposit && (
+        <Modal title="Record Bank Deposit" onClose={()=>setShowBankDeposit(false)}>
+          <div style={{color:C.textSub,marginBottom:12,fontSize:13}}>
+            Upload proof of bank deposit to record payment pending verification.
+          </div>
+          <div style={{background:"#0f172a",border:"1px solid #1e3a5f",borderRadius:10,padding:12,marginBottom:12,fontSize:12,color:"#60a5fa"}}>
+            📎 Attach deposit slip, receipt, or transaction confirmation. Payment will be marked as pending until approved.
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div>
+              <div style={{fontSize:12,color:C.textMuted,marginBottom:4}}>Student</div>
+              <select style={inputStyle} value={bankDepositForm.studentId} onChange={e=>setBankDepositForm({...bankDepositForm,studentId:e.target.value})}>
+                {balances.map(b=>(
+                  <option key={b.studentId} value={b.studentId}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div style={{fontSize:12,color:C.textMuted,marginBottom:4}}>Amount (KES)</div>
+              <input 
+                type="number" 
+                min="100" 
+                max={balances.find(b => b.studentId === bankDepositForm.studentId)?.balance || 100000} 
+                style={inputStyle} 
+                value={bankDepositForm.amount}
+                onChange={e=>setBankDepositForm({...bankDepositForm,amount:e.target.value})} 
+              />
+              {Number(bankDepositForm.amount) > (balances.find(b => b.studentId === bankDepositForm.studentId)?.balance || 0) && (
+                <p style={{color:"red",fontSize:12,marginTop:4}}>Cannot exceed outstanding balance</p>
+              )}
+              {Number(bankDepositForm.amount) < 100 && (
+                <p style={{color:"red",fontSize:12,marginTop:4}}>Minimum KSh 100</p>
+              )}
+            </div>
+          </div>
+          <div style={{marginBottom:12}}>
+            <div style={{fontSize:12,color:C.textMuted,marginBottom:4}}>Proof of Payment</div>
+            <input 
+              type="file" 
+              style={inputStyle}
+              onChange={handleFileUpload}
+              accept="image/*,.pdf"
+            />
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:12}}>
+            <Btn variant="ghost" onClick={()=>setShowBankDeposit(false)}>Cancel</Btn>
+            <Btn 
+              onClick={saveBankDeposit}
+              disabled={bankDepositLoading || !bankDepositForm.studentId || Number(bankDepositForm.amount) <= 0 || Number(bankDepositForm.amount) > (balances.find(b => b.studentId === bankDepositForm.studentId)?.balance || 0) || !bankDepositForm.proofFile}
+            >
+              {bankDepositLoading ? "Saving..." : "Save Bank Deposit"}
+            </Btn>
           </div>
         </Modal>
       )}

@@ -1,18 +1,20 @@
 import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
-import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
-import africastalking from "africastalking"; // NEW: for SMS receipts
+import { env } from "../config/env.js";
+// OLD AFRICAS TALKING CODE
+// import africastalking from "africastalking"; // NEW: for SMS receipts
 import { sendPaymentReceipt } from "../utils/smsUtils.js";
 import paymentConfigService from "../services/payment-config.service.js";
 
 const router = Router();
 
-// NEW: Africa's Talking instance (central account)
-const at = africastalking({
-  username: env.atUsername,
-  apiKey: env.atApiKey,
-});
+// OLD AFRICAS TALKING CODE
+// // NEW: Africa's Talking instance (central account)
+// const at = africastalking({
+//   username: env.atUsername,
+//   apiKey: env.atApiKey,
+// });
 
 // Helper: get Mpesa OAuth token (unchanged, not used here)
 async function getMpesaToken() {

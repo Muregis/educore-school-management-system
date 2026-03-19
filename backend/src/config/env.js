@@ -44,6 +44,11 @@ export const env = {
   atUsername:           process.env.AT_USERNAME   || "",
   atSenderId:           process.env.AT_SENDER_ID  || "EduCore",
 
+  // WhatsApp Business API
+  whatsappApiUrl:       process.env.WHATSAPP_API_URL       || "https://graph.facebook.com/v18.0",
+  whatsappToken:        process.env.WHATSAPP_TOKEN        || "",
+  whatsappPhoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
+
   // Groq
   groqApiKey:           process.env.GROQ_API_KEY || "",
 
