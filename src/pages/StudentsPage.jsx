@@ -74,6 +74,15 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const save = async () => {
     setErr("");
     if (!f.firstName.trim() || !f.lastName.trim()) return setErr("First and last name are required.");
+    
+    // Validate WhatsApp number format (Kenyan)
+    if (f.parentPhone) {
+      const cleanPhone = f.parentPhone.replace(/[^\d]/g, '');
+      if (!/^2547[0-9]{8}$/.test(cleanPhone)) {
+        return setErr("Invalid WhatsApp number format. Use: 2547xxxxxxxx or +2547xxxxxxxx");
+      }
+    }
+    
     try {
       if (editId) {
         await apiFetch(`/students/${editId}`, {
@@ -158,7 +167,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
             <Field label="Gender"><select style={inputStyle} value={f.gender} onChange={e => setF({ ...f, gender: e.target.value })}><option value="female">female</option><option value="male">male</option></select></Field>
             <Field label="Status"><select style={inputStyle} value={f.status} onChange={e => setF({ ...f, status: e.target.value })}><option value="active">active</option><option value="inactive">inactive</option></select></Field>
             <Field label="Parent"><input style={inputStyle} value={f.parentName || ""} onChange={e => setF({ ...f, parentName: e.target.value })} /></Field>
-            <Field label="Phone"><input style={inputStyle} value={f.parentPhone || ""} onChange={e => setF({ ...f, parentPhone: e.target.value })} /></Field>
+            <Field label="Parent WhatsApp"><input style={inputStyle} value={f.parentPhone || ""} onChange={e => setF({ ...f, parentPhone: e.target.value })} placeholder="2547xxxxxxxx" /></Field>
           </div>
           {err && <Msg text={err} tone="error" />}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>

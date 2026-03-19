@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
+import multer from "multer";
 import { env } from "./config/env.js";
 import { apiRateLimit } from "./middleware/rateLimit.js";
 import healthRoutes        from "./routes/health.routes.js";
@@ -38,6 +39,18 @@ import { authRequired } from "./middleware/auth.js";
 import { tenantContext, tenantSecurityCheck } from "./middleware/tenantContext.js";
 
 const app = express();
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    cb(null, allowedTypes.includes(file.mimetype));
+  }
+});
 
 process.on("unhandledRejection", (reason) => {
   console.error("Unhandled Promise Rejection:", reason);
@@ -111,3 +124,4 @@ app.use(errorHandler);
 // startBackupScheduler();
 
 export default app;
+export { upload };

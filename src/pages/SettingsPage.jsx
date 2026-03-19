@@ -21,18 +21,35 @@ const Lbl = ({ children }) => (
 Lbl.propTypes = { children: PropTypes.node };
 
 // ── School Info Tab ───────────────────────────────────────────────────────────
-function SchoolTab({ school, setSchool, toast }) {
+function SchoolTab({ school, setSchool, toast, auth }) {
   const [form, setForm] = useState({ ...school });
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     setSaving(true);
     try {
+      // Save regular school info (excluding WhatsApp number)
+      const { whatsapp_business_number, ...schoolInfo } = form;
       await apiFetch("/settings/school", {
         method: "PUT",
-        token: null,
-        body: form,
+        token: auth?.token,
+        body: schoolInfo,
       });
+
+      // Save WhatsApp number separately if provided
+      if (whatsapp_business_number !== undefined) {
+        try {
+          await apiFetch("/settings/school/whatsapp", {
+            method: "PATCH",
+            token: auth?.token,
+            body: { whatsapp_business_number },
+          });
+        } catch (whatsappErr) {
+          console.warn("WhatsApp number save failed:", whatsappErr);
+          toast("School info saved, but WhatsApp number update failed", "warning");
+        }
+      }
+
       setSchool(form);
       toast("School info saved", "success");
     } catch (e) {
@@ -53,6 +70,7 @@ function SchoolTab({ school, setSchool, toast }) {
         <div><Lbl>School Name</Lbl><input {...f("name")} /></div>
         <div><Lbl>County / Location</Lbl><input {...f("county")} /></div>
         <div><Lbl>Phone</Lbl><input {...f("phone")} /></div>
+        <div><Lbl>WhatsApp Business Number</Lbl><input {...f("whatsapp_business_number")} placeholder="2547xxxxxxxx" /></div>
         <div><Lbl>Email</Lbl><input {...f("email")} type="email" /></div>
         <div><Lbl>Current Term</Lbl>
           <select {...f("term")} style={inp}>
@@ -79,7 +97,7 @@ function SchoolTab({ school, setSchool, toast }) {
     </div>
   );
 }
-SchoolTab.propTypes = { school: PropTypes.object, setSchool: PropTypes.func, toast: PropTypes.func };
+SchoolTab.propTypes = { school: PropTypes.object, setSchool: PropTypes.func, toast: PropTypes.func, auth: PropTypes.object };
 
 // ── Users Tab ─────────────────────────────────────────────────────────────────
 function UsersTab({ auth, toast }) {
@@ -254,13 +272,15 @@ export default function SettingsPage({ auth, school, setSchool, users, setUsers,
             background: tab === t.id ? C.accent : C.card,
             color: tab === t.id ? "#fff" : C.textMuted,
             border: `1px solid ${tab === t.id ? C.accent : C.border}`,
-          }}>{t.label}</button>
+          }}>
+            {t.label}
+          </button>
         ))}
       </div>
 
       {/* Tab content */}
       {tab === "school" && (
-        <SchoolTab school={school} setSchool={setSchool} toast={toast} />
+        <SchoolTab school={school} setSchool={setSchool} toast={toast} auth={auth} />
       )}
       {tab === "users" && (
         <UsersTab auth={auth} toast={toast} />

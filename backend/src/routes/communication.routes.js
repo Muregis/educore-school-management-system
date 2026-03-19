@@ -5,98 +5,56 @@ import { requireRoles } from "../middleware/roles.js";
 import { sendEmail, sendBulkEmail, isEmailConfigured, templates } from "../services/email.service.js";
 import { supabase } from "../config/supabaseClient.js";
 
+// WhatsApp Business API Service
+import { sendWhatsAppMessage, sendBulkWhatsAppMessages, getWhatsAppConfigStatus } from "../services/whatsappService.js";
+
 const router = Router();
 router.use(authRequired);
 
-// ─── Africa's Talking SMS sender with Kenyan validation ───────────────────────────
-async function sendViaSms(recipients, message, schoolId, sentByUserId = null) {
+// ─── WhatsApp Business sender with Kenyan validation (replaces Africa's Talking) ───────────────────────────
+async function sendViaWhatsApp(recipients, message, schoolId, sentByUserId = null) {
   const logs = [];
 
-  // Validate Kenyan phone numbers
+  // Validate Kenyan phone numbers for WhatsApp
   const validRecipients = recipients.filter(phone => {
-    if (!/^2547[0-9]{8}$/.test(phone)) {
-      console.warn(`[Kenyan SMS] Invalid phone format: ${phone}`);
+    if (!/^2547[0-9]{8}$/.test(phone) && !/^07[0-9]{8}$/.test(phone)) {
+      console.warn(`[WhatsApp] Invalid phone format: ${phone}`);
       return false;
     }
     return true;
   });
 
   if (!validRecipients.length) {
-    console.warn('[Kenyan SMS] No valid Kenyan phone numbers provided');
+    console.warn('[WhatsApp] No valid Kenyan phone numbers provided');
     return { sent: 0, failed: recipients.length, queued: 0, logs };
   }
 
-  if (env.atApiKey && env.atUsername) {
+  if (env.whatsappToken && env.whatsappPhoneNumberId) {
     try {
-      const params = new URLSearchParams({
-        username: env.atUsername,
-        to:       validRecipients.join(","),
+      const result = await sendBulkWhatsAppMessages({
+        phones: validRecipients,
         message,
-        from:     env.atSenderId || "EduCore",
+        schoolId,
+        sentByUserId
       });
-
-      const response = await fetch("https://api.africastalking.com/version1/messaging", {
-        method:  "POST",
-        headers: {
-          "apiKey":        env.atApiKey,
-          "Content-Type":  "application/x-www-form-urlencoded",
-          "Accept":        "application/json",
-        },
-        body: params.toString(),
-      });
-
-      const result = await response.json();
-      console.log("AT SMS response:", JSON.stringify(result));
-
-      const atRecipients = result?.SMSMessageData?.Recipients || [];
-
-      for (const r of atRecipients) {
-        const status = r.status === "Success" ? "sent" : "failed";
-        await supabase.from('sms_logs').insert({
-          school_id: schoolId,
-          recipient: r.number,
-          message,
-          channel: 'sms',
-          status,
-          sent_by_user_id: sentByUserId,
-          provider_response: JSON.stringify(r)
-        });
-        logs.push({ phone: r.number, status });
-      }
-
-      // Log any recipients AT didn't return
-      const atNumbers = atRecipients.map(r => r.number);
-      for (const phone of recipients) {
-        if (!atNumbers.includes(phone)) {
-          await supabase.from('sms_logs').insert({
-            school_id: schoolId,
-            recipient: phone,
-            message,
-            channel: 'sms',
-            status: 'failed',
-            sent_by_user_id: sentByUserId
-          });
-          logs.push({ phone, status: "failed" });
-        }
-      }
 
       return {
-        sent:       logs.filter(l => l.status === "sent").length,
-        failed:     logs.filter(l => l.status === "failed").length,
-        logs,
+        sent: result.sent,
+        failed: result.failed,
+        logs: result.details
       };
     } catch (err) {
-      console.error("AT SMS error:", err.message);
+      console.error("WhatsApp error:", err.message);
     }
   }
 
-  // Fallback — queued (AT not configured)
+  // Fallback — queued (WhatsApp not configured)
   for (const phone of recipients) {
     await supabase.from('sms_logs').insert({
       school_id: schoolId,
       recipient: phone,
       message,
-      channel: 'sms',
+      channel: 'sms',  // Use 'sms' channel until schema supports 'whatsapp'
       status: 'queued',
       sent_by_user_id: sentByUserId
     });
@@ -105,13 +63,22 @@ async function sendViaSms(recipients, message, schoolId, sentByUserId = null) {
   return { sent: 0, failed: 0, queued: logs.length, logs };
 }
 
-// ─── GET AT config status (admin only) ───────────────────────────────────────
+// ─── GET WhatsApp config status (admin only) ───────────────────────────────────────
 router.get("/sms-status", async (req, res) => {
+  const whatsappStatus = getWhatsAppConfigStatus();
+  
   res.json({
-    atConfigured: Boolean(env.atApiKey && env.atUsername),
-    username: env.atUsername || null,
-    senderId: env.atSenderId || null,
-    hasApiKey: Boolean(env.atApiKey),
+    // WhatsApp status
+    whatsappConfigured: whatsappStatus.configured,
+    whatsappPhoneNumberId: whatsappStatus.phoneNumberId,
+    whatsappApiUrl: whatsappStatus.apiUrl,
+    whatsappHasToken: whatsappStatus.hasToken,
+    
+    // OLD AFRICAS TALKING CODE (for reference)
+    // atConfigured: Boolean(env.atApiKey && env.atUsername),
+    // username: env.atUsername || null,
+    // senderId: env.atSenderId || null,
+    // hasApiKey: Boolean(env.atApiKey),
   });
 });
 
@@ -132,7 +99,7 @@ router.get("/sms-logs", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── POST single SMS ──────────────────────────────────────────────────────────
+// ─── POST single WhatsApp message ──────────────────────────────────────────────────────
 router.post("/sms", requireRoles("admin", "teacher"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
@@ -140,17 +107,41 @@ router.post("/sms", requireRoles("admin", "teacher"), async (req, res, next) => 
     if (!recipient || !message)
       return res.status(400).json({ message: "recipient and message are required" });
 
-    const result = await sendViaSms([recipient], message, schoolId, userId);
-    res.status(201).json({ ...result, message: "SMS sent" });
+    // Get school details for branding
+    const { data: school } = await supabase
+      .from('schools')
+      .select('name')
+      .eq('id', schoolId)
+      .single();
+
+    const schoolName = school?.name || 'EduCore';
+
+    // Enhanced WhatsApp message format with school branding
+    const enhancedMessage = `📚 *${schoolName}*\n\n${message}\n\n_Sent via EduCore School Management_`;
+
+    const result = await sendViaWhatsApp([recipient], enhancedMessage, schoolId, userId);
+    res.status(201).json({ ...result, message: "WhatsApp message sent" });
   } catch (err) { next(err); }
 });
 
-// ─── POST bulk SMS to class ───────────────────────────────────────────────────
+// ─── POST bulk WhatsApp to class ───────────────────────────────────────────────────
 router.post("/sms/bulk", requireRoles("admin", "teacher"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const { className, message } = req.body;
     if (!message) return res.status(400).json({ message: "message is required" });
+
+    // Get school details for branding
+    const { data: school } = await supabase
+      .from('schools')
+      .select('name')
+      .eq('id', schoolId)
+      .single();
+
+    const schoolName = school?.name || 'EduCore';
+
+    // Enhanced WhatsApp message format with school branding
+    const enhancedMessage = `📚 *${schoolName}*\n\n${message}\n\n_Sent via EduCore School Management_`;
 
     let q = supabase
       .from("students")
@@ -173,7 +164,7 @@ router.post("/sms/bulk", requireRoles("admin", "teacher"), async (req, res, next
       return res.status(404).json({ message: "No parent phone numbers found for this class" });
     }
 
-    const result = await sendViaSms(phones, message, schoolId, userId);
+    const result = await sendViaWhatsApp(phones, enhancedMessage, schoolId, userId);
 
     res.json({ ...result, total: phones.length, recipients: phones });
   } catch (err) { next(err); }

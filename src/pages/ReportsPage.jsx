@@ -778,26 +778,156 @@ export default function ReportsPage({ auth }) {
       {/* ── Defaulters ── */}
       {tab === "defaulters" && (
         <div>
-          <h3 style={{ color:C.text, marginBottom:8 }}>Fee Defaulters</h3>
+          <h3 style={{ color:C.text, marginBottom:8 }}>Fee Defaulters (Highest Balance First)</h3>
           {filteredDefaulters.length === 0 ? <p style={{ color:C.textMuted }}>No defaulters — all fees cleared! 🎉</p> : (
-            <div style={{ overflowX:"auto" }}>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead><tr>{["Student","Class","Admission","Phone","Expected","Paid","Balance"].map(h =>
-                  <th key={h} style={{ textAlign:"left", padding:"8px 10px", borderBottom:`1px solid ${C.border}`, color:C.textMuted, fontSize:12 }}>{h}</th>)}
-                </tr></thead>
-                <tbody>{filteredDefaulters.map((d, i) => (
-                  <tr key={i} style={{ borderBottom:`1px solid ${C.border}` }}>
-                    <td style={{ padding:"8px 10px", color:C.text, fontWeight:600 }}>{d.first_name} {d.last_name}</td>
-                    <td style={{ padding:"8px 10px", color:C.textSub }}>{d.class_name}</td>
-                    <td style={{ padding:"8px 10px", color:C.textMuted, fontSize:12 }}>{d.admission_number}</td>
-                    <td style={{ padding:"8px 10px", color:C.textMuted, fontSize:12 }}>{d.parent_phone}</td>
-                    <td style={{ padding:"8px 10px", color:C.textSub }}>{money(d.expected)}</td>
-                    <td style={{ padding:"8px 10px", color:"#4ade80" }}>{money(d.paid)}</td>
-                    <td style={{ padding:"8px 10px", color:"#f87171", fontWeight:700 }}>{money(d.balance)}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
+            <>
+              {/* Summary stats */}
+              <div style={{ display:"flex", gap:10, marginBottom:16, flexWrap:"wrap" }}>
+                <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:"12px 16px" }}>
+                  <div style={{ fontSize:11, color:C.textMuted }}>Total Defaulters</div>
+                  <div style={{ fontSize:18, fontWeight:800, color:"#f87171" }}>{filteredDefaulters.length}</div>
+                </div>
+                <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:"12px 16px" }}>
+                  <div style={{ fontSize:11, color:C.textMuted }}>Total Outstanding</div>
+                  <div style={{ fontSize:18, fontWeight:800, color:"#f87171" }}>
+                    {money(filteredDefaulters.reduce((sum, d) => sum + (d.balance || 0), 0))}
+                  </div>
+                </div>
+                <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:"12px 16px" }}>
+                  <div style={{ fontSize:11, color:C.textMuted }}>Highest Balance</div>
+                  <div style={{ fontSize:18, fontWeight:800, color:"#f87171" }}>
+                    {money(filteredDefaulters[0]?.balance || 0)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Legend */}
+              <div style={{ display:"flex", gap:16, marginBottom:12, fontSize:12 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <div style={{ width:12, height:12, background:"#1c0505", borderRadius:2 }}></div>
+                  <span style={{ color:C.textMuted }}>Critical (50% balance)</span>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <div style={{ width:12, height:12, background:"#1c1400", borderRadius:2 }}></div>
+                  <span style={{ color:C.textMuted }}>Warning (10-50% balance)</span>
+                </div>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <div style={{ width:12, height:12, background:"#1c1a00", borderRadius:2 }}></div>
+                  <span style={{ color:C.textMuted }}>Info (&lt;10% balance)</span>
+                </div>
+              </div>
+
+              {/* Enhanced table with color coding */}
+              <div style={{ overflowX:"auto" }}>
+                <table style={{ width:"100%", borderCollapse:"collapse" }}>
+                  <thead>
+                    <tr>
+                      {["Student","Class","Admission","Phone","Expected","Paid","Balance","% Owed","Status","Last Payment"].map(h =>
+                        <th key={h} style={{ textAlign:"left", padding:"8px 10px", borderBottom:`1px solid ${C.border}`, color:C.textMuted, fontSize:12 }}>
+                          {h}
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredDefaulters.map((d, i) => {
+                      const balancePercentage = d.balance_percentage || (d.expected_amount > 0 ? (d.balance / d.expected_amount) * 100 : 0);
+                      let severityColor, severityBg, severityLabel;
+                      
+                      if (balancePercentage > 50) {
+                        severityColor = "#f87171"; severityBg = "#1c0505"; severityLabel = "Critical";
+                      } else if (balancePercentage >= 10) {
+                        severityColor = "#facc15"; severityBg = "#1c1400"; severityLabel = "Warning";
+                      } else {
+                        severityColor = "#fbbf24"; severityBg = "#1c1a00"; severityLabel = "Low";
+                      }
+
+                      return (
+                        <tr key={i} style={{ 
+                          borderBottom:`1px solid ${C.border}`,
+                          background: i % 2 === 0 ? "transparent" : C.card
+                        }}>
+                          <td style={{ padding:"8px 10px", color:C.text, fontWeight:600 }}>
+                            {d.student_name || `${d.first_name || ''} ${d.last_name || ''}`}
+                          </td>
+                          <td style={{ padding:"8px 10px", color:C.textSub }}>{d.class_name}</td>
+                          <td style={{ padding:"8px 10px", color:C.textMuted, fontSize:12 }}>{d.admission_number}</td>
+                          <td style={{ padding:"8px 10px", color:C.textMuted, fontSize:12 }}>{d.parent_phone}</td>
+                          <td style={{ padding:"8px 10px", color:C.textSub }}>
+                            {money(d.expected_amount || d.expected || 0)}
+                          </td>
+                          <td style={{ padding:"8px 10px", color:"#4ade80" }}>
+                            {money(d.paid_amount || d.paid || 0)}
+                          </td>
+                          <td style={{ 
+                            padding:"8px 10px", 
+                            color:severityColor, 
+                            fontWeight:700,
+                            background: severityBg + "22"
+                          }}>
+                            {money(d.balance)}
+                          </td>
+                          <td style={{ padding:"8px 10px" }}>
+                            <span style={{
+                              background: severityBg,
+                              border:`1px solid ${severityColor}44`,
+                              borderRadius:12,
+                              padding:"2px 8px",
+                              fontSize:11,
+                              fontWeight:700,
+                              color:severityColor
+                            }}>
+                              {balancePercentage.toFixed(1)}%
+                            </span>
+                          </td>
+                          <td style={{ padding:"8px 10px" }}>
+                            <span style={{
+                              background: severityBg,
+                              border:`1px solid ${severityColor}44`,
+                              borderRadius:12,
+                              padding:"2px 8px",
+                              fontSize:11,
+                              fontWeight:700,
+                              color:severityColor,
+                              whiteSpace:"nowrap"
+                            }}>
+                              {severityLabel}
+                            </span>
+                          </td>
+                          <td style={{ padding:"8px 10px", color:C.textMuted, fontSize:12 }}>
+                            {d.last_payment_date ? new Date(d.last_payment_date).toLocaleDateString() : "Never"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination for >20 defaulters */}
+              {filteredDefaulters.length > 20 && (
+                <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:8, marginTop:16, fontSize:12, color:C.textMuted }}>
+                  <span>Showing first 20 of {filteredDefaulters.length} defaulters</span>
+                  <button 
+                    style={{ 
+                      background:C.accent, 
+                      color:"#fff", 
+                      border:"none", 
+                      borderRadius:6, 
+                      padding:"4px 12px", 
+                      cursor:"pointer",
+                      fontSize:12
+                    }}
+                    onClick={() => {
+                      // TODO: Implement full pagination
+                      alert("Full pagination coming soon - for now showing top 20 defaulters");
+                    }}
+                  >
+                    View All
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

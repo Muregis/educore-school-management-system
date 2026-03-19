@@ -6,16 +6,23 @@ import { sendEmail, isEmailConfigured, templates } from "../services/email.servi
 import { logActivity } from "../helpers/activity.logger.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import { env } from "../config/env.js";
-import africastalking from "africastalking"; // NEW: import for SMS
+import { sendWhatsAppPaymentReceipt } from "../services/whatsappService.js";
+import multer from "multer";
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    cb(null, allowedTypes.includes(file.mimetype));
+  }
+});
 
 const router = Router();
 router.use(authRequired);
-
-// NEW: Africa's Talking instance (central account from .env)
-const at = africastalking({
-  username: env.atUsername,
-  apiKey: env.atApiKey,
-});
 
 // ─── GET all payments (with student name) ────────────────────────────────────
 router.get("/", async (req, res, next) => {
@@ -26,7 +33,7 @@ router.get("/", async (req, res, next) => {
       .from('payments')
       .select(`
         payment_id, student_id, amount, fee_type, payment_method,
-        reference_number, payment_date, status, paid_by, term,
+        reference_number, payment_date, status, paid_by, term, proof_url,
         students!left(
           first_name,
           last_name,
@@ -89,7 +96,7 @@ router.post("/fee-structures", requireRoles("admin", "finance"), async (req, res
   } catch (err) { next(err); }
 });
 
-// ─── POST record manual payment (updated for custom amount + SMS receipt) ──────────────────────────────────────────────
+// ─── POST record manual payment (updated for custom amount + WhatsApp receipt) ──────────────────────────────────────────────
 router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -103,7 +110,8 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
       status       = "paid",
       term         = "Term 2",
       paidBy       = null,
-      parentPhone,  // NEW: optional, for SMS receipt
+      parentPhone,  // NEW: optional, for WhatsApp receipt
+      proofUrl     // NEW: optional, for bank deposits
     } = req.body;
 
     if (!studentId || !amount || !paymentDate)
@@ -135,6 +143,7 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
         status,
         term,
         paid_by: paidBy,
+        proof_url: proofUrl || null  // Include proof URL if provided
       })
       .select('payment_id')
       .single();
@@ -185,42 +194,18 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
       } catch (_) {}
     }
 
-    // NEW: SMS receipt (if parentPhone provided)
+    // NEW: WhatsApp receipt (if parentPhone provided)
     if (parentPhone) {
       try {
-        const { data: school } = await supabase
-          .from('schools')
-          .select('sms_sender_id')
-          .eq('id', schoolId)
-          .single();
-
-        const senderId = school?.sms_sender_id || 'EDUCORE';
-
-        const message = `Payment Receipt\n` +
-          `Amount: KSh ${amount.toLocaleString()}\n` +
-          `Date: ${new Date(paymentDate).toLocaleDateString()}\n` +
-          `Reference: ${referenceNumber || paymentId}\n` +
-          `Balance Due: KSh ${(fee.amount_due - amount).toLocaleString()}\n` +
-          `Paid to: Your School\n` +
-          `Thank you!`;
-
-        const response = await at.SMS.send({
-          to: parentPhone.startsWith('+') ? parentPhone : `+254${parentPhone.replace(/^0/, '')}`,
-          message,
-          from: senderId
-        });
-
-        // Log SMS
-        await supabase.from('sms_logs').insert({
-          school_id: schoolId,
-          recipient: parentPhone,
-          message,
-          status: response.SMSMessageData?.Recipients?.[0]?.status || 'Sent',
-          cost_estimate: response.SMSMessageData?.Recipients?.[0]?.cost || 0,
-          type: 'payment_receipt'
+        await sendWhatsAppPaymentReceipt({
+          schoolId,
+          recipientPhone: parentPhone,
+          amount,
+          reference: referenceNumber || paymentId,
+          studentName: `${studentRow.first_name} ${studentRow.last_name}`,
         });
       } catch (smsErr) {
-        console.error('SMS receipt failed:', smsErr);
+        console.error('WhatsApp receipt failed:', smsErr);
         // Don't fail the payment - just log
       }
     }
@@ -294,11 +279,64 @@ router.delete("/:id", requireRoles("admin", "finance"), async (req, res, next) =
     await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_DELETE, {
       entityId: req.params.id,
       entityType: 'payment',
-      description: `Payment deleted: ID ${req.params.id}`
     });
 
     res.json({ deleted: true });
   } catch (err) { next(err); }
+});
+
+// ─── POST upload proof of payment ───────────────────────────────────────────────
+router.post("/upload-proof", requireRoles("admin", "finance", "teacher"), upload.single('file'), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+    
+    const { studentId, amount } = req.body;
+    
+    const file = req.file;
+    
+    // Additional validation (multer already handles type and size)
+    if (!studentId || !amount) {
+      return res.status(400).json({ message: "Student ID and amount are required" });
+    }
+    
+    // Generate unique filename
+    const timestamp = Date.now();
+    const fileExt = file.originalname.split('.').pop();
+    const filename = `payment-proof-${studentId}-${timestamp}.${fileExt}`;
+    
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('payment-proofs')
+      .upload(filename, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false
+      });
+    
+    if (uploadError) throw uploadError;
+    
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('payment-proofs')
+      .getPublicUrl(filename);
+    
+    logActivity(req, { 
+      action:"payment.proof_uploaded", 
+      entity:"payment", 
+      description:`Payment proof uploaded for student ${studentId}, amount ${amount}` 
+    });
+    
+    res.json({ 
+      proofUrl: publicUrl,
+      filename: filename
+    });
+    
+  } catch (err) { 
+    next(err); 
+  }
 });
 
 export default router;

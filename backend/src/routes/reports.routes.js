@@ -165,52 +165,99 @@ router.get("/fee-defaulters", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     
-    let students = null;
+    // OLD: Basic defaulters with hardcoded 10,000 KSh expected amount
+    // let students = null;
+    // try {
+    //   const { data } = await supabase.rpc('get_fee_defaulters', { p_school_id: schoolId });
+    //   students = data;
+    // } catch {
+    //   students = null;
+    // }
+    
+    // NEW: Enhanced defaulters with proper fee structure integration
+    let defaulters = null;
     try {
-      const { data } = await supabase.rpc('get_fee_defaulters', { p_school_id: schoolId });
-      students = data;
+      const { data } = await supabase.rpc('get_fee_defaulters_enhanced', { p_school_id: schoolId });
+      defaulters = data;
     } catch {
-      students = null;
+      defaulters = null;
     }
     
-    // Fallback to simpler query if RPC not available
-    if (!students) {
+    // Fallback to manual calculation if RPC not available
+    if (!defaulters) {
+      // Get students with their classes
       const { data: allStudents, error: stuErr } = await supabase
         .from('students')
         .select('student_id, first_name, last_name, admission_number, class_name, parent_phone')
         .eq('school_id', schoolId)
-        .eq('is_deleted', false);
+        .eq('is_deleted', false)
+        .order('class_name', { ascending: true });
       if (stuErr) throw stuErr;
       
+      // Get fee structures for proper expected amounts
+      const { data: feeStructures, error: feeErr } = await supabase
+        .from('fee_structures')
+        .select('class_name, tuition, activity, misc')
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false);
+      if (feeErr) throw feeErr;
+      
+      // Get paid payments
       const { data: payments, error: payErr } = await supabase
         .from('payments')
-        .select('student_id, amount')
+        .select('student_id, amount, payment_date')
         .eq('school_id', schoolId)
         .eq('status', 'paid')
         .eq('is_deleted', false);
       if (payErr) throw payErr;
       
+      // Build fee structure map
+      const feeMap = {};
+      feeStructures?.forEach(fs => {
+        const expected = Number(fs.tuition) + Number(fs.activity) + Number(fs.misc);
+        feeMap[fs.class_name] = expected;
+      });
+      
+      // Build payment map per student
       const paymentMap = {};
       payments?.forEach(payment => {
         if (!paymentMap[payment.student_id]) {
-          paymentMap[payment.student_id] = 0;
+          paymentMap[payment.student_id] = { total: 0, lastPaymentDate: null };
         }
-        paymentMap[payment.student_id] += Number(payment.amount);
+        paymentMap[payment.student_id].total += Number(payment.amount);
+        // Track last payment date
+        if (!paymentMap[payment.student_id].lastPaymentDate || 
+            payment.payment_date > paymentMap[payment.student_id].lastPaymentDate) {
+          paymentMap[payment.student_id].lastPaymentDate = payment.payment_date;
+        }
       });
       
-      const defaulters = allStudents?.filter(student => {
-        const paid = paymentMap[student.student_id] || 0;
-        return paid < 10000;
-      }).map(student => ({
-        ...student,
-        paid: paymentMap[student.student_id] || 0,
-        balance: 10000 - (paymentMap[student.student_id] || 0)
-      }));
+      // Calculate defaulters with proper balances
+      const defaultersList = allStudents?.map(student => {
+        const expected = feeMap[student.class_name] || 0;
+        const paid = paymentMap[student.student_id]?.total || 0;
+        const balance = Math.max(0, expected - paid);
+        const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
+        
+        return {
+          student_id: student.student_id,
+          student_name: `${student.first_name} ${student.last_name}`,
+          admission_number: student.admission_number,
+          class_name: student.class_name,
+          parent_phone: student.parent_phone,
+          expected_amount: expected,
+          paid_amount: paid,
+          balance: balance,
+          last_payment_date: lastPaymentDate,
+          balance_percentage: expected > 0 ? (balance / expected) * 100 : 0
+        };
+      }).filter(student => student.balance > 0)
+        .sort((a, b) => b.balance - a.balance); // Sort highest balance first
       
-      return res.json(defaulters);
+      return res.json(defaultersList);
     }
     
-    res.json(students || []);
+    res.json(defaulters || []);
   } catch (err) { next(err); }
 });
 

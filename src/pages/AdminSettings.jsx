@@ -351,7 +351,7 @@ const TABS = [
 ];
 
 // ─── SCHOOL INFO TAB ──────────────────────────────────────────────────────────
-const SchoolInfoTab = ({ onSave }) => {
+const SchoolInfoTab = ({ onSave, auth }) => {
   const [form, setForm] = useState({
     name:        "Greenfield Academy",
     motto:       "Excellence in Every Child",
@@ -359,6 +359,7 @@ const SchoolInfoTab = ({ onSave }) => {
     curriculum:  "cbc",
     email:       "admin@greenfield.ac.ke",
     phone:       "+254 712 345 678",
+    whatsapp_business_number: "",
     address:     "123 Ngong Road, Nairobi",
     county:      "Nairobi",
     term:        "Term 2",
@@ -368,7 +369,51 @@ const SchoolInfoTab = ({ onSave }) => {
     admin_name:  "Mrs. Wanjiku",
     admin_title: "School Principal",
   });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState(null);
+  
+  // Load existing school data
+  useEffect(() => {
+    if (auth?.token) {
+      apiFetch("/settings/school", { token: auth.token })
+        .then(data => {
+          setForm(prev => ({
+            ...prev,
+            name: data.name || prev.name,
+            email: data.email || prev.email,
+            phone: data.phone || prev.phone,
+            whatsapp_business_number: data.whatsapp_business_number || "",
+            address: data.address || prev.address,
+            county: data.county || prev.county,
+          }));
+        })
+        .catch(() => {
+          // School data not found, keep defaults
+        });
+    }
+  }, [auth]);
+
   const f = k => e => setForm({ ...form, [k]: e.target.value });
+
+  const saveSchoolInfo = async () => {
+    setLoading(true); setMessage(null);
+    try {
+      // Save WhatsApp number separately
+      if (form.whatsapp_business_number !== undefined) {
+        await apiFetch("/settings/school/whatsapp", {
+          method: "PATCH",
+          body: { whatsapp_business_number: form.whatsapp_business_number },
+          token: auth?.token,
+        });
+      }
+      
+      setMessage({ type: "success", text: "School information saved successfully!" });
+      onSave();
+    } catch (err) {
+      setMessage({ type: "error", text: err.message || "Failed to save school information" });
+    }
+    setLoading(false);
+  };
 
   return (
     <div>
@@ -404,6 +449,40 @@ const SchoolInfoTab = ({ onSave }) => {
       </div>
 
       <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>WhatsApp Business Settings</div>
+      <div style={{ background: C.tealDim, border: `1px solid ${C.teal}44`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div style={{ fontSize: 20 }}>📱</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>WhatsApp Business Number</div>
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
+              Parents will click "Send to School WhatsApp" and message this number directly
+            </div>
+          </div>
+        </div>
+        <Inp 
+          label="WhatsApp Business Number" 
+          hint="Format: 2547xxxxxxxx or +2547xxxxxxxx (Kenyan numbers only)"
+          value={form.whatsapp_business_number} 
+          onChange={f("whatsapp_business_number")} 
+          placeholder="254712345678" 
+        />
+        {form.whatsapp_business_number && (
+          <div style={{ marginTop: 12, padding: 10, background: C.surface, borderRadius: 8, fontSize: 11, color: C.textSub }}>
+            ✅ Parents will be able to send payment receipts to: 
+            <a 
+              href={`https://wa.me/${form.whatsapp_business_number.replace(/[^\d]/g, '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: C.teal, textDecoration: "none", fontWeight: 600, marginLeft: 6 }}
+            >
+              {form.whatsapp_business_number}
+            </a>
+          </div>
+        )}
+      </div>
+
+      <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
       <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Current Academic Term</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0 24px" }}>
         <Sel label="Term" value={form.term} onChange={f("term")} options={["Term 1","Term 2","Term 3"].map(t=>({value:t,label:t}))} />
@@ -420,13 +499,29 @@ const SchoolInfoTab = ({ onSave }) => {
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-        <Btn icon="save" onClick={onSave}>Save School Info</Btn>
+        <Btn icon="save" onClick={saveSchoolInfo} disabled={loading}>
+          {loading ? "Saving..." : "Save School Info"}
+        </Btn>
       </div>
+      
+      {message && (
+        <div style={{
+          marginTop: 16,
+          padding: "10px 14px",
+          borderRadius: 8,
+          fontSize: 13,
+          background: message.type === "success" ? C.greenDim : C.roseDim,
+          border: `1px solid ${message.type === "success" ? C.green : C.rose}44`,
+          color: message.type === "success" ? C.green : C.rose,
+        }}>
+          {message.text}
+        </div>
+      )}
     </div>
   );
 };
 
-SchoolInfoTab.propTypes = { onSave: PropTypes.func.isRequired };
+SchoolInfoTab.propTypes = { onSave: PropTypes.func.isRequired, auth: PropTypes.object };
 
 // ─── USERS TAB ────────────────────────────────────────────────────────────────
 const UsersTab = ({ onSave }) => {
@@ -701,7 +796,7 @@ export default function AdminSettings({ auth, initialTab }) {
   const renderTab = () => {
     const save = () => showToast("Changes saved successfully!");
     switch (activeTab) {
-      case "school":        return <SchoolInfoTab onSave={save} />;
+      case "school":        return <SchoolInfoTab onSave={save} auth={auth} />;
       case "users":         return <UsersTab onSave={save} />;
       case "security":      return <SecurityTab onSave={save} />;
       case "notifications": return <NotificationsTab onSave={save} />;

@@ -25,6 +25,52 @@ router.get("/users", requireRoles("admin"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get("/school", async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+
+    // Prefer Supabase fluent API (no raw SQL, no MySQL fallback)
+    const { data, error } = await supabase
+      .from("schools")
+      .select("school_id, name, email, phone, whatsapp_business_number, address, county")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .single();
+
+    if (error) throw error;
+
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/settings/payment-config - Bank details for frontend
+router.get("/payment-config", requireRoles("admin"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+
+    // Get bank details from settings table or config
+    const { data, error } = await supabase
+      .from("schools")
+      .select("bank_name, bank_account_number, account_name, bank_branch")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .single();
+
+    if (error) throw error;
+
+    res.json(data || {
+      bank_name: "",
+      bank_account_number: "",
+      account_name: "",
+      bank_branch: ""
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 async function ensurePermissionsTable() {
   // Check if table exists by trying to query it
   const { error } = await supabase
@@ -88,6 +134,64 @@ router.put("/permissions", requireRoles("admin"), async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ─── School WhatsApp Business Number Management ─────────────────────────────
+
+// GET school settings including WhatsApp number
+router.get("/school", async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+
+    const { data, error } = await supabase
+      .from("schools")
+      .select("school_id, name, email, phone, whatsapp_business_number, address, county")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .single();
+    
+    if (error) throw error;
+    if (!data) return res.status(404).json({ message: "School not found" });
+
+    res.json(data);
+  } catch (err) { next(err); }
+});
+
+// PATCH school WhatsApp business number
+router.patch("/school/whatsapp", requireRoles("admin"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { whatsapp_business_number } = req.body;
+
+    // Validate WhatsApp number format (Kenyan)
+    if (whatsapp_business_number) {
+      const cleanNumber = whatsapp_business_number.replace(/[^\d]/g, '');
+      if (!/^2547[0-9]{8}$/.test(cleanNumber)) {
+        return res.status(400).json({ 
+          message: "Invalid WhatsApp number format. Use: 2547xxxxxxxx or +2547xxxxxxxx" 
+        });
+      }
+    }
+
+    const { data, error } = await supabase
+      .from("schools")
+      .update({ 
+        whatsapp_business_number: whatsapp_business_number || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .select("school_id, whatsapp_business_number")
+      .single();
+
+    if (error) throw error;
+    if (!data) return res.status(404).json({ message: "School not found" });
+
+    res.json({ 
+      updated: true, 
+      whatsapp_business_number: data.whatsapp_business_number 
+    });
+  } catch (err) { next(err); }
 });
 
 export default router;
