@@ -47,7 +47,6 @@ router.get("/", async (req, res, next) => {
 
     if (error) throw error;
 
-    // Flatten the joined student fields to match original shape
     const result = (rows || []).map(p => ({
       ...p,
       first_name: p.students?.first_name ?? null,
@@ -96,7 +95,7 @@ router.post("/fee-structures", requireRoles("admin", "finance"), async (req, res
   } catch (err) { next(err); }
 });
 
-// ─── POST record manual payment (updated for custom amount + WhatsApp receipt) ──────────────────────────────────────────────
+// ─── POST record manual payment ──────────────────────────────────────────────
 router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -110,25 +109,28 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
       status       = "paid",
       term         = "Term 2",
       paidBy       = null,
-      parentPhone,  // NEW: optional, for WhatsApp receipt
-      proofUrl     // NEW: optional, for bank deposits
+      parentPhone,
+      proofUrl
     } = req.body;
 
     if (!studentId || !amount || !paymentDate)
       return res.status(400).json({ message: "studentId, amount and paymentDate are required" });
 
-    if (amount < 100) return res.status(400).json({ message: "Amount must be at least KSh 100" });
+    // FIX: Validate amount sensibly - no phantom fees table check
+    if (Number(amount) <= 0)
+      return res.status(400).json({ message: "Amount must be greater than 0" });
 
-    // NEW: Validate against outstanding balance
-    const { data: fee, error: feeError } = await supabase
-      .from('fees')
-      .select('amount_due')
+    // Verify student belongs to this school
+    const { data: student, error: studentErr } = await supabase
+      .from('students')
+      .select('student_id, first_name, last_name, parent_phone')
       .eq('student_id', studentId)
       .eq('school_id', schoolId)
+      .eq('is_deleted', false)
       .single();
 
-    if (feeError || !fee) return res.status(400).json({ message: "Fee record not found" });
-    if (amount > fee.amount_due) return res.status(400).json({ message: "Amount exceeds outstanding balance" });
+    if (studentErr || !student)
+      return res.status(404).json({ message: "Student not found" });
 
     const { data: inserted, error: insertError } = await supabase
       .from('payments')
@@ -143,7 +145,7 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
         status,
         term,
         paid_by: paidBy,
-        proof_url: proofUrl || null  // Include proof URL if provided
+        proof_url: proofUrl || null
       })
       .select('payment_id')
       .single();
@@ -151,25 +153,9 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
     if (insertError) throw insertError;
     const paymentId = inserted.payment_id;
 
-    // NEW: Update balance in fees table
-    await supabase
-      .from('fees')
-      .update({ amount_due: fee.amount_due - amount })
-      .eq('student_id', studentId)
-      .eq('school_id', schoolId);
-
-    // ── Email notification (fire-and-forget) ── (unchanged)
+    // Email notification (fire-and-forget)
     if (isEmailConfigured()) {
       try {
-        const { data: studentRow } = await supabase
-          .from('students')
-          .select('first_name, last_name, parent_name')
-          .eq('student_id', studentId)
-          .eq('school_id', schoolId)
-          .eq('is_deleted', false)
-          .limit(1)
-          .single();
-
         const { data: userRow } = await supabase
           .from('users')
           .select('email')
@@ -179,14 +165,14 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
           .limit(1)
           .single();
 
-        if (studentRow && userRow?.email) {
+        if (student && userRow?.email) {
           sendEmail({
             to: userRow.email,
             subject: `Payment Received — ${term}`,
             html: templates.paymentReceived({
-              parentName:  studentRow.parent_name || "Parent/Guardian",
-              studentName: `${studentRow.first_name} ${studentRow.last_name}`,
-              amount, term, balance: fee.amount_due - amount,
+              parentName:  student.parent_name || "Parent/Guardian",
+              studentName: `${student.first_name} ${student.last_name}`,
+              amount, term, balance: 0,
             }),
             schoolId,
           }).catch(() => {});
@@ -194,19 +180,19 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
       } catch (_) {}
     }
 
-    // NEW: WhatsApp receipt (if parentPhone provided)
-    if (parentPhone) {
+    // WhatsApp receipt (if parentPhone provided)
+    const recipientPhone = parentPhone || student.parent_phone;
+    if (recipientPhone) {
       try {
         await sendWhatsAppPaymentReceipt({
           schoolId,
-          recipientPhone: parentPhone,
+          recipientPhone,
           amount,
           reference: referenceNumber || paymentId,
-          studentName: `${studentRow.first_name} ${studentRow.last_name}`,
+          studentName: `${student.first_name} ${student.last_name}`,
         });
       } catch (smsErr) {
-        console.error('WhatsApp receipt failed:', smsErr);
-        // Don't fail the payment - just log
+        console.error('WhatsApp receipt failed:', smsErr.message);
       }
     }
 
@@ -285,7 +271,7 @@ router.delete("/:id", requireRoles("admin", "finance"), async (req, res, next) =
   } catch (err) { next(err); }
 });
 
-// ─── POST upload proof of payment ───────────────────────────────────────────────
+// ─── POST upload proof of payment ────────────────────────────────────────────
 router.post("/upload-proof", requireRoles("admin", "finance", "teacher"), upload.single('file'), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -296,19 +282,15 @@ router.post("/upload-proof", requireRoles("admin", "finance", "teacher"), upload
     
     const { studentId, amount } = req.body;
     
-    const file = req.file;
-    
-    // Additional validation (multer already handles type and size)
     if (!studentId || !amount) {
       return res.status(400).json({ message: "Student ID and amount are required" });
     }
     
-    // Generate unique filename
+    const file = req.file;
     const timestamp = Date.now();
     const fileExt = file.originalname.split('.').pop();
     const filename = `payment-proof-${studentId}-${timestamp}.${fileExt}`;
     
-    // Upload to Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('payment-proofs')
       .upload(filename, file.buffer, {
@@ -318,7 +300,6 @@ router.post("/upload-proof", requireRoles("admin", "finance", "teacher"), upload
     
     if (uploadError) throw uploadError;
     
-    // Get public URL
     const { data: { publicUrl } } = supabase.storage
       .from('payment-proofs')
       .getPublicUrl(filename);

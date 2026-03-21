@@ -31,13 +31,13 @@ export const DEFAULTS = {
 };
 
 export const ROLE = {
-  admin:     { pages:["dashboard","students","staff","attendance","grades","fees","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analysis","accounts","hr","library","lessonplans","pendingplans","settings"], edit:true },
-  teacher:   { pages:["dashboard","students","attendance","grades","reportcards","discipline","timetable","communication","library","analysis","lessonplans"], edit:true },
-  finance:   { pages:["dashboard","fees","invoices"], edit:true },
-  hr:        { pages:["dashboard","hr","staff"], edit:true },
-  librarian: { pages:["dashboard","library"], edit:true },
-  parent:    { pages:["dashboard","grades","fees","reportcards","attendance","timetable","communication"], edit:false },
-  student:   { pages:["dashboard","grades","attendance","reportcards","timetable","library"], edit:false },
+  admin:     { pages:["dashboard","students","staff","attendance","grades","fees","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analysis","accounts","hr","library","lessonplans","pendingplans","settings","announcements"], edit:true },
+  teacher:   { pages:["dashboard","students","attendance","grades","reportcards","discipline","timetable","communication","library","analysis","lessonplans","announcements"], edit:true },
+  finance:   { pages:["dashboard","fees","invoices","announcements"], edit:true },
+  hr:        { pages:["dashboard","hr","staff","announcements"], edit:true },
+  librarian: { pages:["dashboard","library","announcements"], edit:true },
+  parent:    { pages:["dashboard","grades","fees","reportcards","attendance","communication","announcements"], edit:false },
+  student:   { pages:["dashboard","grades","attendance","reportcards","library","announcements"], edit:false },
 };
 
 export const NAV = [
@@ -59,5 +59,6 @@ export const NAV = [
   { id:"accounts",      label:"Accounts",     icon:"🔑" },
   { id:"hr",            label:"HR",           icon:"🧑" },
   { id:"library",       label:"Library",      icon:"📚" },
+  { id:"announcements", label:"Announcements", icon:"📢" },
   { id:"settings",      label:"Settings",     icon:"⚙"  },
 ];

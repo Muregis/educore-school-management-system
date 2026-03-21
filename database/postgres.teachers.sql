@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS public.teachers (
   school_id     BIGINT NOT NULL REFERENCES public.schools(school_id),
   user_id       BIGINT NULL REFERENCES public.users(user_id),
   staff_number  VARCHAR(60)  NULL,
+  tsc_staff_id VARCHAR(60)  NULL UNIQUE, -- NEW: Unique TSC/Staff ID
   national_id   VARCHAR(40)  NULL,
   first_name    VARCHAR(100) NOT NULL,
   last_name     VARCHAR(100) NOT NULL,

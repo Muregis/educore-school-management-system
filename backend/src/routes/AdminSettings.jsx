@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
 import PropTypes from "prop-types";
 
@@ -49,7 +49,9 @@ const Icon = ({ name, size = 16, color = "currentColor" }) => {
     map:      <><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>,
     user:     <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
     key:      <><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></>,
-    toggle:   <><rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="16" cy="12" r="3"/></>,
+    toggle:   <><rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="16" cy="12" r="3"/>/</>,
+    database: <><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></>,
+    log:      <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -111,7 +113,6 @@ const Btn = ({ children, onClick, variant = "primary", icon, color }) => {
 
 Btn.propTypes = { children: PropTypes.node.isRequired, onClick: PropTypes.func.isRequired, variant: PropTypes.string, icon: PropTypes.string, color: PropTypes.string };
 
-// Toast notification
 const Toast = ({ msg, type, onDone }) => {
   const colors = { success: C.green, error: C.rose, info: C.accent };
   const color = colors[type] || C.accent;
@@ -136,7 +137,6 @@ const Toast = ({ msg, type, onDone }) => {
 
 Toast.propTypes = { msg: PropTypes.string, type: PropTypes.string, onDone: PropTypes.func };
 
-// Toggle switch
 const Toggle = ({ value, onChange, label, description }) => (
   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: `1px solid ${C.border}` }}>
     <div>
@@ -159,7 +159,6 @@ const Toggle = ({ value, onChange, label, description }) => (
 
 Toggle.propTypes = { value: PropTypes.bool.isRequired, onChange: PropTypes.func.isRequired, label: PropTypes.string.isRequired, description: PropTypes.string };
 
-// Section card wrapper
 const Section = ({ title, subtitle, icon, color = C.accent, dim = C.accentGlow, children }) => (
   <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, overflow: "hidden", marginBottom: 20 }}>
     <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12 }}>
@@ -192,13 +191,13 @@ const ROLE_META = {
   viewer:  { label: "Viewer",  color: C.amber,  dim: C.amberDim },
 };
 
-// ─── TABS ─────────────────────────────────────────────────────────────────────
 // ─── ACTIVITY LOGS TAB ───────────────────────────────────────────────────────
 const ActivityLogsTab = ({ auth }) => {
   const [logs, setLogs]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState("");
 
+  // FIX: useEffect now properly imported at top of file
   useEffect(() => {
     apiFetch("/activity-logs?limit=200", { token: auth?.token })
       .then(d => { setLogs(d.logs || []); setLoading(false); })
@@ -269,6 +268,7 @@ const BackupsTab = ({ auth }) => {
       .catch(() => setLoading(false));
   };
 
+  // FIX: useEffect now properly imported
   useEffect(load, [auth]);
 
   const triggerBackup = async () => {
@@ -299,7 +299,7 @@ const BackupsTab = ({ auth }) => {
           color:"#fff", border:"none", borderRadius:8, padding:"9px 20px",
           fontWeight:700, fontSize:13, cursor: running ? "not-allowed" : "pointer",
         }}>{running ? "⏳ Running backup..." : "💾 Run Backup Now"}</button>
-        <span style={{ fontSize:12, color:"#94a3b8" }}>Last 7 backups kept automatically. Backups run daily at midnight.</span>
+        <span style={{ fontSize:12, color:"#94a3b8" }}>Last 7 backups kept automatically.</span>
       </div>
       {message && (
         <div style={{ marginBottom:14, padding:"10px 14px", borderRadius:8, fontSize:13,
@@ -324,10 +324,6 @@ const BackupsTab = ({ auth }) => {
                       {b.sizeKb} KB · {new Date(b.createdAt).toLocaleString()}
                     </div>
                   </div>
-                  <a href={`${import.meta.env.VITE_API_URL}/admin/backups/${b.filename}/download`}
-                    style={{ fontSize:12, color:"#60a5fa", textDecoration:"none", fontWeight:600 }}>
-                    ⬇ Download
-                  </a>
                   <button onClick={() => deleteBackup(b.filename)} style={{
                     background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.3)",
                     color:"#f87171", borderRadius:6, padding:"4px 10px", fontSize:12, cursor:"pointer",
@@ -372,7 +368,6 @@ const SchoolInfoTab = ({ onSave }) => {
 
   return (
     <div>
-      {/* School identity */}
       <div style={{ background: C.accentGlow, border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: 20, marginBottom: 24, display: "flex", alignItems: "center", gap: 18 }}>
         <div style={{ width: 64, height: 64, borderRadius: 16, background: `linear-gradient(135deg, ${C.accent}, #6366F1)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
           🏫
@@ -380,10 +375,6 @@ const SchoolInfoTab = ({ onSave }) => {
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 17, fontWeight: 800, color: C.text }}>{form.name}</div>
           <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{form.motto}</div>
-          <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>
-            <span style={{ background: C.accentDim, borderRadius: 5, padding: "2px 8px", marginRight: 6, fontWeight: 600 }}>{form.curriculum.toUpperCase()}</span>
-            <span style={{ background: C.surface, borderRadius: 5, padding: "2px 8px", fontWeight: 600 }}>{form.type.charAt(0).toUpperCase() + form.type.slice(1)}</span>
-          </div>
         </div>
       </div>
 
@@ -395,28 +386,11 @@ const SchoolInfoTab = ({ onSave }) => {
       </div>
 
       <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
-      <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Contact & Location</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
         <Inp label="School Email" type="email" value={form.email} onChange={f("email")} placeholder="admin@school.ac.ke" />
         <Inp label="Phone Number" value={form.phone} onChange={f("phone")} placeholder="+254 7XX XXX XXX" />
         <Inp label="Physical Address" value={form.address} onChange={f("address")} placeholder="Street, Town" />
         <Inp label="County" value={form.county} onChange={f("county")} placeholder="e.g. Nairobi" />
-      </div>
-
-      <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
-      <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Current Academic Term</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0 24px" }}>
-        <Sel label="Term" value={form.term} onChange={f("term")} options={["Term 1","Term 2","Term 3"].map(t=>({value:t,label:t}))} />
-        <Inp label="Year" value={form.year} onChange={f("year")} placeholder="e.g. 2025" />
-        <Inp label="Term Start" type="date" value={form.term_start} onChange={f("term_start")} />
-        <Inp label="Term End" type="date" value={form.term_end} onChange={f("term_end")} />
-      </div>
-
-      <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
-      <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Administrator</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
-        <Inp label="Admin Name" value={form.admin_name} onChange={f("admin_name")} placeholder="e.g. Mrs. Wanjiku" />
-        <Inp label="Admin Title / Role" value={form.admin_title} onChange={f("admin_title")} placeholder="e.g. School Principal" />
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
@@ -469,7 +443,6 @@ const UsersTab = ({ onSave }) => {
         <Btn icon="plus" onClick={() => { setShowAdd(true); setEditId(null); setForm({ name: "", email: "", role: "teacher", password: "" }); }}>Add User</Btn>
       </div>
 
-      {/* Add / Edit form */}
       {showAdd && (
         <div style={{ background: C.surface, border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: 20, marginBottom: 20 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 16 }}>{editId ? "Edit User" : "New User Account"}</div>
@@ -478,7 +451,7 @@ const UsersTab = ({ onSave }) => {
             <Inp label="Email Address" type="email" value={form.email} onChange={f("email")} placeholder="user@school.ac.ke" />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
-            <Sel label="Role" value={form.role} onChange={f("role")} options={[{value:"admin",label:"Admin — Full access"},{value:"teacher",label:"Teacher — Limited access"},{value:"viewer",label:"Viewer — Read only"}]} />
+            <Sel label="Role" value={form.role} onChange={f("role")} options={[{value:"admin",label:"Admin"},{value:"teacher",label:"Teacher"},{value:"viewer",label:"Viewer"}]} />
             <Field label="Password" hint={editId ? "Leave blank to keep current password" : ""}>
               <div style={{ position: "relative" }}>
                 <input type={showPwd ? "text" : "password"} value={form.password} onChange={f("password")} placeholder={editId ? "••••••••" : "Set password"} style={{ ...inputStyle, paddingRight: 40 }} />
@@ -495,28 +468,24 @@ const UsersTab = ({ onSave }) => {
         </div>
       )}
 
-      {/* User list */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {users.map(u => {
-          const role = ROLE_META[u.role];
+          const role = ROLE_META[u.role] || ROLE_META.teacher;
           return (
             <div key={u.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14 }}>
-              {/* Avatar */}
               <div style={{ width: 42, height: 42, borderRadius: "50%", background: `linear-gradient(135deg, ${u.color[0]}, ${u.color[1]})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: "#fff", flexShrink: 0 }}>
                 {u.initials}
               </div>
-              {/* Info */}
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{u.name}</span>
-                  <span style={{ background: role.dim, color: role.color, borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em" }}>{role.label}</span>
+                  <span style={{ background: role.dim, color: role.color, borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>{role.label}</span>
                   {u.status === "inactive" && <span style={{ background: C.roseDim, color: C.rose, borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>Inactive</span>}
                 </div>
                 <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{u.email}</div>
               </div>
-              {/* Actions */}
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <button onClick={() => toggleStatus(u.id)} title={u.status === "active" ? "Deactivate" : "Activate"}
+                <button onClick={() => toggleStatus(u.id)}
                   style={{ background: u.status === "active" ? C.greenDim : C.roseDim, border: "none", borderRadius: 8, padding: "6px 10px", cursor: "pointer", color: u.status === "active" ? C.green : C.rose, fontSize: 11, fontWeight: 700 }}>
                   {u.status === "active" ? "Active" : "Inactive"}
                 </button>
@@ -540,7 +509,6 @@ UsersTab.propTypes = { onSave: PropTypes.func.isRequired };
 // ─── SECURITY TAB ─────────────────────────────────────────────────────────────
 const SecurityTab = ({ onSave }) => {
   const [form, setForm] = useState({ current: "", newPwd: "", confirm: "" });
-  const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [toggles, setToggles] = useState({
     twoFactor: false,
@@ -569,33 +537,29 @@ const SecurityTab = ({ onSave }) => {
 
   const str = strength(form.newPwd);
 
-  const PwdField = ({ label, val, show, setShow, onChange, placeholder }) => (
-    <Field label={label}>
-      <div style={{ position: "relative" }}>
-        <input type={show ? "text" : "password"} value={val} onChange={onChange} placeholder={placeholder}
-          style={{ ...inputStyle, paddingRight: 42 }} />
-        <button onClick={() => setShow(!show)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.textMuted, cursor: "pointer" }}>
-          <Icon name={show ? "eyeOff" : "eye"} size={15} />
-        </button>
-      </div>
-    </Field>
-  );
-
   return (
     <div>
-      {/* Change password */}
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Change Password</div>
-        <PwdField label="Current Password" val={form.current} show={showCurrent} setShow={setShowCurrent} onChange={f("current")} placeholder="Enter current password" />
-        <PwdField label="New Password" val={form.newPwd} show={showNew} setShow={setShowNew} onChange={f("newPwd")} placeholder="Min 8 characters" />
+        <Field label="Current Password">
+          <input type="password" value={form.current} onChange={f("current")} placeholder="Enter current password" style={inputStyle} />
+        </Field>
+        <Field label="New Password">
+          <div style={{ position: "relative" }}>
+            <input type={showNew ? "text" : "password"} value={form.newPwd} onChange={f("newPwd")} placeholder="Min 8 characters" style={{ ...inputStyle, paddingRight: 42 }} />
+            <button onClick={() => setShowNew(!showNew)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.textMuted, cursor: "pointer" }}>
+              <Icon name={showNew ? "eyeOff" : "eye"} size={15} />
+            </button>
+          </div>
+        </Field>
         {form.newPwd && (
-          <div style={{ marginBottom: 16, marginTop: -8 }}>
+          <div style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
               <span style={{ fontSize: 11, color: C.textMuted }}>Password strength</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: str.color }}>{str.label}</span>
             </div>
             <div style={{ background: C.border, borderRadius: 99, height: 5 }}>
-              <div style={{ width: `${str.width}%`, background: str.color, borderRadius: 99, height: "100%", transition: "width 0.3s, background 0.3s" }} />
+              <div style={{ width: `${str.width}%`, background: str.color, borderRadius: 99, height: "100%", transition: "width 0.3s" }} />
             </div>
           </div>
         )}
@@ -627,46 +591,29 @@ SecurityTab.propTypes = { onSave: PropTypes.func.isRequired };
 // ─── NOTIFICATIONS TAB ────────────────────────────────────────────────────────
 const NotificationsTab = ({ onSave }) => {
   const [toggles, setToggles] = useState({
-    feeReminders: true,
-    attendanceAlerts: true,
-    newStudentAlert: true,
-    gradeUpdates: false,
-    weeklyReport: true,
-    smsEnabled: false,
-    emailEnabled: true,
-    systemUpdates: true,
+    feeReminders: true, attendanceAlerts: true, newStudentAlert: true,
+    gradeUpdates: false, weeklyReport: true, smsEnabled: false,
+    emailEnabled: true, systemUpdates: true,
   });
   const t = k => v => setToggles({ ...toggles, [k]: v });
 
   const groups = [
-    {
-      label: "Academic Alerts",
-      items: [
-        { key: "attendanceAlerts", label: "Attendance Alerts", desc: "Notify when a student is absent 3+ days in a row" },
-        { key: "gradeUpdates",     label: "Grade Updates",     desc: "Notify when new results are entered" },
-        { key: "weeklyReport",     label: "Weekly Summary",    desc: "Send a weekly performance digest every Friday" },
-      ]
-    },
-    {
-      label: "Finance Alerts",
-      items: [
-        { key: "feeReminders", label: "Fee Payment Reminders", desc: "Send reminders for pending fee balances" },
-      ]
-    },
-    {
-      label: "Admin Alerts",
-      items: [
-        { key: "newStudentAlert", label: "New Student Registered", desc: "Notify when a new student is added to the system" },
-        { key: "systemUpdates",   label: "System Updates",         desc: "Get notified about new features and maintenance" },
-      ]
-    },
-    {
-      label: "Delivery Channels",
-      items: [
-        { key: "emailEnabled", label: "Email Notifications", desc: "Send notifications to admin@greenfield.ac.ke" },
-        { key: "smsEnabled",   label: "SMS Notifications",   desc: "Send SMS to registered phone number (charges apply)" },
-      ]
-    },
+    { label: "Academic Alerts", items: [
+      { key: "attendanceAlerts", label: "Attendance Alerts", desc: "Notify when a student is absent 3+ days in a row" },
+      { key: "gradeUpdates", label: "Grade Updates", desc: "Notify when new results are entered" },
+      { key: "weeklyReport", label: "Weekly Summary", desc: "Send a weekly performance digest every Friday" },
+    ]},
+    { label: "Finance Alerts", items: [
+      { key: "feeReminders", label: "Fee Payment Reminders", desc: "Send reminders for pending fee balances" },
+    ]},
+    { label: "Admin Alerts", items: [
+      { key: "newStudentAlert", label: "New Student Registered", desc: "Notify when a new student is added" },
+      { key: "systemUpdates", label: "System Updates", desc: "Get notified about new features" },
+    ]},
+    { label: "Delivery Channels", items: [
+      { key: "emailEnabled", label: "Email Notifications", desc: "Send notifications to admin email" },
+      { key: "smsEnabled", label: "SMS Notifications", desc: "Send SMS to registered phone number" },
+    ]},
   ];
 
   return (
@@ -713,7 +660,6 @@ export default function AdminSettings({ auth }) {
 
   return (
     <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", color: C.text }}>
-      {/* Tab bar */}
       <div style={{ display: "flex", gap: 6, marginBottom: 24, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 6 }}>
         {TABS.map(tab => {
           const active = activeTab === tab.id;
@@ -733,16 +679,10 @@ export default function AdminSettings({ auth }) {
         })}
       </div>
 
-      {/* Tab content in section card */}
       <Section
-        title={TABS.find(t => t.id === activeTab)?.label}
-        subtitle={{
-          school:        "Manage your school's identity, contact info, and term dates",
-          users:         "Control who can access the system and what they can do",
-          security:      "Password management and login security settings",
-          notifications: "Choose what alerts you receive and how they're delivered",
-        }[activeTab]}
-        icon={TABS.find(t => t.id === activeTab)?.icon}
+        title={TABS.find(t => t.id === activeTab)?.label || ""}
+        subtitle={{ school: "Manage your school's identity", users: "Control system access", security: "Password and security settings", notifications: "Alert preferences" }[activeTab]}
+        icon={TABS.find(t => t.id === activeTab)?.icon || "settings"}
       >
         {renderTab()}
       </Section>

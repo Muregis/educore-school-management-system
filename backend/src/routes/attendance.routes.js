@@ -1,14 +1,12 @@
-import { Router } from "express";
-import { supabase } from "../config/supabaseClient.js";
-import { authRequired } from "../middleware/auth.js";
+import express from 'express';
+import { supabase } from '../config/supabase.js'; // Adjust path as needed
 
-const router = Router();
-router.use(authRequired);
+const router = express.Router();
 
-// ─── GET / — list attendance records (already Supabase, unchanged) ────────────
+// GET /attendance - Fetch all attendance records with student details
 router.get("/", async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
+    const { schoolId, role, user_id } = req.user;
     const { classId, date, from, to, studentId } = req.query;
 
     let query = supabase
@@ -30,6 +28,21 @@ router.get("/", async (req, res, next) => {
       .eq('school_id', schoolId)
       .eq('is_deleted', false);
 
+    // RESTRICTION: If user is a teacher, only show their assigned classes
+    if (role === 'teacher') {
+      const { data: teacherClasses } = await supabase
+        .from('teacher_classes')
+        .select('class_id')
+        .eq('school_id', schoolId)
+        .eq('teacher_id', user_id)
+        .eq('is_deleted', false);
+      
+      const allowedClassIds = teacherClasses?.map(tc => tc.class_id) || [];
+      if (allowedClassIds.length > 0) {
+        query = query.in('class_id', allowedClassIds);
+      }
+    }
+
     if (classId)   { query = query.eq('class_id', classId); }
     if (studentId) { query = query.eq('student_id', studentId); }
     if (date)      { query = query.eq('attendance_date', date); }
@@ -43,155 +56,137 @@ router.get("/", async (req, res, next) => {
     const { data, error } = await query;
     if (error) throw error;
 
-    const transformedData = data?.map(item => ({
-      attendance_id:   item.attendance_id,
-      student_id:      item.student_id,
-      student_name:    `${item.students.first_name} ${item.students.last_name}`,
-      admission_number: item.students.admission_number,
-      class_name:      item.students.class_name,
-      attendance_date: item.attendance_date,
-      status:          item.status,
-      class_id:        item.class_id,
-    })) || [];
+    // FIX: Properly flatten student data to match frontend expectations
+    const transformedData = data?.map(item => {
+      const student = item.students || {};
+      return {
+        attendance_id:   item.attendance_id,
+        student_id:      item.student_id,
+        first_name:      student.first_name || '',
+        last_name:       student.last_name || '',
+        admission_number: student.admission_number || null,
+        class_name:      student.class_name || null,
+        attendance_date: item.attendance_date,
+        status:          item.status,
+        class_id:        item.class_id,
+      };
+    }) || [];
 
     res.json(transformedData);
-  } catch (err) { next(err); }
+  } catch (err) { 
+    next(err); 
+  }
 });
 
-// ── Helper: resolve classId from numeric ID or class_name string ──────────────
-async function resolveClassId(schoolId, classId) {
-  if (!isNaN(Number(classId)) && Number(classId) > 0) return Number(classId);
-
-  const { data: cls } = await supabase
-    .from('classes')
-    .select('class_id')
-    .eq('school_id', schoolId)
-    .eq('class_name', classId)
-    .eq('is_deleted', false)
-    .limit(1)
-    .single();
-  if (cls) return cls.class_id;
-
-  // Auto-create placeholder class so FK is satisfied
-  const { data: result } = await supabase
-    .from('classes')
-    .insert({
-      school_id:     schoolId,
-      class_name:    classId,
-      academic_year: new Date().getFullYear(),
-      status:        'active',
-    })
-    .select('class_id')
-    .single();
-  return result.class_id;
-}
-
-// ─── POST /bulk — save full class attendance for a date ───────────────────────
+// POST /attendance/bulk - Bulk create attendance records for a class
 router.post("/bulk", async (req, res, next) => {
   try {
-    const { schoolId, userId } = req.user;
+    const { schoolId, role, user_id } = req.user;
     const { classId, date, records } = req.body;
 
-    if (!classId || !date || !Array.isArray(records) || !records.length)
-      return res.status(400).json({ message: "classId, date and records array are required" });
+    if (!classId || !date || !Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ error: 'Missing required fields: classId, date, records' });
+    }
 
-    const resolvedClassId = await resolveClassId(schoolId, classId);
+    // RESTRICTION: If user is a teacher, verify they can access this class
+    if (role === 'teacher') {
+      const { data: teacherClasses } = await supabase
+        .from('teacher_classes')
+        .select('class_id')
+        .eq('school_id', schoolId)
+        .eq('teacher_id', user_id)
+        .eq('is_deleted', false);
+      
+      const allowedClassIds = teacherClasses?.map(tc => tc.class_id) || [];
+      if (!allowedClassIds.includes(Number(classId))) {
+        return res.status(403).json({ error: 'Access denied: You can only manage attendance for your assigned classes' });
+      }
+    }
 
-    // Soft-delete existing records for this class + date instead of hard DELETE
-    const { error: delError } = await supabase
-      .from('attendance')
-      .update({ is_deleted: true })
-      .eq('school_id', schoolId)
-      .eq('class_id', resolvedClassId)
-      .eq('attendance_date', date);
-    if (delError) throw delError;
-
-    // Build insert payload
-    const rows = records.map(r => ({
-      school_id:          schoolId,
-      student_id:         r.studentId ?? r.student_id,
-      class_id:           resolvedClassId,
-      attendance_date:    date,
-      status:             r.status || 'present',
-      marked_by_user_id:  userId || null,
-      is_deleted:         false,
+    // Prepare bulk insert data
+    const attendanceRecords = records.map(r => ({
+      school_id: schoolId,
+      student_id: r.studentId,
+      class_id: classId,
+      attendance_date: date,
+      status: r.status || 'present',
+      is_deleted: false,
+      created_at: new Date().toISOString(),
     }));
 
-    const { error: insError } = await supabase
+    const { data, error } = await supabase
       .from('attendance')
-      .insert(rows);
-    if (insError) throw insError;
+      .insert(attendanceRecords)
+      .select();
 
-    res.status(201).json({ saved: records.length });
-  } catch (err) { next(err); }
-});
-
-// ─── POST / — single attendance record (upsert) ───────────────────────────────
-router.post("/", async (req, res, next) => {
-  try {
-    const { schoolId, userId } = req.user;
-    const { studentId, classId, date, status = "present" } = req.body;
-
-    if (!studentId || !classId || !date)
-      return res.status(400).json({ message: "studentId, classId and date are required" });
-
-    const resolvedClassId = await resolveClassId(schoolId, classId);
-
-    const { error } = await supabase
-      .from('attendance')
-      .upsert(
-        {
-          school_id:         schoolId,
-          student_id:        studentId,
-          class_id:          resolvedClassId,
-          attendance_date:   date,
-          status,
-          marked_by_user_id: userId || null,
-          is_deleted:        false,
-        },
-        { onConflict: 'school_id,student_id,class_id,attendance_date' }
-      );
     if (error) throw error;
 
-    res.status(201).json({ saved: true });
-  } catch (err) { next(err); }
+    res.status(201).json({ 
+      message: 'Bulk attendance saved successfully',
+      count: data.length 
+    });
+  } catch (err) { 
+    next(err); 
+  }
 });
 
-// ─── PUT /:id — update a single attendance record ────────────────────────────
+// PUT /attendance/:id - Update single attendance record
 router.put("/:id", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    const { id } = req.params;
     const { status, date } = req.body;
 
-    const { data: updated, error } = await supabase
+    const updateData = {};
+    if (status) updateData.status = status;
+    if (date) updateData.attendance_date = date;
+    updateData.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase
       .from('attendance')
-      .update({ status, attendance_date: date })
-      .eq('attendance_id', req.params.id)
+      .update(updateData)
+      .eq('attendance_id', id)
       .eq('school_id', schoolId)
-      .select('attendance_id')
+      .eq('is_deleted', false)
+      .select()
       .single();
 
     if (error) throw error;
-    if (!updated) return res.status(404).json({ message: "Record not found" });
+    if (!data) return res.status(404).json({ error: 'Attendance record not found' });
 
-    res.json({ updated: true });
-  } catch (err) { next(err); }
+    res.json({ 
+      message: 'Attendance updated successfully',
+      data 
+    });
+  } catch (err) { 
+    next(err); 
+  }
 });
 
-// ─── DELETE /:id — soft delete attendance record ──────────────────────────────
+// DELETE /attendance/:id - Soft delete attendance record
 router.delete("/:id", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    const { id } = req.params;
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('attendance')
-      .update({ is_deleted: true })
-      .eq('attendance_id', req.params.id)
-      .eq('school_id', schoolId);
-    if (error) throw error;
+      .update({ 
+        is_deleted: true,
+        deleted_at: new Date().toISOString() 
+      })
+      .eq('attendance_id', id)
+      .eq('school_id', schoolId)
+      .select()
+      .single();
 
-    res.json({ deleted: true });
-  } catch (err) { next(err); }
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Attendance record not found' });
+
+    res.json({ message: 'Attendance deleted successfully' });
+  } catch (err) { 
+    next(err); 
+  }
 });
 
 export default router;

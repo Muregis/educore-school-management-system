@@ -28,6 +28,7 @@ import LibraryPage from "./pages/LibraryPage";
 import StaffPage from "./pages/StaffPage";
 import LessonPlansPage from "./pages/LessonPlansPage";
 import PendingPlansPage from "./pages/PendingPlansPage";
+import AnnouncementsPage from "./pages/AnnouncementsPage";
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 
 function useIsMobile() {
@@ -88,7 +89,7 @@ const BOTTOM_NAV_PAGES = {
   finance:   ["dashboard","fees","invoices"],
   hr:        ["dashboard","hr","staff"],
   librarian: ["dashboard","library"],
-  parent:    ["dashboard","grades","fees","attendance","timetable"],
+  parent:    ["dashboard","grades","fees","attendance"],
   student:   ["dashboard","grades","attendance","timetable","library"],
 };
 
@@ -218,6 +219,7 @@ export default function App() {
     accounts:      auth.role === "admin" ? <AccountsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
     lessonplans:   ["admin","teacher"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     pendingplans:  auth.role === "admin" ? <PendingPlansPage auth={auth} toast={toast} /> : <Forbidden />,
+    announcements: <AnnouncementsPage auth={auth} toast={toast} />,
     settings:      auth.role === "admin"
       ? <div><SettingsPage auth={auth} school={school} setSchool={setSchool} users={users} setUsers={setUsers} toast={toast} /><div style={{ marginTop:12 }}><Btn variant="danger" onClick={() => { if (window.confirm("Reset demo data?")) resetDemo(); }}>Reset Demo Data</Btn></div></div>
       : <Forbidden />,

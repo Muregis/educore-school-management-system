@@ -3,24 +3,22 @@ import { supabase } from "../config/supabaseClient.js";
 
 const router = Router();
 
-  router.get("/health", async (req, res, next) => {
-    try {
-      // Check Supabase connectivity with a simple query
-      const startTime = Date.now();
-      const { data: nowData, error: nowError } = await supabase
-        .rpc('get_current_timestamp');
-      const dbTime = nowError ? null : nowData;
-      
-      // Alternative: check via a simple table count
-      const { data: schoolsData, error: schoolsError } = await supabase
-        .from('schools')
-        .select('school_id', { count: 'exact', head: true });
-      
-      const isConnected = !schoolsError && schoolsData !== undefined;
+// FIX: Route was nested as /health/health due to double path definition.
+// app.js mounts this at /api/health, so this handler should be at "/"
+router.get("/", async (req, res, next) => {
+  try {
+    const startTime = Date.now();
+
+    // Check via a simple table count
+    const { count: schoolCount, error: schoolsError } = await supabase
+      .from('schools')
+      .select('school_id', { count: 'exact', head: true });
+    
+    const isConnected = !schoolsError;
 
     let lessonPlansTable = null;
     try {
-      const { data: t, error: tableError } = await supabase
+      const { error: tableError } = await supabase
         .from('lesson_plans')
         .select('*', { count: 'exact', head: true });
       lessonPlansTable = !tableError;
@@ -30,7 +28,7 @@ const router = Router();
 
     let activityLogsTable = null;
     try {
-      const { data: t, error: tableError } = await supabase
+      const { error: tableError } = await supabase
         .from('activity_logs')
         .select('*', { count: 'exact', head: true });
       activityLogsTable = !tableError;
@@ -40,7 +38,6 @@ const router = Router();
 
     const payload = {
       ok: isConnected,
-      dbTime: dbTime,
       db: 'supabase',
       lessonPlansTable,
       activityLogsTable,

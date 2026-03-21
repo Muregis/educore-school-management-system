@@ -1,4 +1,5 @@
 import '../config/env.js';
+import bcrypt from 'bcryptjs';
 import { supabase } from '../config/supabaseClient.js';
 
 /**
@@ -20,11 +21,19 @@ export async function authLogin(email, password, schoolId = 1) {
       return null;
     }
     
-    if (users && users.length > 0) {
-      return { user: users[0], source: 'supabase' };
+    if (!users || users.length === 0) {
+      return null;
+    }
+
+    const user = users[0];
+
+    // FIX: Verify password against stored hash
+    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    if (!isValidPassword) {
+      return null;
     }
     
-    return null;
+    return { user, source: 'supabase' };
   } catch (err) {
     console.error('Auth service error:', err.message);
     return null;

@@ -50,15 +50,18 @@ router.get("/payment-config", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 
-    // Get bank details from settings table or config
+    // Get bank details from payment_configs table
     const { data, error } = await supabase
-      .from("schools")
+      .from("payment_configs")
       .select("bank_name, bank_account_number, account_name, bank_branch")
       .eq("school_id", schoolId)
+      .eq("is_active", true)
       .eq("is_deleted", false)
       .single();
 
-    if (error) throw error;
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      throw error;
+    }
 
     res.json(data || {
       bank_name: "",

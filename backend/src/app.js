@@ -31,6 +31,7 @@ import analysisRoutes      from "./routes/analysis.routes.js";
 import activityRoutes      from "./routes/activity.routes.js";
 import adminRoutes         from "./routes/admin.routes.js";
 import lessonPlansRoutes   from "./routes/lessonplans.routes.js";
+import announcementsRoutes from "./routes/announcements.routes.js";
 import importRoutes         from "./routes/import.routes.js";
 import ledgerRoutes        from "./routes/ledger.routes.js";
 // import { startBackupScheduler } from "./services/backup.service.js";
@@ -114,6 +115,7 @@ app.use("/api/analysis",      analysisRoutes);
 app.use("/api/activity-logs", activityRoutes);
 app.use("/api/admin",         adminRoutes);
 app.use("/api/lesson-plans",  lessonPlansRoutes);
+app.use("/api/announcements", announcementsRoutes);
 app.use("/api/import",         importRoutes);
 app.use("/api/ledger",         ledgerRoutes);
 

@@ -620,7 +620,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                       <Btn variant="primary" size="small" onClick={() => openBankDeposit(b)}>🏦 Bank Deposit</Btn>
                     )}
                   </div>
-                  <Btn variant="ghost" size="small" onClick={() => {
+                  {/* OLD: Removed 'Pay Custom Amount' for parents per requirements */}
+                  {/* <Btn variant="ghost" size="small" onClick={() => {
                     setPaymentForm({
                       ...paymentForm,
                       studentId: b.studentId,
@@ -629,7 +630,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                     setShowPayment(true);
                   }}>
                     Pay Custom Amount
-                  </Btn>
+                  </Btn> */}
                 </div>
               ) : "—"
             ])}

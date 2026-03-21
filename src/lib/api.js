@@ -1,5 +1,5 @@
 // simple wrapper for calling backend API with optional auth token
-export const API_BASE = "http://localhost:4000/api";
+export const API_BASE = "http://localhost:4001/api";
 
 export async function apiFetch(
   path,

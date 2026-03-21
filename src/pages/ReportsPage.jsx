@@ -822,7 +822,7 @@ export default function ReportsPage({ auth }) {
                 <table style={{ width:"100%", borderCollapse:"collapse" }}>
                   <thead>
                     <tr>
-                      {["Student","Class","Admission","Phone","Expected","Paid","Balance","% Owed","Status","Last Payment"].map(h =>
+                      {["Student","Class","Admission","Phone","Expected","Paid","Balance","% Owed","Status","Last Payment","Actions"].map(h =>
                         <th key={h} style={{ textAlign:"left", padding:"8px 10px", borderBottom:`1px solid ${C.border}`, color:C.textMuted, fontSize:12 }}>
                           {h}
                         </th>
@@ -896,6 +896,50 @@ export default function ReportsPage({ auth }) {
                           </td>
                           <td style={{ padding:"8px 10px", color:C.textMuted, fontSize:12 }}>
                             {d.last_payment_date ? new Date(d.last_payment_date).toLocaleDateString() : "Never"}
+                          </td>
+                          <td style={{ padding:"8px 10px" }}>
+                            <button
+                              onClick={() => {
+                                const phone = d.parent_phone;
+                                const studentName = d.student_name || `${d.first_name || ''} ${d.last_name || ''}`;
+                                const balance = money(d.balance);
+                                const message = encodeURIComponent(
+                                  `🏫 *FEE REMINDER*\n\n` +
+                                  `📚 *Student:* ${studentName}\n` +
+                                  `📝 *Class:* ${d.class_name}\n` +
+                                  `💰 *Outstanding Balance:* ${balance}\n\n` +
+                                  `Dear Parent,\n` +
+                                  `Please settle the outstanding fee balance at your earliest convenience.\n` +
+                                  `Payment options available via the school portal.\n\n` +
+                                  `Thank you for your cooperation.\n` +
+                                  `_EduCore School Management_`
+                                );
+                                
+                                const cleanPhone = phone ? phone.replace(/[^\d]/g, '') : '';
+                                if (cleanPhone) {
+                                  const waMeLink = `https://wa.me/254${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone.startsWith('254') ? cleanPhone.slice(3) : cleanPhone}?text=${message}`;
+                                  window.open(waMeLink, '_blank');
+                                } else {
+                                  alert('No phone number available for this student');
+                                }
+                              }}
+                              style={{
+                                background: "#25D366",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: 6,
+                                padding: "4px 8px",
+                                fontSize: 11,
+                                cursor: "pointer",
+                                fontWeight: 600,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 4
+                              }}
+                              title="Send WhatsApp reminder"
+                            >
+                                📱 Send
+                            </button>
                           </td>
                         </tr>
                       );
