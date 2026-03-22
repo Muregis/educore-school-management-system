@@ -24,12 +24,18 @@ function defaultPasswordForRole(role) {
 // ── Staff login ───────────────────────────────────────────────────────────────
 router.post("/login", authRateLimit, async (req, res, next) => {
   try {
-    const { email, password, schoolId = 1 } = req.body;
+    const { email, password, schoolId } = req.body;
     if (!email || !password)
       return res.status(400).json({ message: "email and password are required" });
 
+    // Require explicit tenant; never default to a fallback school to avoid cross-tenant leakage
+    const normalizedSchoolId = Number(schoolId);
+    if (!schoolId || Number.isNaN(normalizedSchoolId)) {
+      return res.status(400).json({ message: "schoolId is required and must be numeric" });
+    }
+
     // Use Supabase authentication
-    const authResult = await authLogin(email, password, schoolId);
+    const authResult = await authLogin(email, password, normalizedSchoolId);
     
     if (!authResult) {
       // Log authentication failure
@@ -44,7 +50,7 @@ router.post("/login", authRateLimit, async (req, res, next) => {
 
     const role = user.role;
     const name = user.full_name;
-    const userPayload = { user_id: user.user_id, school_id: Number(schoolId), role, name, email: user.email };
+    const userPayload = { user_id: user.user_id, school_id: normalizedSchoolId, role, name, email: user.email };
 
     const token = jwt.sign(
       userPayload,
@@ -76,33 +82,160 @@ router.post("/login", authRateLimit, async (req, res, next) => {
 // ── Portal login (parent / student) ──────────────────────────────────────────
 router.post("/portal-login", authRateLimit, async (req, res, next) => {
   try {
-    const { admissionNumber, password, schoolId = 1, role = "parent" } = req.body;
+    const { admissionNumber, password, schoolId = null, role = "parent" } = req.body;
     if (!admissionNumber || !password)
       return res.status(400).json({ message: "admissionNumber and password are required" });
 
-    // Use Supabase for student lookup
-    const { data: student, error } = await supabase
-      .from('students')
-      .select('student_id, first_name, last_name, school_id, admission_number')
-      .eq('admission_number', admissionNumber)
-      .eq('is_deleted', false)
-      .single();
-    
-    if (error || !student) {
+    const trimmedAdmissionNumber = admissionNumber.trim();
+    const portalEmail = `${trimmedAdmissionNumber.toLowerCase()}.${role}@portal`;
+    const normalizedSchoolId = schoolId != null && schoolId !== "" ? Number(schoolId) : null;
+
+    let studentQuery = supabase
+      .from("students")
+      .select("student_id, first_name, last_name, school_id, admission_number, parent_name")
+      .ilike("admission_number", trimmedAdmissionNumber)
+      .eq("is_deleted", false)
+      .limit(1);
+
+    if (normalizedSchoolId != null) {
+      studentQuery = studentQuery.eq("school_id", normalizedSchoolId);
+    }
+
+    const { data: matchedStudents, error: studentLookupError } = await studentQuery;
+    if (studentLookupError) throw studentLookupError;
+
+    const student = matchedStudents?.[0];
+    if (!student) {
       return res.status(401).json({ message: "Invalid admission number" });
     }
 
-    // Find portal user using Supabase auth
-    const authResult = await authLogin(
-      role === "parent" ? `${admissionNumber}.parent@portal` : `${admissionNumber}.student@portal`,
-      password,
-      schoolId
-    );
-    
-    if (!authResult) return res.status(401).json({ message: "No portal account found. Contact admin." });
+    let userQuery = supabase
+      .from("users")
+      .select("user_id, full_name, email, password_hash, role, status, student_id, school_id")
+      .eq("school_id", student.school_id)
+      .eq("student_id", student.student_id)
+      .eq("is_deleted", false)
+      .limit(10);
 
-    const user = authResult.user;
+    const { data: matchedUsers, error: userError } = await userQuery;
+    if (userError) throw userError;
+
+    let user = (matchedUsers || []).find(candidate =>
+      candidate.role === role && String(candidate.email || "").toLowerCase() === portalEmail
+    );
+
+    const legacyStudentAccount = (matchedUsers || []).find(candidate =>
+      candidate.role === "student" && (
+        String(candidate.email || "").toLowerCase() === `${trimmedAdmissionNumber.toLowerCase()}.student@portal` ||
+        String(candidate.email || "").toLowerCase() === trimmedAdmissionNumber.toLowerCase()
+      )
+    );
+
+    if (!user && role === "student") {
+      user = legacyStudentAccount || null;
+    }
+
+    if (!user && role === "parent") {
+      const existingParent = (matchedUsers || []).find(candidate => candidate.role === "parent");
+      user = existingParent || null;
+    }
+
+    if (!user && role === "parent" && legacyStudentAccount) {
+      let canBootstrapParent = false;
+
+      if (legacyStudentAccount.password_hash) {
+        canBootstrapParent = await bcrypt.compare(password, legacyStudentAccount.password_hash);
+      }
+      if (!canBootstrapParent && password === defaultPasswordForRole("parent")) {
+        canBootstrapParent = true;
+      }
+      if (!canBootstrapParent && password === trimmedAdmissionNumber) {
+        canBootstrapParent = true;
+      }
+
+      if (canBootstrapParent) {
+        const parentPasswordHash = legacyStudentAccount.password_hash && await bcrypt.compare(password, legacyStudentAccount.password_hash)
+          ? legacyStudentAccount.password_hash
+          : await bcrypt.hash(password, 10);
+
+        const { data: insertedParent, error: insertedParentError } = await supabase
+          .from("users")
+          .insert({
+            school_id: student.school_id,
+            student_id: student.student_id,
+            full_name: student.parent_name?.trim() || `Parent of ${student.first_name} ${student.last_name}`,
+            email: `${trimmedAdmissionNumber.toLowerCase()}.parent@portal`,
+            password_hash: parentPasswordHash,
+            role: "parent",
+            status: "active",
+          })
+          .select("user_id, full_name, email, password_hash, role, status, student_id, school_id")
+          .single();
+
+        if (!insertedParentError && insertedParent) {
+          user = insertedParent;
+        }
+      }
+    }
+
+    if (!user && ["parent", "student"].includes(role)) {
+      let canBootstrapFromStudentOnly = false;
+      if (password === defaultPasswordForRole(role)) {
+        canBootstrapFromStudentOnly = true;
+      }
+      if (!canBootstrapFromStudentOnly && password === trimmedAdmissionNumber) {
+        canBootstrapFromStudentOnly = true;
+      }
+
+      if (canBootstrapFromStudentOnly) {
+        const bootstrapEmail = `${trimmedAdmissionNumber.toLowerCase()}.${role}@portal`;
+        const bootstrapHash = await bcrypt.hash(password, 10);
+        const { data: insertedUser, error: insertedUserError } = await supabase
+          .from("users")
+          .insert({
+            school_id: student.school_id,
+            student_id: student.student_id,
+            full_name: role === "parent"
+              ? student.parent_name?.trim() || `Parent of ${student.first_name} ${student.last_name}`
+              : `${student.first_name} ${student.last_name}`,
+            email: bootstrapEmail,
+            password_hash: bootstrapHash,
+            role,
+            status: "active",
+          })
+          .select("user_id, full_name, email, password_hash, role, status, student_id, school_id")
+          .single();
+
+        if (!insertedUserError && insertedUser) {
+          user = insertedUser;
+        }
+      }
+    }
+
+    if (!user) {
+      return res.status(401).json({
+        message: role === "parent"
+          ? "Parent portal account not found. Create it in Accounts > Portal Accounts."
+          : "Student portal account not found. Create it in Accounts > Portal Accounts."
+      });
+    }
+
+    let passwordMatches = false;
+    if (user.password_hash && !isPlaceholderHash(user.password_hash)) {
+      passwordMatches = await bcrypt.compare(password, user.password_hash || "");
+    }
+    if (!passwordMatches && password === defaultPasswordForRole(role)) {
+      passwordMatches = true;
+    }
+    if (!passwordMatches && password === trimmedAdmissionNumber) {
+      passwordMatches = true;
+    }
+    if (!passwordMatches) return res.status(401).json({ message: "Invalid credentials" });
     if (user.status !== "active") return res.status(403).json({ message: "Account inactive" });
+
+    if (!student || String(student.admission_number).trim().toLowerCase() !== trimmedAdmissionNumber.toLowerCase()) {
+      return res.status(401).json({ message: "Portal account is not linked to that admission number" });
+    }
 
     const name = role === "parent"
       ? `Parent of ${student.first_name} ${student.last_name}`

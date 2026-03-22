@@ -27,6 +27,18 @@ function logAuthEvent(level, event, details) {
 export function authRequired(req, res, next) {
   // Attach request ID for tracing
   req.requestId = generateRequestId();
+
+  // Allowlist unauthenticated webhooks / callbacks
+  const openPaths = [
+    "/paystack/webhook",
+    "/paystack/callback",
+    "/mpesa/callback",
+    "/mpesa/c2b/confirm",
+    "/mpesa/c2b/validate",
+  ];
+  if (openPaths.some(p => req.path.startsWith(p))) {
+    return next();
+  }
   
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;

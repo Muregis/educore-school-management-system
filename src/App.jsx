@@ -89,7 +89,7 @@ const BOTTOM_NAV_PAGES = {
   finance:   ["dashboard","fees","invoices"],
   hr:        ["dashboard","hr","staff"],
   librarian: ["dashboard","library"],
-  parent:    ["dashboard","grades","fees","attendance"],
+  parent:    ["dashboard","grades","fees","attendance","communication"],
   student:   ["dashboard","grades","attendance","timetable","library"],
 };
 
@@ -219,7 +219,7 @@ export default function App() {
     accounts:      auth.role === "admin" ? <AccountsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
     lessonplans:   ["admin","teacher"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     pendingplans:  auth.role === "admin" ? <PendingPlansPage auth={auth} toast={toast} /> : <Forbidden />,
-    announcements: <AnnouncementsPage auth={auth} toast={toast} />,
+    announcements: perms?.pages.includes("announcements") ? <AnnouncementsPage auth={auth} toast={toast} /> : <Forbidden />,
     settings:      auth.role === "admin"
       ? <div><SettingsPage auth={auth} school={school} setSchool={setSchool} users={users} setUsers={setUsers} toast={toast} /><div style={{ marginTop:12 }}><Btn variant="danger" onClick={() => { if (window.confirm("Reset demo data?")) resetDemo(); }}>Reset Demo Data</Btn></div></div>
       : <Forbidden />,
@@ -228,6 +228,7 @@ export default function App() {
   const currentNav = nav.find(n => n.id === page);
   const bottomNavIds = [...new Set(BOTTOM_NAV_PAGES[auth.role] || ["dashboard"])].slice(0, 5);
   const bottomNavItems = bottomNavIds.map(id => nav.find(n => n.id === id)).filter(Boolean);
+
 
   const SidebarContent = ({ collapsed }) => (
     <>
@@ -389,7 +390,7 @@ export default function App() {
               <span>{n.label.length > 8 ? n.label.slice(0,7)+"…" : n.label}</span>
             </button>
           ))}
-          <button className="ec-bottom-nav-item" onClick={() => setDrawerOpen(true)}>
+   w2        <button className="ec-bottom-nav-item" onClick={() => setDrawerOpen(true)}>
             <span className="icon">⋯</span>
             <span>More</span>
           </button>

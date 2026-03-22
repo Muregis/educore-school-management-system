@@ -107,11 +107,13 @@ export default function AttendancePage({
   const saveBulk = async () => {
     if (!date) return toast("Select date", "error");
     if (bulk.length === 0) return toast("No students in this class", "error");
+    const resolvedClassId = classStudents[0]?.class_id ?? classStudents[0]?.classId ?? null;
     
     try {
       await apiFetch("/attendance/bulk", {
         method: "POST",
-        body: { classId: cls, date, records: bulk },
+        // OLD: body: { classId: cls, date, records: bulk },
+        body: { classId: resolvedClassId, className: cls, date, records: bulk },
         token: auth?.token,
       });
       

@@ -29,7 +29,24 @@ function SchoolTab({ school, setSchool, toast, auth }) {
     setSaving(true);
     try {
       // Save regular school info (excluding WhatsApp number)
-      const { whatsapp_business_number, ...schoolInfo } = form;
+      const {
+        whatsapp_business_number,
+        term,
+        year,
+        motto,
+        ...restSchoolInfo
+      } = form;
+      // OLD: const { whatsapp_business_number, ...schoolInfo } = form;
+      const schoolInfo = {
+        name: restSchoolInfo.name,
+        county: restSchoolInfo.county,
+        phone: restSchoolInfo.phone,
+        email: restSchoolInfo.email,
+        address: restSchoolInfo.address,
+      };
+      void term;
+      void year;
+      void motto;
       await apiFetch("/settings/school", {
         method: "PUT",
         token: auth?.token,

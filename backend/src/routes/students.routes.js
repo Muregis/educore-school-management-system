@@ -113,23 +113,46 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
     if (error) throw error;
     const studentId = result.student_id;
 
-    // Auto-create student portal account (login: admissionNumber, pass: admissionNumber)
+    // Auto-create portal accounts (login: admissionNumber, pass: admissionNumber)
     try {
       const hash = await bcrypt.hash(admissionNumber, 10);
+      const parentDisplayName = parentName?.trim() || `Parent of ${firstName} ${lastName}`;
+      // OLD: await supabase
+      // OLD:   .from('users')
+      // OLD:   .upsert(
+      // OLD:     {
+      // OLD:       school_id: schoolId,
+      // OLD:       student_id: studentId,
+      // OLD:       full_name: `${firstName} ${lastName}`,
+      // OLD:       email: admissionNumber,
+      // OLD:       password_hash: hash,
+      // OLD:       role: 'student',
+      // OLD:       status: 'active',
+      // OLD:     },
+      // OLD:     { onConflict: 'school_id,student_id' }
+      // OLD:   );
       await supabase
         .from('users')
-        .upsert(
+        .insert([
           {
             school_id: schoolId,
             student_id: studentId,
             full_name: `${firstName} ${lastName}`,
-            email: admissionNumber,
+            email: `${String(admissionNumber).trim().toLowerCase()}.student@portal`,
             password_hash: hash,
             role: 'student',
             status: 'active',
           },
-          { onConflict: 'school_id,student_id' }
-        );
+          {
+            school_id: schoolId,
+            student_id: studentId,
+            full_name: parentDisplayName,
+            email: `${String(admissionNumber).trim().toLowerCase()}.parent@portal`,
+            password_hash: hash,
+            role: 'parent',
+            status: 'active',
+          },
+        ]);
     } catch { /* ignore if account already exists */ }
 
     // Return the full new student row so frontend can update state correctly

@@ -7,7 +7,16 @@ import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 // NEW: Tenant context middleware for automatic tenant isolation
 export function tenantContext(req, res, next) {
   // Skip tenant validation for auth routes and health checks
-  if (req.path.startsWith('/auth/') || req.path.startsWith('/health')) {
+  const openPaths = [
+    '/auth/',
+    '/health',
+    '/paystack/webhook',
+    '/paystack/callback',
+    '/mpesa/callback',
+    '/mpesa/c2b/confirm',
+    '/mpesa/c2b/validate',
+  ];
+  if (openPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
 
@@ -29,7 +38,16 @@ export function tenantContext(req, res, next) {
 // NEW: Tenant security check middleware
 export function tenantSecurityCheck(req, res, next) {
   // Skip for auth routes and health checks
-  if (req.path.startsWith('/auth/') || req.path.startsWith('/health')) {
+  const openPaths = [
+    '/auth/',
+    '/health',
+    '/paystack/webhook',
+    '/paystack/callback',
+    '/mpesa/callback',
+    '/mpesa/c2b/confirm',
+    '/mpesa/c2b/validate',
+  ];
+  if (openPaths.some(p => req.path.startsWith(p))) {
     return next();
   }
 

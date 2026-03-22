@@ -23,11 +23,22 @@ router.get("/", async (req, res, next) => {
 router.post("/", requireRoles("admin","hr"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { firstName, lastName, email, phone, staffNumber, tscStaffId, department,
-            qualification, hireDate, status = "active" } = req.body;
+    const { firstName, lastName, email, phone, staffNumber, department,
+            qualification, hireDate, tscStaffId, status = "active" } = req.body;
 
     if (!firstName || !lastName || !email)
       return res.status(400).json({ message: "firstName, lastName and email are required" });
+
+    // Auto-generate staff number if not provided
+    let finalStaffNumber = staffNumber;
+    if (!finalStaffNumber) {
+      const { rows: countRows } = await pgPool.query(
+        `SELECT COUNT(*) as count FROM teachers WHERE school_id = $1 AND is_deleted = false`,
+        [schoolId]
+      );
+      const nextNumber = (parseInt(countRows[0].count) || 0) + 1;
+      finalStaffNumber = `STF-${schoolId}-${String(nextNumber).padStart(4, '0')}`;
+    }
 
     const { rows } = await pgPool.query(
       `INSERT INTO teachers (school_id, first_name, last_name, email, phone,
@@ -35,7 +46,7 @@ router.post("/", requireRoles("admin","hr"), async (req, res, next) => {
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [schoolId, firstName, lastName, email, phone||null,
-        staffNumber||null, tscStaffId||null, department||null, qualification||null,
+        finalStaffNumber, tscStaffId || null, department||null, qualification||null,
         hireDate||null, status]
     );
     const result = rows[0];
@@ -68,8 +79,8 @@ router.post("/", requireRoles("admin","hr"), async (req, res, next) => {
 router.put("/:id", requireRoles("admin","hr"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { firstName, lastName, email, phone, staffNumber, tscStaffId,
-            department, qualification, hireDate, status } = req.body;
+    const { firstName, lastName, email, phone, staffNumber,
+            department, qualification, hireDate, tscStaffId, status } = req.body;
     const { rowCount } = await pgPool.query(
       `UPDATE teachers SET first_name=$1, last_name=$2, email=$3, phone=$4,
       staff_number=$5, tsc_staff_id=$6, department=$7, qualification=$8, hire_date=$9, status=$10,

@@ -177,6 +177,7 @@ function PlanEditor({ auth, toast, editPlan, type: initType, onBack, onSaved }) 
   const [content, setContent]         = useState(editPlan?.content || "");
   const [generating, setGenerating]   = useState(false);
   const [saving, setSaving]           = useState(false);
+  const [uploading, setUploading]     = useState(false);
   const [rejectionNote, setRejNote]   = useState(editPlan?.admin_feedback || "");
 
   const f = key => ({
@@ -209,6 +210,33 @@ function PlanEditor({ auth, toast, editPlan, type: initType, onBack, onSaved }) 
       toast(e.message || "Generation failed", "error");
     }
     setGenerating(false);
+  };
+
+  const importFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedExt = [".txt", ".md", ".csv"];
+    const lowerName = file.name.toLowerCase();
+    const isAllowed = allowedExt.some(ext => lowerName.endsWith(ext));
+
+    if (!isAllowed) {
+      toast("Upload a .txt, .md, or .csv lesson plan file", "error");
+      event.target.value = "";
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const importedText = await file.text();
+      // OLD: Teachers could only type or generate content manually.
+      setContent(importedText);
+      toast(`Imported ${file.name}`, "success");
+    } catch (e) {
+      toast(e.message || "File import failed", "error");
+    }
+    event.target.value = "";
+    setUploading(false);
   };
 
   const save = async (submitStatus) => {
@@ -330,6 +358,20 @@ function PlanEditor({ auth, toast, editPlan, type: initType, onBack, onSaved }) 
           <span style={{ fontSize:11, color:C.textMuted, marginLeft:12 }}>
             Uses KICD CBC framework
           </span>
+        </div>
+
+        <div style={{ marginTop:14 }}>
+          <Lbl>Import Existing File</Lbl>
+          <input
+            type="file"
+            accept=".txt,.md,.csv,text/plain,text/markdown,text/csv"
+            onChange={importFile}
+            style={{ ...inp, padding: "10px 12px" }}
+          />
+          <div style={{ fontSize:11, color:C.textMuted, marginTop:6 }}>
+            Upload a text-based lesson plan or scheme file and review it before saving.
+            {uploading ? " Importing file..." : ""}
+          </div>
         </div>
       </div>
 
