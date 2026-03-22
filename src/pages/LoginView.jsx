@@ -245,6 +245,7 @@ export default function LoginView({ onLogin }) {
   const [email, setEmail]           = useState("");
   const [admission, setAdmission]   = useState("");
   const [password, setPassword]     = useState("");
+  const [schoolId, setSchoolId]     = useState("");
   const [portalRole, setPortalRole] = useState("parent");
   const [error, setError]           = useState("");
   const [loading, setLoading]       = useState(false);
@@ -265,9 +266,13 @@ export default function LoginView({ onLogin }) {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
+      const numericSchoolId = Number(schoolId);
+      if (!schoolId || Number.isNaN(numericSchoolId)) {
+        throw new Error("School ID is required");
+      }
       const data = await apiFetch("/auth/login", {
         method: "POST",
-        body: { email, password }, // Removed hardcoded schoolId: 1
+        body: { email, password, schoolId: numericSchoolId }, // Explicit tenant required
       });
       onLogin({
         id: data.user.userId, name: data.user.name,
@@ -381,6 +386,12 @@ export default function LoginView({ onLogin }) {
           {/* Staff form */}
           {mode === "staff" && (
             <form onSubmit={submitStaff}>
+              <div className="lv-field">
+                <label className="lv-label">School ID</label>
+                <input className="lv-input" type="number" value={schoolId}
+                  onChange={e => setSchoolId(e.target.value)}
+                  placeholder="e.g. 101" />
+              </div>
               <div className="lv-field">
                 <label className="lv-label">Email address</label>
                 <input className="lv-input" type="email" value={email}

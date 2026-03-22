@@ -1,13 +1,13 @@
-import { supabase } from '../config/supabaseClient.js';
-import { env } from '../config/env.js';
+// OLD: import { supabase } from '../config/supabaseClient.js';
+// OLD: import { env } from '../config/env.js';
 // OLD AFRICA'S TALKING CODE - MIGRATED TO WHATSAPP BUSINESS PER SCHOOL
 // import africastalking from 'africastalking';
 // All SMS functionality replaced with WhatsApp Business per-school mobile app
 // Payment receipts now sent via wa.me links to school's WhatsApp number
 // Zero cost solution using school's existing WhatsApp Business app
 
-// WhatsApp Business API Service (replaces Africa's Talking SMS)
-import { sendWhatsAppPaymentReceipt } from '../services/whatsappService.js';
+// OLD: import { sendWhatsAppPaymentReceipt } from '../services/whatsappService.js';
+import { prepareWhatsAppMessage } from "./whatsappLinks.js";
 
 // OLD AFRICAS TALKING CODE
 // const at = africastalking({
@@ -53,16 +53,34 @@ export async function sendPaymentReceipt(schoolId, recipientPhone, amount, refer
 
     // console.log('SMS receipt sent:', response);
 
-    // NEW: Send WhatsApp payment receipt
-    const result = await sendWhatsAppPaymentReceipt({
+    const message =
+      `Payment Receipt\n` +
+      `Student: ${studentName}\n` +
+      `Amount: KES ${Number(amount).toLocaleString()}\n` +
+      `Reference: ${reference}\n` +
+      `Date: ${new Date().toLocaleDateString()}\n\n` +
+      `Thank you for your payment.`;
+
+    // OLD: const result = await sendWhatsAppPaymentReceipt({
+    // OLD:   schoolId,
+    // OLD:   recipientPhone,
+    // OLD:   amount,
+    // OLD:   reference,
+    // OLD:   studentName
+    // OLD: });
+    const result = await prepareWhatsAppMessage({
       schoolId,
       recipientPhone,
-      amount,
-      reference,
-      studentName
+      message,
+      meta: {
+        type: "payment_receipt",
+        reference,
+        amount: Number(amount),
+        studentName,
+      },
     });
 
-    console.log('WhatsApp payment receipt sent:', result);
+    console.log('WhatsApp payment receipt prepared:', result);
     
   } catch (err) {
     console.error('WhatsApp payment receipt failed:', err);

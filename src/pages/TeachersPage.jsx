@@ -13,6 +13,8 @@ import { Msg, pager, Pager } from "../components/Helpers";
 function normalise(t) {
   return {
     id:        t.teacher_id  ?? t.id,
+    staffNumber: t.staff_number ?? t.staffNumber ?? "",
+    tscStaffId: t.tsc_staff_id ?? t.tscStaffId ?? "",
     firstName: t.first_name  ?? t.firstName,
     lastName:  t.last_name   ?? t.lastName,
     email:     t.email       ?? "",
@@ -30,7 +32,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const [page, setPage] = useState(1);
   const [show, setShow] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [f, setF] = useState({ firstName: "", lastName: "", email: "", phone: "", status: "active", classes: [], timetable: "", subjects: [] });
+  const [f, setF] = useState({ firstName: "", lastName: "", email: "", phone: "", staffNumber: "", tscStaffId: "", status: "active", classes: [], timetable: "", subjects: [] });
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -54,7 +56,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
 
   const openAdd = () => {
     setEditId(null);
-    setF({ firstName: "", lastName: "", email: "", phone: "", status: "active", classes: [], timetable: "", subjects: [] });
+    setF({ firstName: "", lastName: "", email: "", phone: "", staffNumber: "", tscStaffId: "", status: "active", classes: [], timetable: "", subjects: [] });
     setShow(true);
   };
 
@@ -64,17 +66,33 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
       if (editId) {
         await apiFetch(`/teachers/${editId}`, {
           method: "PUT",
-          body: { firstName: f.firstName, lastName: f.lastName, email: f.email, phone: f.phone || null, status: f.status },
+          body: {
+            firstName: f.firstName,
+            lastName: f.lastName,
+            email: f.email,
+            phone: f.phone || null,
+            staffNumber: f.staffNumber || null,
+            tscStaffId: f.tscStaffId || null,
+            status: f.status,
+          },
           token: auth?.token,
         });
         setTeachers(prev => prev.map(t => (t.id === editId || t.teacher_id === editId) ? { ...normalise(t), ...f, id: editId } : t));
       } else {
         const res = await apiFetch(`/teachers`, {
           method: "POST",
-          body: { firstName: f.firstName, lastName: f.lastName, email: f.email, phone: f.phone || null, status: f.status },
+          body: {
+            firstName: f.firstName,
+            lastName: f.lastName,
+            email: f.email,
+            phone: f.phone || null,
+            staffNumber: f.staffNumber || null,
+            tscStaffId: f.tscStaffId || null,
+            status: f.status,
+          },
           token: auth?.token,
         });
-        setTeachers(prev => [...prev, { ...f, id: res.teacherId }]);
+        setTeachers(prev => [...prev, normalise({ ...res, ...f, id: res.teacherId })]);
       }
       setShow(false);
       toast("Teacher saved", "success");
@@ -100,8 +118,8 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
           <option value="inactive">inactive</option>
         </select>
         <Btn variant="ghost" onClick={() => {
-          const headers = ["Name","Email","Phone","Status","Classes","Subjects"];
-          const rows = filtered.map(t => [`${t.firstName} ${t.lastName}`,t.email,t.phone||"",t.status,(t.classes||[]).join("|"),(t.subjects||[]).join("|")]);
+          const headers = ["Name","Email","Phone","Staff Number","TSC/Staff ID","Status","Classes","Subjects"];
+          const rows = filtered.map(t => [`${t.firstName} ${t.lastName}`,t.email,t.phone||"",t.staffNumber||"",t.tscStaffId||"",t.status,(t.classes||[]).join("|"),(t.subjects||[]).join("|")]);
           const content = [headers, ...rows].map(r => r.join(",")).join("\n");
           const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([content], { type: "text/csv" })); a.download = "teachers.csv"; a.click();
           toast("Teachers CSV exported", "success");
@@ -112,10 +130,12 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
         <>
           <div style={{ overflowX: "auto" }}>
             <Table
-              headers={["Name","Email","Phone","Classes","Subjects","Timetable","Status","Actions"]}
+              headers={["Name","Email","Phone","Staff No.","TSC/Staff ID","Classes","Subjects","Timetable","Status","Actions"]}
               rows={rows.map(t => [
                 <span key={t.id} style={{ color: C.text, fontWeight: 600 }}>{t.firstName} {t.lastName}</span>,
                 t.email, t.phone || "-",
+                t.staffNumber || "-",
+                t.tscStaffId || "-",
                 (t.classes||[]).join(", ") || "-",
                 (t.subjects||[]).join(", ") || "-",
                 t.timetable || "-",
@@ -137,6 +157,8 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
             <Field label="Last Name"><input style={inputStyle} value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} /></Field>
             <Field label="Email"><input style={inputStyle} value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></Field>
             <Field label="Phone"><input style={inputStyle} value={f.phone||""} onChange={e => setF({ ...f, phone: e.target.value })} /></Field>
+            <Field label="Staff Number"><input style={inputStyle} value={f.staffNumber||""} onChange={e => setF({ ...f, staffNumber: e.target.value })} /></Field>
+            <Field label="TSC / Staff ID"><input style={inputStyle} value={f.tscStaffId||""} onChange={e => setF({ ...f, tscStaffId: e.target.value })} /></Field>
             <Field label="Status"><select style={inputStyle} value={f.status} onChange={e => setF({ ...f, status: e.target.value })}><option value="active">active</option><option value="inactive">inactive</option></select></Field>
             <Field label="Timetable"><input style={inputStyle} value={f.timetable||""} onChange={e => setF({ ...f, timetable: e.target.value })} /></Field>
           </div>

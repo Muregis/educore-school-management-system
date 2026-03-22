@@ -45,6 +45,52 @@ router.get("/school", async (req, res, next) => {
   }
 });
 
+// PUT /api/settings/school - update school profile fields except WhatsApp number
+router.put("/school", requireRoles("admin"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const {
+      name,
+      email,
+      phone,
+      address,
+      county,
+      term,
+      year,
+      motto
+    } = req.body;
+
+    const updatePayload = {
+      // OLD: school profile update endpoint was missing, causing frontend 404s.
+      updated_at: new Date().toISOString(),
+    };
+
+    if (name !== undefined) updatePayload.name = name;
+    if (email !== undefined) updatePayload.email = email;
+    if (phone !== undefined) updatePayload.phone = phone;
+    if (address !== undefined) updatePayload.address = address;
+    if (county !== undefined) updatePayload.county = county;
+    // OLD: if (term !== undefined) updatePayload.term = term;
+    // OLD: if (year !== undefined) updatePayload.year = year;
+    // OLD: if (motto !== undefined) updatePayload.motto = motto;
+    // Current schools schema does not yet include term/year/motto columns.
+    void term;
+    void year;
+    void motto;
+
+    const { data, error } = await supabase
+      .from("schools")
+      .update(updatePayload)
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .select("school_id, name, email, phone, whatsapp_business_number, address, county")
+      .single();
+    if (error) throw error;
+
+    res.json({ updated: true, school: data });
+  } catch (err) { next(err); }
+});
+
 // GET /api/settings/payment-config - Bank details for frontend
 router.get("/payment-config", requireRoles("admin"), async (req, res, next) => {
   try {
@@ -83,13 +129,18 @@ async function ensurePermissionsTable() {
   if (error && error.code === 'PGRST205') {
     // Table doesn't exist - create it via RPC or migration
     console.warn('role_permissions table does not exist. Please run the migration to create it.');
+    return { missing: true };
   }
+  return { missing: false };
 }
 
 router.get("/permissions", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    await ensurePermissionsTable();
+    const check = await ensurePermissionsTable();
+    if (check.missing) {
+      return res.json({ permissions: {} });
+    }
     
     const { data: rows, error } = await supabase
       .from('role_permissions')
@@ -116,7 +167,10 @@ router.put("/permissions", requireRoles("admin"), async (req, res, next) => {
       return res.status(400).json({ message: "permissions object is required" });
     }
 
-    await ensurePermissionsTable();
+    const check = await ensurePermissionsTable();
+    if (check.missing) {
+      return res.status(400).json({ message: "role_permissions table is missing. Run the migration and retry." });
+    }
 
     for (const [roleName, cfg] of Object.entries(permissions)) {
       const pages = Array.isArray(cfg?.pages) ? cfg.pages : [];
@@ -142,23 +196,7 @@ router.put("/permissions", requireRoles("admin"), async (req, res, next) => {
 // ─── School WhatsApp Business Number Management ─────────────────────────────
 
 // GET school settings including WhatsApp number
-router.get("/school", async (req, res, next) => {
-  try {
-    const { schoolId } = req.user;
-
-    const { data, error } = await supabase
-      .from("schools")
-      .select("school_id, name, email, phone, whatsapp_business_number, address, county")
-      .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .single();
-    
-    if (error) throw error;
-    if (!data) return res.status(404).json({ message: "School not found" });
-
-    res.json(data);
-  } catch (err) { next(err); }
-});
+// OLD: duplicate GET /school handler existed; consolidated above to avoid route ambiguity.
 
 // PATCH school WhatsApp business number
 router.patch("/school/whatsapp", requireRoles("admin"), async (req, res, next) => {

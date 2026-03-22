@@ -9,7 +9,7 @@ router.use(authRequired);
 // ─── Get announcements ──────────────────────────────────────────────────────
 router.get("/", async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
+    const { schoolId, role } = req.user;
     const { target_audience, status = 'published' } = req.query;
     
     let query = supabase
@@ -21,12 +21,20 @@ router.get("/", async (req, res, next) => {
       `)
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
-      .eq('status', status)
       .order('pinned', { ascending: false })
       .order('publish_date', { ascending: false })
       .order('created_at', { ascending: false });
 
-    if (target_audience) {
+    // OLD: .eq('status', status)
+    if (role === "parent" || role === "student") {
+      query = query
+        .eq("status", "published")
+        .in("target_audience", role === "parent" ? ["all", "parents"] : ["all", "students"]);
+    } else {
+      query = status === "all" ? query : query.eq("status", status);
+    }
+
+    if (target_audience && role !== "parent" && role !== "student") {
       query = query.eq('target_audience', target_audience);
     }
 

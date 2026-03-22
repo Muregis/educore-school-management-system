@@ -179,12 +179,21 @@ export default function AnnouncementsPage({ auth, toast }) {
   });
 
   const canEdit = auth?.role === 'admin' || auth?.role === 'teacher';
+  const isPortal = auth?.role === "parent" || auth?.role === "student";
 
   const loadAnnouncements = useCallback(async () => {
     if (!auth?.token) return;
     setLoading(true);
     try {
-      const params = new URLSearchParams(filter);
+      const effectiveFilter = isPortal
+        ? {
+            // OLD: status: filter.status,
+            status: "published",
+            // OLD: target_audience: filter.target_audience
+            target_audience: auth?.role === "parent" ? "parents" : "students",
+          }
+        : filter;
+      const params = new URLSearchParams(effectiveFilter);
       const data = await apiFetch(`/announcements?${params}`, { token: auth.token });
       setAnnouncements(data || []);
     } catch (err) {
@@ -192,7 +201,7 @@ export default function AnnouncementsPage({ auth, toast }) {
     } finally {
       setLoading(false);
     }
-  }, [auth, filter, toast]);
+  }, [auth, filter, isPortal, toast]);
 
   useEffect(() => {
     loadAnnouncements();
@@ -311,38 +320,40 @@ export default function AnnouncementsPage({ auth, toast }) {
       </div>
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        <div>
-          <label style={{ display: "block", fontSize: 12, color: C.textMuted, marginBottom: 4 }}>
-            Status
-          </label>
-          <select
-            style={inputStyle}
-            value={filter.status}
-            onChange={e => setFilter(f => ({ ...f, status: e.target.value }))}
-          >
-            <option value="published">Published</option>
-            <option value="draft">Draft</option>
-            <option value="archived">Archived</option>
-            <option value="all">All</option>
-          </select>
+      {!isPortal && (
+        <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, color: C.textMuted, marginBottom: 4 }}>
+              Status
+            </label>
+            <select
+              style={inputStyle}
+              value={filter.status}
+              onChange={e => setFilter(f => ({ ...f, status: e.target.value }))}
+            >
+              <option value="published">Published</option>
+              <option value="draft">Draft</option>
+              <option value="archived">Archived</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+          
+          <div>
+            <label style={{ display: "block", fontSize: 12, color: C.textMuted, marginBottom: 4 }}>
+              Audience
+            </label>
+            <select
+              style={inputStyle}
+              value={filter.target_audience}
+              onChange={e => setFilter(f => ({ ...f, target_audience: e.target.value }))}
+            >
+              {AUDIENCE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        
-        <div>
-          <label style={{ display: "block", fontSize: 12, color: C.textMuted, marginBottom: 4 }}>
-            Audience
-          </label>
-          <select
-            style={inputStyle}
-            value={filter.target_audience}
-            onChange={e => setFilter(f => ({ ...f, target_audience: e.target.value }))}
-          >
-            {AUDIENCE_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      )}
 
       {loading ? (
         <div style={{ textAlign: "center", padding: 40, color: C.textMuted }}>

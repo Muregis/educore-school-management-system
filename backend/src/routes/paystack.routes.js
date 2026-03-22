@@ -221,9 +221,9 @@ router.get("/callback", async (req, res, next) => {
     const { reference } = req.query;
     if (!reference) return res.status(400).json({ message: "No reference" });
 
-    // First verify the transaction to get metadata
+    // First verify the transaction to get metadata using global key (initial)
     const tempResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-      headers: { Authorization: `Bearer ${env.paystackSecretKey}` }, // Use global for initial lookup
+      headers: { Authorization: `Bearer ${env.paystackSecretKey}` },
     });
     const tempData = await tempResponse.json();
     
@@ -239,9 +239,6 @@ router.get("/callback", async (req, res, next) => {
       const paystackConfig = await paymentConfigService.getPaystackConfig(schoolId);
       
       // Re-verify with school-specific config
-      // OLD: const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-      // OLD:   headers: { Authorization: `Bearer ${env.paystackSecretKey}` },
-      // OLD: });
       const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
         headers: { Authorization: `Bearer ${paystackConfig.secretKey}` },
       });

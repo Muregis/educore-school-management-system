@@ -39,11 +39,6 @@ export const env = {
   paystackPublicKey:    process.env.PAYSTACK_PUBLIC_KEY    || "",
   paystackCallbackUrl:  process.env.PAYSTACK_CALLBACK_URL  || "http://localhost:5173",
 
-  // Africa's Talking
-  atApiKey:             process.env.AT_API_KEY    || "",
-  atUsername:           process.env.AT_USERNAME   || "",
-  atSenderId:           process.env.AT_SENDER_ID  || "EduCore",
-
   // WhatsApp Business API
   whatsappApiUrl:       process.env.WHATSAPP_API_URL       || "https://graph.facebook.com/v18.0",
   whatsappToken:        process.env.WHATSAPP_TOKEN        || "",

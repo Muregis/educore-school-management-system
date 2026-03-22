@@ -144,15 +144,22 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       reloadPayments().catch(e => console.warn("Payments:", e));
       
       // Load bank details and school WhatsApp number
-      apiFetch("/settings/payment-config", { token: auth.token })
-        .then(data => setBankDetails(data))
-        .catch(e => console.warn("Bank details:", e));
+      // OLD: apiFetch("/settings/payment-config", { token: auth.token })
+      // OLD:   .then(data => setBankDetails(data))
+      // OLD:   .catch(e => console.warn("Bank details:", e));
+      if (canEdit) {
+        apiFetch("/settings/payment-config", { token: auth.token })
+          .then(data => setBankDetails(data))
+          .catch(e => console.warn("Bank details:", e));
+      } else {
+        setBankDetails(null);
+      }
         
       apiFetch("/settings/school", { token: auth.token })
         .then(data => setSchoolWhatsApp(data?.whatsapp_business_number || ""))
         .catch(e => console.warn("School settings:", e));
     }
-  }, [auth, setFeeStructures, reloadPayments]);
+  }, [auth, setFeeStructures, reloadPayments, canEdit]);
 
   const normalisedPayments   = payments.map(p => p.payment_id ? normalisePayment(p) : p);
   const normalisedStructures = feeStructures.map(f => f.fee_structure_id ? normaliseFeeStruct(f) : f);
