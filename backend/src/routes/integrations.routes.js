@@ -81,7 +81,17 @@ router.post("/mpesa/callback", async (req, res, next) => {
     
     // Extract school ID from BillRefNumber (format: SCHOOLID-ADMNO)
     const billRefParts = (BillRefNumber || '').split('-');
-    const schoolId = Number(billRefParts[0]) || 1;
+    const schoolId = Number(billRefParts[0]);
+    
+    // Validate school ID extraction
+    if (!schoolId || !Number.isInteger(schoolId) || schoolId < 1) {
+      return res.status(400).json({ 
+        error: "Invalid school ID in BillRefNumber format",
+        expectedFormat: "SCHOOLID-ADMNO",
+        received: BillRefNumber
+      });
+    }
+    
     const admissionNumber = billRefParts[1] || BillRefNumber;
     
     const referenceNumber = TransID;

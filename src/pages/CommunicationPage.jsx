@@ -155,7 +155,6 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         {[
           { label: "Total", value: logs.length, color: C.text },
-          { label: "Prepared", value: logs.filter(l => l.status === "queued").length, color: C.amber },
           { label: "Sent", value: logs.filter(l => l.status === "sent").length, color: C.green },
           { label: "Failed", value: logs.filter(l => l.status === "failed").length, color: C.rose },
         ].map(s => (

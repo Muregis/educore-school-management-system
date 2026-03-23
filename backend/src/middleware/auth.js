@@ -97,6 +97,21 @@ export function authRequired(req, res, next) {
       schoolId: Number(payload.school_id || payload.schoolId)
     };
 
+    // Validate school_id is a valid positive integer
+    if (!req.user.school_id || !Number.isInteger(req.user.school_id) || req.user.school_id < 1) {
+      logAuthEvent("ERROR", "JWT_INVALID_SCHOOL_ID", {
+        requestId: req.requestId,
+        path: req.path,
+        userId: req.user.user_id,
+        schoolId: req.user.school_id,
+        payloadKeys: Object.keys(payload)
+      });
+      return res.status(401).json({ 
+        error: "Invalid school_id in token",
+        code: "AUTH_INVALID_TENANT"
+      });
+    }
+
     // Calculate token expiration warning (if exp exists)
     const now = Math.floor(Date.now() / 1000);
     const exp = payload.exp;

@@ -7,7 +7,26 @@ import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 const router = Router();
 router.use(authRequired);
 
-// ─── Helper: map DB result row → camelCase shape the frontend expects ─────────
+// ─── Helper: validate teacher class access for grades ─────────────────────
+async function validateTeacherGradeAccess(schoolId, userId, classId) {
+  if (!classId) return true; // No class filter, allow access
+  
+  const { data: teacherClasses, error } = await supabase
+    .from("teacher_classes")
+    .select("class_id")
+    .eq("school_id", schoolId)
+    .eq("teacher_id", userId)
+    .eq("is_deleted", false);
+  if (error) throw error;
+  
+  const teacherClassIds = teacherClasses?.map(tc => tc.class_id).filter(Boolean) || [];
+  if (!teacherClassIds.includes(Number(classId))) {
+    throw new Error("Teacher can only access grades for their assigned classes");
+  }
+  return true;
+}
+
+// ─── Helper: map DB result row → camelCase shape frontend expects ─────────
 function normalise(r) {
   return {
     id:             r.result_id,
@@ -23,11 +42,16 @@ function normalise(r) {
   };
 }
 
-// ─── GET /api/grades — list all results for the school ───────────────────────
+// ─── GET /api/grades — list all results for school ───────────────────────
 router.get("/", async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
+    const { schoolId, role, userId } = req.user;
     const { studentId, term, classId } = req.query;
+
+    // Validate teacher class access
+    if (role === "teacher") {
+      await validateTeacherGradeAccess(schoolId, userId, classId);
+    }
 
     let q = supabase
       .from("results")

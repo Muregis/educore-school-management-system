@@ -1,52 +1,109 @@
 import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
+import { env } from "../config/env.js";
 
 const router = Router();
 
-// FIX: Route was nested as /health/health due to double path definition.
-// app.js mounts this at /api/health, so this handler should be at "/"
-router.get("/", async (req, res, next) => {
+// Enhanced health check with service status monitoring
+router.get("/", async (req, res) => {
+  const healthCheck = {
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    version: process.env.npm_package_version || "1.0.0",
+    environment: process.env.NODE_ENV || "development",
+    services: {
+      database: "checking...",
+      supabase: "checking...",
+      whatsapp: "checking...",
+      paystack: "checking...",
+      mpesa: "checking..."
+    }
+  };
+
   try {
-    const startTime = Date.now();
-
-    // Check via a simple table count
-    const { count: schoolCount, error: schoolsError } = await supabase
+    // Check database connectivity
+    const { data, error } = await supabase
       .from('schools')
-      .select('school_id', { count: 'exact', head: true });
+      .select('school_id')
+      .limit(1);
     
-    const isConnected = !schoolsError;
-
-    let lessonPlansTable = null;
-    try {
-      const { error: tableError } = await supabase
-        .from('lesson_plans')
-        .select('*', { count: 'exact', head: true });
-      lessonPlansTable = !tableError;
-    } catch {
-      lessonPlansTable = false;
+    healthCheck.services.database = error ? "error" : "healthy";
+    healthCheck.services.supabase = error ? "error" : "healthy";
+    
+    if (error) {
+      healthCheck.status = "degraded";
+      healthCheck.database_error = error.message;
     }
+  } catch (dbError) {
+    healthCheck.services.database = "error";
+    healthCheck.services.supabase = "error";
+    healthCheck.status = "unhealthy";
+    healthCheck.database_error = dbError.message;
+  }
 
-    let activityLogsTable = null;
-    try {
-      const { error: tableError } = await supabase
-        .from('activity_logs')
-        .select('*', { count: 'exact', head: true });
-      activityLogsTable = !tableError;
-    } catch {
-      activityLogsTable = false;
-    }
+  // Check WhatsApp configuration
+  if (env.whatsappToken && env.whatsappPhoneNumberId && env.whatsappApiUrl) {
+    healthCheck.services.whatsapp = "configured";
+  } else {
+    healthCheck.services.whatsapp = "not_configured";
+    healthCheck.status = healthCheck.status === "healthy" ? "degraded" : healthCheck.status;
+  }
 
-    const payload = {
-      ok: isConnected,
-      db: 'supabase',
-      lessonPlansTable,
-      activityLogsTable,
-      responseTimeMs: Date.now() - startTime
-    };
+  // Check Paystack configuration
+  if (env.paystackSecretKey && env.paystackPublicKey) {
+    healthCheck.services.paystack = "configured";
+  } else {
+    healthCheck.services.paystack = "not_configured";
+    healthCheck.status = healthCheck.status === "healthy" ? "degraded" : healthCheck.status;
+  }
 
-    res.json(payload);
-  } catch (err) {
-    next(err);
+  // Check M-Pesa configuration
+  if (env.mpesaConsumerKey && env.mpesaConsumerSecret) {
+    healthCheck.services.mpesa = "configured";
+  } else {
+    healthCheck.services.mpesa = "not_configured";
+    healthCheck.status = healthCheck.status === "healthy" ? "degraded" : healthCheck.status;
+  }
+
+  // Check memory usage
+  const memUsage = process.memoryUsage();
+  healthCheck.memory = {
+    used: Math.round(memUsage.heapUsed / 1024 / 1024) + " MB",
+    total: Math.round(memUsage.heapTotal / 1024 / 1024) + " MB",
+    rss: Math.round(memUsage.rss / 1024 / 1024) + " MB"
+  };
+
+  const statusCode = healthCheck.status === "healthy" ? 200 : 
+                   healthCheck.status === "degraded" ? 200 : 503;
+
+  res.status(statusCode).json(healthCheck);
+});
+
+// Simple liveness probe for Kubernetes/container orchestration
+router.get("/live", (req, res) => {
+  res.status(200).json({ 
+    status: "ok", 
+    timestamp: new Date().toISOString() 
+  });
+});
+
+// Readiness probe - checks if application is ready to serve traffic
+router.get("/ready", async (req, res) => {
+  try {
+    // Check if we can connect to database
+    await supabase.from('schools').select('school_id').limit(1);
+    
+    res.status(200).json({ 
+      status: "ready", 
+      timestamp: new Date().toISOString() 
+    });
+  } catch (error) {
+    res.status(503).json({ 
+      status: "not_ready", 
+      timestamp: new Date().toISOString(),
+      error: error.message 
+    });
   }
 });
 

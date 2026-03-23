@@ -14,6 +14,17 @@ async function getTeacherClassIds(schoolId, userId) {
   return teacherClasses?.map(tc => tc.class_id).filter(Boolean) || [];
 }
 
+// Enhanced teacher validation - ensures teacher can only access assigned classes
+async function validateTeacherClassAccess(schoolId, userId, classId) {
+  if (!classId) return true; // No class filter, allow access
+  
+  const teacherClassIds = await getTeacherClassIds(schoolId, userId);
+  if (!teacherClassIds.includes(Number(classId))) {
+    throw new Error("Teacher can only access attendance for their assigned classes");
+  }
+  return true;
+}
+
 async function resolveClassId({ schoolId, classId, className }) {
   if (classId && !Number.isNaN(Number(classId))) return Number(classId);
 
@@ -36,6 +47,11 @@ router.get("/", async (req, res, next) => {
     // OLD: const { schoolId, role, user_id } = req.user;
     const { schoolId, role, userId } = req.user;
     const { classId, date, from, to, studentId } = req.query;
+
+    // Validate teacher class access
+    if (role === "teacher") {
+      await validateTeacherClassAccess(schoolId, userId, classId);
+    }
 
     let query = supabase
       .from("attendance")

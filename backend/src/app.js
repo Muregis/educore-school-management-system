@@ -3,7 +3,7 @@ import cors from "cors";
 import morgan from "morgan";
 import multer from "multer";
 import { env } from "./config/env.js";
-import { apiRateLimit } from "./middleware/rateLimit.js";
+import { apiRateLimit } from "./middleware/tenantRateLimit.js";
 import healthRoutes        from "./routes/health.routes.js";
 import authRoutes          from "./routes/auth.routes.js";
 import studentsRoutes      from "./routes/students.routes.js";

@@ -60,3 +60,42 @@ export const env = {
   smtpFrom:     process.env.SMTP_FROM     || "noreply@greenfield.ac.ke",
   smtpFromName: process.env.SMTP_FROM_NAME|| "Greenfield Academy",
 };
+
+// Validate production environment variables
+function validateProductionEnv() {
+  if (process.env.NODE_ENV === 'production') {
+    const required = [
+      'JWT_SECRET',
+      'SUPABASE_URL', 
+      'SUPABASE_SERVICE_KEY',
+      'SUPABASE_ANON_KEY'
+    ];
+    
+    const missing = required.filter(key => !process.env[key]);
+    
+    if (missing.length > 0) {
+      console.error('❌ Missing required production environment variables:');
+      missing.forEach(key => console.error(`   - ${key}`));
+      console.error('\nPlease set these environment variables before starting in production mode.');
+      process.exit(1);
+    }
+    
+    // Warn about optional but recommended variables
+    const recommended = [
+      'WHATSAPP_TOKEN',
+      'WHATSAPP_PHONE_NUMBER_ID',
+      'PAYSTACK_SECRET_KEY',
+      'MPESA_CONSUMER_KEY',
+      'MPESA_CONSUMER_SECRET'
+    ];
+    
+    const missingRecommended = recommended.filter(key => !process.env[key]);
+    if (missingRecommended.length > 0) {
+      console.warn('⚠️  Recommended environment variables not set:');
+      missingRecommended.forEach(key => console.warn(`   - ${key}`));
+      console.warn('Some features may not work properly without these.\n');
+    }
+  }
+}
+
+validateProductionEnv();
