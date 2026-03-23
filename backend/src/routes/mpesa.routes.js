@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
+import { authRateLimit } from "../middleware/rateLimit.js";
 import { env } from "../config/env.js";
 // OLD AFRICA'S TALKING CODE - MIGRATED TO WHATSAPP BUSINESS PER SCHOOL
 // import africastalking from "africastalking"; // NEW: for SMS receipts
@@ -190,12 +191,12 @@ router.post("/register", authRequired, async (req, res, next) => {
 });
 
 // C2B Validation (unchanged)
-router.post("/c2b/validate", async (_req, res) => {
+router.post("/c2b/validate", authRateLimit, async (_req, res) => {
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 });
 
-// C2B Confirmation (updated with SMS receipt)
-router.post("/c2b/confirm", async (req, res, next) => {
+// C2B Confirmation (updated with rate limiting and SMS receipt)
+router.post("/c2b/confirm", authRateLimit, async (req, res, next) => {
   try {
     const b         = req.body || {};
     const transId   = b.TransID;

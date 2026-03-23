@@ -188,20 +188,23 @@ Give 5-7 concrete, practical recommendations. Each should be actionable by a tea
 Keep the tone professional but simple enough for a school administrator to act on immediately.`;
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const result = await apiFetch("/analysis/ai-report", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1800,
-          messages: [{ role: "user", content: prompt }],
-        }),
+        token: auth.token,
+        body: { prompt },
       });
-      const result = await response.json();
-      if (result.content?.[0]?.text) {
-        setAiReport(result.content[0].text);
+      
+      // Backend returns { text } directly, not { choices: [...] }
+      if (result?.text) {
+        setAiReport(result.text);
+      } else if (result?.choices?.[0]?.message?.content) {
+        // Fallback for raw Groq format
+        setAiReport(result.choices[0].message.content);
+      } else if (result?.error) {
+        setAiError("AI service error: " + result.error);
       } else {
-        setAiError("No response from AI. Check your network connection.");
+        console.error("[AI Report] Unexpected response:", result);
+        setAiError("Unexpected response from AI service. Check console.");
       }
     } catch (e) {
       setAiError("Failed to reach AI service: " + e.message);

@@ -144,6 +144,54 @@ class PaymentConfigService {
     }
   }
 
+  // OLD CODE - preserved
+  // /**
+  //  * Get SMS configuration for a school
+  //  * @param {number} schoolId - School ID
+  //  * @returns {Promise<Object>} SMS configuration
+  //  */
+  // async getSmsConfig(schoolId) {
+  //   const config = await this.getPaymentConfig(schoolId);
+  //   
+  //   return {
+  //     enabled: config?.sms_enabled || false,
+  //     senderId: config?.sms_sender_id || 'EDUCORE',
+  //     // Global Africa's Talking credentials (can be made per-school later)
+  //     apiKey: process.env.AT_API_KEY || '',
+  //     username: process.env.AT_USERNAME || ''
+  //   };
+  // }
+  // OLD CODE - preserved
+
+  /**
+   * Get WhatsApp Business configuration for a school (Option A: per-school WhatsApp)
+   * @param {number} schoolId - School ID
+   * @returns {Promise<Object>} WhatsApp configuration
+   */
+  async getWhatsAppConfig(schoolId) {
+    const config = await this.getPaymentConfig(schoolId);
+    
+    if (!config) {
+      console.warn(`No WhatsApp config found for school ${schoolId}, using global fallback`);
+      // Fallback to global credentials (temporary for migration)
+      return {
+        enabled: false,
+        apiUrl: process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v18.0',
+        phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+        token: process.env.WHATSAPP_TOKEN || '',
+        businessAccountId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || ''
+      };
+    }
+
+    return {
+      enabled: config.whatsapp_enabled || false,
+      apiUrl: config.whatsapp_api_url || process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v18.0',
+      phoneNumberId: config.whatsapp_phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+      token: config.whatsapp_token || process.env.WHATSAPP_TOKEN || '',
+      businessAccountId: config.whatsapp_business_account_id || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || ''
+    };
+  }
+
   /**
    * Validate payment configuration completeness
    * @param {Object} config - Payment configuration

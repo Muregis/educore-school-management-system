@@ -164,7 +164,35 @@ router.post("/webhook", async (req, res, next) => {
   try {
     const crypto = await import("crypto");
     
-    // Extract school_id from metadata first to get correct config
+    // OLD CODE - preserved (vulnerable to cross-school attack)
+    // // Extract school_id from metadata first to get correct config
+    // const event = JSON.parse(req.body.toString());
+    // if (event.event !== "charge.success") return res.sendStatus(200);
+    // const { reference, amount, metadata } = event.data;
+    // const { schoolId, studentId, parentPhone, studentName } = metadata || {};
+    // if (!schoolId) {
+    //   console.error("SECURITY: Missing school_id in Paystack webhook metadata", { reference });
+    //   return res.status(400).json({ message: "Invalid payment metadata" });
+    // }
+    // const paystackConfig = await paymentConfigService.getPaystackConfig(schoolId);
+    // const secret = paystackConfig.secretKey || "";
+    // const hash   = crypto.createHmac("sha512", secret).update(req.body).digest("hex");
+    // if (hash !== req.headers["x-paystack-signature"])
+    //   return res.status(400).json({ message: "Invalid signature" });
+    // OLD CODE - preserved
+    
+    // SECURITY FIX: Validate signature FIRST with global secret to prevent tampering
+    const globalSecret = env.paystackSecretKey || "";
+    const hash = crypto.createHmac("sha512", globalSecret).update(req.body).digest("hex");
+    if (hash !== req.headers["x-paystack-signature"]) {
+      console.error("SECURITY: Invalid Paystack webhook signature", {
+        received: req.headers["x-paystack-signature"],
+        calculated: hash
+      });
+      return res.status(400).json({ message: "Invalid signature" });
+    }
+    
+    // Now safe to parse body - signature validated
     const event = JSON.parse(req.body.toString());
     if (event.event !== "charge.success") return res.sendStatus(200);
 
@@ -176,13 +204,18 @@ router.post("/webhook", async (req, res, next) => {
       return res.status(400).json({ message: "Invalid payment metadata" });
     }
     
-    // Get Paystack config for this school
+    // Get Paystack config for this school for additional verification if needed
     const paystackConfig = await paymentConfigService.getPaystackConfig(schoolId);
     
-    const secret = paystackConfig.secretKey || "";
-    const hash   = crypto.createHmac("sha512", secret).update(req.body).digest("hex");
-    if (hash !== req.headers["x-paystack-signature"])
-      return res.status(400).json({ message: "Invalid signature" });
+    // Verify the payment reference format matches our pattern (EDU-{schoolId}-{studentId}-{timestamp})
+    if (!reference.startsWith(`EDU-${schoolId}-`)) {
+      console.error("SECURITY: Reference format mismatch - possible tampering", { 
+        reference, 
+        expectedPrefix: `EDU-${schoolId}-`,
+        webhookSchoolId: schoolId 
+      });
+      return res.status(400).json({ message: "Invalid reference format" });
+    }
 
     const paidAmount = amount / 100;
 

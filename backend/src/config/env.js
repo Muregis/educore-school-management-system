@@ -80,6 +80,21 @@ function validateProductionEnv() {
       process.exit(1);
     }
     
+    // SECURITY FIX M5: Prevent insecure JWT_SECRET fallback in production
+    if (process.env.JWT_SECRET === 'educore_dev_secret_change_me') {
+      console.error('❌ SECURITY ERROR: JWT_SECRET is set to default development value in production!');
+      console.error('   Please set a strong, unique JWT_SECRET for production.');
+      process.exit(1);
+    }
+    
+    // SECURITY FIX M4: Require explicit CORS origin in production
+    if (!process.env.CORS_ORIGIN || process.env.CORS_ORIGIN === 'http://localhost:5173') {
+      console.error('❌ SECURITY ERROR: CORS_ORIGIN must be explicitly set to your production frontend URL');
+      console.error('   Current value:', process.env.CORS_ORIGIN || 'not set');
+      console.error('   Example: https://your-school-app.vercel.app');
+      process.exit(1);
+    }
+    
     // Warn about optional but recommended variables
     const recommended = [
       'WHATSAPP_TOKEN',

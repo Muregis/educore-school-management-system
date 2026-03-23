@@ -1,7 +1,14 @@
 import { supabase } from '../config/supabaseClient.js';
 import { env } from '../config/env.js';
 import { createClient } from '@supabase/supabase-js';
+import paymentConfigService from './payment-config.service.js';
 
+// OLD CODE - preserved
+// // Create service role client for admin operations (bypasses RLS)
+// const supabaseAdmin = createClient(env.supabaseUrl, env.supabaseServiceKey, {
+//   auth: { autoRefreshToken: false }
+// });
+// OLD CODE - preserved
 // Create service role client for admin operations (bypasses RLS)
 const supabaseAdmin = createClient(env.supabaseUrl, env.supabaseServiceKey, {
   auth: { autoRefreshToken: false }
@@ -35,7 +42,36 @@ function validateWhatsAppPhone(phone) {
   return null; // Invalid format
 }
 
-// Send WhatsApp message via Cloud API with enhanced fallback
+// OLD CODE - preserved
+// // Send WhatsApp message via Cloud API with enhanced fallback
+// async function sendWhatsAppMessage({ phone, message, schoolId, sentByUserId = null, messageType = 'text' }) {
+//   try {
+//     // Validate phone number
+//     const whatsappPhone = validateWhatsAppPhone(phone);
+//     if (!whatsappPhone) {
+//       throw new Error(`Invalid WhatsApp phone format: ${phone}`);
+//     }
+//
+//     // Get school details for branding - multi-tenant isolation
+//     const { data: school, error: schoolError } = await supabaseAdmin
+//       .from('schools')
+//       .select('name')  // Only select existing columns
+//       .eq('school_id', schoolId)  // Use school_id column
+//       // .eq('is_deleted', false)  // Temporarily removed for testing
+//       .single();
+//
+//     if (schoolError || !school) {
+//       throw new Error(`School not found or access denied for school_id: ${schoolId}`);
+//     }
+//
+//     const schoolName = school?.name || 'EduCore';
+//     // const businessId = school?.whatsapp_business_id || env.whatsappPhoneNumberId; // Column doesn't exist yet
+//
+//     // Check if WhatsApp is configured
+//     if (!env.whatsappToken || !env.whatsappPhoneNumberId) {
+// OLD CODE - preserved
+
+// Send WhatsApp message via Cloud API with per-school config (Option A)
 async function sendWhatsAppMessage({ phone, message, schoolId, sentByUserId = null, messageType = 'text' }) {
   try {
     // Validate phone number
@@ -47,9 +83,8 @@ async function sendWhatsAppMessage({ phone, message, schoolId, sentByUserId = nu
     // Get school details for branding - multi-tenant isolation
     const { data: school, error: schoolError } = await supabaseAdmin
       .from('schools')
-      .select('name')  // Only select existing columns
-      .eq('school_id', schoolId)  // Use school_id column
-      // .eq('is_deleted', false)  // Temporarily removed for testing
+      .select('name')
+      .eq('school_id', schoolId)
       .single();
 
     if (schoolError || !school) {
@@ -57,43 +92,38 @@ async function sendWhatsAppMessage({ phone, message, schoolId, sentByUserId = nu
     }
 
     const schoolName = school?.name || 'EduCore';
-    // const businessId = school?.whatsapp_business_id || env.whatsappPhoneNumberId; // Column doesn't exist yet
 
-    // Check if WhatsApp is configured
-    if (!env.whatsappToken || !env.whatsappPhoneNumberId) {
-      console.warn('WhatsApp not configured - message queued for fallback');
+    // Get per-school WhatsApp configuration (Option A: per-school WhatsApp)
+    const whatsappConfig = await paymentConfigService.getWhatsAppConfig(schoolId);
+
+    // Check if WhatsApp is configured for this school
+    if (!whatsappConfig.enabled || !whatsappConfig.token || !whatsappConfig.phoneNumberId) {
+      console.warn(`WhatsApp not configured for school ${schoolId} - message queued for fallback`);
       
-      // Fallback: Log as queued and try email if available
+      // Fallback: Log as queued for manual sending via wa.me links
       await supabase.from('sms_logs').insert({
-        school_id: schoolId,  // Tenant isolation
+        school_id: schoolId,
         recipient: phone,
         message,
-        channel: 'sms',  // Use 'sms' channel until schema supports 'whatsapp'
+        channel: 'whatsapp',
         status: 'queued',
         sent_by_user_id: sentByUserId,
-        provider_response: JSON.stringify({ error: 'WhatsApp not configured', fallback: 'queued' })
+        provider_response: JSON.stringify({ 
+          error: 'WhatsApp not configured for this school', 
+          fallback: 'queued_for_wa_me',
+          waLink: `https://wa.me/${whatsappPhone.replace('+', '')}?text=${encodeURIComponent(message)}`
+        })
       });
 
-      // Try email fallback for critical messages
-      if (message.toLowerCase().includes('payment') || message.toLowerCase().includes('urgent')) {
-        try {
-          const { sendEmail } = await import('./email.service.js');
-          await sendEmail({
-            to: 'admin@' + schoolName.toLowerCase().replace(/\s+/g, '-') + '.edu',
-            subject: `WhatsApp Fallback: ${schoolName}`,
-            html: `<p>WhatsApp message could not be sent to ${phone}</p><p>Message: ${message}</p>`,
-            schoolId  // Tenant isolation
-          });
-          console.log('Email fallback sent for critical message');
-        } catch (emailErr) {
-          console.error('Email fallback also failed:', emailErr);
-        }
-      }
-
-      throw new Error('WhatsApp not configured - message queued');
+      return {
+        success: false,
+        error: 'WhatsApp not configured for this school',
+        fallback: 'queued',
+        waLink: `https://wa.me/${whatsappPhone.replace('+', '')}?text=${encodeURIComponent(message)}`
+      };
     }
 
-    // Prepare WhatsApp API payload
+    // Prepare WhatsApp API payload using per-school config
     const payload = {
       messaging_product: 'whatsapp',
       to: whatsappPhone.replace('+', ''), // Remove + for API
@@ -104,11 +134,11 @@ async function sendWhatsAppMessage({ phone, message, schoolId, sentByUserId = nu
       }
     };
 
-    // Call WhatsApp Cloud API
-    const response = await fetch(`${env.whatsappApiUrl}/${env.whatsappPhoneNumberId}/messages`, {
+    // Call WhatsApp Cloud API using per-school credentials
+    const response = await fetch(`${whatsappConfig.apiUrl}/${whatsappConfig.phoneNumberId}/messages`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${env.whatsappToken}`,
+        'Authorization': `Bearer ${whatsappConfig.token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
@@ -120,12 +150,12 @@ async function sendWhatsAppMessage({ phone, message, schoolId, sentByUserId = nu
       throw new Error(`WhatsApp API error: ${result.error?.message || 'Unknown error'}`);
     }
 
-    // Log success with tenant isolation
+    // Log success with tenant isolation - use 'whatsapp' channel
     await supabase.from('sms_logs').insert({
-      school_id: schoolId,  // Tenant isolation
+      school_id: schoolId,
       recipient: phone,
       message,
-      channel: 'sms',  // Use 'sms' channel until schema supports 'whatsapp'
+      channel: 'whatsapp',
       status: result.messages?.[0]?.message_status || 'sent',
       sent_by_user_id: sentByUserId,
       provider_response: JSON.stringify(result),
@@ -142,12 +172,12 @@ async function sendWhatsAppMessage({ phone, message, schoolId, sentByUserId = nu
   } catch (error) {
     console.error('WhatsApp message failed:', error);
     
-    // Enhanced fallback logging with tenant isolation
+    // Enhanced fallback logging with tenant isolation - use 'whatsapp' channel
     await supabase.from('sms_logs').insert({
-      school_id: schoolId,  // Tenant isolation
+      school_id: schoolId,
       recipient: phone,
       message,
-      channel: 'sms',  // Use 'sms' channel until schema supports 'whatsapp'
+      channel: 'whatsapp',
       status: 'failed',
       sent_by_user_id: sentByUserId,
       provider_response: JSON.stringify({ 
@@ -245,13 +275,28 @@ async function sendBulkWhatsAppMessages({ phones, message, schoolId, sentByUserI
   return results;
 }
 
-// Check WhatsApp configuration status
-function getWhatsAppConfigStatus() {
+// Check WhatsApp configuration status for a specific school
+async function getWhatsAppConfigStatus(schoolId) {
+  if (schoolId) {
+    const config = await paymentConfigService.getWhatsAppConfig(schoolId);
+    return {
+      configured: Boolean(config.enabled && config.token && config.phoneNumberId),
+      enabled: config.enabled,
+      apiUrl: config.apiUrl || null,
+      phoneNumberId: config.phoneNumberId || null,
+      hasToken: Boolean(config.token),
+      mode: 'per-school'
+    };
+  }
+  
+  // Global fallback (deprecated)
   return {
     configured: Boolean(env.whatsappToken && env.whatsappApiUrl && env.whatsappPhoneNumberId),
+    enabled: Boolean(env.whatsappToken),
     apiUrl: env.whatsappApiUrl || null,
     phoneNumberId: env.whatsappPhoneNumberId || null,
-    hasToken: Boolean(env.whatsappToken)
+    hasToken: Boolean(env.whatsappToken),
+    mode: 'global-deprecated'
   };
 }
 

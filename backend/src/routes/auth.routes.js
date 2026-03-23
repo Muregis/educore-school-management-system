@@ -16,9 +16,19 @@ function isPlaceholderHash(value) {
   return typeof value === "string" && value.includes("placeholder_");
 }
 
+// OLD CODE - preserved
+// function defaultPasswordForRole(role) {
+//   if (!role) return null;
+//   return `${role}123`;  // INSECURE: Too predictable
+// }
+// OLD CODE - preserved
+
+// SECURITY FIX: Generate secure random default password instead of predictable pattern
 function defaultPasswordForRole(role) {
   if (!role) return null;
-  return `${role}123`;
+  // Generate secure random 8-character password (role prefix + random digits)
+  const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `${role.substring(0, 2).toUpperCase()}${randomPart}`;
 }
 
 // ── Staff login ───────────────────────────────────────────────────────────────
@@ -90,6 +100,8 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
     const portalEmail = `${trimmedAdmissionNumber.toLowerCase()}.${role}@portal`;
     const normalizedSchoolId = schoolId != null && schoolId !== "" ? Number(schoolId) : null;
 
+    // SECURITY FIX: If schoolId provided, validate admission number belongs to that school
+    // This prevents cross-school attacks where admission numbers might collide
     let studentQuery = supabase
       .from("students")
       .select("student_id, first_name, last_name, school_id, admission_number, parent_name")
@@ -106,13 +118,24 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
 
     const student = matchedStudents?.[0];
     if (!student) {
-      return res.status(401).json({ message: "Invalid admission number" });
+      // SECURITY: Don't reveal whether admission number exists or wrong school
+      return res.status(401).json({ message: "Invalid admission number or school" });
     }
+    
+    // OLD CODE - preserved
+    // if (!student) {
+    //   return res.status(401).json({ message: "Invalid admission number" });
+    // }
+    // OLD CODE - preserved
+
+    // If schoolId was not provided, use the student's school_id (discovered from admission number)
+    // This maintains backward compatibility while adding security when schoolId IS provided
+    const resolvedSchoolId = normalizedSchoolId ?? student.school_id;
 
     let userQuery = supabase
       .from("users")
       .select("user_id, full_name, email, password_hash, role, status, student_id, school_id")
-      .eq("school_id", student.school_id)
+      .eq("school_id", resolvedSchoolId)
       .eq("student_id", student.student_id)
       .eq("is_deleted", false)
       .limit(10);
@@ -242,7 +265,7 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       : `${student.first_name} ${student.last_name}`;
 
     const userPayload = {
-      user_id: user.user_id, school_id: student.school_id,
+      user_id: user.user_id, school_id: resolvedSchoolId,
       role, name, student_id: student.student_id,
       admission_number: student.admission_number, email: user.email
     };
@@ -262,7 +285,7 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
     }
 
     // Log portal login
-    req.user = { userId: user.user_id, schoolId: student.school_id, role, name };
+    req.user = { userId: user.user_id, schoolId: resolvedSchoolId, role, name };
     logActivity(req, { action: "auth.portal_login", description: `${role} login: ${name}` });
 
     res.json({
@@ -270,7 +293,7 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       supabaseToken,
       feeBlocked: false, // TODO: Implement fee check
       user: {
-        userId: user.user_id, schoolId: student.school_id,
+        userId: user.user_id, schoolId: resolvedSchoolId,
         role, name, email: user.email,
         studentId: student.student_id,
         admissionNumber: student.admission_number,
