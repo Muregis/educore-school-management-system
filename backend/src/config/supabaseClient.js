@@ -1,16 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = (process.env.SUPABASE_URL || "").trim().replace(/^['"]|['"]$/g, '');
-const supabaseServiceKey = (process.env.SUPABASE_SERVICE_KEY || "").trim().replace(/^['"]|['"]$/g, '');
+const cleanEnv = (val) => (val || "").trim().replace(/^['"]|['"]$/g, '').replace(/^false\s+/i, '');
+
+const supabaseUrl = cleanEnv(process.env.SUPABASE_URL);
+const supabaseServiceKey = cleanEnv(process.env.SUPABASE_SERVICE_KEY);
+const supabaseAnonKey = cleanEnv(process.env.SUPABASE_ANON_KEY);
 
 if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in environment variables');
 }
 
-// DEBUG: Safe log to see why Suapbase thinks the URL is invalid
-console.log(`[Supabase] URL check: length=${supabaseUrl.length}, startsWithHttp=${supabaseUrl.toLowerCase().startsWith('http')}`);
-if (supabaseUrl.length > 0 && !supabaseUrl.toLowerCase().startsWith('http')) {
-  console.error(`[Supabase] CRITICAL: URL does not start with http/https! Actual prefix: "${supabaseUrl.substring(0, 10)}..."`);
+// DEBUG: Final check to identify why Render is failing
+console.log(`[Supabase] URL: length=${supabaseUrl.length}, startsWithHttp=${supabaseUrl.toLowerCase().startsWith('http')}`);
+console.log(`[Supabase] Keys: ServiceKey_len=${supabaseServiceKey.length}, AnonKey_len=${supabaseAnonKey.length}`);
+if (supabaseServiceKey.length > 0 && !supabaseServiceKey.startsWith('sb_') && !supabaseServiceKey.startsWith('eyJ')) {
+  console.error(`[Supabase] CRITICAL: Service Key format looks invalid! Prefix: "${supabaseServiceKey.substring(0, 10)}..."`);
 }
 
 export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
