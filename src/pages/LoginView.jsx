@@ -386,8 +386,24 @@ export default function LoginView({ onLogin }) {
             </div>
           </div>
 
-          <div className="lv-form-title">Welcome back</div>
-          <div className="lv-form-sub">Sign in to access your school portal</div>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
+              background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.12)",
+              borderRadius: 12, marginBottom: 24, cursor: "pointer"
+            }} onClick={() => {
+              const id = prompt("Enter School Code:");
+              if (id) { setSchoolId(id); fetchSchoolName(id); }
+            }}>
+              <span style={{ fontSize: 18 }}>🏢</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#3B82F6", textTransform: "uppercase", letterSpacing: "0.05em" }}>School Portal</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#E2EAF8" }}>{schoolId ? schoolInfo.name : "Click to select school"}</div>
+              </div>
+              <span style={{ fontSize: 11, color: "#3D5070" }}>Change</span>
+            </div>
+
+            <div className="lv-form-title">Welcome back</div>
+            <div className="lv-form-sub">Sign in to access your school portal</div>
 
           {/* Tabs */}
           <div className="lv-tabs">
@@ -404,15 +420,6 @@ export default function LoginView({ onLogin }) {
           {/* Staff form */}
           {mode === "staff" && (
             <form onSubmit={submitStaff}>
-              {/* NEW: Hide school ID if in URL, show if not */}
-              {!new URLSearchParams(window.location.search).get("school") && (
-                <div className="lv-field">
-                  <label className="lv-label">School ID</label>
-                  <input className="lv-input" type="text" value={schoolId}
-                    onChange={e => setSchoolId(e.target.value)}
-                    placeholder="Enter your School ID" />
-                </div>
-              )}
               <div className="lv-field">
                 <label className="lv-label">Email address</label>
                 <input className="lv-input" type="email" value={email}
@@ -451,15 +458,6 @@ export default function LoginView({ onLogin }) {
                   ))}
                 </div>
               </div>
-              {/* NEW: Hide school ID if in URL, show if not */}
-              {!new URLSearchParams(window.location.search).get("school") && (
-                <div className="lv-field">
-                  <label className="lv-label">School ID</label>
-                  <input className="lv-input" type="text" value={schoolId}
-                    onChange={e => setSchoolId(e.target.value)}
-                    placeholder="Enter School ID" />
-                </div>
-              )}
               <div className="lv-field">
                 <label className="lv-label">Admission Number</label>
                 <input className="lv-input" value={admission}
