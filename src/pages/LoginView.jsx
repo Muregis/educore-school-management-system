@@ -250,6 +250,15 @@ export default function LoginView({ onLogin }) {
   const [error, setError]           = useState("");
   const [loading, setLoading]       = useState(false);
   const [showPass, setShowPass]     = useState(false);
+  const [schoolInfo, setSchoolInfo] = useState({ name: "EduCore School", motto: "Student & Parent Portal" });
+
+  const fetchSchoolName = async (id) => {
+    try {
+      // Public endpoint to get school basic info (no auth required)
+      const res = await apiFetch(`/auth/school-info/${id}`);
+      if (res.name) setSchoolInfo({ name: res.name, motto: res.motto || "Student & Parent Portal" });
+    } catch (e) { /* Fallback to default */ }
+  };
 
   // Inject CSS once
   useEffect(() => {
@@ -265,8 +274,7 @@ export default function LoginView({ onLogin }) {
     const sId = params.get("school") || params.get("s");
     if (sId) {
       setSchoolId(sId);
-      // If it's a valid ID, we might want to default to staff if it's an admin link, 
-      // but let's stay on staff by default and just pre-fill it.
+      fetchSchoolName(sId);
     }
 
     return () => {};
@@ -324,10 +332,10 @@ export default function LoginView({ onLogin }) {
 
         {/* Logo */}
         <div className="lv-logo-row">
-          <div className="lv-logo-mark">G</div>
+          <div className="lv-logo-mark">{schoolInfo.name.charAt(0)}</div>
           <div className="lv-logo-text">
-            <div className="lv-logo-name">Greenfield Academy</div>
-            <div className="lv-logo-sub">Student & Parent Portal</div>
+            <div className="lv-logo-name">{schoolInfo.name}</div>
+            <div className="lv-logo-sub">{schoolInfo.motto}</div>
           </div>
         </div>
 
@@ -396,11 +404,20 @@ export default function LoginView({ onLogin }) {
           {/* Staff form */}
           {mode === "staff" && (
             <form onSubmit={submitStaff}>
+              {/* NEW: Hide school ID if in URL, show if not */}
+              {!new URLSearchParams(window.location.search).get("school") && (
+                <div className="lv-field">
+                  <label className="lv-label">School ID</label>
+                  <input className="lv-input" type="text" value={schoolId}
+                    onChange={e => setSchoolId(e.target.value)}
+                    placeholder="Enter your School ID" />
+                </div>
+              )}
               <div className="lv-field">
                 <label className="lv-label">Email address</label>
                 <input className="lv-input" type="email" value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="you@greenfield.ac.ke" autoComplete="email" />
+                  placeholder="you@school.ac.ke" autoComplete="email" />
               </div>
               <div className="lv-field">
                 <label className="lv-label">Password</label>
@@ -434,6 +451,15 @@ export default function LoginView({ onLogin }) {
                   ))}
                 </div>
               </div>
+              {/* NEW: Hide school ID if in URL, show if not */}
+              {!new URLSearchParams(window.location.search).get("school") && (
+                <div className="lv-field">
+                  <label className="lv-label">School ID</label>
+                  <input className="lv-input" type="text" value={schoolId}
+                    onChange={e => setSchoolId(e.target.value)}
+                    placeholder="Enter School ID" />
+                </div>
+              )}
               <div className="lv-field">
                 <label className="lv-label">Admission Number</label>
                 <input className="lv-input" value={admission}

@@ -31,6 +31,22 @@ function defaultPasswordForRole(role) {
   return `${role.substring(0, 2).toUpperCase()}${randomPart}`;
 }
 
+// ── Public school info (for login branding) ──────────────────────────────────
+router.get("/school-info/:id", authRateLimit, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabase
+      .from("schools")
+      .select("name, motto")
+      .eq("school_id", id)
+      .maybeSingle();
+    if (error || !data) return res.status(404).json({ message: "School not found" });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching school info" });
+  }
+});
+
 // ── Staff login ───────────────────────────────────────────────────────────────
 router.post("/login", authRateLimit, async (req, res, next) => {
   try {
