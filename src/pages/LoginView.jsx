@@ -253,26 +253,39 @@ export default function LoginView({ onLogin }) {
   const [schoolInfo, setSchoolInfo] = useState({ name: "EduCore School", motto: "Student & Parent Portal" });
   const [discoveredSchools, setDiscoveredSchools] = useState([]); // Array of {id, name, motto}
   const [showManualId, setShowManualId]       = useState(false);
+  const [timer, setTimer]               = useState(null);
 
   const lookup = async (id, currentMode) => {
     if (!id || id.length < 3) return;
-    try {
-      const res = await apiFetch(`/auth/lookup-school?loginId=${encodeURIComponent(id)}&role=${currentMode}`);
-      if (res.schools?.length === 1) {
-        setSchoolId(res.schools[0].id);
-        setSchoolInfo({ name: res.schools[0].name, motto: res.schools[0].motto });
-        setDiscoveredSchools([]);
-      } else if (res.schools?.length > 1) {
-        setDiscoveredSchools(res.schools);
-      }
-    } catch (e) { /* silent */ }
+    if (timer) clearTimeout(timer);
+    
+    setTimer(setTimeout(async () => {
+      try {
+        const res = await apiFetch(`/auth/lookup-school?loginId=${encodeURIComponent(id)}&role=${currentMode}`);
+        if (res.schools?.length === 1) {
+          setSchoolId(res.schools[0].id);
+          setSchoolInfo({ name: res.schools[0].name, motto: res.schools[0].motto });
+          setDiscoveredSchools([]);
+        } else if (res.schools?.length > 1) {
+          setDiscoveredSchools(res.schools);
+        }
+      } catch (e) { /* silent */ }
+    }, 400)); // 400ms debounce
   };
 
   const fetchSchoolName = async (id) => {
-    try {
-      const res = await apiFetch(`/auth/school-info/${id}`);
-      if (res.name) setSchoolInfo({ name: res.name, motto: res.motto || "Student & Parent Portal" });
-    } catch (e) { /* fallback */ }
+    if (!id) return;
+    if (timer) clearTimeout(timer);
+    
+    setTimer(setTimeout(async () => {
+      try {
+        const res = await apiFetch(`/auth/school-info/${id}`);
+        setSchoolInfo({ 
+          name: res.name || "EduCore School", 
+          motto: res.motto || "Student & Parent Portal" 
+        });
+      } catch (e) { /* fallback */ }
+    }, 400));
   };
 
   // Inject CSS once

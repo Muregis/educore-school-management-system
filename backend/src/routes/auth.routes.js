@@ -82,7 +82,9 @@ router.get("/school-info/:id", authRateLimit, async (req, res) => {
       .select("name, motto")
       .eq("school_id", id)
       .maybeSingle();
-    if (error || !data) return res.status(404).json({ message: "School not found" });
+    if (error || !data) {
+      return res.json({ name: "EduCore School", motto: "Student & Parent Portal", notFound: true });
+    }
     res.json(data);
   } catch (err) {
     res.status(500).json({ message: "Error fetching school info" });
