@@ -346,8 +346,9 @@ const TABS = [
   { id: "users",         label: "User Accounts",  icon: "users" },
   { id: "security",      label: "Security",       icon: "shield" },
   { id: "notifications", label: "Notifications",  icon: "bell" },
-  { id: "activity",      label: "Activity Logs",  icon: "log" },
+  { id: "activity",      label: "Activity Logs",  icon: "activity" },
   { id: "backups",       label: "DB Backups",     icon: "database" },
+  { id: "integrations",  label: "Integrations",   icon: "key" },
 ];
 
 // ─── SCHOOL INFO TAB ──────────────────────────────────────────────────────────
@@ -717,6 +718,88 @@ const SecurityTab = ({ onSave }) => {
   );
 };
 
+const IntegrationsTab = ({ auth }) => {
+  const [config, setConfig] = useState({
+    mpesaShortcode: "", mpesaConsumerKey: "", mpesaConsumerSecret: "", mpesaPasskey: "",
+    paystackPublicKey: "", paystackSecretKey: "",
+    smsEnabled: false, smsSenderId: ""
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [message, setMessage] = useState(null);
+
+  useEffect(() => {
+    apiFetch("/payment-configs", { token: auth?.token })
+      .then(res => {
+        if (res.exists) setConfig(prev => ({ ...prev, ...res.config }));
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [auth]);
+
+  const save = async () => {
+    setSaving(true); setMessage(null);
+    try {
+      await apiFetch("/payment-configs", {
+        method: "PUT",
+        body: config,
+        token: auth?.token
+      });
+      setMessage({ type: "success", text: "✅ Integration settings saved successfully!" });
+    } catch (e) {
+      setMessage({ type: "error", text: `❌ Save failed: ${e.message}` });
+    }
+    setSaving(false);
+  };
+
+  if (loading) return <div style={{ color: C.textSub }}>Loading settings...</div>;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* M-Pesa section */}
+      <div style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.15)", borderRadius: 16, padding: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#22C55E", display: "flex", alignItems: "center", justifyCenter: "center", fontSize: 20 }}>💸</div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>M-Pesa (Daraja API)</div>
+            <div style={{ fontSize: 11, color: C.textMuted }}>Accept mobile money payments via STK Push</div>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+          <Inp label="Shortcode" value={config.mpesaShortcode || ""} onChange={e => setConfig({ ...config, mpesaShortcode: e.target.value })} placeholder="e.g. 174379" />
+          <Inp label="Passkey" value={config.mpesaPasskey || ""} onChange={e => setConfig({ ...config, mpesaPasskey: e.target.value })} placeholder="Lipa Na M-Pesa Passkey" />
+        </div>
+        <Inp label="Consumer Key" value={config.mpesaConsumerKey || ""} onChange={e => setConfig({ ...config, mpesaConsumerKey: e.target.value })} />
+        <Inp label="Consumer Secret" value={config.mpesaConsumerSecret || ""} onChange={e => setConfig({ ...config, mpesaConsumerSecret: e.target.value })} />
+      </div>
+
+      {/* Paystack section */}
+      <div style={{ background: "rgba(59,130,246,0.05)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: 16, padding: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#3B82F6", display: "flex", alignItems: "center", justifyCenter: "center", fontSize: 20 }}>💳</div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Paystack</div>
+            <div style={{ fontSize: 11, color: C.textMuted }}>Accept Card, Bank Transfer, and Apple Pay</div>
+          </div>
+        </div>
+        <Inp label="Public Key" value={config.paystackPublicKey || ""} onChange={e => setConfig({ ...config, paystackPublicKey: e.target.value })} placeholder="pk_test_..." />
+        <Inp label="Secret Key" value={config.paystackSecretKey || ""} onChange={e => setConfig({ ...config, paystackSecretKey: e.target.value })} placeholder="sk_test_..." />
+      </div>
+
+      {message && (
+        <div style={{ padding: 14, borderRadius: 10, fontSize: 13, background: message.type === "success" ? "#064e3b" : "#450a0a", color: message.type === "success" ? "#6ee7b7" : "#fca5a5" }}>
+          {message.text}
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <Btn icon="save" onClick={save} disabled={saving}>{saving ? "Saving..." : "Save Integrations"}</Btn>
+      </div>
+    </div>
+  );
+};
+IntegrationsTab.propTypes = { auth: PropTypes.object };
+
 SecurityTab.propTypes = { onSave: PropTypes.func.isRequired };
 
 // ─── NOTIFICATIONS TAB ────────────────────────────────────────────────────────
@@ -802,6 +885,7 @@ export default function AdminSettings({ auth, initialTab }) {
       case "notifications": return <NotificationsTab onSave={save} />;
       case "activity":      return <ActivityLogsTab auth={auth} />;
       case "backups":       return <BackupsTab auth={auth} />;
+      case "integrations":  return <IntegrationsTab auth={auth} />;
       default:              return null;
     }
   };
@@ -836,6 +920,9 @@ export default function AdminSettings({ auth, initialTab }) {
           users:         "Control who can access the system and what they can do",
           security:      "Password management and login security settings",
           notifications: "Choose what alerts you receive and how they're delivered",
+          activity:      "View a history of actions performed in the system",
+          backups:       "Download or create database backups for safety",
+          integrations:  "Connect M-Pesa, Paystack, and SMS gateways",
         }[activeTab]}
         icon={TABS.find(t => t.id === activeTab)?.icon}
       >

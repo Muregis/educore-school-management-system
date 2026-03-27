@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { env } from './env.js';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+const supabaseUrl = env.supabaseUrl;
+const supabaseServiceKey = env.supabaseServiceKey;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in environment variables');
