@@ -259,6 +259,16 @@ export default function LoginView({ onLogin }) {
       el.id = id; el.textContent = style;
       document.head.appendChild(el);
     }
+
+    // NEW: Capture school ID from URL (?school=101)
+    const params = new URLSearchParams(window.location.search);
+    const sId = params.get("school") || params.get("s");
+    if (sId) {
+      setSchoolId(sId);
+      // If it's a valid ID, we might want to default to staff if it's an admin link, 
+      // but let's stay on staff by default and just pre-fill it.
+    }
+
     return () => {};
   }, []);
 
@@ -289,7 +299,7 @@ export default function LoginView({ onLogin }) {
     try {
       const data = await apiFetch("/auth/portal-login", {
         method: "POST",
-        body: { admissionNumber: admission.trim(), password, role: portalRole }, // Removed hardcoded schoolId: 1
+        body: { admissionNumber: admission.trim(), password, role: portalRole, schoolId }, // Pass schoolId if pre-filled
       });
       onLogin({
         id: data.user.userId, name: data.user.name,
@@ -386,12 +396,14 @@ export default function LoginView({ onLogin }) {
           {/* Staff form */}
           {mode === "staff" && (
             <form onSubmit={submitStaff}>
-              <div className="lv-field">
-                <label className="lv-label">School ID</label>
-                <input className="lv-input" type="number" value={schoolId}
-                  onChange={e => setSchoolId(e.target.value)}
-                  placeholder="e.g. 101" />
-              </div>
+              {(!new URLSearchParams(window.location.search).get("school") && !new URLSearchParams(window.location.search).get("s")) && (
+                <div className="lv-field">
+                  <label className="lv-label">School ID</label>
+                  <input className="lv-input" type="number" value={schoolId}
+                    onChange={e => setSchoolId(e.target.value)}
+                    placeholder="e.g. 101" />
+                </div>
+              )}
               <div className="lv-field">
                 <label className="lv-label">Email address</label>
                 <input className="lv-input" type="email" value={email}
