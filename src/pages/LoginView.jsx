@@ -249,6 +249,7 @@ export default function LoginView({ onLogin }) {
   const [portalRole, setPortalRole] = useState("parent");
   const [error, setError]           = useState("");
   const [loading, setLoading]       = useState(false);
+  const [showPass, setShowPass]     = useState(false);
   const [schoolInfo, setSchoolInfo] = useState({ name: "EduCore School", motto: "Student & Parent Portal" });
   const [discoveredSchools, setDiscoveredSchools] = useState([]); // Array of {id, name, motto}
 
