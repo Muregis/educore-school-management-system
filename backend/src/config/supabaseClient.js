@@ -7,6 +7,12 @@ if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in environment variables');
 }
 
+// DEBUG: Safe log to see why Suapbase thinks the URL is invalid
+console.log(`[Supabase] URL check: length=${supabaseUrl.length}, startsWithHttp=${supabaseUrl.toLowerCase().startsWith('http')}`);
+if (supabaseUrl.length > 0 && !supabaseUrl.toLowerCase().startsWith('http')) {
+  console.error(`[Supabase] CRITICAL: URL does not start with http/https! Actual prefix: "${supabaseUrl.substring(0, 10)}..."`);
+}
+
 export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
