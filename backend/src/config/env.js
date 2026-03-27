@@ -20,7 +20,7 @@ try {
 }
 
 export const env = {
-  port:                 Number(process.env.PORT || 4000),
+  port:                 Number(process.env.PORT || 10000),
   jwtSecret:            process.env.JWT_SECRET   || "educore_dev_secret_change_me",
   jwtExpiresIn:         process.env.JWT_EXPIRES_IN || "7d",
   supabaseJwtSecret:    process.env.SUPABASE_JWT_SECRET || "",

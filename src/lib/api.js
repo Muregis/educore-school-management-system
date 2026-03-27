@@ -2,7 +2,7 @@
 // OLD: export const API_BASE = "http://localhost:4001/api";
 export const API_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
-  "http://localhost:4000/api";
+  "http://localhost:10000/api";
 
 export async function apiFetch(
   path,
