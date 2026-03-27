@@ -31,6 +31,44 @@ function defaultPasswordForRole(role) {
   return `${role.substring(0, 2).toUpperCase()}${randomPart}`;
 }
 
+// ── Public school lookup (for silent tenant discovery) ────────────────────────
+router.get("/lookup-school", authRateLimit, async (req, res) => {
+  try {
+    const { loginId, role = "staff" } = req.query;
+    if (!loginId) return res.json({ schools: [] });
+
+    let schools = [];
+    if (role === "staff") {
+      const { data: users } = await supabase
+        .from("users")
+        .select("school_id, schools(name, motto)")
+        .ilike("email", loginId.trim())
+        .eq("is_deleted", false);
+      schools = users?.map(u => ({ id: u.school_id, ...u.schools })) || [];
+    } else {
+      const { data: students } = await supabase
+        .from("students")
+        .select("school_id, schools(name, motto)")
+        .ilike("admission_number", loginId.trim())
+        .eq("is_deleted", false);
+      schools = students?.map(s => ({ id: s.school_id, ...s.schools })) || [];
+    }
+
+    // De-duplicate and filter
+    const unique = [];
+    const seen = new Set();
+    for (const s of schools) {
+      if (!seen.has(s.id)) {
+        seen.add(s.id);
+        unique.push(s);
+      }
+    }
+    res.json({ schools: unique });
+  } catch (err) {
+    res.status(500).json({ message: "Lookup failed" });
+  }
+});
+
 // ── Public school info (for login branding) ──────────────────────────────────
 router.get("/school-info/:id", authRateLimit, async (req, res) => {
   try {

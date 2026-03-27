@@ -249,15 +249,28 @@ export default function LoginView({ onLogin }) {
   const [portalRole, setPortalRole] = useState("parent");
   const [error, setError]           = useState("");
   const [loading, setLoading]       = useState(false);
-  const [showPass, setShowPass]     = useState(false);
   const [schoolInfo, setSchoolInfo] = useState({ name: "EduCore School", motto: "Student & Parent Portal" });
+  const [discoveredSchools, setDiscoveredSchools] = useState([]); // Array of {id, name, motto}
+
+  const lookup = async (id, currentMode) => {
+    if (!id || id.length < 3) return;
+    try {
+      const res = await apiFetch(`/auth/lookup-school?loginId=${encodeURIComponent(id)}&role=${currentMode}`);
+      if (res.schools?.length === 1) {
+        setSchoolId(res.schools[0].id);
+        setSchoolInfo({ name: res.schools[0].name, motto: res.schools[0].motto });
+        setDiscoveredSchools([]);
+      } else if (res.schools?.length > 1) {
+        setDiscoveredSchools(res.schools);
+      }
+    } catch (e) { /* silent */ }
+  };
 
   const fetchSchoolName = async (id) => {
     try {
-      // Public endpoint to get school basic info (no auth required)
       const res = await apiFetch(`/auth/school-info/${id}`);
       if (res.name) setSchoolInfo({ name: res.name, motto: res.motto || "Student & Parent Portal" });
-    } catch (e) { /* Fallback to default */ }
+    } catch (e) { /* fallback */ }
   };
 
   // Inject CSS once
@@ -286,7 +299,7 @@ export default function LoginView({ onLogin }) {
     try {
       const numericSchoolId = Number(schoolId);
       if (!schoolId || Number.isNaN(numericSchoolId)) {
-        throw new Error("School ID is required");
+        throw new Error("Could not identify your school. Please check your email or contact support.");
       }
       const data = await apiFetch("/auth/login", {
         method: "POST",
@@ -305,6 +318,10 @@ export default function LoginView({ onLogin }) {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
+      const numericSchoolId = Number(schoolId);
+      if (!schoolId || Number.isNaN(numericSchoolId)) {
+        throw new Error("Please verify your admission number or select your school.");
+      }
       const data = await apiFetch("/auth/portal-login", {
         method: "POST",
         body: { admissionNumber: admission.trim(), password, role: portalRole, schoolId }, // Pass schoolId if pre-filled
@@ -386,22 +403,6 @@ export default function LoginView({ onLogin }) {
             </div>
           </div>
 
-            <div style={{
-              display: "flex", alignItems: "center", gap: 10, padding: "10px 14px",
-              background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.12)",
-              borderRadius: 12, marginBottom: 24, cursor: "pointer"
-            }} onClick={() => {
-              const id = prompt("Enter School Code:");
-              if (id) { setSchoolId(id); fetchSchoolName(id); }
-            }}>
-              <span style={{ fontSize: 18 }}>🏢</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#3B82F6", textTransform: "uppercase", letterSpacing: "0.05em" }}>School Portal</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#E2EAF8" }}>{schoolId ? schoolInfo.name : "Click to select school"}</div>
-              </div>
-              <span style={{ fontSize: 11, color: "#3D5070" }}>Change</span>
-            </div>
-
             <div className="lv-form-title">Welcome back</div>
             <div className="lv-form-sub">Sign in to access your school portal</div>
 
@@ -409,13 +410,28 @@ export default function LoginView({ onLogin }) {
           <div className="lv-tabs">
             <button
               className={`lv-tab ${mode === "staff" ? "lv-tab-active" : "lv-tab-inactive"}`}
-              onClick={() => { setMode("staff"); setError(""); }}
+              onClick={() => { setMode("staff"); setError(""); setDiscoveredSchools([]); }}
             >Staff Login</button>
             <button
               className={`lv-tab ${mode === "portal" ? "lv-tab-active" : "lv-tab-inactive"}`}
-              onClick={() => { setMode("portal"); setError(""); }}
+              onClick={() => { setMode("portal"); setError(""); setDiscoveredSchools([]); }}
             >Parent / Student</button>
           </div>
+
+          {/* Multiple schools found selector */}
+          {discoveredSchools.length > 1 && (
+            <div style={{ marginBottom: 20, padding: 12, background: "rgba(59,130,246,0.1)", borderRadius: 10, border: "1px solid #3B82F644" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#3B82F6", marginBottom: 8, textTransform: "uppercase" }}>Please select your school:</div>
+              <select className="lv-input" style={{ background: "#0E1420" }} 
+                onChange={e => {
+                  const s = discoveredSchools.find(sc => sc.id === Number(e.target.value));
+                  if (s) { setSchoolId(s.id); setSchoolInfo({ name: s.name, motto: s.motto }); }
+                }}>
+                <option value="">-- Select School --</option>
+                {discoveredSchools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          )}
 
           {/* Staff form */}
           {mode === "staff" && (
@@ -423,7 +439,7 @@ export default function LoginView({ onLogin }) {
               <div className="lv-field">
                 <label className="lv-label">Email address</label>
                 <input className="lv-input" type="email" value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={e => { setEmail(e.target.value); lookup(e.target.value, "staff"); }}
                   placeholder="you@school.ac.ke" autoComplete="email" />
               </div>
               <div className="lv-field">
@@ -461,7 +477,7 @@ export default function LoginView({ onLogin }) {
               <div className="lv-field">
                 <label className="lv-label">Admission Number</label>
                 <input className="lv-input" value={admission}
-                  onChange={e => setAdmission(e.target.value)}
+                  onChange={e => { setAdmission(e.target.value); lookup(e.target.value, "portal"); }}
                   placeholder="e.g. ADM-2020-001" autoComplete="username" />
               </div>
               <div className="lv-field">
