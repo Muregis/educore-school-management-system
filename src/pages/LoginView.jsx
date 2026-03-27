@@ -312,13 +312,13 @@ export default function LoginView({ onLogin }) {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const numericSchoolId = Number(schoolId);
-      if (!schoolId || Number.isNaN(numericSchoolId)) {
+      const numericSchoolId = schoolId ? Number(schoolId) : null;
+      if (numericSchoolId != null && Number.isNaN(numericSchoolId)) {
         throw new Error("Could not identify your school. Please check your email or contact support.");
       }
       const data = await apiFetch("/auth/login", {
         method: "POST",
-        body: { email, password, schoolId: numericSchoolId }, // Explicit tenant required
+        body: { email, password, schoolId: numericSchoolId },
       });
       onLogin({
         id: data.user.userId, name: data.user.name,
@@ -333,8 +333,8 @@ export default function LoginView({ onLogin }) {
     e.preventDefault();
     setError(""); setLoading(true);
     try {
-      const numericSchoolId = Number(schoolId);
-      if (!schoolId || Number.isNaN(numericSchoolId)) {
+      const numericSchoolId = schoolId ? Number(schoolId) : null;
+      if (numericSchoolId != null && Number.isNaN(numericSchoolId)) {
         throw new Error("Please verify your admission number or select your school.");
       }
       const data = await apiFetch("/auth/portal-login", {

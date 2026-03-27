@@ -98,10 +98,27 @@ router.post("/login", authRateLimit, async (req, res, next) => {
     if (!email || !password)
       return res.status(400).json({ message: "email and password are required" });
 
-    // Require explicit tenant; never default to a fallback school to avoid cross-tenant leakage
-    const normalizedSchoolId = Number(schoolId);
-    if (!schoolId || Number.isNaN(normalizedSchoolId)) {
-      return res.status(400).json({ message: "schoolId is required and must be numeric" });
+    // Resolve tenant automatically when schoolId is omitted.
+    let normalizedSchoolId = schoolId != null && schoolId !== "" ? Number(schoolId) : null;
+    if (normalizedSchoolId != null && Number.isNaN(normalizedSchoolId)) {
+      return res.status(400).json({ message: "schoolId must be numeric when provided" });
+    }
+    if (normalizedSchoolId == null) {
+      const { data: candidates, error } = await supabase
+        .from("users")
+        .select("school_id")
+        .ilike("email", email.trim())
+        .eq("is_deleted", false);
+      if (error) throw error;
+
+      const unique = Array.from(new Set((candidates || []).map(u => u.school_id)));
+      if (unique.length === 0) {
+        return res.status(404).json({ message: "We couldn't find your school for that email. Please enter the school ID or contact admin." });
+      }
+      if (unique.length > 1) {
+        return res.status(400).json({ message: "Multiple schools matched this email. Please choose your school ID to continue.", schoolOptions: unique });
+      }
+      normalizedSchoolId = unique[0];
     }
 
     // Use Supabase authentication
