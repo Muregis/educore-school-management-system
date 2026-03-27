@@ -24,7 +24,7 @@ export const env = {
   jwtSecret:            process.env.JWT_SECRET   || "educore_dev_secret_change_me",
   jwtExpiresIn:         process.env.JWT_EXPIRES_IN || "7d",
   supabaseJwtSecret:    process.env.SUPABASE_JWT_SECRET || "",
-  corsOrigin:           process.env.CORS_ORIGIN  || "http://localhost:5173",
+  corsOrigin:           process.env.CORS_ORIGIN  || "https://educore-school-management-system-pi.vercel.app",
 
   // Mpesa Daraja
   mpesaConsumerKey:     process.env.MPESA_CONSUMER_KEY     || "",

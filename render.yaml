@@ -13,7 +13,7 @@ services:
       - key: PORT
         value: 10000 # Default Render port (Local is 4000)
       - key: CORS_ORIGIN
-        sync: false # Set to your Vercel URL
+        value: https://educore-school-management-system-pi.vercel.app
       - key: JWT_SECRET
         sync: false # Set a strong random secret
       - key: SUPABASE_URL
