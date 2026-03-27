@@ -10,10 +10,12 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 20.11.1
       - key: PORT
         value: 10000 # Default Render port (Local is 4000)
       - key: CORS_ORIGIN
-        value: https://educore-school-management-system-pi.vercel.app
+        value: https://educore-school-management-system.vercel.app,https://educore-school-management-system-pi.vercel.app
       - key: JWT_SECRET
         sync: false # Set a strong random secret
       - key: SUPABASE_URL
