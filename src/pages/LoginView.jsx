@@ -396,14 +396,6 @@ export default function LoginView({ onLogin }) {
           {/* Staff form */}
           {mode === "staff" && (
             <form onSubmit={submitStaff}>
-              {(!new URLSearchParams(window.location.search).get("school") && !new URLSearchParams(window.location.search).get("s")) && (
-                <div className="lv-field">
-                  <label className="lv-label">School ID</label>
-                  <input className="lv-input" type="number" value={schoolId}
-                    onChange={e => setSchoolId(e.target.value)}
-                    placeholder="e.g. 101" />
-                </div>
-              )}
               <div className="lv-field">
                 <label className="lv-label">Email address</label>
                 <input className="lv-input" type="email" value={email}
@@ -426,11 +418,6 @@ export default function LoginView({ onLogin }) {
               <button className="lv-submit" type="submit" disabled={loading}>
                 {loading ? "Signing in…" : "Sign In →"}
               </button>
-              <div className="lv-hint">
-                <strong>Demo credentials:</strong><br />
-                admin@greenfield.ac.ke · admin123<br />
-                teacher@greenfield.ac.ke · teacher123
-              </div>
             </form>
           )}
 
@@ -469,9 +456,6 @@ export default function LoginView({ onLogin }) {
               <button className="lv-submit" type="submit" disabled={loading}>
                 {loading ? "Signing in…" : "Access Portal →"}
               </button>
-              <div className="lv-hint">
-                <strong>Demo:</strong> ADM-2020-001 · parent123 (parent) · student123 (student)
-              </div>
             </form>
           )}
         </div>
