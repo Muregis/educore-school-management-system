@@ -37,22 +37,26 @@ router.get("/lookup-school", authRateLimit, async (req, res) => {
     const { loginId, role = "staff" } = req.query;
     if (!loginId) return res.json({ schools: [] });
 
+    console.log(`🔍 School lookup for [${loginId}] as [${role}]`);
     let schools = [];
     if (role === "staff") {
-      const { data: users } = await supabase
+      const { data: users, error } = await supabase
         .from("users")
-        .select("school_id, schools(name, motto)")
+        .select("school_id, schools:school_id(name, motto)") // Explicit join on FK
         .ilike("email", loginId.trim())
         .eq("is_deleted", false);
+      if (error) console.error("Lookup error (users):", error);
       schools = users?.map(u => ({ id: u.school_id, ...u.schools })) || [];
     } else {
-      const { data: students } = await supabase
+      const { data: students, error } = await supabase
         .from("students")
-        .select("school_id, schools(name, motto)")
+        .select("school_id, schools:school_id(name, motto)") // Explicit join on FK
         .ilike("admission_number", loginId.trim())
         .eq("is_deleted", false);
+      if (error) console.error("Lookup error (students):", error);
       schools = students?.map(s => ({ id: s.school_id, ...s.schools })) || [];
     }
+    console.log(`✅ Lookup found ${schools.length} schools`);
 
     // De-duplicate and filter
     const unique = [];

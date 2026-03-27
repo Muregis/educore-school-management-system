@@ -252,6 +252,7 @@ export default function LoginView({ onLogin }) {
   const [showPass, setShowPass]     = useState(false);
   const [schoolInfo, setSchoolInfo] = useState({ name: "EduCore School", motto: "Student & Parent Portal" });
   const [discoveredSchools, setDiscoveredSchools] = useState([]); // Array of {id, name, motto}
+  const [showManualId, setShowManualId]       = useState(false);
 
   const lookup = async (id, currentMode) => {
     if (!id || id.length < 3) return;
@@ -437,6 +438,14 @@ export default function LoginView({ onLogin }) {
           {/* Staff form */}
           {mode === "staff" && (
             <form onSubmit={submitStaff}>
+              {showManualId && (
+                <div className="lv-field">
+                  <label className="lv-label">School ID (Manual)</label>
+                  <input className="lv-input" type="text" value={schoolId}
+                    onChange={e => { setSchoolId(e.target.value); fetchSchoolName(e.target.value); }}
+                    placeholder="e.g. 101" />
+                </div>
+              )}
               <div className="lv-field">
                 <label className="lv-label">Email address</label>
                 <input className="lv-input" type="email" value={email}
@@ -456,6 +465,16 @@ export default function LoginView({ onLogin }) {
                 </div>
               </div>
               {error && <div className="lv-error">⚠ {error}</div>}
+
+              {!showManualId && !schoolId && (
+                <div style={{ textAlign: "center", marginBottom: 15 }}>
+                  <button type="button" onClick={() => setShowManualId(true)} 
+                    style={{ background: "none", border: "none", color: "#3B82F6", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>
+                    Can't find your school? Enter ID manually
+                  </button>
+                </div>
+              )}
+
               <button className="lv-submit" type="submit" disabled={loading}>
                 {loading ? "Signing in…" : "Sign In →"}
               </button>
@@ -465,6 +484,14 @@ export default function LoginView({ onLogin }) {
           {/* Portal form */}
           {mode === "portal" && (
             <form onSubmit={submitPortal}>
+              {showManualId && (
+                <div className="lv-field">
+                  <label className="lv-label">School ID (Manual)</label>
+                  <input className="lv-input" type="text" value={schoolId}
+                    onChange={e => { setSchoolId(e.target.value); fetchSchoolName(e.target.value); }}
+                    placeholder="e.g. 101" />
+                </div>
+              )}
               <div className="lv-field">
                 <label className="lv-label">I am a</label>
                 <div className="lv-role-pills">
@@ -494,6 +521,16 @@ export default function LoginView({ onLogin }) {
                 </div>
               </div>
               {error && <div className="lv-error">⚠ {error}</div>}
+
+              {!showManualId && !schoolId && (
+                <div style={{ textAlign: "center", marginBottom: 15 }}>
+                  <button type="button" onClick={() => setShowManualId(true)} 
+                    style={{ background: "none", border: "none", color: "#3B82F6", fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>
+                    Can't find your school? Enter ID manually
+                  </button>
+                </div>
+              )}
+
               <button className="lv-submit" type="submit" disabled={loading}>
                 {loading ? "Signing in…" : "Access Portal →"}
               </button>
