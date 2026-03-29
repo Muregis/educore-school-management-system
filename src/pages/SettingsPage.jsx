@@ -11,6 +11,10 @@ const inp = {
   boxSizing: "border-box",
 };
 
+function normalizeColor(value, fallback) {
+  return /^#[0-9a-fA-F]{6}$/.test(String(value || "").trim()) ? value : fallback;
+}
+
 const Lbl = ({ children }) => (
   <label style={{ display: "block", fontSize: 11, fontWeight: 700,
     color: C.textMuted, marginBottom: 5, textTransform: "uppercase",
@@ -79,7 +83,7 @@ function SchoolTab({ school, setSchool, toast, auth }) {
           {form.logo_url ? (
             <img src={form.logo_url} alt="School logo" style={{ width: 52, height: 52, borderRadius: 12, objectFit: "cover", border: `1px solid ${C.border}` }} />
           ) : (
-            <div style={{ width: 52, height: 52, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${form.primary_color || C.accent}, ${form.secondary_color || "#6366F1"})`, color: "#fff", fontWeight: 800, fontSize: 20 }}>
+            <div style={{ width: 52, height: 52, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${normalizeColor(form.primary_color, C.accent)}, ${normalizeColor(form.secondary_color, "#6366F1")})`, color: "#fff", fontWeight: 800, fontSize: 20 }}>
               {String(form.name || "E").charAt(0).toUpperCase()}
             </div>
           )}
@@ -136,8 +140,8 @@ function SchoolTab({ school, setSchool, toast, auth }) {
         <div style={{ gridColumn: "1 / -1" }}>
           <Lbl>Logo URL</Lbl><input {...f("logo_url")} placeholder="https://..." />
         </div>
-        <div><Lbl>Primary Color</Lbl><input {...f("primary_color")} type="color" style={{ ...inp, padding: 4, height: 42 }} /></div>
-        <div><Lbl>Secondary Color</Lbl><input {...f("secondary_color")} type="color" style={{ ...inp, padding: 4, height: 42 }} /></div>
+        <div><Lbl>Primary Color</Lbl><input {...f("primary_color")} value={normalizeColor(form.primary_color, C.accent)} type="color" style={{ ...inp, padding: 4, height: 42 }} /></div>
+        <div><Lbl>Secondary Color</Lbl><input {...f("secondary_color")} value={normalizeColor(form.secondary_color, "#6366F1")} type="color" style={{ ...inp, padding: 4, height: 42 }} /></div>
         <div><Lbl>Administrator Name</Lbl><input {...f("admin_name")} placeholder="e.g. Jane Wanjiku" /></div>
         <div><Lbl>Administrator Title</Lbl><input {...f("admin_title")} placeholder="e.g. School Principal" /></div>
       </div>
