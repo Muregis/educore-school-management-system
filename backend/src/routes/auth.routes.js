@@ -114,11 +114,10 @@ async function resolveSchoolCandidates({ loginId, role = "staff" }) {
   let schools = [];
 
   if (role === "staff") {
-    const domain = trimmedLoginId.includes("@") ? trimmedLoginId.split("@")[1]?.trim().toLowerCase() : null;
     const { data: users, error } = await supabase
       .from("users")
       .select("school_id, schools:school_id(school_id, name, code, email, phone, address, county, country)")
-      .ilike("email", domain ? `%@${domain}` : trimmedLoginId)
+      .ilike("email", trimmedLoginId)
       .eq("is_deleted", false);
     if (error) throw error;
     schools = users?.map(user => user.schools).filter(Boolean) || [];
