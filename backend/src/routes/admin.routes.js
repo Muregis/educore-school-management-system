@@ -11,6 +11,18 @@ import { logTenantContext, logTenantQuery } from "../helpers/tenant-debug.logger
 
 const router  = Router();
 const BACKUP_DIR = path.resolve("backups");
+const DEMO_USER_EMAILS = new Set([
+  "admin@greenfield.ac.ke",
+  "teacher@greenfield.ac.ke",
+  "finance@greenfield.ac.ke",
+  "hr@greenfield.ac.ke",
+  "librarian@greenfield.ac.ke",
+]);
+const DEMO_USER_NAMES = new Set([
+  "mrs. wanjiku",
+  "grace akinyi",
+  "james mwangi",
+]);
 
 router.use(authRequired);
 router.use(requireRoles("admin"));
@@ -96,6 +108,25 @@ async function softResetTable(table, schoolId, options = {}) {
   }
 
   return { count: data?.length ?? 0, mode: "hard" };
+}
+
+async function softDeleteByIds(table, idColumn, ids) {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return { count: 0 };
+  }
+
+  const { data, error } = await supabase
+    .from(table)
+    .update({ is_deleted: true, updated_at: new Date().toISOString() })
+    .in(idColumn, ids)
+    .eq("is_deleted", false)
+    .select(idColumn);
+
+  if (error) {
+    return { error };
+  }
+
+  return { count: data?.length ?? 0 };
 }
 
 // ── GET /api/admin/backups ────────────────────────────────────────────────────
@@ -365,6 +396,68 @@ router.post(
 
       deletedCounts.students = studentResetResult.count;
       deletionModes.students = studentResetResult.mode;
+
+      const { data: teacherRows, error: teacherLookupError } = await supabase
+        .from("teachers")
+        .select("teacher_id, first_name, last_name, email")
+        .eq("school_id", bodySchoolId)
+        .eq("is_deleted", false);
+
+      if (!teacherLookupError) {
+        const demoTeacherIds = (teacherRows || [])
+          .filter((teacher) => {
+            const fullName = `${teacher.first_name || ""} ${teacher.last_name || ""}`.trim().toLowerCase();
+            const email = String(teacher.email || "").trim().toLowerCase();
+            return DEMO_USER_NAMES.has(fullName) || DEMO_USER_EMAILS.has(email);
+          })
+          .map((teacher) => teacher.teacher_id);
+
+        const teacherCleanup = await softDeleteByIds("teachers", "teacher_id", demoTeacherIds);
+        if (teacherCleanup.error) {
+          return res.status(500).json({
+            message: "Failed while purging demo teachers",
+            table: "teachers",
+            error: teacherCleanup.error.message,
+            deletedCounts,
+          });
+        }
+
+        deletedCounts.teachers = teacherCleanup.count;
+        deletionModes.teachers = "soft-demo-purge";
+      }
+
+      const { data: staffRows, error: staffLookupError } = await supabase
+        .from("users")
+        .select("user_id, full_name, email, role")
+        .eq("school_id", bodySchoolId)
+        .in("role", ["admin", "teacher", "finance", "hr", "librarian"])
+        .eq("is_deleted", false);
+
+      if (!staffLookupError) {
+        const demoStaffUserIds = (staffRows || [])
+          .filter((user) => {
+            if (String(user.user_id) === String(req.user?.user_id || req.user?.userId)) {
+              return false;
+            }
+            const fullName = String(user.full_name || "").trim().toLowerCase();
+            const email = String(user.email || "").trim().toLowerCase();
+            return DEMO_USER_NAMES.has(fullName) || DEMO_USER_EMAILS.has(email);
+          })
+          .map((user) => user.user_id);
+
+        const staffCleanup = await softDeleteByIds("users", "user_id", demoStaffUserIds);
+        if (staffCleanup.error) {
+          return res.status(500).json({
+            message: "Failed while purging demo staff users",
+            table: "users",
+            error: staffCleanup.error.message,
+            deletedCounts,
+          });
+        }
+
+        deletedCounts.demo_staff_users = staffCleanup.count;
+        deletionModes.demo_staff_users = "soft-demo-purge";
+      }
 
       return res.json({
         success: true,
