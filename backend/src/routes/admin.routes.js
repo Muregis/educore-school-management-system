@@ -20,6 +20,7 @@ async function softResetTable(table, schoolId, options = {}) {
     extraFilters = [],
     select = "school_id",
     supportsSoftDelete = true,
+    allowMissingTable = false,
   } = options;
 
   const applyFilters = (query) => {
@@ -35,31 +36,44 @@ async function softResetTable(table, schoolId, options = {}) {
   };
 
   if (supportsSoftDelete) {
-    const softDeletePayload = {
-      is_deleted: true,
-      updated_at: new Date().toISOString(),
-    };
+    const softDeleteVariants = [
+      { payload: { is_deleted: true, updated_at: new Date().toISOString() }, requireActiveOnly: true, mode: "soft" },
+      { payload: { is_deleted: true }, requireActiveOnly: true, mode: "soft-no-updated-at" },
+      { payload: { updated_at: new Date().toISOString() }, requireActiveOnly: false, mode: "touch-updated-at" },
+    ];
 
-    const softDeleteQuery = applyFilters(
-      supabase
-        .from(table)
-        .update(softDeletePayload)
-        .eq("is_deleted", false)
-    );
+    for (const variant of softDeleteVariants) {
+      let softDeleteQuery = applyFilters(
+        supabase
+          .from(table)
+          .update(variant.payload)
+      );
 
-    const { data, error } = await softDeleteQuery.select(select);
+      if (variant.requireActiveOnly) {
+        softDeleteQuery = softDeleteQuery.eq("is_deleted", false);
+      }
 
-    if (!error) {
-      return { count: data?.length ?? 0, mode: "soft" };
-    }
+      const { data, error } = await softDeleteQuery.select(select);
+      if (!error) {
+        return { count: data?.length ?? 0, mode: variant.mode };
+      }
 
-    const message = String(error.message || "").toLowerCase();
-    const missingSoftDeleteColumns =
-      message.includes("is_deleted") ||
-      message.includes("updated_at");
+      const message = String(error.message || "").toLowerCase();
+      const missingColumn =
+        message.includes("column") ||
+        message.includes("does not exist") ||
+        message.includes("could not find");
+      const missingTable =
+        error.code === "PGRST205" ||
+        (message.includes(table) && message.includes("does not exist"));
 
-    if (!missingSoftDeleteColumns) {
-      return { error };
+      if (missingTable && allowMissingTable) {
+        return { count: 0, mode: "missing-table" };
+      }
+
+      if (!missingColumn) {
+        return { error };
+      }
     }
   }
 
@@ -71,6 +85,13 @@ async function softResetTable(table, schoolId, options = {}) {
 
   const { data, error } = await hardDeleteQuery.select(select);
   if (error) {
+    const message = String(error.message || "").toLowerCase();
+    const missingTable =
+      error.code === "PGRST205" ||
+      (message.includes(table) && message.includes("does not exist"));
+    if (missingTable && allowMissingTable) {
+      return { count: 0, mode: "missing-table" };
+    }
     return { error };
   }
 
@@ -293,7 +314,9 @@ router.post(
 
       for (const table of deleteOrder) {
         logTenantQuery("admin.reset_demo_data.delete", { table, schoolId: bodySchoolId });
-        const result = await softResetTable(table, bodySchoolId);
+        const result = await softResetTable(table, bodySchoolId, {
+          allowMissingTable: true,
+        });
 
         if (result.error) {
           return res.status(500).json({
