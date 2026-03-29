@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { logTenantQuery } from "../helpers/tenant-debug.logger.js";
 
 const cleanEnv = (val) => (val || "").trim().replace(/^['"]|['"]$/g, '').replace(/^false\s+/i, '');
 
@@ -94,6 +95,15 @@ export const database = {
 
     // Structured query
     const options = paramsOrOptions;
+    logTenantQuery("database.query", {
+      table: sqlOrTable,
+      select: options.select || "*",
+      schoolId: options.schoolId || options.where?.school_id || null,
+      whereKeys: Object.keys(options.where || {}),
+      order: options.order || null,
+      limit: options.limit || null,
+      offset: options.offset || null,
+    });
     let query = supabase.from(sqlOrTable);
 
     // Apply select
@@ -148,6 +158,11 @@ export const database = {
   },
 
   async insert(table, data, options = {}) {
+    const schoolIds = Array.isArray(data)
+      ? Array.from(new Set(data.map(item => item?.school_id).filter(Boolean)))
+      : [data?.school_id].filter(Boolean);
+    logTenantQuery("database.insert", { table, schoolIds, rows: Array.isArray(data) ? data.length : 1 });
+
     let query = supabase.from(table).insert(data);
     if (options.select) {
       query = query.select(options.select);
@@ -156,6 +171,12 @@ export const database = {
   },
 
   async update(table, data, where, options = {}) {
+    logTenantQuery("database.update", {
+      table,
+      schoolId: where?.school_id || null,
+      whereKeys: Object.keys(where || {}),
+      updateKeys: Object.keys(data || {}),
+    });
     let query = supabase.from(table).update(data);
     if (where) {
       for (const [key, value] of Object.entries(where)) {
@@ -169,6 +190,11 @@ export const database = {
   },
 
   async delete(table, where, options = {}) {
+    logTenantQuery("database.delete", {
+      table,
+      schoolId: where?.school_id || null,
+      whereKeys: Object.keys(where || {}),
+    });
     let query = supabase.from(table).delete();
     if (where) {
       for (const [key, value] of Object.entries(where)) {
@@ -182,6 +208,7 @@ export const database = {
   },
 
   async rpc(functionName, params = {}) {
+    logTenantQuery("database.rpc", { functionName, schoolId: params?.p_school_id || params?.school_id || null });
     return safeSupabaseQuery(
       () => supabase.rpc(functionName, params),
       `RPC call failed for ${functionName}`

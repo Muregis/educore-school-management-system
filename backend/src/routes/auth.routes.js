@@ -9,6 +9,7 @@ import { authRateLimit } from "../middleware/rateLimit.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { logAuthFailure } from "../helpers/security.logger.js";
 import { generateSupabaseJWT } from "../helpers/supabase-jwt.js";
+import { logTenantContext, logTenantQuery } from "../helpers/tenant-debug.logger.js";
 
 const router = Router();
 
@@ -95,6 +96,7 @@ router.get("/school-info/:id", authRateLimit, async (req, res) => {
 router.post("/login", authRateLimit, async (req, res, next) => {
   try {
     const { email, password, schoolId } = req.body;
+    logTenantContext("auth.login.request", req, { email, schoolId });
     if (!email || !password)
       return res.status(400).json({ message: "email and password are required" });
 
@@ -109,6 +111,7 @@ router.post("/login", authRateLimit, async (req, res, next) => {
         .select("school_id")
         .ilike("email", email.trim())
         .eq("is_deleted", false);
+      logTenantQuery("auth.login.school_lookup", { table: "users", email, schoolId: null });
       if (error) throw error;
 
       const unique = Array.from(new Set((candidates || []).map(u => u.school_id)));
@@ -161,7 +164,7 @@ router.post("/login", authRateLimit, async (req, res, next) => {
     res.json({
       token,
       supabaseToken, // New Supabase JWT for frontend
-      user: { userId: user.user_id, schoolId: Number(schoolId), role, name, email: user.email },
+      user: { userId: user.user_id, schoolId: normalizedSchoolId, role, name, email: user.email },
     });
   } catch (err) { next(err); }
 });
@@ -170,30 +173,45 @@ router.post("/login", authRateLimit, async (req, res, next) => {
 router.post("/portal-login", authRateLimit, async (req, res, next) => {
   try {
     const { admissionNumber, password, schoolId = null, role = "parent" } = req.body;
+    logTenantContext("auth.portal_login.request", req, { admissionNumber, schoolId, role });
     if (!admissionNumber || !password)
       return res.status(400).json({ message: "admissionNumber and password are required" });
 
     const trimmedAdmissionNumber = admissionNumber.trim();
     const portalEmail = `${trimmedAdmissionNumber.toLowerCase()}.${role}@portal`;
     const normalizedSchoolId = schoolId != null && schoolId !== "" ? Number(schoolId) : null;
+    if (normalizedSchoolId != null && Number.isNaN(normalizedSchoolId)) {
+      return res.status(400).json({ message: "schoolId must be numeric when provided" });
+    }
 
-    // SECURITY FIX: If schoolId provided, validate admission number belongs to that school
-    // This prevents cross-school attacks where admission numbers might collide
-    let studentQuery = supabase
+    // Resolve tenant safely. Never pick "first" student globally when schoolId is omitted.
+    let studentLookup = supabase
       .from("students")
       .select("student_id, first_name, last_name, school_id, admission_number, parent_name")
       .ilike("admission_number", trimmedAdmissionNumber)
-      .eq("is_deleted", false)
-      .limit(1);
+      .eq("is_deleted", false);
 
     if (normalizedSchoolId != null) {
-      studentQuery = studentQuery.eq("school_id", normalizedSchoolId);
+      studentLookup = studentLookup.eq("school_id", normalizedSchoolId);
     }
 
-    const { data: matchedStudents, error: studentLookupError } = await studentQuery;
+    logTenantQuery("auth.portal_login.student_lookup", {
+      table: "students",
+      admissionNumber: trimmedAdmissionNumber,
+      schoolId: normalizedSchoolId,
+    });
+    const { data: matchedStudents, error: studentLookupError } = await studentLookup;
     if (studentLookupError) throw studentLookupError;
 
-    const student = matchedStudents?.[0];
+    const uniqueStudentSchoolIds = Array.from(new Set((matchedStudents || []).map(s => s.school_id)));
+    if (normalizedSchoolId == null && uniqueStudentSchoolIds.length > 1) {
+      return res.status(400).json({
+        message: "Multiple schools matched this admission number. Please choose your school ID to continue.",
+        schoolOptions: uniqueStudentSchoolIds,
+      });
+    }
+
+    const student = (matchedStudents || []).find(s => s.school_id === (normalizedSchoolId ?? uniqueStudentSchoolIds[0]));
     if (!student) {
       // SECURITY: Don't reveal whether admission number exists or wrong school
       return res.status(401).json({ message: "Invalid admission number or school" });
@@ -216,6 +234,11 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       .eq("student_id", student.student_id)
       .eq("is_deleted", false)
       .limit(10);
+    logTenantQuery("auth.portal_login.user_lookup", {
+      table: "users",
+      schoolId: resolvedSchoolId,
+      studentId: student.student_id,
+    });
 
     const { data: matchedUsers, error: userError } = await userQuery;
     if (userError) throw userError;

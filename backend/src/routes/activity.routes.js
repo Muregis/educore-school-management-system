@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { supabase } from "../config/supabaseClient.js";
+import { logTenantContext, logTenantQuery } from "../helpers/tenant-debug.logger.js";
 
 const router = Router();
 router.use(authRequired);
@@ -41,6 +42,7 @@ router.get("/", async (req, res, next) => {
   let offset;
   try {
     const { schoolId } = req.user;
+    logTenantContext("activity_logs.list.request", req, { path: req.path });
     limit  = Math.min(parseInt(req.query.limit)  || 100, 500);
     offset = parseInt(req.query.offset) || 0;
     const action = req.query.action || null;
@@ -50,6 +52,14 @@ router.get("/", async (req, res, next) => {
       .from('activity_logs')
       .select('log_id, action, entity, entity_id, description, role, ip_address, created_at, users(full_name)', { count: 'exact' })
       .eq('school_id', schoolId);
+    logTenantQuery("activity_logs.select", {
+      table: "activity_logs",
+      schoolId,
+      action: action || null,
+      role: role || null,
+      limit,
+      offset,
+    });
     
     if (action) { q = q.ilike('action', `${action}%`); }
     if (role)   { q = q.eq('role', role); }
@@ -77,6 +87,7 @@ router.get("/", async (req, res, next) => {
 router.get("/summary", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    logTenantContext("activity_logs.summary.request", req, { path: req.path });
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
@@ -85,6 +96,11 @@ router.get("/summary", async (req, res, next) => {
       .select('action')
       .eq('school_id', schoolId)
       .gte('created_at', thirtyDaysAgo.toISOString());
+    logTenantQuery("activity_logs.summary.select", {
+      table: "activity_logs",
+      schoolId,
+      from: thirtyDaysAgo.toISOString(),
+    });
     if (error) throw error;
     
     // Count actions manually since Supabase doesn't have a simple group by count

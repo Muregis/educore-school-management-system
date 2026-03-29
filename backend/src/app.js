@@ -38,6 +38,7 @@ import ledgerRoutes        from "./routes/ledger.routes.js";
 import { errorHandler }    from "./middleware/error.js";
 import { authRequired } from "./middleware/auth.js";
 import { tenantContext, tenantSecurityCheck } from "./middleware/tenantContext.js";
+import { logTenantContext } from "./helpers/tenant-debug.logger.js";
 
 const app = express();
 
@@ -87,6 +88,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api", authRequired);
 app.use("/api", tenantContext);
 app.use("/api", tenantSecurityCheck);
+app.use("/api", (req, _res, next) => {
+  logTenantContext("api.request", req, { method: req.method, path: req.path });
+  next();
+});
 
 // OLD: app.use("/api",               studentsRoutes);
 app.use("/api/students",      studentsRoutes);

@@ -159,6 +159,7 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
         const { data: userRow } = await supabase
           .from('users')
           .select('email')
+          .eq('school_id', schoolId)
           .eq('student_id', studentId)
           .eq('role', 'parent')
           .eq('is_deleted', false)

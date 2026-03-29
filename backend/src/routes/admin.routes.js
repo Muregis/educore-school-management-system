@@ -6,6 +6,8 @@ import { requireRoles } from "../middleware/roles.js";
 import { adminActionRateLimit, passwordResetRateLimit } from "../middleware/rateLimit.js";
 import { runBackup, listBackups } from "../services/backup.service.js";
 import { AdminService } from "../services/admin.service.js";
+import { supabase } from "../config/supabaseClient.js";
+import { logTenantContext, logTenantQuery } from "../helpers/tenant-debug.logger.js";
 
 const router  = Router();
 const BACKUP_DIR = path.resolve("backups");
@@ -191,6 +193,104 @@ router.post("/users/bulk-update",
       const result = await AdminService.bulkUpdateUsers(schoolId, userIds, updates, req);
       res.json(result);
 
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// POST /api/admin/reset-demo-data - wipe demo data for current school only
+router.post(
+  "/reset-demo-data",
+  adminActionRateLimit,
+  async (req, res, next) => {
+    try {
+      const { schoolId } = req.user;
+      const bodySchoolId = Number(req.body?.school_id);
+
+      if (!Number.isInteger(bodySchoolId) || bodySchoolId < 1) {
+        return res.status(400).json({ message: "Valid school_id is required" });
+      }
+      if (bodySchoolId !== Number(schoolId)) {
+        return res.status(403).json({ message: "school_id does not match your tenant" });
+      }
+
+      logTenantContext("admin.reset_demo_data.request", req, { bodySchoolId });
+
+      const deletedCounts = {};
+      const deleteOrder = [
+        "student_ledger",
+        "report_cards",
+        "results",
+        "attendance",
+        "payments",
+        "invoices",
+        "discipline_records",
+        "activity_logs",
+      ];
+
+      for (const table of deleteOrder) {
+        logTenantQuery("admin.reset_demo_data.delete", { table, schoolId: bodySchoolId });
+        const { data, error } = await supabase
+          .from(table)
+          .delete()
+          .eq("school_id", bodySchoolId)
+          .select("school_id", { count: "exact" });
+
+        if (error) {
+          return res.status(500).json({
+            message: `Failed while deleting ${table}`,
+            table,
+            error: error.message,
+            deletedCounts,
+          });
+        }
+
+        deletedCounts[table] = data?.length ?? 0;
+      }
+
+      logTenantQuery("admin.reset_demo_data.delete_portal_users", { table: "users", schoolId: bodySchoolId });
+      const { data: deletedPortalUsers, error: portalUserDeleteError } = await supabase
+        .from("users")
+        .delete()
+        .eq("school_id", bodySchoolId)
+        .in("role", ["parent", "student"])
+        .select("user_id");
+
+      if (portalUserDeleteError) {
+        return res.status(500).json({
+          message: "Failed while deleting portal users",
+          table: "users",
+          error: portalUserDeleteError.message,
+          deletedCounts,
+        });
+      }
+
+      deletedCounts.users = deletedPortalUsers?.length ?? 0;
+
+      logTenantQuery("admin.reset_demo_data.delete_students", { table: "students", schoolId: bodySchoolId });
+      const { data: deletedStudents, error: studentDeleteError } = await supabase
+        .from("students")
+        .delete()
+        .eq("school_id", bodySchoolId)
+        .select("student_id");
+
+      if (studentDeleteError) {
+        return res.status(500).json({
+          message: "Failed while deleting students",
+          table: "students",
+          error: studentDeleteError.message,
+          deletedCounts,
+        });
+      }
+
+      deletedCounts.students = deletedStudents?.length ?? 0;
+
+      return res.json({
+        success: true,
+        school_id: bodySchoolId,
+        deletedCounts,
+      });
     } catch (error) {
       next(error);
     }

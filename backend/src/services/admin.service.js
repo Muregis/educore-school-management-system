@@ -3,6 +3,7 @@ import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
+import { logTenantQuery } from "../helpers/tenant-debug.logger.js";
 
 // Admin Tools Service
 export class AdminService {
@@ -12,18 +13,18 @@ export class AdminService {
       // Get target user info using Supabase
       const { data: users } = await database.query('users', {
         select: 'user_id, school_id, full_name, email, role',
-        where: { user_id: targetUserId, is_deleted: false },
+        where: { user_id: targetUserId, school_id: adminUser.school_id, is_deleted: false },
         limit: 1
+      });
+      logTenantQuery("admin.reset_password.target_user", {
+        table: "users",
+        userId: targetUserId,
+        schoolId: adminUser.school_id,
       });
 
       const targetUser = users?.[0];
       if (!targetUser) {
-        throw new Error('User not found');
-      }
-
-      // Verify admin can reset this user's password (same school)
-      if (targetUser.school_id !== adminUser.school_id) {
-        throw new Error('Cannot reset password for user from different school');
+        throw new Error('User not found in your school');
       }
 
       // Hash new password
@@ -35,8 +36,13 @@ export class AdminService {
           password_hash: hash, 
           updated_at: new Date().toISOString() 
         },
-        { user_id: targetUserId }
+        { user_id: targetUserId, school_id: adminUser.school_id }
       );
+      logTenantQuery("admin.reset_password.update_user", {
+        table: "users",
+        userId: targetUserId,
+        schoolId: adminUser.school_id,
+      });
 
       // Log password reset
       await logAuditEvent(req, AUDIT_ACTIONS.USER_STATUS_CHANGE, {
@@ -59,18 +65,18 @@ export class AdminService {
       // Get target user info using Supabase
       const { data: users } = await database.query('users', {
         select: 'user_id, school_id, full_name, email, role, student_id',
-        where: { user_id: targetUserId, is_deleted: false },
+        where: { user_id: targetUserId, school_id: adminUser.school_id, is_deleted: false },
         limit: 1
+      });
+      logTenantQuery("admin.impersonate.target_user", {
+        table: "users",
+        userId: targetUserId,
+        schoolId: adminUser.school_id,
       });
 
       const targetUser = users?.[0];
       if (!targetUser) {
-        throw new Error('User not found');
-      }
-
-      // Verify admin can impersonate this user (same school)
-      if (targetUser.school_id !== adminUser.school_id) {
-        throw new Error('Cannot impersonate user from different school');
+        throw new Error('User not found in your school');
       }
 
       // Create impersonation payload
@@ -355,8 +361,14 @@ export class AdminService {
               ...updates,
               updated_at: new Date().toISOString() 
             },
-            { user_id: userId }
+            { user_id: userId, school_id: schoolId }
           );
+          logTenantQuery("admin.bulk_update_user", {
+            table: "users",
+            userId,
+            schoolId,
+            updateKeys: Object.keys(updates || {}),
+          });
 
           // Log bulk update
           await logAuditEvent(req, AUDIT_ACTIONS.USER_ROLE_CHANGE, {

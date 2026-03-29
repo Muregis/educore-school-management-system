@@ -30,6 +30,7 @@ import LessonPlansPage from "./pages/LessonPlansPage";
 import PendingPlansPage from "./pages/PendingPlansPage";
 import AnnouncementsPage from "./pages/AnnouncementsPage";
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
+import { apiFetch } from "./lib/api";
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
@@ -98,6 +99,24 @@ const NAV_EXTRAS = [
   { id: "pendingplans", label: "Pending Plans", icon: "⏳" },
 ];
 
+
+const TENANT_STATE_KEYS = [
+  "educore.school",
+  "educore.users",
+  "educore.students",
+  "educore.teachers",
+  "educore.attendance",
+  "educore.results",
+  "educore.feeStructures",
+  "educore.payments",
+  "educore.notifications",
+];
+
+function clearTenantLocalState() {
+  TENANT_STATE_KEYS.forEach((key) => localStorage.removeItem(key));
+  localStorage.removeItem("educore.auth");
+  localStorage.removeItem("token");
+}
 export default function App() {
   const [school, setSchool]               = useLocalState("educore.school",        DEFAULTS.school);
   const [users, setUsers]                 = useLocalState("educore.users",          DEFAULTS.users);
@@ -181,15 +200,84 @@ export default function App() {
   const nav = useMemo(() => perms ? fullNav.filter(n => perms.pages.includes(n.id)) : [], [perms, fullNav]);
   useEffect(() => { if (perms && !perms.pages.includes(page)) setPage(perms.pages[0]); }, [perms, page]);
 
-  const resetDemo = () => {
+  const resetClientData = useCallback(() => {
     setSchool(DEFAULTS.school); setUsers(DEFAULTS.users); setStudents(DEFAULTS.students);
     setTeachers(DEFAULTS.teachers); setAttendance(DEFAULTS.attendance); setResults(DEFAULTS.results);
     setFeeStructures(DEFAULTS.feeStructures); setPayments(DEFAULTS.payments); setNotifications(DEFAULTS.notifications);
-    toast("Demo data reset", "success");
-  };
+  }, [setSchool, setUsers, setStudents, setTeachers, setAttendance, setResults, setFeeStructures, setPayments, setNotifications]);
+
+  const hydrateTenantData = useCallback(async (loggedInAuth) => {
+    if (!loggedInAuth?.token) return;
+    const token = loggedInAuth.token;
+    const [schoolRes, studentsRes, teachersRes, attendanceRes, gradesRes, paymentsRes, feeRes] = await Promise.allSettled([
+      apiFetch("/settings/school", { token }),
+      apiFetch("/students", { token }),
+      apiFetch("/teachers", { token }),
+      apiFetch("/attendance", { token }),
+      apiFetch("/grades", { token }),
+      apiFetch("/payments", { token }),
+      apiFetch("/payments/fee-structures", { token }),
+    ]);
+
+    if (schoolRes.status === "fulfilled" && schoolRes.value) setSchool(prev => ({ ...prev, ...schoolRes.value }));
+    if (studentsRes.status === "fulfilled") setStudents(studentsRes.value || []);
+    if (teachersRes.status === "fulfilled") setTeachers(teachersRes.value || []);
+    if (attendanceRes.status === "fulfilled") setAttendance(attendanceRes.value || []);
+    if (gradesRes.status === "fulfilled") setResults(gradesRes.value || []);
+    if (paymentsRes.status === "fulfilled") setPayments(paymentsRes.value || []);
+    if (feeRes.status === "fulfilled") setFeeStructures(feeRes.value || []);
+  }, [setSchool, setStudents, setTeachers, setAttendance, setResults, setPayments, setFeeStructures]);
+
+  const handleLogout = useCallback(() => {
+    clearTenantLocalState();
+    resetClientData();
+    setAuth(null);
+    setActiveChildId(null);
+    setPage("dashboard");
+  }, [resetClientData]);
+
+  const handleLogin = useCallback(async (u) => {
+    clearTenantLocalState();
+    resetClientData();
+
+    localStorage.setItem("educore.auth", JSON.stringify(u));
+    if (u?.token) localStorage.setItem("token", u.token);
+
+    setAuth(u);
+    setActiveChildId(null);
+    setPage("dashboard");
+    toast(`Welcome, ${u.name}`, "success");
+
+    try {
+      await hydrateTenantData(u);
+    } catch (err) {
+      console.error("[tenant_hydrate] Failed to load fresh tenant data:", err.message);
+    }
+  }, [hydrateTenantData, resetClientData, toast]);
+
+  const resetDemo = useCallback(async () => {
+    if (!auth?.token || !auth?.schoolId) {
+      toast("Missing school context. Please log in again.", "error");
+      return;
+    }
+
+    try {
+      const response = await apiFetch("/admin/reset-demo-data", {
+        method: "POST",
+        token: auth.token,
+        body: { school_id: auth.schoolId },
+      });
+
+      resetClientData();
+      await hydrateTenantData(auth);
+      toast(`Demo data reset for school ${response.school_id}`, "success");
+    } catch (err) {
+      toast(err.message || "Failed to reset demo data", "error");
+    }
+  }, [auth, hydrateTenantData, resetClientData, toast]);
 
   if (!auth) return (
-    <LoginView onLogin={u => { setAuth(u); setActiveChildId(null); localStorage.setItem("educore.auth", JSON.stringify(u)); toast(`Welcome, ${u.name}`, "success"); }} />
+    <LoginView onLogin={handleLogin} />
   );
 
   const pageExists = fullNav.some(n => n.id === page);
@@ -303,7 +391,7 @@ export default function App() {
             <div style={{ width:32, height:32, borderRadius:8, background:`${roleColor}22`, border:`1px solid ${roleColor}44`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:14, color:roleColor }}>{ROLE_AVATARS[auth.role] || "?"}</div>
           </div>
         )}
-        <button onClick={() => { localStorage.removeItem("educore.auth"); setAuth(null); setActiveChildId(null); }} style={{
+        <button onClick={handleLogout} style={{
           width:"100%", padding: collapsed ? "7px 0" : "7px 12px", borderRadius:8,
           background:"transparent", border:`1px solid ${C.border}`,
           color:C.textSub, cursor:"pointer", fontSize:12,
@@ -370,7 +458,7 @@ export default function App() {
               </div>
             )}
             {isMobile && (
-              <button onClick={() => { localStorage.removeItem("educore.auth"); setAuth(null); setActiveChildId(null); }} style={{ width:34, height:34, borderRadius:8, background:`${roleColor}22`, border:`1px solid ${roleColor}44`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:14, color:roleColor, cursor:"pointer" }} title="Logout">
+              <button onClick={handleLogout} style={{ width:34, height:34, borderRadius:8, background:`${roleColor}22`, border:`1px solid ${roleColor}44`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:14, color:roleColor, cursor:"pointer" }} title="Logout">
                 {ROLE_AVATARS[auth.role] || "?"}
               </button>
             )}

@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabaseClient.js";
+import { logTenantQuery } from "./tenant-debug.logger.js";
 
 /**
  * Log an activity — fire-and-forget, never throws, never blocks.
@@ -8,12 +9,21 @@ import { supabase } from "../config/supabaseClient.js";
  */
 export async function logActivity(req, { action, entity = null, entityId = null, description = null }) {
   try {
-    const schoolId = req.user?.schoolId ?? null;
-    const userId   = req.user?.userId   ?? null;
+    const schoolId = req.user?.schoolId ?? req.user?.school_id ?? req.schoolId ?? null;
+    const userId   = req.user?.userId   ?? req.user?.user_id   ?? null;
     const role     = req.user?.role     ?? null;
     const ip       = (req.headers["x-forwarded-for"] || "").split(",")[0].trim()
                   || req.socket?.remoteAddress
                   || null;
+
+    logTenantQuery("activity_logs.insert", {
+      table: "activity_logs",
+      schoolId,
+      userId,
+      action,
+      entity,
+      entityId,
+    });
 
     const { error } = await supabase
       .from('activity_logs')
