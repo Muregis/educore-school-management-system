@@ -219,13 +219,18 @@ export default function App() {
       apiFetch("/payments/fee-structures", { token }),
     ]);
 
-    if (schoolRes.status === "fulfilled" && schoolRes.value) setSchool(prev => ({ ...prev, ...schoolRes.value }));
-    if (studentsRes.status === "fulfilled") setStudents(studentsRes.value || []);
-    if (teachersRes.status === "fulfilled") setTeachers(teachersRes.value || []);
-    if (attendanceRes.status === "fulfilled") setAttendance(attendanceRes.value || []);
-    if (gradesRes.status === "fulfilled") setResults(gradesRes.value || []);
-    if (paymentsRes.status === "fulfilled") setPayments(paymentsRes.value || []);
-    if (feeRes.status === "fulfilled") setFeeStructures(feeRes.value || []);
+    if (schoolRes.status === "fulfilled" && schoolRes.value) {
+      setSchool({ ...DEFAULTS.school, ...schoolRes.value });
+    } else {
+      setSchool(DEFAULTS.school);
+    }
+
+    setStudents(studentsRes.status === "fulfilled" ? (studentsRes.value || []) : []);
+    setTeachers(teachersRes.status === "fulfilled" ? (teachersRes.value || []) : []);
+    setAttendance(attendanceRes.status === "fulfilled" ? (attendanceRes.value || []) : []);
+    setResults(gradesRes.status === "fulfilled" ? (gradesRes.value || []) : []);
+    setPayments(paymentsRes.status === "fulfilled" ? (paymentsRes.value || []) : []);
+    setFeeStructures(feeRes.status === "fulfilled" ? (feeRes.value || []) : []);
   }, [setSchool, setStudents, setTeachers, setAttendance, setResults, setPayments, setFeeStructures]);
 
   const handleLogout = useCallback(() => {
