@@ -6,6 +6,54 @@ import { requireRoles } from "../middleware/roles.js";
 const router = Router();
 router.use(authRequired);
 
+async function ensureSchoolSettingsTable() {
+  const { error } = await supabase
+    .from("school_settings")
+    .select("school_id", { count: "exact", head: true });
+
+  if (error && error.code === "PGRST205") {
+    return { missing: true };
+  }
+
+  if (error) throw error;
+  return { missing: false };
+}
+
+async function getSchoolSettingsMap(schoolId) {
+  const check = await ensureSchoolSettingsTable();
+  if (check.missing) return new Map();
+
+  const { data, error } = await supabase
+    .from("school_settings")
+    .select("setting_key, setting_value")
+    .eq("school_id", schoolId);
+  if (error) throw error;
+
+  return new Map((data || []).map((row) => [row.setting_key, row.setting_value]));
+}
+
+async function upsertSchoolSettings(schoolId, values) {
+  const check = await ensureSchoolSettingsTable();
+  if (check.missing) return { skipped: true };
+
+  const rows = Object.entries(values)
+    .filter(([, value]) => value !== undefined)
+    .map(([setting_key, setting_value]) => ({
+      school_id: schoolId,
+      setting_key,
+      setting_value: setting_value === null ? "" : String(setting_value),
+    }));
+
+  if (!rows.length) return { skipped: false };
+
+  const { error } = await supabase
+    .from("school_settings")
+    .upsert(rows, { onConflict: "school_id,setting_key" });
+  if (error) throw error;
+
+  return { skipped: false };
+}
+
 // NEW: GET /api/settings/users (frontend expects this path)
 router.get("/users", requireRoles("admin"), async (req, res, next) => {
   try {
@@ -39,7 +87,24 @@ router.get("/school", async (req, res, next) => {
 
     if (error) throw error;
 
-    res.json(data);
+    const settings = await getSchoolSettingsMap(schoolId);
+
+    res.json({
+      ...data,
+      term: settings.get("current_term") || "",
+      year: settings.get("academic_year") || "",
+      motto: settings.get("school_motto") || "",
+      tagline: settings.get("school_tagline") || "",
+      hero_message: settings.get("hero_message") || "",
+      logo_url: settings.get("logo_url") || settings.get("school_logo") || "",
+      primary_color: settings.get("primary_color") || "",
+      secondary_color: settings.get("secondary_color") || "",
+      established_year: settings.get("established_year") || "",
+      admin_name: settings.get("admin_name") || "",
+      admin_title: settings.get("admin_title") || "",
+      school_type: settings.get("school_type") || "",
+      curriculum: settings.get("curriculum") || "",
+    });
   } catch (err) {
     next(err);
   }
@@ -57,7 +122,17 @@ router.put("/school", requireRoles("admin"), async (req, res, next) => {
       county,
       term,
       year,
-      motto
+      motto,
+      tagline,
+      hero_message,
+      logo_url,
+      primary_color,
+      secondary_color,
+      established_year,
+      admin_name,
+      admin_title,
+      school_type,
+      curriculum,
     } = req.body;
 
     const updatePayload = {
@@ -70,14 +145,6 @@ router.put("/school", requireRoles("admin"), async (req, res, next) => {
     if (phone !== undefined) updatePayload.phone = phone;
     if (address !== undefined) updatePayload.address = address;
     if (county !== undefined) updatePayload.county = county;
-    // OLD: if (term !== undefined) updatePayload.term = term;
-    // OLD: if (year !== undefined) updatePayload.year = year;
-    // OLD: if (motto !== undefined) updatePayload.motto = motto;
-    // Current schools schema does not yet include term/year/motto columns.
-    void term;
-    void year;
-    void motto;
-
     const { data, error } = await supabase
       .from("schools")
       .update(updatePayload)
@@ -87,7 +154,43 @@ router.put("/school", requireRoles("admin"), async (req, res, next) => {
       .single();
     if (error) throw error;
 
-    res.json({ updated: true, school: data });
+    await upsertSchoolSettings(schoolId, {
+      current_term: term,
+      academic_year: year,
+      school_motto: motto,
+      school_tagline: tagline,
+      hero_message,
+      logo_url,
+      primary_color,
+      secondary_color,
+      established_year,
+      admin_name,
+      admin_title,
+      school_type,
+      curriculum,
+    });
+
+    const settings = await getSchoolSettingsMap(schoolId);
+
+    res.json({
+      updated: true,
+      school: {
+        ...data,
+        term: settings.get("current_term") || "",
+        year: settings.get("academic_year") || "",
+        motto: settings.get("school_motto") || "",
+        tagline: settings.get("school_tagline") || "",
+        hero_message: settings.get("hero_message") || "",
+        logo_url: settings.get("logo_url") || settings.get("school_logo") || "",
+        primary_color: settings.get("primary_color") || "",
+        secondary_color: settings.get("secondary_color") || "",
+        established_year: settings.get("established_year") || "",
+        admin_name: settings.get("admin_name") || "",
+        admin_title: settings.get("admin_title") || "",
+        school_type: settings.get("school_type") || "",
+        curriculum: settings.get("curriculum") || "",
+      },
+    });
   } catch (err) { next(err); }
 });
 

@@ -178,13 +178,7 @@ const Section = ({ title, subtitle, icon, color = C.accent, dim = C.accentGlow, 
 Section.propTypes = { title: PropTypes.string.isRequired, subtitle: PropTypes.string, icon: PropTypes.string.isRequired, color: PropTypes.string, dim: PropTypes.string, children: PropTypes.node.isRequired };
 
 // ─── MOCK USER ACCOUNTS ───────────────────────────────────────────────────────
-const INITIAL_USERS = [
-  { id: 1, name: "Mrs. Wanjiku",   email: "wanjiku@greenfield.ac.ke",  role: "admin",   status: "active",   initials: "MW", color: [C.accent, C.purple] },
-  { id: 2, name: "Grace Akinyi",   email: "g.akinyi@greenfield.ac.ke", role: "teacher", status: "active",   initials: "GA", color: [C.teal, C.accent] },
-  { id: 3, name: "James Mwangi",   email: "j.mwangi@greenfield.ac.ke", role: "teacher", status: "active",   initials: "JM", color: [C.amber, C.rose] },
-  { id: 4, name: "Priya Shah",     email: "p.shah@greenfield.ac.ke",   role: "teacher", status: "active",   initials: "PS", color: [C.purple, C.teal] },
-  { id: 5, name: "Samuel Korir",   email: "s.korir@greenfield.ac.ke",  role: "viewer",  status: "inactive", initials: "SK", color: [C.rose, C.amber] },
-];
+const INITIAL_USERS = [];
 
 const ROLE_META = {
   admin:   { label: "Admin",   color: C.purple, dim: C.purpleDim },
@@ -354,21 +348,21 @@ const TABS = [
 // ─── SCHOOL INFO TAB ──────────────────────────────────────────────────────────
 const SchoolInfoTab = ({ onSave, auth }) => {
   const [form, setForm] = useState({
-    name:        "Greenfield Academy",
-    motto:       "Excellence in Every Child",
+    name:        "",
+    motto:       "",
     type:        "private",
     curriculum:  "cbc",
-    email:       "admin@greenfield.ac.ke",
-    phone:       "+254 712 345 678",
+    email:       "",
+    phone:       "",
     whatsapp_business_number: "",
-    address:     "123 Ngong Road, Nairobi",
-    county:      "Nairobi",
+    address:     "",
+    county:      "",
     term:        "Term 2",
     year:        "2025",
     term_start:  "2025-05-05",
     term_end:    "2025-08-01",
-    admin_name:  "Mrs. Wanjiku",
-    admin_title: "School Principal",
+    admin_name:  "",
+    admin_title: "",
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
@@ -434,7 +428,7 @@ const SchoolInfoTab = ({ onSave, auth }) => {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
-        <Inp label="School Name" value={form.name} onChange={f("name")} placeholder="e.g. Greenfield Academy" />
+        <Inp label="School Name" value={form.name} onChange={f("name")} placeholder="e.g. Sunrise Academy" />
         <Inp label="School Motto" value={form.motto} onChange={f("motto")} placeholder="e.g. Excellence in Every Child" />
         <Sel label="School Type" value={form.type} onChange={f("type")} options={[{value:"private",label:"Private"},{value:"public",label:"Public"},{value:"international",label:"International"}]} />
         <Sel label="Curriculum" value={form.curriculum} onChange={f("curriculum")} options={[{value:"cbc",label:"CBC (Competency Based)"},{value:"844",label:"8-4-4"},{value:"igcse",label:"IGCSE"},{value:"ib",label:"IB"}]} />
@@ -495,7 +489,7 @@ const SchoolInfoTab = ({ onSave, auth }) => {
       <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
       <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Administrator</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
-        <Inp label="Admin Name" value={form.admin_name} onChange={f("admin_name")} placeholder="e.g. Mrs. Wanjiku" />
+        <Inp label="Admin Name" value={form.admin_name} onChange={f("admin_name")} placeholder="e.g. Jane Doe" />
         <Inp label="Admin Title / Role" value={form.admin_title} onChange={f("admin_title")} placeholder="e.g. School Principal" />
       </div>
 
@@ -841,7 +835,7 @@ const NotificationsTab = ({ onSave }) => {
     {
       label: "Delivery Channels",
       items: [
-        { key: "emailEnabled", label: "Email Notifications", desc: "Send notifications to admin@greenfield.ac.ke" },
+        { key: "emailEnabled", label: "Email Notifications", desc: "Send notifications to the school's configured admin email" },
         { key: "smsEnabled",   label: "SMS Notifications",   desc: "Send SMS to registered phone number (charges apply)" },
       ]
     },

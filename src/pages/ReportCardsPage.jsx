@@ -8,7 +8,7 @@ import Modal from "../components/Modal";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 
-export default function ReportCardsPage({ auth, students, canEdit, toast, feeBlocked = false, onGoFees}) {
+export default function ReportCardsPage({ auth, school, students, canEdit, toast, feeBlocked = false, onGoFees}) {
   const [reportCards, setReportCards] = useState([]);
   const [selected, setSelected]       = useState(null);
   const [fullData, setFullData]       = useState(null);
@@ -71,7 +71,7 @@ export default function ReportCardsPage({ auth, students, canEdit, toast, feeBlo
         .signature{display:flex;justify-content:space-between;margin-top:40px;font-size:12px}
         @media print{button{display:none}}
       </style></head><body>
-        <h1>Greenfield Academy</h1>
+        <h1>${school?.name || "School Report Card"}</h1>
         <div class="sub">Academic Report Card — ${term} ${year}</div>
         <div class="info">
           <div class="info-box"><div class="info-label">Student Name</div><strong>${student.full_name}</strong></div>
@@ -223,6 +223,7 @@ export default function ReportCardsPage({ auth, students, canEdit, toast, feeBlo
 
 ReportCardsPage.propTypes = {
   auth: PropTypes.object,
+  school: PropTypes.object,
   students: PropTypes.array.isRequired,
   canEdit: PropTypes.bool.isRequired,
   toast: PropTypes.func.isRequired,

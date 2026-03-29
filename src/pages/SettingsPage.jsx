@@ -25,49 +25,40 @@ function SchoolTab({ school, setSchool, toast, auth }) {
   const [form, setForm] = useState({ ...school });
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    setForm({ ...school });
+  }, [school]);
+
   const save = async () => {
     setSaving(true);
     try {
-      // Save regular school info (excluding WhatsApp number)
-      const {
-        whatsapp_business_number,
-        term,
-        year,
-        motto,
-        ...restSchoolInfo
-      } = form;
-      // OLD: const { whatsapp_business_number, ...schoolInfo } = form;
       const schoolInfo = {
-        name: restSchoolInfo.name,
-        county: restSchoolInfo.county,
-        phone: restSchoolInfo.phone,
-        email: restSchoolInfo.email,
-        address: restSchoolInfo.address,
+        name: form.name || "",
+        county: form.county || "",
+        phone: form.phone || "",
+        email: form.email || "",
+        address: form.address || "",
+        whatsapp_business_number: form.whatsapp_business_number || "",
+        term: form.term || "",
+        year: form.year || "",
+        motto: form.motto || "",
+        tagline: form.tagline || "",
+        hero_message: form.hero_message || "",
+        logo_url: form.logo_url || "",
+        primary_color: form.primary_color || "",
+        secondary_color: form.secondary_color || "",
+        established_year: form.established_year || "",
+        admin_name: form.admin_name || "",
+        admin_title: form.admin_title || "",
+        school_type: form.school_type || "",
+        curriculum: form.curriculum || "",
       };
-      void term;
-      void year;
-      void motto;
-      await apiFetch("/settings/school", {
+      const response = await apiFetch("/settings/school", {
         method: "PUT",
         token: auth?.token,
         body: schoolInfo,
       });
-
-      // Save WhatsApp number separately if provided
-      if (whatsapp_business_number !== undefined) {
-        try {
-          await apiFetch("/settings/school/whatsapp", {
-            method: "PATCH",
-            token: auth?.token,
-            body: { whatsapp_business_number },
-          });
-        } catch (whatsappErr) {
-          console.warn("WhatsApp number save failed:", whatsappErr);
-          toast("School info saved, but WhatsApp number update failed", "warning");
-        }
-      }
-
-      setSchool(form);
+      setSchool(response?.school || schoolInfo);
       toast("School info saved", "success");
     } catch (e) {
       toast(e.message || "Save failed", "error");
@@ -83,6 +74,21 @@ function SchoolTab({ school, setSchool, toast, auth }) {
 
   return (
     <div style={{ maxWidth: 560 }}>
+      <div style={{ marginBottom: 18, padding: 16, borderRadius: 12, background: `${form.primary_color || C.accent}16`, border: `1px solid ${C.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {form.logo_url ? (
+            <img src={form.logo_url} alt="School logo" style={{ width: 52, height: 52, borderRadius: 12, objectFit: "cover", border: `1px solid ${C.border}` }} />
+          ) : (
+            <div style={{ width: 52, height: 52, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${form.primary_color || C.accent}, ${form.secondary_color || "#6366F1"})`, color: "#fff", fontWeight: 800, fontSize: 20 }}>
+              {String(form.name || "E").charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{form.name || "Your school"}</div>
+            <div style={{ fontSize: 12, color: C.textMuted }}>{form.tagline || form.motto || "Personalized school experience"}</div>
+          </div>
+        </div>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
         <div><Lbl>School Name</Lbl><input {...f("name")} /></div>
         <div><Lbl>County / Location</Lbl><input {...f("county")} /></div>
@@ -97,12 +103,43 @@ function SchoolTab({ school, setSchool, toast, auth }) {
           </select>
         </div>
         <div><Lbl>Academic Year</Lbl><input {...f("year")} /></div>
+        <div><Lbl>Established Year</Lbl><input {...f("established_year")} placeholder="e.g. 2014" /></div>
+        <div><Lbl>School Type</Lbl>
+          <select {...f("school_type")} style={inp}>
+            <option value="">Select type</option>
+            <option value="private">Private</option>
+            <option value="public">Public</option>
+            <option value="international">International</option>
+          </select>
+        </div>
+        <div><Lbl>Curriculum</Lbl>
+          <select {...f("curriculum")} style={inp}>
+            <option value="">Select curriculum</option>
+            <option value="cbc">CBC</option>
+            <option value="844">8-4-4</option>
+            <option value="igcse">IGCSE</option>
+            <option value="ib">IB</option>
+          </select>
+        </div>
         <div style={{ gridColumn: "1 / -1" }}>
           <Lbl>Postal Address</Lbl><input {...f("address")} />
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
           <Lbl>School Motto</Lbl><input {...f("motto")} />
         </div>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <Lbl>Login Tagline</Lbl><input {...f("tagline")} placeholder="Shown on the login page" />
+        </div>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <Lbl>Hero Message</Lbl><textarea {...f("hero_message")} rows={3} style={{ ...inp, resize: "vertical" }} placeholder="Short welcome message for your login page" />
+        </div>
+        <div style={{ gridColumn: "1 / -1" }}>
+          <Lbl>Logo URL</Lbl><input {...f("logo_url")} placeholder="https://..." />
+        </div>
+        <div><Lbl>Primary Color</Lbl><input {...f("primary_color")} type="color" style={{ ...inp, padding: 4, height: 42 }} /></div>
+        <div><Lbl>Secondary Color</Lbl><input {...f("secondary_color")} type="color" style={{ ...inp, padding: 4, height: 42 }} /></div>
+        <div><Lbl>Administrator Name</Lbl><input {...f("admin_name")} placeholder="e.g. Jane Wanjiku" /></div>
+        <div><Lbl>Administrator Title</Lbl><input {...f("admin_title")} placeholder="e.g. School Principal" /></div>
       </div>
       <button onClick={save} disabled={saving} style={{
         background: C.accent, color: "#fff", border: "none", borderRadius: 9,

@@ -10,7 +10,7 @@ import { ALL_CLASSES } from "../lib/constants";
 
 function money(n) { return `KES ${Number(n||0).toLocaleString()}`; }
 
-export default function InvoicesPage({ auth, students, canEdit, toast }) {
+export default function InvoicesPage({ auth, school, students, canEdit, toast }) {
   const [invoices, setInvoices]       = useState([]);
   const [loading, setLoading]         = useState(true);
   const [showSingle, setShowSingle]   = useState(false);
@@ -57,7 +57,7 @@ export default function InvoicesPage({ auth, students, canEdit, toast }) {
       <style>body{font-family:sans-serif;padding:40px;max-width:500px;margin:auto}h1{font-size:20px;margin-bottom:4px}.school{color:#888;margin-bottom:24px}.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee}.total{font-weight:bold;font-size:16px;border-top:2px solid #000;margin-top:8px}@media print{button{display:none}}</style>
       </head><body>
         <h1>Fee Invoice</h1>
-        <div class="school">Greenfield Academy · ${inv.term} ${inv.academic_year}</div>
+        <div class="school">${school?.name || "School"} - ${inv.term} ${inv.academic_year}</div>
         <div class="row"><span>Student</span><strong>${inv.student_name}</strong></div>
         <div class="row"><span>Class</span><strong>${inv.class_name}</strong></div>
         <div class="row"><span>Admission</span><strong>${inv.admission_number}</strong></div>
@@ -179,6 +179,7 @@ export default function InvoicesPage({ auth, students, canEdit, toast }) {
 
 InvoicesPage.propTypes = {
   auth: PropTypes.object,
+  school: PropTypes.object,
   students: PropTypes.array.isRequired,
   canEdit: PropTypes.bool.isRequired,
   toast: PropTypes.func.isRequired,
