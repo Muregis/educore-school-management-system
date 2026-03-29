@@ -69,7 +69,24 @@ router.get("/users", requireRoles("admin"), async (req, res, next) => {
       .order("full_name");
     if (error) throw error;
 
-    res.json(data || []);
+    const rows = Array.isArray(data) ? [...data] : [];
+    const currentUserId = String(req.user?.user_id || req.user?.userId || "");
+    const hasCurrentUser = rows.some((user) => String(user.user_id) === currentUserId);
+
+    if (!hasCurrentUser && currentUserId) {
+      rows.unshift({
+        user_id: req.user.user_id || req.user.userId,
+        full_name: req.user.name || "Current Admin",
+        email: req.user.email || "",
+        phone: "",
+        role: req.user.role || "admin",
+        status: "active",
+        created_at: null,
+        is_session_user: true,
+      });
+    }
+
+    res.json(rows);
   } catch (err) { next(err); }
 });
 
