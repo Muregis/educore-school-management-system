@@ -13,98 +13,213 @@ import { logTenantContext, logTenantQuery } from "../helpers/tenant-debug.logger
 
 const router = Router();
 
+const DEFAULT_SCHOOL_BRANDING = {
+  school_id: null,
+  name: "EduCore",
+  tagline: "Student & Parent Portal",
+  motto: "Student & Parent Portal",
+  location: "Multi-school platform",
+  established_year: null,
+  logo_url: null,
+  primary_color: "#C9A84C",
+  secondary_color: "#3B82F6",
+  hero_message: "Access grades, fees, attendance, and school updates from one secure portal.",
+  code: null,
+  notFound: true,
+};
+
 function isPlaceholderHash(value) {
   return typeof value === "string" && value.includes("placeholder_");
 }
 
-// OLD CODE - preserved
-// function defaultPasswordForRole(role) {
-//   if (!role) return null;
-//   return `${role}123`;  // INSECURE: Too predictable
-// }
-// OLD CODE - preserved
-
-// SECURITY FIX: Generate secure random default password instead of predictable pattern
 function defaultPasswordForRole(role) {
   if (!role) return null;
-  // Generate secure random 8-character password (role prefix + random digits)
   const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `${role.substring(0, 2).toUpperCase()}${randomPart}`;
 }
 
-// ── Public school lookup (for silent tenant discovery) ────────────────────────
+function slugifySchoolName(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function getHostSubdomain(hostname) {
+  const host = String(hostname || "").trim().toLowerCase().split(":")[0];
+  if (!host || host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host)) return null;
+  const parts = host.split(".").filter(Boolean);
+  if (parts.length < 3) return null;
+  return parts[0];
+}
+
+async function getSchoolSettingsMap(schoolId) {
+  const { data, error } = await supabase
+    .from("school_settings")
+    .select("setting_key, setting_value")
+    .eq("school_id", schoolId);
+
+  if (error && error.code !== "PGRST205") throw error;
+  return new Map((data || []).map(item => [item.setting_key, item.setting_value]));
+}
+
+async function findSchoolById(schoolId) {
+  if (!schoolId) return null;
+  const { data, error } = await supabase
+    .from("schools")
+    .select("school_id, name, code, email, phone, address, county, country")
+    .eq("school_id", schoolId)
+    .eq("is_deleted", false)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+async function buildSchoolBranding(baseSchool) {
+  if (!baseSchool) return { ...DEFAULT_SCHOOL_BRANDING };
+
+  const settings = await getSchoolSettingsMap(baseSchool.school_id);
+  const tagline =
+    settings.get("school_tagline") ||
+    settings.get("school_motto") ||
+    settings.get("tagline") ||
+    DEFAULT_SCHOOL_BRANDING.tagline;
+
+  return {
+    school_id: baseSchool.school_id,
+    name: baseSchool.name || DEFAULT_SCHOOL_BRANDING.name,
+    tagline,
+    motto: tagline,
+    location: [baseSchool.county, baseSchool.country].filter(Boolean).join(", ") || DEFAULT_SCHOOL_BRANDING.location,
+    established_year: settings.get("established_year") || null,
+    logo_url: settings.get("school_logo") || settings.get("logo_url") || null,
+    primary_color: settings.get("primary_color") || DEFAULT_SCHOOL_BRANDING.primary_color,
+    secondary_color: settings.get("secondary_color") || DEFAULT_SCHOOL_BRANDING.secondary_color,
+    hero_message: settings.get("hero_message") || `Welcome to ${baseSchool.name}. Sign in to continue.`,
+    code: baseSchool.code || null,
+    email: baseSchool.email || null,
+    phone: baseSchool.phone || null,
+    address: baseSchool.address || null,
+    county: baseSchool.county || null,
+    country: baseSchool.country || "Kenya",
+    notFound: false,
+  };
+}
+
+async function resolveSchoolCandidates({ loginId, role = "staff" }) {
+  if (!loginId) return [];
+
+  const trimmedLoginId = String(loginId).trim();
+  let schools = [];
+
+  if (role === "staff") {
+    const domain = trimmedLoginId.includes("@") ? trimmedLoginId.split("@")[1]?.trim().toLowerCase() : null;
+    const { data: users, error } = await supabase
+      .from("users")
+      .select("school_id, schools:school_id(school_id, name, code, email, phone, address, county, country)")
+      .ilike("email", domain ? `%@${domain}` : trimmedLoginId)
+      .eq("is_deleted", false);
+    if (error) throw error;
+    schools = users?.map(user => user.schools).filter(Boolean) || [];
+  } else {
+    const { data: students, error } = await supabase
+      .from("students")
+      .select("school_id, schools:school_id(school_id, name, code, email, phone, address, county, country)")
+      .ilike("admission_number", trimmedLoginId)
+      .eq("is_deleted", false);
+    if (error) throw error;
+    schools = students?.map(student => student.schools).filter(Boolean) || [];
+  }
+
+  const uniqueSchools = [];
+  const seen = new Set();
+  for (const school of schools) {
+    if (school?.school_id && !seen.has(school.school_id)) {
+      seen.add(school.school_id);
+      uniqueSchools.push(await buildSchoolBranding(school));
+    }
+  }
+
+  return uniqueSchools;
+}
+
 router.get("/lookup-school", authRateLimit, async (req, res) => {
   try {
     const { loginId, role = "staff" } = req.query;
     if (!loginId) return res.json({ schools: [] });
 
-    console.log(`🔍 School lookup for [${loginId}] as [${role}]`);
-    let schools = [];
-    if (role === "staff") {
-      const { data: users, error } = await supabase
-        .from("users")
-        .select("school_id, schools:school_id(name, motto)") // Explicit join on FK
-        .ilike("email", loginId.trim())
-        .eq("is_deleted", false);
-      if (error) console.error("Lookup error (users):", error);
-      schools = users?.map(u => ({ id: u.school_id, ...u.schools })) || [];
-    } else {
-      const { data: students, error } = await supabase
-        .from("students")
-        .select("school_id, schools:school_id(name, motto)") // Explicit join on FK
-        .ilike("admission_number", loginId.trim())
-        .eq("is_deleted", false);
-      if (error) console.error("Lookup error (students):", error);
-      schools = students?.map(s => ({ id: s.school_id, ...s.schools })) || [];
-    }
-    console.log(`✅ Lookup found ${schools.length} schools`);
-
-    // De-duplicate and filter
-    const unique = [];
-    const seen = new Set();
-    for (const s of schools) {
-      if (!seen.has(s.id)) {
-        seen.add(s.id);
-        unique.push(s);
-      }
-    }
-    res.json({ schools: unique });
-  } catch (err) {
+    const schools = await resolveSchoolCandidates({ loginId, role });
+    res.json({ schools });
+  } catch (_err) {
     res.status(500).json({ message: "Lookup failed" });
   }
 });
 
-// ── Public school info (for login branding) ──────────────────────────────────
+router.get("/resolve-school", authRateLimit, async (req, res) => {
+  try {
+    const { hostname = "", loginId = "", selectedSchoolId = "", role = "staff" } = req.query;
+    const numericSchoolId = selectedSchoolId ? Number(selectedSchoolId) : null;
+
+    if (numericSchoolId && !Number.isNaN(numericSchoolId)) {
+      const matchedSchool = await findSchoolById(numericSchoolId);
+      if (matchedSchool) return res.json(await buildSchoolBranding(matchedSchool));
+    }
+
+    const subdomain = getHostSubdomain(hostname);
+    if (subdomain) {
+      const { data: schools, error } = await supabase
+        .from("schools")
+        .select("school_id, name, code, email, phone, address, county, country")
+        .eq("is_deleted", false);
+      if (error) throw error;
+
+      const matchedSchool = (schools || []).find(school =>
+        String(school.code || "").toLowerCase() === subdomain ||
+        slugifySchoolName(school.name) === subdomain
+      );
+
+      if (matchedSchool) {
+        return res.json(await buildSchoolBranding(matchedSchool));
+      }
+    }
+
+    if (loginId) {
+      const schools = await resolveSchoolCandidates({ loginId, role });
+      if (schools.length === 1) return res.json(schools[0]);
+      if (schools.length > 1) return res.json({ ...DEFAULT_SCHOOL_BRANDING, schoolOptions: schools, ambiguous: true });
+    }
+
+    return res.json({ ...DEFAULT_SCHOOL_BRANDING });
+  } catch (_err) {
+    return res.status(500).json({ message: "Error resolving school branding" });
+  }
+});
+
 router.get("/school-info/:id", authRateLimit, async (req, res) => {
   try {
     const { id } = req.params;
-    const { data, error } = await supabase
-      .from("schools")
-      .select("name, motto")
-      .eq("school_id", id)
-      .maybeSingle();
-    if (error || !data) {
-      return res.json({ name: "EduCore School", motto: "Student & Parent Portal", notFound: true });
-    }
-    res.json(data);
-  } catch (err) {
+    const school = await findSchoolById(id);
+    if (!school) return res.json({ ...DEFAULT_SCHOOL_BRANDING });
+    res.json(await buildSchoolBranding(school));
+  } catch (_err) {
     res.status(500).json({ message: "Error fetching school info" });
   }
 });
 
-// ── Staff login ───────────────────────────────────────────────────────────────
 router.post("/login", authRateLimit, async (req, res, next) => {
   try {
     const { email, password, schoolId } = req.body;
     logTenantContext("auth.login.request", req, { email, schoolId });
-    if (!email || !password)
+    if (!email || !password) {
       return res.status(400).json({ message: "email and password are required" });
+    }
 
-    // Resolve tenant automatically when schoolId is omitted.
     let normalizedSchoolId = schoolId != null && schoolId !== "" ? Number(schoolId) : null;
     if (normalizedSchoolId != null && Number.isNaN(normalizedSchoolId)) {
       return res.status(400).json({ message: "schoolId must be numeric when provided" });
     }
+
     if (normalizedSchoolId == null) {
       const { data: candidates, error } = await supabase
         .from("users")
@@ -114,7 +229,7 @@ router.post("/login", authRateLimit, async (req, res, next) => {
       logTenantQuery("auth.login.school_lookup", { table: "users", email, schoolId: null });
       if (error) throw error;
 
-      const unique = Array.from(new Set((candidates || []).map(u => u.school_id)));
+      const unique = Array.from(new Set((candidates || []).map(user => user.school_id)));
       if (unique.length === 0) {
         return res.status(404).json({ message: "We couldn't find your school for that email. Please enter the school ID or contact admin." });
       }
@@ -124,58 +239,49 @@ router.post("/login", authRateLimit, async (req, res, next) => {
       normalizedSchoolId = unique[0];
     }
 
-    // Use Supabase authentication
     const authResult = await authLogin(email, password, normalizedSchoolId);
-    
     if (!authResult) {
-      // Log authentication failure
       logAuthFailure(req, { email, reason: "User not found", schoolId });
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const { user } = authResult;
-    console.log(`🔐 User authenticated:`, { email, userId: user.user_id });
-
-    if (user.status !== "active") return res.status(403).json({ message: "Account inactive" });
+    if (user.status !== "active") {
+      return res.status(403).json({ message: "Account inactive" });
+    }
 
     const role = user.role;
     const name = user.full_name;
     const userPayload = { user_id: user.user_id, school_id: normalizedSchoolId, role, name, email: user.email };
+    const token = jwt.sign(userPayload, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
 
-    const token = jwt.sign(
-      userPayload,
-      env.jwtSecret,
-      { expiresIn: env.jwtExpiresIn }
-    );
-
-    // Generate Supabase-compatible JWT for RLS
     let supabaseToken = null;
     try {
       supabaseToken = generateSupabaseJWT(userPayload);
     } catch (error) {
       console.error("Failed to generate Supabase JWT:", error.message);
-      // Continue without Supabase token for now
     }
 
-    // Attach user to req so logActivity can read it
     req.user = userPayload;
     logActivity(req, { action: "auth.login", description: `${role} login: ${name}` });
 
     res.json({
       token,
-      supabaseToken, // New Supabase JWT for frontend
+      supabaseToken,
       user: { userId: user.user_id, schoolId: normalizedSchoolId, role, name, email: user.email },
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
-// ── Portal login (parent / student) ──────────────────────────────────────────
 router.post("/portal-login", authRateLimit, async (req, res, next) => {
   try {
     const { admissionNumber, password, schoolId = null, role = "parent" } = req.body;
     logTenantContext("auth.portal_login.request", req, { admissionNumber, schoolId, role });
-    if (!admissionNumber || !password)
+    if (!admissionNumber || !password) {
       return res.status(400).json({ message: "admissionNumber and password are required" });
+    }
 
     const trimmedAdmissionNumber = admissionNumber.trim();
     const portalEmail = `${trimmedAdmissionNumber.toLowerCase()}.${role}@portal`;
@@ -184,7 +290,6 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       return res.status(400).json({ message: "schoolId must be numeric when provided" });
     }
 
-    // Resolve tenant safely. Never pick "first" student globally when schoolId is omitted.
     let studentLookup = supabase
       .from("students")
       .select("student_id, first_name, last_name, school_id, admission_number, parent_name")
@@ -203,7 +308,7 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
     const { data: matchedStudents, error: studentLookupError } = await studentLookup;
     if (studentLookupError) throw studentLookupError;
 
-    const uniqueStudentSchoolIds = Array.from(new Set((matchedStudents || []).map(s => s.school_id)));
+    const uniqueStudentSchoolIds = Array.from(new Set((matchedStudents || []).map(student => student.school_id)));
     if (normalizedSchoolId == null && uniqueStudentSchoolIds.length > 1) {
       return res.status(400).json({
         message: "Multiple schools matched this admission number. Please choose your school ID to continue.",
@@ -211,23 +316,14 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       });
     }
 
-    const student = (matchedStudents || []).find(s => s.school_id === (normalizedSchoolId ?? uniqueStudentSchoolIds[0]));
+    const student = (matchedStudents || []).find(item => item.school_id === (normalizedSchoolId ?? uniqueStudentSchoolIds[0]));
     if (!student) {
-      // SECURITY: Don't reveal whether admission number exists or wrong school
       return res.status(401).json({ message: "Invalid admission number or school" });
     }
-    
-    // OLD CODE - preserved
-    // if (!student) {
-    //   return res.status(401).json({ message: "Invalid admission number" });
-    // }
-    // OLD CODE - preserved
 
-    // If schoolId was not provided, use the student's school_id (discovered from admission number)
-    // This maintains backward compatibility while adding security when schoolId IS provided
     const resolvedSchoolId = normalizedSchoolId ?? student.school_id;
 
-    let userQuery = supabase
+    const { data: matchedUsers, error: userError } = await supabase
       .from("users")
       .select("user_id, full_name, email, password_hash, role, status, student_id, school_id")
       .eq("school_id", resolvedSchoolId)
@@ -239,8 +335,6 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       schoolId: resolvedSchoolId,
       studentId: student.student_id,
     });
-
-    const { data: matchedUsers, error: userError } = await userQuery;
     if (userError) throw userError;
 
     let user = (matchedUsers || []).find(candidate =>
@@ -259,8 +353,7 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
     }
 
     if (!user && role === "parent") {
-      const existingParent = (matchedUsers || []).find(candidate => candidate.role === "parent");
-      user = existingParent || null;
+      user = (matchedUsers || []).find(candidate => candidate.role === "parent") || null;
     }
 
     if (!user && role === "parent" && legacyStudentAccount) {
@@ -277,9 +370,10 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       }
 
       if (canBootstrapParent) {
-        const parentPasswordHash = legacyStudentAccount.password_hash && await bcrypt.compare(password, legacyStudentAccount.password_hash)
-          ? legacyStudentAccount.password_hash
-          : await bcrypt.hash(password, 10);
+        const parentPasswordHash =
+          legacyStudentAccount.password_hash && await bcrypt.compare(password, legacyStudentAccount.password_hash)
+            ? legacyStudentAccount.password_hash
+            : await bcrypt.hash(password, 10);
 
         const { data: insertedParent, error: insertedParentError } = await supabase
           .from("users")
@@ -356,7 +450,7 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
     if (!passwordMatches) return res.status(401).json({ message: "Invalid credentials" });
     if (user.status !== "active") return res.status(403).json({ message: "Account inactive" });
 
-    if (!student || String(student.admission_number).trim().toLowerCase() !== trimmedAdmissionNumber.toLowerCase()) {
+    if (String(student.admission_number).trim().toLowerCase() !== trimmedAdmissionNumber.toLowerCase()) {
       return res.status(401).json({ message: "Portal account is not linked to that admission number" });
     }
 
@@ -365,18 +459,17 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       : `${student.first_name} ${student.last_name}`;
 
     const userPayload = {
-      user_id: user.user_id, school_id: resolvedSchoolId,
-      role, name, student_id: student.student_id,
-      admission_number: student.admission_number, email: user.email
+      user_id: user.user_id,
+      school_id: resolvedSchoolId,
+      role,
+      name,
+      student_id: student.student_id,
+      admission_number: student.admission_number,
+      email: user.email,
     };
 
-    const token = jwt.sign(
-      userPayload,
-      env.jwtSecret,
-      { expiresIn: env.jwtExpiresIn }
-    );
+    const token = jwt.sign(userPayload, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
 
-    // Generate Supabase-compatible JWT for RLS
     let supabaseToken = null;
     try {
       supabaseToken = generateSupabaseJWT(userPayload);
@@ -384,25 +477,28 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       console.error("Failed to generate Supabase JWT:", error.message);
     }
 
-    // Log portal login
     req.user = { userId: user.user_id, schoolId: resolvedSchoolId, role, name };
     logActivity(req, { action: "auth.portal_login", description: `${role} login: ${name}` });
 
     res.json({
       token,
       supabaseToken,
-      feeBlocked: false, // TODO: Implement fee check
+      feeBlocked: false,
       user: {
-        userId: user.user_id, schoolId: resolvedSchoolId,
-        role, name, email: user.email,
+        userId: user.user_id,
+        schoolId: resolvedSchoolId,
+        role,
+        name,
+        email: user.email,
         studentId: student.student_id,
         admissionNumber: student.admission_number,
       },
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
-// ── /me ───────────────────────────────────────────────────────────────────────
 router.get("/me", authRequired, (req, res) => res.json({ user: req.user }));
 
 export default router;

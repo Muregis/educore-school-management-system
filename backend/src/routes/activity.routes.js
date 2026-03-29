@@ -35,6 +35,30 @@ function handleActivityLogsDbError(err, res, next, meta = {}) {
   return next(err);
 }
 
+function sanitizeActivityDescription(action, entity, description) {
+  if (!description) return null;
+
+  const normalizedAction = String(action || "").toLowerCase();
+  const normalizedEntity = String(entity || "").toLowerCase();
+
+  if (normalizedAction.startsWith("auth.")) {
+    return "Authentication event";
+  }
+
+  if (
+    normalizedAction.includes("password") ||
+    normalizedAction.includes("impersonat") ||
+    normalizedAction.includes("account") ||
+    normalizedEntity === "user" ||
+    normalizedEntity === "school" ||
+    normalizedEntity === "settings"
+  ) {
+    return "Sensitive administrative change";
+  }
+
+  return description;
+}
+
 // ── GET /api/activity-logs ────────────────────────────────────────────────────
 // Recent activity, paginated. Admin only.
 router.get("/", async (req, res, next) => {
@@ -50,7 +74,7 @@ router.get("/", async (req, res, next) => {
 
     let q = supabase
       .from('activity_logs')
-      .select('log_id, action, entity, entity_id, description, role, ip_address, created_at, users(full_name)', { count: 'exact' })
+      .select('log_id, action, entity, entity_id, description, role, ip_address, created_at, user_id', { count: 'exact' })
       .eq('school_id', schoolId);
     logTenantQuery("activity_logs.select", {
       table: "activity_logs",
@@ -69,11 +93,31 @@ router.get("/", async (req, res, next) => {
       .range(offset, offset + limit - 1);
     if (error) throw error;
 
-    // Flatten user data
+    const userIds = Array.from(new Set((rows || []).map(r => r.user_id).filter(Boolean)));
+    let userNameMap = new Map();
+
+    if (userIds.length > 0) {
+      logTenantQuery("activity_logs.user_lookup", {
+        table: "users",
+        schoolId,
+        userIds,
+      });
+
+      const { data: users, error: usersError } = await supabase
+        .from("users")
+        .select("user_id, full_name")
+        .eq("school_id", schoolId)
+        .in("user_id", userIds)
+        .eq("is_deleted", false);
+
+      if (usersError) throw usersError;
+      userNameMap = new Map((users || []).map(user => [String(user.user_id), user.full_name]));
+    }
+
     const logs = (rows || []).map(r => ({
       ...r,
-      user_name: r.users?.full_name,
-      users: undefined
+      description: sanitizeActivityDescription(r.action, r.entity, r.description),
+      user_name: r.user_id ? (userNameMap.get(String(r.user_id)) || null) : null,
     }));
 
     res.json({ logs, total: total || 0, limit, offset });
