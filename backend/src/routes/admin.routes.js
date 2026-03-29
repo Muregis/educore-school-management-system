@@ -15,6 +15,68 @@ const BACKUP_DIR = path.resolve("backups");
 router.use(authRequired);
 router.use(requireRoles("admin"));
 
+async function softResetTable(table, schoolId, options = {}) {
+  const {
+    extraFilters = [],
+    select = "school_id",
+    supportsSoftDelete = true,
+  } = options;
+
+  const applyFilters = (query) => {
+    let nextQuery = query.eq("school_id", schoolId);
+    for (const filter of extraFilters) {
+      if (filter.type === "in") {
+        nextQuery = nextQuery.in(filter.column, filter.values);
+        continue;
+      }
+      nextQuery = nextQuery.eq(filter.column, filter.value);
+    }
+    return nextQuery;
+  };
+
+  if (supportsSoftDelete) {
+    const softDeletePayload = {
+      is_deleted: true,
+      updated_at: new Date().toISOString(),
+    };
+
+    const softDeleteQuery = applyFilters(
+      supabase
+        .from(table)
+        .update(softDeletePayload)
+        .eq("is_deleted", false)
+    );
+
+    const { data, error } = await softDeleteQuery.select(select);
+
+    if (!error) {
+      return { count: data?.length ?? 0, mode: "soft" };
+    }
+
+    const message = String(error.message || "").toLowerCase();
+    const missingSoftDeleteColumns =
+      message.includes("is_deleted") ||
+      message.includes("updated_at");
+
+    if (!missingSoftDeleteColumns) {
+      return { error };
+    }
+  }
+
+  const hardDeleteQuery = applyFilters(
+    supabase
+      .from(table)
+      .delete()
+  );
+
+  const { data, error } = await hardDeleteQuery.select(select);
+  if (error) {
+    return { error };
+  }
+
+  return { count: data?.length ?? 0, mode: "hard" };
+}
+
 // ── GET /api/admin/backups ────────────────────────────────────────────────────
 router.get("/backups", (req, res) => {
   const backups = listBackups().map(b => ({
@@ -218,6 +280,7 @@ router.post(
       logTenantContext("admin.reset_demo_data.request", req, { bodySchoolId });
 
       const deletedCounts = {};
+      const deletionModes = {};
       const deleteOrder = [
         "student_ledger",
         "report_cards",
@@ -226,70 +289,65 @@ router.post(
         "payments",
         "invoices",
         "discipline_records",
-        "activity_logs",
       ];
 
       for (const table of deleteOrder) {
         logTenantQuery("admin.reset_demo_data.delete", { table, schoolId: bodySchoolId });
-        const { data, error } = await supabase
-          .from(table)
-          .delete()
-          .eq("school_id", bodySchoolId)
-          .select("school_id", { count: "exact" });
+        const result = await softResetTable(table, bodySchoolId);
 
-        if (error) {
+        if (result.error) {
           return res.status(500).json({
-            message: `Failed while deleting ${table}`,
+            message: `Failed while resetting ${table}`,
             table,
-            error: error.message,
+            error: result.error.message,
             deletedCounts,
           });
         }
 
-        deletedCounts[table] = data?.length ?? 0;
+        deletedCounts[table] = result.count;
+        deletionModes[table] = result.mode;
       }
 
-      logTenantQuery("admin.reset_demo_data.delete_portal_users", { table: "users", schoolId: bodySchoolId });
-      const { data: deletedPortalUsers, error: portalUserDeleteError } = await supabase
-        .from("users")
-        .delete()
-        .eq("school_id", bodySchoolId)
-        .in("role", ["parent", "student"])
-        .select("user_id");
+      logTenantQuery("admin.reset_demo_data.soft_delete_portal_users", { table: "users", schoolId: bodySchoolId });
+      const portalUserResult = await softResetTable("users", bodySchoolId, {
+        extraFilters: [{ type: "in", column: "role", values: ["parent", "student"] }],
+        select: "user_id",
+      });
 
-      if (portalUserDeleteError) {
+      if (portalUserResult.error) {
         return res.status(500).json({
-          message: "Failed while deleting portal users",
+          message: "Failed while resetting portal users",
           table: "users",
-          error: portalUserDeleteError.message,
+          error: portalUserResult.error.message,
           deletedCounts,
         });
       }
 
-      deletedCounts.users = deletedPortalUsers?.length ?? 0;
+      deletedCounts.users = portalUserResult.count;
+      deletionModes.users = portalUserResult.mode;
 
-      logTenantQuery("admin.reset_demo_data.delete_students", { table: "students", schoolId: bodySchoolId });
-      const { data: deletedStudents, error: studentDeleteError } = await supabase
-        .from("students")
-        .delete()
-        .eq("school_id", bodySchoolId)
-        .select("student_id");
+      logTenantQuery("admin.reset_demo_data.soft_delete_students", { table: "students", schoolId: bodySchoolId });
+      const studentResetResult = await softResetTable("students", bodySchoolId, {
+        select: "student_id",
+      });
 
-      if (studentDeleteError) {
+      if (studentResetResult.error) {
         return res.status(500).json({
-          message: "Failed while deleting students",
+          message: "Failed while resetting students",
           table: "students",
-          error: studentDeleteError.message,
+          error: studentResetResult.error.message,
           deletedCounts,
         });
       }
 
-      deletedCounts.students = deletedStudents?.length ?? 0;
+      deletedCounts.students = studentResetResult.count;
+      deletionModes.students = studentResetResult.mode;
 
       return res.json({
         success: true,
         school_id: bodySchoolId,
         deletedCounts,
+        deletionModes,
       });
     } catch (error) {
       next(error);
