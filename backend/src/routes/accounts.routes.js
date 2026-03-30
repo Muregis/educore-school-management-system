@@ -29,18 +29,52 @@ router.get("/users", requireRoles("admin", "teacher", "finance"), async (req, re
 // GET /api/accounts/staff — list all staff (admin / teacher / finance)
 router.get("/staff", async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
+    const { schoolId, userId } = req.user;
+    console.log(`[DEBUG] Loading staff for schoolId=${schoolId}, requestedBy=${userId}`);
+    
     const { data: rows, error } = await supabase
       .from('users')
-      .select('user_id, full_name, email, phone, role, status, created_at')
+      .select('user_id, full_name, email, phone, role, status, created_at, is_deleted, school_id')
       .eq('school_id', schoolId)
       .in('role', ['admin', 'teacher', 'finance'])
       .eq('is_deleted', false)
       .order('role')
       .order('full_name');
-    if (error) throw error;
+    
+    if (error) {
+      console.error('[DEBUG] Supabase error:', error);
+      throw error;
+    }
+    
+    console.log(`[DEBUG] Found ${rows?.length || 0} staff accounts`);
+    if (rows?.length > 0) {
+      console.log('[DEBUG] First account:', { 
+        id: rows[0].user_id, 
+        name: rows[0].full_name, 
+        role: rows[0].role,
+        school_id: rows[0].school_id,
+        is_deleted: rows[0].is_deleted
+      });
+    }
+    
+    // Also check total count without is_deleted filter (for debugging)
+    const { data: allUsers, error: allError } = await supabase
+      .from('users')
+      .select('user_id, full_name, role, is_deleted, school_id', { count: 'exact', head: false })
+      .eq('school_id', schoolId)
+      .in('role', ['admin', 'teacher', 'finance']);
+    
+    if (!allError && allUsers) {
+      const deleted = allUsers.filter(u => u.is_deleted).length;
+      const active = allUsers.filter(u => !u.is_deleted).length;
+      console.log(`[DEBUG] Total staff in DB: ${allUsers.length} (active: ${active}, deleted: ${deleted})`);
+    }
+    
     res.json(rows || []);
-  } catch (err) { next(err); }
+  } catch (err) { 
+    console.error('[DEBUG] Error in staff list:', err);
+    next(err); 
+  }
 });
 
 // POST /api/accounts/staff — create a new staff account (admin-only)
