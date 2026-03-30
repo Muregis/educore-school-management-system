@@ -58,22 +58,36 @@ async function upsertSchoolSettings(schoolId, values) {
 router.get("/users", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    const currentUserId = String(req.user?.user_id || req.user?.userId || "");
+    
+    console.log(`[DEBUG] Settings/users: schoolId=${schoolId}, currentUserId=${currentUserId}`);
 
     // Prefer Supabase fluent API (no raw SQL, no MySQL fallback)
     const { data, error } = await supabase
       .from("users")
-      .select("user_id, full_name, email, phone, role, status, created_at")
+      .select("user_id, full_name, email, phone, role, status, created_at, is_deleted, school_id")
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
       .order("role")
       .order("full_name");
-    if (error) throw error;
+    
+    if (error) {
+      console.error(`[DEBUG] Supabase error:`, error);
+      throw error;
+    }
+
+    console.log(`[DEBUG] Found ${data?.length || 0} users from DB`);
+    if (data?.length > 0) {
+      console.log(`[DEBUG] First user:`, data[0]);
+    }
 
     const rows = Array.isArray(data) ? [...data] : [];
-    const currentUserId = String(req.user?.user_id || req.user?.userId || "");
     const hasCurrentUser = rows.some((user) => String(user.user_id) === currentUserId);
+    
+    console.log(`[DEBUG] hasCurrentUser=${hasCurrentUser}, currentUserId=${currentUserId}`);
 
     if (!hasCurrentUser && currentUserId) {
+      console.log(`[DEBUG] Injecting current user into results`);
       rows.unshift({
         user_id: req.user.user_id || req.user.userId,
         full_name: req.user.name || "Current Admin",
@@ -85,9 +99,13 @@ router.get("/users", requireRoles("admin"), async (req, res, next) => {
         is_session_user: true,
       });
     }
-
+    
+    console.log(`[DEBUG] Returning ${rows.length} users`);
     res.json(rows);
-  } catch (err) { next(err); }
+  } catch (err) { 
+    console.error(`[DEBUG] Error:`, err);
+    next(err); 
+  }
 });
 
 router.get("/school", async (req, res, next) => {
