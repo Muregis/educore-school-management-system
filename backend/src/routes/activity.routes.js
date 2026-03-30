@@ -107,8 +107,8 @@ router.get("/", async (req, res, next) => {
         .from("users")
         .select("user_id, full_name")
         .eq("school_id", schoolId)
-        .in("user_id", userIds)
-        .eq("is_deleted", false);
+        .in("user_id", userIds);
+        // Note: Removed is_deleted filter so deleted users still show in activity logs
 
       if (usersError) throw usersError;
       userNameMap = new Map((users || []).map(user => [String(user.user_id), user.full_name]));

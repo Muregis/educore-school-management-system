@@ -56,6 +56,22 @@ router.post("/staff", requireRoles("admin"), async (req, res, next) => {
     if (password.length < 6)
       return res.status(400).json({ message: "Password must be at least 6 characters" });
 
+    // Check if admin already exists when trying to create another admin
+    if (role === "admin") {
+      const { data: users, error: usersError } = await supabase
+        .from("users")
+        .select("user_id, full_name")
+        .eq("school_id", schoolId)
+        .in("role", ["admin"])
+        .maybeSingle();
+      if (usersError) throw usersError;
+      if (users) {
+        return res.status(409).json({ 
+          message: `An admin already exists: ${users.full_name} (${users.email}). Only one admin per school is allowed.` 
+        });
+      }
+    }
+
     const hash = await bcrypt.hash(password, 10);
     const { data: inserted, error: insertError } = await supabase
       .from('users')
