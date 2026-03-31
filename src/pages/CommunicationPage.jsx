@@ -29,12 +29,8 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
 
   const load = useCallback(async () => {
     if (!auth?.token) return;
-    try {
-      const data = await apiFetch("/communication/sms-logs", { token: auth.token });
-      setLogs(Array.isArray(data) ? data : []);
-    } catch {
-      setLogs([]);
-    }
+    // SMS logs removed - WhatsApp doesn't store logs server-side
+    setLogs([]);
     if (isStaff) {
       try {
         const status = await apiFetch("/communication/sms-status", { token: auth.token });
@@ -63,16 +59,13 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
     if (!singleForm.recipient || !singleForm.message) return toast("Recipient and message required", "error");
     setSending(true);
     try {
-      const res = await apiFetch("/communication/sms", { method: "POST", body: singleForm, token: auth.token });
-      // OLD: if (res.sent > 0) toast("SMS sent successfully","success");
+      const res = await apiFetch("/communication/whatsapp", { method: "POST", body: singleForm, token: auth.token });
       if (res.waLink) {
         window.open(res.waLink, "_blank", "noopener,noreferrer");
       }
       toast(res.message || "WhatsApp chat prepared", "success");
       setShowSingle(false);
-      // OLD: setSingleForm({ recipient: "", message: "" });
       setSingleForm({ recipient: "", selectedStudentId: "", message: "" });
-      load();
     } catch (e) {
       toast(e.message || "Failed", "error");
     }
@@ -83,10 +76,9 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
     if (!bulkForm.message) return toast("Message required", "error");
     setSending(true);
     try {
-      const data = await apiFetch("/communication/sms/bulk", { method: "POST", body: bulkForm, token: auth.token });
+      const data = await apiFetch("/communication/whatsapp/bulk", { method: "POST", body: bulkForm, token: auth.token });
       setBulkResult(data);
       toast(data.message || `Prepared ${data.queued || 0} WhatsApp chats`, "success");
-      load();
     } catch (e) {
       toast(e.message || "Failed", "error");
     }
