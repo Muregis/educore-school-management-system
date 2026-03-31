@@ -6,7 +6,7 @@ import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 
 // NEW: Tenant context middleware for automatic tenant isolation
 export function tenantContext(req, res, next) {
-  // Skip tenant validation for auth routes and health checks
+  // Skip tenant validation for auth routes, health checks, and superadmin
   const openPaths = [
     '/auth/',
     '/health',
@@ -17,6 +17,18 @@ export function tenantContext(req, res, next) {
     '/mpesa/c2b/validate',
   ];
   if (openPaths.some(p => req.path.startsWith(p))) {
+    return next();
+  }
+
+  // Superadmin bypass - can access all schools
+  if (req.user?.isSuperadmin || req.user?.role === 'superadmin') {
+    // Allow superadmin to specify which school to work with via query param
+    const requestedSchoolId = req.body?.school_id || req.query?.school_id || req.params?.school_id;
+    if (requestedSchoolId) {
+      req.user.school_id = Number(requestedSchoolId);
+      req.user.schoolId = Number(requestedSchoolId);
+      req.schoolId = Number(requestedSchoolId);
+    }
     return next();
   }
 
@@ -48,6 +60,11 @@ export function tenantSecurityCheck(req, res, next) {
     '/mpesa/c2b/validate',
   ];
   if (openPaths.some(p => req.path.startsWith(p))) {
+    return next();
+  }
+
+  // Superadmin bypass - can access any school's data
+  if (req.user?.isSuperadmin || req.user?.role === 'superadmin') {
     return next();
   }
 

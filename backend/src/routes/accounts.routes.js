@@ -187,17 +187,46 @@ router.patch("/staff/:id", async (req, res, next) => {
   }
 });
 
-// DELETE /api/accounts/staff/:id — soft delete (admin-only, cannot delete yourself)
+// DELETE /api/accounts/staff/:id — soft delete (admin-only, cannot delete yourself or last admin)
 router.delete("/staff/:id", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
-    if (String(req.params.id) === String(userId))
+    const targetId = req.params.id;
+    
+    // Prevent self-deletion
+    if (String(targetId) === String(userId))
       return res.status(400).json({ message: "You cannot delete your own account" });
+
+    // Check if target is an admin
+    const { data: targetUser, error: targetError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('user_id', targetId)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+    
+    if (targetError && targetError.code !== 'PGRST116') throw targetError;
+    
+    // If deleting an admin, check if this is the last one
+    if (targetUser?.role === 'admin') {
+      const { count, error: countError } = await supabase
+        .from('users')
+        .select('user_id', { count: 'exact', head: true })
+        .eq('school_id', schoolId)
+        .eq('role', 'admin')
+        .eq('is_deleted', false);
+      
+      if (countError) throw countError;
+      if (count <= 1) {
+        return res.status(400).json({ message: "Cannot delete the last admin account. Create another admin first." });
+      }
+    }
 
     const { data: updated, error } = await supabase
       .from('users')
       .update({ is_deleted: true, updated_at: new Date().toISOString() })
-      .eq('user_id', req.params.id)
+      .eq('user_id', targetId)
       .eq('school_id', schoolId)
       .in('role', ['admin', 'teacher', 'finance'])
       .select('user_id')

@@ -24,6 +24,8 @@ function logAuthEvent(level, event, details) {
   }
 }
 
+const SUPERADMIN_EMAIL = "muregivictor@gmail.com";
+
 export function authRequired(req, res, next) {
   // Attach request ID for tracing
   req.requestId = generateRequestId();
@@ -88,13 +90,28 @@ export function authRequired(req, res, next) {
       });
     }
 
-    // Normalize payload for consistent access
+    // Allow superadmin to bypass school_id requirement
+    if (payload.email === SUPERADMIN_EMAIL || payload.role === 'superadmin') {
+      req.user = {
+        ...payload,
+        user_id: payload.user_id || payload.userId,
+        userId: payload.user_id || payload.userId,
+        role: 'superadmin',
+        school_id: null, // Superadmin has access to all schools
+        schoolId: null,
+        isSuperadmin: true
+      };
+      return next();
+    }
+
+    // Normalize payload for consistent access (non-superadmin)
     req.user = {
       ...payload,
       user_id: payload.user_id || payload.userId,
       userId: payload.user_id || payload.userId,
       school_id: Number(payload.school_id || payload.schoolId),
-      schoolId: Number(payload.school_id || payload.schoolId)
+      schoolId: Number(payload.school_id || payload.schoolId),
+      isSuperadmin: false
     };
 
     // Validate school_id is a valid positive integer

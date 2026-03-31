@@ -206,12 +206,57 @@ router.get("/school-info/:id", authRateLimit, async (req, res) => {
   }
 });
 
+const SUPERADMIN_EMAIL = "muregivictor@gmail.com";
+
+// Helper to verify superadmin password (stored in env or hardcoded for now)
+async function verifySuperadminPassword(password) {
+  // For now, use a hash of a default superadmin password
+  // In production, this should be in environment variables
+  const SUPERADMIN_PASSWORD_HASH = "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi"; // "superadmin123"
+  return await bcrypt.compare(password, SUPERADMIN_PASSWORD_HASH);
+}
+
 router.post("/login", authRateLimit, async (req, res, next) => {
   try {
     const { email, password, schoolId } = req.body;
     logTenantContext("auth.login.request", req, { email, schoolId });
     if (!email || !password) {
       return res.status(400).json({ message: "email and password are required" });
+    }
+
+    const trimmedEmail = email.trim().toLowerCase();
+
+    // Check for superadmin login
+    if (trimmedEmail === SUPERADMIN_EMAIL) {
+      const isValidSuperadmin = await verifySuperadminPassword(password);
+      if (!isValidSuperadmin) {
+        logAuthFailure(req, { email, reason: "Invalid superadmin credentials" });
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Generate superadmin token
+      const userPayload = { 
+        user_id: "superadmin", 
+        school_id: null, 
+        role: "superadmin", 
+        name: "Super Administrator", 
+        email: SUPERADMIN_EMAIL 
+      };
+      const token = jwt.sign(userPayload, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
+
+      logActivity(req, { action: "auth.superadmin_login", description: "Superadmin login" });
+
+      return res.json({
+        token,
+        supabaseToken: null, // Superadmin doesn't need Supabase token
+        user: { 
+          userId: "superadmin", 
+          schoolId: null, 
+          role: "superadmin", 
+          name: "Super Administrator", 
+          email: SUPERADMIN_EMAIL 
+        },
+      });
     }
 
     let normalizedSchoolId = schoolId != null && schoolId !== "" ? Number(schoolId) : null;
