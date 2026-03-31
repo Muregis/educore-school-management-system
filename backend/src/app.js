@@ -34,6 +34,7 @@ import lessonPlansRoutes   from "./routes/lessonplans.routes.js";
 import announcementsRoutes from "./routes/announcements.routes.js";
 import importRoutes         from "./routes/import.routes.js";
 import ledgerRoutes        from "./routes/ledger.routes.js";
+import paymentConfigsRoutes from "./routes/payment-configs.routes.js";
 // import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }    from "./middleware/error.js";
 import { authRequired } from "./middleware/auth.js";
@@ -123,6 +124,7 @@ app.use("/api/lesson-plans",  lessonPlansRoutes);
 app.use("/api/announcements", announcementsRoutes);
 app.use("/api/import",         importRoutes);
 app.use("/api/ledger",         ledgerRoutes);
+app.use("/api/payment-configs",  paymentConfigsRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
 app.use(errorHandler);
