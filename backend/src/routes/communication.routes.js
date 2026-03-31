@@ -38,71 +38,15 @@ async function sendViaWhatsApp(recipients, message, schoolId, sentByUserId = nul
   };
 }
 
-router.get("/sms-status", async (req, res, next) => {
-  try {
-    const { schoolId } = req.user;
-    const { data: school, error } = await supabase
-      .from("schools")
-      .select("whatsapp_business_number")
-      .eq("school_id", schoolId)
-      .single();
-    if (error) throw error;
-
-    res.json({
-      whatsappConfigured: Boolean(school?.whatsapp_business_number),
-      whatsappMode: "wa.me",
-      schoolWhatsAppNumber: school?.whatsapp_business_number || null,
-      // OLD: atConfigured: Boolean(env.atApiKey && env.atUsername),
-      // OLD: username: env.atUsername || null,
-      // OLD: senderId: env.atSenderId || null,
-      // OLD: hasApiKey: Boolean(env.atApiKey),
-    });
-  } catch (err) { next(err); }
+router.get("/sms-status", async (req, res) => {
+  res.json({
+    disabled: true,
+    message: "SMS deprecated - use WhatsApp Business instead"
+  });
 });
 
-router.get("/sms-logs", async (req, res, next) => {
-  try {
-    const { schoolId, role, studentId } = req.user;
-
-    let query = supabase
-      .from("sms_logs")
-      .select("sms_id, recipient, message, channel, status, sent_at, provider_response")
-      .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .order("created_at", { ascending: false })
-      .limit(300);
-
-    if (role === "parent") {
-      const { data: student, error: studentError } = await supabase
-        .from("students")
-        .select("parent_phone")
-        .eq("school_id", schoolId)
-        .eq("student_id", studentId)
-        .eq("is_deleted", false)
-        .limit(1)
-        .maybeSingle();
-      if (studentError) throw studentError;
-
-      if (!student?.parent_phone) {
-        return res.json([]);
-      }
-
-      query = query
-        .eq("recipient", student.parent_phone)
-        .eq("status", "sent");
-    }
-
-    if (role === "student") {
-      return res.json([]);
-    }
-
-    const { data: rows, error } = await query;
-    if (error) throw error;
-    return res.json(rows || []);
-  } catch (err) { next(err); }
-});
-
-router.post("/sms", requireRoles("admin", "teacher"), async (req, res, next) => {
+// Single WhatsApp message
+router.post("/whatsapp", requireRoles("admin", "teacher"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const { recipient, message } = req.body;
@@ -132,7 +76,8 @@ router.post("/sms", requireRoles("admin", "teacher"), async (req, res, next) => 
   } catch (err) { next(err); }
 });
 
-router.post("/sms/bulk", requireRoles("admin", "teacher"), async (req, res, next) => {
+// Bulk WhatsApp messages
+router.post("/whatsapp/bulk", requireRoles("admin", "teacher"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const { className, message } = req.body;
@@ -180,20 +125,6 @@ router.post("/sms/bulk", requireRoles("admin", "teacher"), async (req, res, next
       recipients: phones,
       message: `Prepared ${result.queued} WhatsApp chats`,
     });
-  } catch (err) { next(err); }
-});
-
-router.patch("/sms-logs/:id/status", requireRoles("admin"), async (req, res, next) => {
-  try {
-    const { schoolId } = req.user;
-    const { status } = req.body;
-    const { error } = await supabase
-      .from("sms_logs")
-      .update({ status })
-      .eq("sms_id", req.params.id)
-      .eq("school_id", schoolId);
-    if (error) throw error;
-    res.json({ updated: true });
   } catch (err) { next(err); }
 });
 
@@ -346,7 +277,7 @@ router.post("/email/fee-reminder", requireRoles("admin", "finance"), async (req,
   } catch (err) { next(err); }
 });
 
-router.post("/sms/fee-defaulters", requireRoles("admin", "finance"), async (req, res, next) => {
+router.post("/whatsapp/fee-defaulters", requireRoles("admin", "finance"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const { className, customMessage } = req.body;
