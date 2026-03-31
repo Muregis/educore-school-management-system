@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import morgan from "morgan";
 import multer from "multer";
+import * as Sentry from "@sentry/node";
 import { env } from "./config/env.js";
 import { apiRateLimit } from "./middleware/tenantRateLimit.js";
 import healthRoutes        from "./routes/health.routes.js";
@@ -127,6 +128,11 @@ app.use("/api/ledger",         ledgerRoutes);
 app.use("/api/payment-configs",  paymentConfigsRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
+
+// Sentry error handler - must be added after all routes
+Sentry.setupExpressErrorHandler(app);
+
+// Legacy error handler (kept as fallback)
 app.use(errorHandler);
 
 // ── Start backup scheduler (daily at midnight) ───────────────────────────────

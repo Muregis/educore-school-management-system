@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import { C } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import AdminSettings from "./AdminSettings";
+import ErrorButton from "../components/ErrorButton";
 
 // ── Shared input style ────────────────────────────────────────────────────────
 const inp = {
@@ -310,6 +311,7 @@ const TABS = [
   { id: "users",    label: "👥 Users" },
   { id: "activity", label: "📋 Activity Logs" },
   { id: "backups",  label: "🗄️ DB Backups" },
+  { id: "dev",      label: "🐛 Dev Tools" },
 ];
 
 // ── Main SettingsPage ─────────────────────────────────────────────────────────
@@ -345,6 +347,13 @@ export default function SettingsPage({ auth, school, setSchool, users, setUsers,
       )}
       {(tab === "activity" || tab === "backups") && (
         <AdminSettings auth={auth} initialTab={tab} />
+      )}
+      {tab === "dev" && (
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
+          <h3 style={{ margin: "0 0 16px 0", color: C.text }}>Developer Tools</h3>
+          <p style={{ color: C.textMuted, marginBottom: 16 }}>Use these tools to test error tracking and debugging features.</p>
+          <ErrorButton />
+        </div>
       )}
     </div>
   );
