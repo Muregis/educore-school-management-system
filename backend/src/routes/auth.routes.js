@@ -476,7 +476,7 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       console.error("Failed to generate Supabase JWT:", error.message);
     }
 
-    req.user = { userId: user.user_id, schoolId: resolvedSchoolId, role, name };
+    req.user = { user_id: user.user_id, school_id: resolvedSchoolId, role, name };
     logActivity(req, { action: "auth.portal_login", description: `${role} login: ${name}` });
 
     res.json({

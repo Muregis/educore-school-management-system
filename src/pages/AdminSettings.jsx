@@ -519,28 +519,87 @@ const SchoolInfoTab = ({ onSave, auth }) => {
 SchoolInfoTab.propTypes = { onSave: PropTypes.func.isRequired, auth: PropTypes.object };
 
 // ─── USERS TAB ────────────────────────────────────────────────────────────────
-const UsersTab = ({ onSave }) => {
-  const [users, setUsers] = useState(INITIAL_USERS);
+const UsersTab = ({ onSave, auth }) => {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", role: "teacher", password: "" });
   const [showPwd, setShowPwd] = useState(false);
+  const [message, setMessage] = useState(null);
   const f = k => e => setForm({ ...form, [k]: e.target.value });
 
-  const initials = name => name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  // Load real users from backend
+  const loadUsers = async () => {
+    try {
+      const data = await apiFetch("/accounts/staff", { token: auth?.token });
+      // Map backend fields to frontend format
+      const mapped = (data || []).map(u => ({
+        id: u.user_id,
+        name: u.full_name,
+        email: u.email,
+        role: u.role,
+        status: u.status,
+        initials: u.full_name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "??",
+        color: colorPairs[Math.floor(Math.random() * colorPairs.length)],
+      }));
+      setUsers(mapped);
+    } catch (e) {
+      console.error("Failed to load users:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (auth?.token) loadUsers();
+  }, [auth]);
+
+  const initials = name => name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "??";
   const colorPairs = [[C.accent, C.purple],[C.teal, C.accent],[C.amber, C.rose],[C.purple, C.teal],[C.green, C.teal],[C.rose, C.amber]];
 
-  const addUser = () => {
+  // CREATE / UPDATE user via API
+  const addUser = async () => {
     if (!form.name || !form.email) return;
-    if (editId) {
-      setUsers(users.map(u => u.id === editId ? { ...u, name: form.name, email: form.email, role: form.role, initials: initials(form.name) } : u));
+    setLoading(true);
+    try {
+      if (editId) {
+        // Update existing user
+        const updates = {};
+        if (form.name) updates.name = form.name;
+        if (form.email) updates.email = form.email;
+        if (form.role && ["admin","teacher","finance"].includes(form.role)) updates.role = form.role;
+        if (form.password) updates.password = form.password;
+        
+        await apiFetch(`/accounts/staff/${editId}`, {
+          method: "PATCH",
+          token: auth?.token,
+          body: updates,
+        });
+        setMessage({ type: "success", text: "User updated successfully" });
+      } else {
+        // Create new user
+        await apiFetch("/accounts/staff", {
+          method: "POST",
+          token: auth?.token,
+          body: {
+            name: form.name,
+            email: form.email,
+            role: form.role,
+            password: form.password,
+          },
+        });
+        setMessage({ type: "success", text: "User created successfully" });
+      }
+      await loadUsers();
+      setForm({ name: "", email: "", role: "teacher", password: "" });
+      setShowAdd(false);
       setEditId(null);
-    } else {
-      setUsers([...users, { id: Date.now(), name: form.name, email: form.email, role: form.role, status: "active", initials: initials(form.name), color: colorPairs[users.length % colorPairs.length] }]);
+      onSave();
+    } catch (e) {
+      setMessage({ type: "error", text: e.message || "Failed to save user" });
     }
-    setForm({ name: "", email: "", role: "teacher", password: "" });
-    setShowAdd(false);
-    onSave();
+    setLoading(false);
   };
 
   const startEdit = u => {
@@ -549,8 +608,45 @@ const UsersTab = ({ onSave }) => {
     setShowAdd(true);
   };
 
-  const toggleStatus = id => setUsers(users.map(u => u.id === id ? { ...u, status: u.status === "active" ? "inactive" : "active" } : u));
-  const deleteUser = id => setUsers(users.filter(u => u.id !== id));
+  // Toggle status via API (active/inactive)
+  const toggleStatus = async id => {
+    const user = users.find(u => u.id === id);
+    if (!user) return;
+    const newStatus = user.status === "active" ? "inactive" : "active";
+    
+    setLoading(true);
+    try {
+      await apiFetch(`/accounts/staff/${id}`, {
+        method: "PATCH",
+        token: auth?.token,
+        body: { status: newStatus },
+      });
+      await loadUsers();
+      setMessage({ type: "success", text: `User ${newStatus === "active" ? "activated" : "deactivated"}` });
+    } catch (e) {
+      setMessage({ type: "error", text: e.message || "Failed to update status" });
+    }
+    setLoading(false);
+  };
+
+  // Soft delete via API
+  const deleteUser = async id => {
+    if (!confirm("Are you sure you want to delete this user?")) return;
+    setLoading(true);
+    try {
+      await apiFetch(`/accounts/staff/${id}`, {
+        method: "DELETE",
+        token: auth?.token,
+      });
+      await loadUsers();
+      setMessage({ type: "success", text: "User deleted successfully" });
+    } catch (e) {
+      setMessage({ type: "error", text: e.message || "Failed to delete user" });
+    }
+    setLoading(false);
+  };
+
+  if (loading && users.length === 0) return <div style={{ color: C.textSub }}>Loading users...</div>;
 
   return (
     <div>
@@ -558,6 +654,20 @@ const UsersTab = ({ onSave }) => {
         <div style={{ fontSize: 13, color: C.textSub }}>{users.length} accounts · {users.filter(u => u.status === "active").length} active</div>
         <Btn icon="plus" onClick={() => { setShowAdd(true); setEditId(null); setForm({ name: "", email: "", role: "teacher", password: "" }); }}>Add User</Btn>
       </div>
+
+      {message && (
+        <div style={{
+          marginBottom: 16,
+          padding: "10px 14px",
+          borderRadius: 8,
+          fontSize: 13,
+          background: message.type === "success" ? C.greenDim : C.roseDim,
+          border: `1px solid ${message.type === "success" ? C.green : C.rose}44`,
+          color: message.type === "success" ? C.green : C.rose,
+        }}>
+          {message.text}
+        </div>
+      )}
 
       {/* Add / Edit form */}
       {showAdd && (
@@ -606,14 +716,14 @@ const UsersTab = ({ onSave }) => {
               </div>
               {/* Actions */}
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <button onClick={() => toggleStatus(u.id)} title={u.status === "active" ? "Deactivate" : "Activate"}
-                  style={{ background: u.status === "active" ? C.greenDim : C.roseDim, border: "none", borderRadius: 8, padding: "6px 10px", cursor: "pointer", color: u.status === "active" ? C.green : C.rose, fontSize: 11, fontWeight: 700 }}>
+                <button onClick={() => toggleStatus(u.id)} disabled={loading} title={u.status === "active" ? "Deactivate" : "Activate"}
+                  style={{ background: u.status === "active" ? C.greenDim : C.roseDim, border: "none", borderRadius: 8, padding: "6px 10px", cursor: loading ? "not-allowed" : "pointer", color: u.status === "active" ? C.green : C.rose, fontSize: 11, fontWeight: 700, opacity: loading ? 0.6 : 1 }}>
                   {u.status === "active" ? "Active" : "Inactive"}
                 </button>
-                <button onClick={() => startEdit(u)} style={{ background: C.accentGlow, border: `1px solid ${C.accentDim}`, borderRadius: 8, padding: 7, cursor: "pointer", color: C.accent }}>
+                <button onClick={() => startEdit(u)} disabled={loading} style={{ background: C.accentGlow, border: `1px solid ${C.accentDim}`, borderRadius: 8, padding: 7, cursor: loading ? "not-allowed" : "pointer", color: C.accent, opacity: loading ? 0.6 : 1 }}>
                   <Icon name="edit" size={13} />
                 </button>
-                <button onClick={() => deleteUser(u.id)} style={{ background: C.roseDim, border: `1px solid ${C.rose}33`, borderRadius: 8, padding: 7, cursor: "pointer", color: C.rose }}>
+                <button onClick={() => deleteUser(u.id)} disabled={loading} style={{ background: C.roseDim, border: `1px solid ${C.rose}33`, borderRadius: 8, padding: 7, cursor: loading ? "not-allowed" : "pointer", color: C.rose, opacity: loading ? 0.6 : 1 }}>
                   <Icon name="trash" size={13} />
                 </button>
               </div>
@@ -625,7 +735,7 @@ const UsersTab = ({ onSave }) => {
   );
 };
 
-UsersTab.propTypes = { onSave: PropTypes.func.isRequired };
+UsersTab.propTypes = { onSave: PropTypes.func.isRequired, auth: PropTypes.object };
 
 // ─── SECURITY TAB ─────────────────────────────────────────────────────────────
 const SecurityTab = ({ onSave }) => {
@@ -874,7 +984,7 @@ export default function AdminSettings({ auth, initialTab }) {
     const save = () => showToast("Changes saved successfully!");
     switch (activeTab) {
       case "school":        return <SchoolInfoTab onSave={save} auth={auth} />;
-      case "users":         return <UsersTab onSave={save} />;
+      case "users":         return <UsersTab onSave={save} auth={auth} />;
       case "security":      return <SecurityTab onSave={save} />;
       case "notifications": return <NotificationsTab onSave={save} />;
       case "activity":      return <ActivityLogsTab auth={auth} />;
