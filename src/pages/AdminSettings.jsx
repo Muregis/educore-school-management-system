@@ -183,8 +183,12 @@ const INITIAL_USERS = [];
 const ROLE_META = {
   admin:   { label: "Admin",   color: C.purple, dim: C.purpleDim },
   teacher: { label: "Teacher", color: C.teal,   dim: C.tealDim },
+  finance: { label: "Finance", color: C.green,  dim: C.greenDim },
   viewer:  { label: "Viewer",  color: C.amber,  dim: C.amberDim },
 };
+
+// Fallback for unknown roles
+const getRoleMeta = (role) => ROLE_META[role] || { label: role, color: C.textMuted, dim: C.surface };
 
 // ─── TABS ─────────────────────────────────────────────────────────────────────
 // ─── ACTIVITY LOGS TAB ───────────────────────────────────────────────────────
@@ -698,7 +702,7 @@ const UsersTab = ({ onSave, auth }) => {
       {/* User list */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {users.map(u => {
-          const role = ROLE_META[u.role];
+          const role = getRoleMeta(u.role);
           return (
             <div key={u.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14 }}>
               {/* Avatar */}
