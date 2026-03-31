@@ -29,7 +29,6 @@ const SUPERADMIN_EMAIL = "muregivictor@gmail.com";
 export function authRequired(req, res, next) {
   // Attach request ID for tracing
   req.requestId = generateRequestId();
-
   // Allowlist unauthenticated webhooks / callbacks
   const openPaths = [
     "/paystack/webhook",
