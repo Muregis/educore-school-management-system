@@ -63,7 +63,9 @@ export default function LibraryPage({ auth, students = [], teachers = [] }) {
   const filteredBooks = useMemo(() => books.filter(b => {
     const q = search.toLowerCase();
     const matchSearch = !q || b.title?.toLowerCase().includes(q) || b.author?.toLowerCase().includes(q) || b.isbn?.includes(q);
-    const matchCat = catFilter === "all" || b.category === catFilter;
+    // Case-insensitive category matching with fallback
+    const bookCategory = (b.category || "General").toString();
+    const matchCat = catFilter === "all" || bookCategory.toLowerCase() === catFilter.toLowerCase();
     return matchSearch && matchCat;
   }), [books, search, catFilter]);
 
