@@ -830,7 +830,12 @@ const IntegrationsTab = ({ auth }) => {
   const [config, setConfig] = useState({
     mpesaShortcode: "", mpesaConsumerKey: "", mpesaConsumerSecret: "", mpesaPasskey: "",
     paystackPublicKey: "", paystackSecretKey: "",
-    smsEnabled: false, smsSenderId: ""
+    smsEnabled: false, smsSenderId: "",
+    whatsappEnabled: false,
+    whatsappApiUrl: "",
+    whatsappPhoneNumberId: "",
+    whatsappToken: "",
+    whatsappBusinessAccountId: ""
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
@@ -867,7 +872,7 @@ const IntegrationsTab = ({ auth }) => {
       {/* M-Pesa section */}
       <div style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.15)", borderRadius: 16, padding: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#22C55E", display: "flex", alignItems: "center", justifyCenter: "center", fontSize: 20 }}>💸</div>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#22C55E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>💸</div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>M-Pesa (Daraja API)</div>
             <div style={{ fontSize: 11, color: C.textMuted }}>Accept mobile money payments via STK Push</div>
@@ -884,7 +889,7 @@ const IntegrationsTab = ({ auth }) => {
       {/* Paystack section */}
       <div style={{ background: "rgba(59,130,246,0.05)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: 16, padding: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#3B82F6", display: "flex", alignItems: "center", justifyCenter: "center", fontSize: 20 }}>💳</div>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#3B82F6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>💳</div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Paystack</div>
             <div style={{ fontSize: 11, color: C.textMuted }}>Accept Card, Bank Transfer, and Apple Pay</div>
@@ -892,6 +897,69 @@ const IntegrationsTab = ({ auth }) => {
         </div>
         <Inp label="Public Key" value={config.paystackPublicKey || ""} onChange={e => setConfig({ ...config, paystackPublicKey: e.target.value })} placeholder="pk_test_..." />
         <Inp label="Secret Key" value={config.paystackSecretKey || ""} onChange={e => setConfig({ ...config, paystackSecretKey: e.target.value })} placeholder="sk_test_..." />
+      </div>
+
+      {/* WhatsApp section */}
+      <div style={{ background: "rgba(37,211,102,0.05)", border: "1px solid rgba(37,211,102,0.15)", borderRadius: 16, padding: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#25D366", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>📱</div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>WhatsApp Business API</div>
+            <div style={{ fontSize: 11, color: C.textMuted }}>Send payment receipts and notifications via WhatsApp</div>
+          </div>
+        </div>
+        
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+            <input 
+              type="checkbox" 
+              checked={config.whatsappEnabled || false}
+              onChange={e => setConfig({ ...config, whatsappEnabled: e.target.checked })}
+              style={{ width: 18, height: 18 }}
+            />
+            <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Enable WhatsApp messaging</span>
+          </label>
+        </div>
+
+        {config.whatsappEnabled && (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+              <Inp 
+                label="Phone Number ID" 
+                value={config.whatsappPhoneNumberId || ""} 
+                onChange={e => setConfig({ ...config, whatsappPhoneNumberId: e.target.value })} 
+                placeholder="e.g. 123456789012345" 
+              />
+              <Inp 
+                label="Business Account ID (Optional)" 
+                value={config.whatsappBusinessAccountId || ""} 
+                onChange={e => setConfig({ ...config, whatsappBusinessAccountId: e.target.value })} 
+                placeholder="e.g. 987654321098765" 
+              />
+            </div>
+            <Inp 
+              label="API Token" 
+              type="password"
+              value={config.whatsappToken || ""} 
+              onChange={e => setConfig({ ...config, whatsappToken: e.target.value })} 
+              placeholder="EAAB... (Meta/Facebook access token)"
+            />
+            <Inp 
+              label="API URL (Optional)" 
+              value={config.whatsappApiUrl || ""} 
+              onChange={e => setConfig({ ...config, whatsappApiUrl: e.target.value })} 
+              placeholder="https://graph.facebook.com/v18.0" 
+            />
+            <div style={{ marginTop: 12, padding: 12, background: C.surface, borderRadius: 8, fontSize: 11, color: C.textSub }}>
+              <strong>How to get credentials:</strong>
+              <ol style={{ margin: "8px 0 0 16px", padding: 0 }}>
+                <li>Create a Meta Business account at business.facebook.com</li>
+                <li>Set up WhatsApp Business API in the Meta Developer portal</li>
+                <li>Copy the Phone Number ID and generate a permanent access token</li>
+              </ol>
+            </div>
+          </>
+        )}
       </div>
 
       {message && (

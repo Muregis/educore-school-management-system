@@ -24,7 +24,7 @@ function logAuthEvent(level, event, details) {
   }
 }
 
-const SUPERADMIN_EMAIL = "muregivictor@gmail.com";
+const SUPERADMIN_EMAIL = env.superadminEmail;
 
 export function authRequired(req, res, next) {
   // Attach request ID for tracing

@@ -71,7 +71,14 @@ router.put("/", requireRoles("admin", "finance"), async (req, res, next) => {
       
       // SMS Configuration
       smsEnabled = false,
-      smsSenderId
+      smsSenderId,
+      
+      // WhatsApp Configuration
+      whatsappEnabled = false,
+      whatsappApiUrl,
+      whatsappPhoneNumberId,
+      whatsappToken,
+      whatsappBusinessAccountId
     } = req.body;
 
     const configData = {
@@ -101,6 +108,13 @@ router.put("/", requireRoles("admin", "finance"), async (req, res, next) => {
       // SMS
       sms_enabled: smsEnabled,
       sms_sender_id: smsSenderId,
+      
+      // WhatsApp
+      whatsapp_enabled: whatsappEnabled,
+      whatsapp_api_url: whatsappApiUrl,
+      whatsapp_phone_number_id: whatsappPhoneNumberId,
+      whatsapp_token: whatsappToken,
+      whatsapp_business_account_id: whatsappBusinessAccountId,
       
       is_active: true,
       is_deleted: false

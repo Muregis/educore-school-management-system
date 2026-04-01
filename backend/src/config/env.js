@@ -48,6 +48,9 @@ export const env = {
   smtpPass:     process.env.SMTP_PASS     || "",
   smtpFrom:     process.env.SMTP_FROM     || "noreply@greenfield.ac.ke",
   smtpFromName: process.env.SMTP_FROM_NAME|| "Greenfield Academy",
+
+  // Superadmin
+  superadminEmail: clean(process.env.SUPERADMIN_EMAIL) || "muregivictor@gmail.com",
 };
 
 // Validate production environment variables
