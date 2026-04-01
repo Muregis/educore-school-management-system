@@ -844,7 +844,29 @@ const IntegrationsTab = ({ auth }) => {
   useEffect(() => {
     apiFetch("/payment-configs", { token: auth?.token })
       .then(res => {
-        if (res.exists) setConfig(prev => ({ ...prev, ...res.config }));
+        if (res.exists && res.config) {
+          const c = res.config;
+          setConfig(prev => ({
+            ...prev,
+            // M-Pesa
+            mpesaShortcode: c.mpesa_shortcode || "",
+            mpesaConsumerKey: c.mpesa_consumer_key || "",
+            mpesaConsumerSecret: c.mpesa_consumer_secret || "",
+            mpesaPasskey: c.mpesa_passkey || "",
+            // Paystack
+            paystackPublicKey: c.paystack_public_key || "",
+            paystackSecretKey: c.paystack_secret_key || "",
+            // SMS
+            smsEnabled: c.sms_enabled || false,
+            smsSenderId: c.sms_sender_id || "",
+            // WhatsApp - map snake_case to camelCase
+            whatsappEnabled: c.whatsapp_enabled || false,
+            whatsappApiUrl: c.whatsapp_api_url || "",
+            whatsappPhoneNumberId: c.whatsapp_phone_number_id || "",
+            whatsappToken: c.whatsapp_token || "",
+            whatsappBusinessAccountId: c.whatsapp_business_account_id || ""
+          }));
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
