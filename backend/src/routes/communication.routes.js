@@ -39,9 +39,26 @@ async function sendViaWhatsApp(recipients, message, schoolId, sentByUserId = nul
 }
 
 router.get("/sms-status", async (req, res) => {
+  const { schoolId } = req.user;
+  const { data: school, error } = await supabase
+    .from("schools")
+    .select("whatsapp_business_number")
+    .eq("school_id", schoolId)
+    .single();
+
+  if (error || !school?.whatsapp_business_number) {
+    return res.json({
+      disabled: true,
+      configured: false,
+      message: "WhatsApp Business number not configured. Please set it in School Settings."
+    });
+  }
+
   res.json({
-    disabled: true,
-    message: "SMS deprecated - use WhatsApp Business instead"
+    disabled: false,
+    configured: true,
+    number: school.whatsapp_business_number,
+    message: "WhatsApp Business is configured"
   });
 });
 

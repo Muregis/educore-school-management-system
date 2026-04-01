@@ -42,12 +42,22 @@ router.get("/", async (req, res) => {
     healthCheck.database_error = dbError.message;
   }
 
-  // Check WhatsApp configuration
-  if (env.whatsappToken && env.whatsappPhoneNumberId && env.whatsappApiUrl) {
-    healthCheck.services.whatsapp = "configured";
-  } else {
-    healthCheck.services.whatsapp = "not_configured";
-    healthCheck.status = healthCheck.status === "healthy" ? "degraded" : healthCheck.status;
+  // Check WhatsApp configuration from school settings
+  try {
+    const { data: schoolWa } = await supabase
+      .from('schools')
+      .select('whatsapp_business_number')
+      .limit(1)
+      .maybeSingle();
+    
+    if (schoolWa?.whatsapp_business_number) {
+      healthCheck.services.whatsapp = "configured";
+    } else {
+      healthCheck.services.whatsapp = "not_configured";
+      healthCheck.status = healthCheck.status === "healthy" ? "degraded" : healthCheck.status;
+    }
+  } catch {
+    healthCheck.services.whatsapp = "error";
   }
 
   // Check Paystack configuration
