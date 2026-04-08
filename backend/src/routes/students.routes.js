@@ -24,6 +24,7 @@ router.get("/", async (req, res, next) => {
       .order('first_name');
 
     if (error) throw error;
+    console.log('[DEBUG] GET students first row:', rows?.[0]);
     res.json(rows || []);
   } catch (err) { next(err); }
 });
@@ -57,6 +58,8 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
       parentPhone = null, email = null, address = null,
       admissionDate = null, status = "active"
     } = req.body;
+    
+    console.log('[DEBUG] POST /students req.body:', req.body);
 
     if (!admissionNumber || !firstName || !lastName || !gender)
       return res.status(400).json({ message: "admissionNumber, firstName, lastName, gender are required" });
@@ -88,6 +91,8 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
       if (cls) resolvedClassId = cls.class_id;
     }
 
+    console.log('[DEBUG] Inserting student with class_name:', resolvedClassName, 'parent_name:', parentName, 'parent_phone:', parentPhone);
+    
     const { data: result, error } = await supabase
       .from('students')
       .insert({
@@ -111,6 +116,7 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
       .single();
 
     if (error) throw error;
+    console.log('[DEBUG] Insert result:', result);
     const studentId = result.student_id;
 
     // Auto-create portal accounts (login: admissionNumber, pass: admissionNumber)
@@ -156,13 +162,16 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
     } catch { /* ignore if account already exists */ }
 
     // Return the full new student row so frontend can update state correctly
-    const { data: newRow } = await supabase
+    const { data: newRow, error: fetchError } = await supabase
       .from('students')
       .select('*')
       .eq('student_id', studentId)
       .eq('school_id', schoolId)
       .limit(1)
       .single();
+    
+    if (fetchError) console.log('[DEBUG] Fetch error:', fetchError);
+    console.log('[DEBUG] Returning newRow:', newRow);
 
     logActivity(req, { action: "student.create", entity: "student", entityId: studentId, description: `Student admitted: ${firstName} ${lastName}` });
     res.status(201).json(newRow);
