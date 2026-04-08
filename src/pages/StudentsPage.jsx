@@ -22,7 +22,7 @@ function normalise(s) {
     className:   s.class_name  ?? s.className  ?? "",
     gender:      s.gender      ?? "female",
     parentName:  s.parent_name ?? s.parentName ?? "",
-    parentPhone: s.phone       ?? s.parentPhone ?? "",
+    parentPhone: s.parent_phone ?? s.parentPhone ?? "",
     dob:         s.date_of_birth ?? s.dob ?? "",
     status:      s.status      ?? "active",
   };
