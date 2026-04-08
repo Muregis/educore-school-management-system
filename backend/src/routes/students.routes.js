@@ -16,7 +16,7 @@ router.get("/", async (req, res, next) => {
     const { data: rows, error } = await supabase
       .from('students')
       .select(
-        'student_id, admission_number, first_name, last_name, gender, class_id, class_name, status, date_of_birth, phone, email, parent_name, parent_phone, admission_date, created_at'
+        'student_id, admission_number, first_name, last_name, gender, class_id, class_name, status, date_of_birth, nemis_number, phone, email, parent_name, parent_phone, admission_date, created_at'
       )
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
@@ -54,7 +54,7 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
     const { schoolId } = req.user;
     const {
       admissionNumber, firstName, lastName, gender, className,
-      classId = null, dateOfBirth = null, phone = null, parentName = null,
+      classId = null, dateOfBirth = null, nemisNumber = null, phone = null, parentName = null,
       parentPhone = null, email = null, address = null,
       admissionDate = null, status = "active"
     } = req.body;
@@ -109,6 +109,7 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
         last_name: lastName,
         gender,
         date_of_birth: dateOfBirth,
+        nemis_number: nemisNumber,
         phone,
         email,
         address,
@@ -193,7 +194,7 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
     const { schoolId } = req.user;
     const {
       firstName, lastName, gender, className, classId,
-      dateOfBirth, phone, parentName, parentPhone, email, address, status
+      dateOfBirth, nemisNumber, phone, parentName, parentPhone, email, address, status
     } = req.body;
 
     let resolvedClassId = classId || null;
@@ -221,6 +222,7 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
         class_id: resolvedClassId,
         class_name: className || null,
         date_of_birth: dateOfBirth || null,
+        nemis_number: nemisNumber || null,
         phone: phone || null,
         email: email || null,
         address: address || null,

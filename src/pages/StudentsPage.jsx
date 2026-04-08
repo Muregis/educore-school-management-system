@@ -24,6 +24,7 @@ function normalise(s) {
     parentName:  s.parent_name ?? s.parentName ?? "",
     parentPhone: s.parent_phone ?? s.parentPhone ?? "",
     dob:         s.date_of_birth ?? s.dob ?? "",
+    nemisNumber: s.nemis_number ?? s.nemisNumber ?? "",
     status:      s.status      ?? "active",
   };
 }
@@ -37,7 +38,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [editId, setEditId] = useState(null);
   const [profile, setProfile] = useState(null);
   const [err, setErr] = useState("");
-  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", status: "active", admission: "" });
+  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", status: "active", admission: "" });
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -56,7 +57,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const normalised = useMemo(() => students.map(s => s.first_name ? normalise(s) : s), [students]);
 
   const filtered = normalised.filter(s =>
-    `${s.firstName} ${s.lastName} ${s.className} ${s.admission} ${s.parentPhone || ""}`
+    `${s.firstName} ${s.lastName} ${s.className} ${s.admission} ${s.parentPhone || ""} ${s.nemisNumber || ""}`
       .toLowerCase().includes(q.toLowerCase()) &&
     (cls === "all" || s.className === cls) &&
     (status === "all" || s.status === status)
@@ -67,7 +68,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
   const openAdd = () => {
     setEditId(null); setErr("");
-    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", status: "active", admission: "" });
+    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", status: "active", admission: "" });
     setShow(true);
   };
 
@@ -89,14 +90,14 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       if (editId) {
         await apiFetch(`/students/${editId}`, {
           method: "PUT",
-          body: { firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, phone: f.parentPhone || null, email: null, address: null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
+          body: { firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, phone: f.parentPhone || null, email: null, address: null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
           token: auth?.token,
         });
         setStudents(prev => prev.map(s => (s.id === editId || s.student_id === editId) ? { ...normalise(s), ...f, id: editId } : s));
       } else {
         const res = await apiFetch(`/students`, {
           method: "POST",
-          body: { admissionNumber: f.admission || `ADM-${Date.now()}`, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, phone: f.parentPhone || null, email: null, address: null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
+          body: { admissionNumber: f.admission || `ADM-${Date.now()}`, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, phone: f.parentPhone || null, email: null, address: null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
           token: auth?.token,
         });
         setStudents(prev => [...prev, normalise(res)]);
@@ -170,6 +171,8 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
             <Field label="Status"><select style={inputStyle} value={f.status} onChange={e => setF({ ...f, status: e.target.value })}><option value="active">active</option><option value="inactive">inactive</option></select></Field>
             <Field label="Parent"><input style={inputStyle} value={f.parentName || ""} onChange={e => setF({ ...f, parentName: e.target.value })} /></Field>
             <Field label="Parent WhatsApp"><input style={inputStyle} value={f.parentPhone || ""} onChange={e => setF({ ...f, parentPhone: e.target.value })} placeholder="07xxxxxxxx, 01xxxxxxxx, 2547..." /></Field>
+            <Field label="Date of Birth"><input type="date" style={inputStyle} value={f.dob || ""} onChange={e => setF({ ...f, dob: e.target.value })} /></Field>
+            <Field label="NEMIS Number"><input style={inputStyle} value={f.nemisNumber || ""} onChange={e => setF({ ...f, nemisNumber: e.target.value.toUpperCase() })} placeholder="e.g. NEM12345678" /></Field>
           </div>
           {err && <Msg text={err} tone="error" />}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -182,6 +185,8 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         <Modal title="Student Profile" onClose={() => setProfile(null)}>
           <div style={{ color: C.text, fontWeight: 700, fontSize: 17 }}>{profile.firstName} {profile.lastName}</div>
           <div style={{ color: C.textSub, marginBottom: 8 }}>{profile.admission} | {profile.className}</div>
+          {profile.dob && <div style={{ color: C.textSub, marginBottom: 8 }}>Date of Birth: {new Date(profile.dob).toLocaleDateString()}</div>}
+          {profile.nemisNumber && <div style={{ color: C.textSub, marginBottom: 8 }}>NEMIS: {profile.nemisNumber}</div>}
           <div style={{ color: C.textSub, marginBottom: 8 }}>Parent: {profile.parentName} ({profile.parentPhone || "-"})</div>
           <div style={{ color: C.textSub, marginBottom: 8 }}>Expected Fees: {money(expected(profile.className))}</div>
           <div style={{ color: C.textSub, marginBottom: 8 }}>Paid: {money(payments.filter(p => (p.studentId ?? p.student_id) === profile.id && p.status === "paid").reduce((s, p) => s + Number(p.amount), 0))}</div>

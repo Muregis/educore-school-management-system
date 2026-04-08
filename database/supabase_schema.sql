@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS students (
   last_name        VARCHAR(100) NOT NULL,
   gender           VARCHAR(20) NOT NULL CHECK (gender IN ('male','female','other')),
   date_of_birth    DATE NULL,
+  nemis_number     VARCHAR(40)  NULL,
   phone            VARCHAR(40)  NULL,
   email            VARCHAR(160) NULL,
   address          VARCHAR(255) NULL,
