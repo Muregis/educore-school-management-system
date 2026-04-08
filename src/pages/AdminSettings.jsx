@@ -461,10 +461,10 @@ const SchoolInfoTab = ({ onSave, auth }) => {
         </div>
         <Inp 
           label="WhatsApp Business Number" 
-          hint="Format: 2547xxxxxxxx or +2547xxxxxxxx (Kenyan numbers only)"
+          hint="Formats: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx (Kenyan numbers)"
           value={form.whatsapp_business_number} 
           onChange={f("whatsapp_business_number")} 
-          placeholder="254712345678" 
+          placeholder="254712345678 or 0112345678" 
         />
         {form.whatsapp_business_number && (
           <div style={{ marginTop: 12, padding: 10, background: C.surface, borderRadius: 8, fontSize: 11, color: C.textSub }}>
