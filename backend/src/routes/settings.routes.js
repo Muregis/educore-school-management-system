@@ -342,17 +342,23 @@ router.patch("/school/whatsapp", requireRoles("admin"), async (req, res, next) =
     const { schoolId } = req.user;
     const { whatsapp_business_number } = req.body;
 
+    console.log('[DEBUG] PATCH /school/whatsapp - schoolId:', schoolId, 'received:', whatsapp_business_number);
+
     // Validate WhatsApp number format (Kenyan) - supports 07, 01, 254, +254 prefixes
     if (whatsapp_business_number) {
       const cleanNumber = whatsapp_business_number.replace(/[^\d+]/g, '');
+      console.log('[DEBUG] Cleaned number:', cleanNumber);
       const phoneRegex = /^(\+?254|0)[17][0-9]{8}$/;
       if (!phoneRegex.test(cleanNumber)) {
+        console.log('[DEBUG] Validation FAILED for:', cleanNumber);
         return res.status(400).json({ 
           message: "Invalid WhatsApp number format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx" 
         });
       }
+      console.log('[DEBUG] Validation passed');
     }
 
+    console.log('[DEBUG] Updating Supabase with:', whatsapp_business_number);
     const { data, error } = await supabase
       .from("schools")
       .update({ 
@@ -364,14 +370,24 @@ router.patch("/school/whatsapp", requireRoles("admin"), async (req, res, next) =
       .select("school_id, whatsapp_business_number")
       .single();
 
-    if (error) throw error;
-    if (!data) return res.status(404).json({ message: "School not found" });
+    if (error) {
+      console.log('[DEBUG] Supabase error:', error);
+      throw error;
+    }
+    if (!data) {
+      console.log('[DEBUG] No data returned from Supabase');
+      return res.status(404).json({ message: "School not found" });
+    }
 
+    console.log('[DEBUG] Success - saved:', data.whatsapp_business_number);
     res.json({ 
       updated: true, 
       whatsapp_business_number: data.whatsapp_business_number 
     });
-  } catch (err) { next(err); }
+  } catch (err) { 
+    console.log('[DEBUG] Error caught:', err.message);
+    next(err); 
+  }
 });
 
 export default router;

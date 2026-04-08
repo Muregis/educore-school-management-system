@@ -397,19 +397,21 @@ const SchoolInfoTab = ({ onSave, auth }) => {
   const saveSchoolInfo = async () => {
     setLoading(true); setMessage(null);
     try {
-      // Save WhatsApp number separately
-      if (form.whatsapp_business_number !== undefined) {
-        await apiFetch("/settings/school/whatsapp", {
-          method: "PATCH",
-          body: { whatsapp_business_number: form.whatsapp_business_number },
-          token: auth?.token,
-        });
-      }
+      console.log('[DEBUG] Saving WhatsApp number:', form.whatsapp_business_number);
       
-      setMessage({ type: "success", text: "School information saved successfully!" });
+      // Save WhatsApp number
+      const whatsappRes = await apiFetch("/settings/school/whatsapp", {
+        method: "PATCH",
+        body: { whatsapp_business_number: form.whatsapp_business_number },
+        token: auth?.token,
+      });
+      console.log('[DEBUG] WhatsApp save response:', whatsappRes);
+      
+      setMessage({ type: "success", text: "School WhatsApp number saved successfully!" });
       onSave();
     } catch (err) {
-      setMessage({ type: "error", text: err.message || "Failed to save school information" });
+      console.error('[DEBUG] Save failed:', err);
+      setMessage({ type: "error", text: err.message || "Failed to save WhatsApp number" });
     }
     setLoading(false);
   };
