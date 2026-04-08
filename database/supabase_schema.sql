@@ -97,6 +97,12 @@ CREATE TABLE IF NOT EXISTS students (
   address          VARCHAR(255) NULL,
   parent_name      VARCHAR(160) NULL,
   parent_phone     VARCHAR(40)  NULL,
+  blood_group      VARCHAR(10)  NULL,
+  allergies        TEXT NULL,
+  medical_conditions TEXT NULL,
+  emergency_contact_name VARCHAR(160) NULL,
+  emergency_contact_phone VARCHAR(40) NULL,
+  emergency_contact_relationship VARCHAR(50) NULL,
   admission_date   DATE NULL,
   status           VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive','graduated','transferred')),
   is_deleted       BOOLEAN NOT NULL DEFAULT FALSE,
@@ -111,6 +117,27 @@ CREATE INDEX IF NOT EXISTS idx_students_school_status ON students(school_id, sta
 CREATE INDEX IF NOT EXISTS idx_students_parent_phone ON students(school_id, parent_phone);
 CREATE INDEX IF NOT EXISTS idx_students_deleted ON students(is_deleted);
 CREATE INDEX IF NOT EXISTS idx_students_class_name ON students(school_id, class_name);
+
+-- SUBJECTS TABLE - School curriculum management
+CREATE TABLE IF NOT EXISTS subjects (
+  subject_id      BIGSERIAL PRIMARY KEY,
+  school_id       BIGINT NOT NULL REFERENCES schools(school_id),
+  name            VARCHAR(100) NOT NULL,
+  code            VARCHAR(20) NULL,
+  category        VARCHAR(50) NULL,
+  description     TEXT NULL,
+  class_levels    VARCHAR(255) NULL,
+  max_marks       INTEGER NOT NULL DEFAULT 100,
+  pass_marks      INTEGER NOT NULL DEFAULT 40,
+  is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+  is_deleted      BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  UNIQUE (school_id, name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_subjects_school ON subjects(school_id, is_deleted, is_active);
+CREATE INDEX IF NOT EXISTS idx_subjects_category ON subjects(category);
 
 -- Guardians table (separate from parent users)
 CREATE TABLE IF NOT EXISTS guardians (

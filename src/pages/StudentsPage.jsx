@@ -5,6 +5,7 @@ import Field from "../components/Field";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
 import Table from "../components/Table";
+import StudentIDCard from "../components/StudentIDCard";
 import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
@@ -25,6 +26,12 @@ function normalise(s) {
     parentPhone: s.parent_phone ?? s.parentPhone ?? "",
     dob:         s.date_of_birth ?? s.dob ?? "",
     nemisNumber: s.nemis_number ?? s.nemisNumber ?? "",
+    bloodGroup:  s.blood_group ?? s.bloodGroup ?? "",
+    allergies:   s.allergies ?? "",
+    medicalConditions: s.medical_conditions ?? s.medicalConditions ?? "",
+    emergencyContactName: s.emergency_contact_name ?? s.emergencyContactName ?? "",
+    emergencyContactPhone: s.emergency_contact_phone ?? s.emergencyContactPhone ?? "",
+    emergencyContactRelationship: s.emergency_contact_relationship ?? s.emergencyContactRelationship ?? "",
     status:      s.status      ?? "active",
   };
 }
@@ -37,8 +44,9 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [show, setShow] = useState(false);
   const [editId, setEditId] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [idCardStudent, setIdCardStudent] = useState(null);
   const [err, setErr] = useState("");
-  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", status: "active", admission: "" });
+  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", status: "active", admission: "" });
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -68,7 +76,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
   const openAdd = () => {
     setEditId(null); setErr("");
-    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", status: "active", admission: "" });
+    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", status: "active", admission: "" });
     setShow(true);
   };
 
@@ -90,14 +98,14 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       if (editId) {
         await apiFetch(`/students/${editId}`, {
           method: "PUT",
-          body: { firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, phone: f.parentPhone || null, email: null, address: null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
+          body: { firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
           token: auth?.token,
         });
         setStudents(prev => prev.map(s => (s.id === editId || s.student_id === editId) ? { ...normalise(s), ...f, id: editId } : s));
       } else {
         const res = await apiFetch(`/students`, {
           method: "POST",
-          body: { admissionNumber: f.admission || `ADM-${Date.now()}`, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, phone: f.parentPhone || null, email: null, address: null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
+          body: { admissionNumber: f.admission || `ADM-${Date.now()}`, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
           token: auth?.token,
         });
         setStudents(prev => [...prev, normalise(res)]);
@@ -151,6 +159,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
                 <Badge key="b" text={s.status} tone={s.status === "active" ? "success" : "danger"} />,
                 <div key="a" style={{ display: "flex", gap: 6 }}>
                   <Btn variant="ghost" onClick={() => setProfile(s)}>Profile</Btn>
+                  <Btn variant="ghost" onClick={() => setIdCardStudent(s)}>🪪 ID Card</Btn>
                   {canEdit && auth.role !== "finance" && <Btn variant="ghost" onClick={() => { setEditId(s.id); setF(s); setShow(true); }}>Edit</Btn>}
                   {canEdit && auth.role !== "finance" && <Btn variant="danger" onClick={() => del(s.id)}>Delete</Btn>}
                 </div>
@@ -173,6 +182,26 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
             <Field label="Parent WhatsApp"><input style={inputStyle} value={f.parentPhone || ""} onChange={e => setF({ ...f, parentPhone: e.target.value })} placeholder="07xxxxxxxx, 01xxxxxxxx, 2547..." /></Field>
             <Field label="Date of Birth"><input type="date" style={inputStyle} value={f.dob || ""} onChange={e => setF({ ...f, dob: e.target.value })} /></Field>
             <Field label="NEMIS Number"><input style={inputStyle} value={f.nemisNumber || ""} onChange={e => setF({ ...f, nemisNumber: e.target.value.toUpperCase() })} placeholder="e.g. NEM12345678" /></Field>
+            <Field label="Blood Group">
+              <select style={inputStyle} value={f.bloodGroup || ""} onChange={e => setF({ ...f, bloodGroup: e.target.value })}>
+                <option value="">-- Select --</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+              </select>
+            </Field>
+            <Field label="Allergies"><input style={inputStyle} value={f.allergies || ""} onChange={e => setF({ ...f, allergies: e.target.value })} placeholder="e.g. Peanuts, Penicillin" /></Field>
+            <Field label="Medical Conditions" style={{ gridColumn: "1 / -1" }}>
+              <textarea style={{ ...inputStyle, height: 60, resize: "vertical" }} value={f.medicalConditions || ""} onChange={e => setF({ ...f, medicalConditions: e.target.value })} placeholder="Any medical conditions or special needs" />
+            </Field>
+            <Field label="Emergency Contact"><input style={inputStyle} value={f.emergencyContactName || ""} onChange={e => setF({ ...f, emergencyContactName: e.target.value })} placeholder="Name" /></Field>
+            <Field label="Emergency Phone"><input style={inputStyle} value={f.emergencyContactPhone || ""} onChange={e => setF({ ...f, emergencyContactPhone: e.target.value })} placeholder="07xxxxxxxx" /></Field>
+            <Field label="Relationship"><input style={inputStyle} value={f.emergencyContactRelationship || ""} onChange={e => setF({ ...f, emergencyContactRelationship: e.target.value })} placeholder="e.g. Parent, Guardian" /></Field>
           </div>
           {err && <Msg text={err} tone="error" />}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -187,12 +216,26 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <div style={{ color: C.textSub, marginBottom: 8 }}>{profile.admission} | {profile.className}</div>
           {profile.dob && <div style={{ color: C.textSub, marginBottom: 8 }}>Date of Birth: {new Date(profile.dob).toLocaleDateString()}</div>}
           {profile.nemisNumber && <div style={{ color: C.textSub, marginBottom: 8 }}>NEMIS: {profile.nemisNumber}</div>}
+          {profile.bloodGroup && <div style={{ color: C.textSub, marginBottom: 8 }}>Blood Group: {profile.bloodGroup}</div>}
+          {profile.allergies && <div style={{ color: C.textSub, marginBottom: 8 }}>⚠️ Allergies: {profile.allergies}</div>}
+          {profile.medicalConditions && <div style={{ color: C.textSub, marginBottom: 8 }}>Medical: {profile.medicalConditions}</div>}
+          {profile.emergencyContactName && <div style={{ color: C.textSub, marginBottom: 8 }}>Emergency: {profile.emergencyContactName} ({profile.emergencyContactPhone || "-"}) - {profile.emergencyContactRelationship}</div>}
           <div style={{ color: C.textSub, marginBottom: 8 }}>Parent: {profile.parentName} ({profile.parentPhone || "-"})</div>
           <div style={{ color: C.textSub, marginBottom: 8 }}>Expected Fees: {money(expected(profile.className))}</div>
           <div style={{ color: C.textSub, marginBottom: 8 }}>Paid: {money(payments.filter(p => (p.studentId ?? p.student_id) === profile.id && p.status === "paid").reduce((s, p) => s + Number(p.amount), 0))}</div>
           <div style={{ color: C.textSub, marginBottom: 14 }}>Results: {results.filter(r => (r.studentId ?? r.student_id) === profile.id).length}</div>
-          <Btn onClick={() => { const rowsHtml = results.filter(r => (r.studentId ?? r.student_id) === profile.id).map(r => `<li>${r.subject}: ${r.marks}/${r.total || r.total_marks} (${r.grade})</li>`).join(""); const w = window.open("","_blank"); if (!w) return; w.document.write(`<h2>${profile.firstName} ${profile.lastName}</h2><p>${profile.admission}</p><ul>${rowsHtml||"<li>No results</li>"}</ul>`); w.document.close(); w.print(); }}>Export Report (Print/PDF)</Btn>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <Btn onClick={() => { const rowsHtml = results.filter(r => (r.studentId ?? r.student_id) === profile.id).map(r => `<li>${r.subject}: ${r.marks}/${r.total || r.total_marks} (${r.grade})</li>`).join(""); const w = window.open("","_blank"); if (!w) return; w.document.write(`<h2>${profile.firstName} ${profile.lastName}</h2><p>${profile.admission}</p><ul>${rowsHtml||"<li>No results</li>"}</ul>`); w.document.close(); w.print(); }}>Export Report (Print/PDF)</Btn>
+            <Btn onClick={() => { setProfile(null); setIdCardStudent(profile); }}>🪪 View ID Card</Btn>
+          </div>
         </Modal>
+      )}
+      {idCardStudent && (
+        <StudentIDCard 
+          student={idCardStudent} 
+          school={feeStructures[0]?.school || { name: "School", year: new Date().getFullYear() }} 
+          onClose={() => setIdCardStudent(null)} 
+        />
       )}
     </div>
   );

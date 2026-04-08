@@ -219,10 +219,21 @@ router.post("/c2b/confirm", authRateLimit, async (req, res, next) => {
       .eq('is_deleted', false)
       .maybeSingle();
 
-    // If no student found, skip insert to avoid null FK and broken reports
+    // If no student found, store in unmatched table for later reconciliation
     if (studentError || !student) {
-      console.warn(`[C2B Confirm] No student for billRef: ${billRef}. TransID: ${transId}`);
-      return res.json({ ok: true, warning: "Student not found, payment not recorded" });
+      console.warn(`[C2B Confirm] No student for billRef: ${billRef}. TransID: ${transId}. Storing for reconciliation.`);
+      
+      await supabase.from('mpesa_unmatched').upsert({
+        school_id: null, // Will be matched later during reconciliation
+        transaction_id: transId,
+        amount,
+        phone_number: msisdn || null,
+        bill_ref_number: billRef || null,
+        raw_payload: b,
+        status: 'unmatched'
+      }, { onConflict: 'transaction_id' });
+      
+      return res.json({ ok: true, warning: "Student not found, payment stored for reconciliation" });
     }
 
     const schoolId  = student.school_id;
@@ -263,6 +274,191 @@ router.get("/status/:checkoutRequestId", authRequired, async (req, res, next) =>
       .maybeSingle();
     if (error || !payment) return res.status(404).json({ message: "Payment not found" });
     res.json(payment);
+  } catch (err) { next(err); }
+});
+
+// GET /api/mpesa/unmatched - List unmatched M-Pesa payments
+router.get("/unmatched", authRequired, requireRoles("admin", "finance"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { status = 'unmatched', limit = 50 } = req.query;
+
+    let query = supabase
+      .from('mpesa_unmatched')
+      .select(`
+        *,
+        student:matched_student_id (student_id, admission_number, first_name, last_name),
+        matcher:matched_by (full_name)
+      `)
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false })
+      .limit(Number(limit));
+
+    if (status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    res.json(data || []);
+  } catch (err) { next(err); }
+});
+
+// POST /api/mpesa/reconcile/:id - Manually match unmatched payment to student
+router.post("/reconcile/:id", authRequired, requireRoles("admin", "finance"), async (req, res, next) => {
+  try {
+    const { schoolId, userId } = req.user;
+    const { id } = req.params;
+    const { studentId, notes = '' } = req.body;
+
+    if (!studentId) {
+      return res.status(400).json({ message: "studentId is required" });
+    }
+
+    // Get unmatched record
+    const { data: unmatched, error: unmatchedError } = await supabase
+      .from('mpesa_unmatched')
+      .select('*')
+      .eq('id', id)
+      .eq('school_id', schoolId)
+      .eq('status', 'unmatched')
+      .single();
+
+    if (unmatchedError || !unmatched) {
+      return res.status(404).json({ message: "Unmatched payment not found or already processed" });
+    }
+
+    // Verify student exists
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('student_id, first_name, last_name')
+      .eq('student_id', studentId)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (studentError || !student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    // Create payment record
+    const { data: payment, error: paymentError } = await supabase
+      .from('payments')
+      .insert({
+        school_id: schoolId,
+        student_id: studentId,
+        amount: unmatched.amount,
+        fee_type: 'tuition',
+        payment_method: 'mpesa',
+        reference_number: unmatched.transaction_id,
+        payment_date: unmatched.created_at.slice(0, 10),
+        status: 'paid',
+        notes: `Manually reconciled from M-Pesa. ${notes}`.trim()
+      })
+      .select()
+      .single();
+
+    if (paymentError) throw paymentError;
+
+    // Update unmatched record
+    await supabase
+      .from('mpesa_unmatched')
+      .update({
+        status: 'matched',
+        matched_student_id: studentId,
+        matched_at: new Date().toISOString(),
+        matched_by: userId
+      })
+      .eq('id', id);
+
+    // Log reconciliation
+    await supabase
+      .from('mpesa_reconciliation_logs')
+      .insert({
+        school_id: schoolId,
+        unmatched_id: id,
+        student_id: studentId,
+        payment_id: payment.payment_id,
+        action: 'match',
+        performed_by: userId,
+        notes
+      });
+
+    // Send SMS notification
+    const phone = unmatched.phone_number;
+    if (phone) {
+      await sendPaymentReceipt(schoolId, phone, unmatched.amount, unmatched.transaction_id, 
+        `${student.first_name} ${student.last_name}`);
+    }
+
+    res.json({
+      success: true,
+      message: `Payment of ${unmatched.amount} matched to ${student.first_name} ${student.last_name}`,
+      payment
+    });
+  } catch (err) { next(err); }
+});
+
+// POST /api/mpesa/ignore/:id - Mark unmatched payment as ignored
+router.post("/ignore/:id", authRequired, requireRoles("admin", "finance"), async (req, res, next) => {
+  try {
+    const { schoolId, userId } = req.user;
+    const { id } = req.params;
+    const { notes = '' } = req.body;
+
+    const { data: unmatched, error } = await supabase
+      .from('mpesa_unmatched')
+      .update({
+        status: 'ignored',
+        matched_at: new Date().toISOString(),
+        matched_by: userId
+      })
+      .eq('id', id)
+      .eq('school_id', schoolId)
+      .eq('status', 'unmatched')
+      .select()
+      .single();
+
+    if (error || !unmatched) {
+      return res.status(404).json({ message: "Unmatched payment not found or already processed" });
+    }
+
+    // Log action
+    await supabase
+      .from('mpesa_reconciliation_logs')
+      .insert({
+        school_id: schoolId,
+        unmatched_id: id,
+        action: 'ignore',
+        performed_by: userId,
+        notes
+      });
+
+    res.json({ success: true, message: "Payment marked as ignored" });
+  } catch (err) { next(err); }
+});
+
+// GET /api/mpesa/reconciliation-logs - View reconciliation audit trail
+router.get("/reconciliation-logs", authRequired, requireRoles("admin", "finance"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { limit = 50 } = req.query;
+
+    const { data, error } = await supabase
+      .from('mpesa_reconciliation_logs')
+      .select(`
+        *,
+        unmatched:unmatched_id (transaction_id, amount),
+        student:student_id (admission_number, first_name, last_name),
+        performer:performed_by (full_name)
+      `)
+      .eq('school_id', schoolId)
+      .order('created_at', { ascending: false })
+      .limit(Number(limit));
+
+    if (error) throw error;
+    res.json(data || []);
   } catch (err) { next(err); }
 });
 

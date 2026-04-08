@@ -321,22 +321,57 @@ router.post("/login", authRateLimit, async (req, res, next) => {
 
 router.post("/portal-login", authRateLimit, async (req, res, next) => {
   try {
-    const { admissionNumber, password, schoolId = null, role = "parent" } = req.body;
-    logTenantContext("auth.portal_login.request", req, { admissionNumber, schoolId, role });
+    const { admissionNumber, password, schoolId = null, schoolCode: providedSchoolCode = null, role = "parent" } = req.body;
+    logTenantContext("auth.portal_login.request", req, { admissionNumber, schoolId, schoolCode: providedSchoolCode, role });
     if (!admissionNumber || !password) {
       return res.status(400).json({ message: "admissionNumber and password are required" });
     }
 
     const trimmedAdmissionNumber = admissionNumber.trim();
-    const portalEmail = `${trimmedAdmissionNumber.toLowerCase()}.${role}@portal`;
     const normalizedSchoolId = schoolId != null && schoolId !== "" ? Number(schoolId) : null;
+    
+    // Validate school identification is provided
+    if (!normalizedSchoolId && !providedSchoolCode) {
+      // Check if admission number exists in multiple schools
+      const { data: schoolsCheck, error: checkError } = await supabase
+        .from("students")
+        .select("school_id, schools!inner(code, name)")
+        .ilike("admission_number", trimmedAdmissionNumber)
+        .eq("is_deleted", false);
+      
+      if (checkError) throw checkError;
+      
+      if (schoolsCheck && schoolsCheck.length > 1) {
+        return res.status(400).json({
+          message: "This admission number exists in multiple schools. Please provide your school code.",
+          schools: schoolsCheck.map(s => ({ code: s.schools.code, name: s.schools.name })),
+          requireSchoolCode: true
+        });
+      }
+    }
+    
+    // Fetch school code for unique portal account naming
+    let schoolCode = providedSchoolCode;
+    if (normalizedSchoolId && !schoolCode) {
+      const { data: schoolData } = await supabase
+        .from("schools")
+        .select("code")
+        .eq("school_id", normalizedSchoolId)
+        .single();
+      schoolCode = schoolData?.code;
+    }
     if (normalizedSchoolId != null && Number.isNaN(normalizedSchoolId)) {
       return res.status(400).json({ message: "schoolId must be numeric when provided" });
     }
 
+    // Build portal email with school code for uniqueness: adm001.schoolcode.parent@portal
+    const portalEmail = schoolCode 
+      ? `${trimmedAdmissionNumber.toLowerCase()}.${schoolCode.toLowerCase()}.${role}@portal`
+      : `${trimmedAdmissionNumber.toLowerCase()}.${role}@portal`;
+    
     let studentLookup = supabase
       .from("students")
-      .select("student_id, first_name, last_name, school_id, admission_number, parent_name")
+      .select("student_id, first_name, last_name, school_id, admission_number, parent_name, schools!inner(code)")
       .ilike("admission_number", trimmedAdmissionNumber)
       .eq("is_deleted", false);
 
@@ -419,13 +454,21 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
             ? legacyStudentAccount.password_hash
             : await bcrypt.hash(password, 10);
 
+        // Fetch school code for unique email
+        const { data: schoolData } = await supabase
+          .from("schools")
+          .select("code")
+          .eq("school_id", student.school_id)
+          .single();
+        const sc = schoolData?.code?.toLowerCase() || "school";
+
         const { data: insertedParent, error: insertedParentError } = await supabase
           .from("users")
           .insert({
             school_id: student.school_id,
             student_id: student.student_id,
             full_name: student.parent_name?.trim() || `Parent of ${student.first_name} ${student.last_name}`,
-            email: `${trimmedAdmissionNumber.toLowerCase()}.parent@portal`,
+            email: `${trimmedAdmissionNumber.toLowerCase()}.${sc}.${role}@portal`,
             password_hash: parentPasswordHash,
             role: "parent",
             status: "active",
@@ -449,7 +492,15 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       }
 
       if (canBootstrapFromStudentOnly) {
-        const bootstrapEmail = `${trimmedAdmissionNumber.toLowerCase()}.${role}@portal`;
+        // Fetch school code for unique email
+        const { data: schoolData } = await supabase
+          .from("schools")
+          .select("code")
+          .eq("school_id", student.school_id)
+          .single();
+        const sc = schoolData?.code?.toLowerCase() || "school";
+        
+        const bootstrapEmail = `${trimmedAdmissionNumber.toLowerCase()}.${sc}.${role}@portal`;
         const bootstrapHash = await bcrypt.hash(password, 10);
         const { data: insertedUser, error: insertedUserError } = await supabase
           .from("users")

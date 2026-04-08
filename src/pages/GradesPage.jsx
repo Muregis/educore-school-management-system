@@ -39,7 +39,8 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const [filterStudent, setFilterStudent] = useState("all");
   const [page, setPage]                   = useState(1);
   const [showBulk, setShowBulk]           = useState(false);
-  const [studentId, setStudentId]         = useState(students[0]?.id || "");
+  const [bulkClass, setBulkClass]          = useState("");
+  const [studentId, setStudentId]         = useState("");
   const [total, setTotal]                 = useState("100");
   const [bulkMarks, setBulkMarks]         = useState(() =>
     SUBJECTS.reduce((a, s) => ({ ...a, [s]: "" }), {})
@@ -172,8 +173,10 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
         </select>
         <select style={inputStyle} value={filterStudent} onChange={e => setFilterStudent(e.target.value)}>
-          <option value="all">All students</option>
-          {students.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
+          <option value="all">{filterClass === "all" ? "All students" : `Students in ${filterClass}`}</option>
+          {(filterClass === "all" ? students : students.filter(s => s.className === filterClass)).map(s => (
+            <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
+          ))}
         </select>
         <Btn variant="ghost" onClick={() => {
           csv("results.csv",
@@ -211,12 +214,19 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
 
       {/* Bulk Modal */}
       {showBulk && (
-        <Modal title="Bulk Results Entry" onClose={() => setShowBulk(false)}>
+        <Modal title="Bulk Results Entry" onClose={() => { setShowBulk(false); setBulkClass(""); setStudentId(""); }}>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
+            <Field label="Class">
+              <select style={inputStyle} value={bulkClass} onChange={e => { setBulkClass(e.target.value); setStudentId(""); }}>
+                <option value="">Select class...</option>
+                {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
             <Field label="Student">
-              <select style={inputStyle} value={studentId} onChange={e => setStudentId(Number(e.target.value))}>
-                {students.map(s => (
-                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.className})</option>
+              <select style={inputStyle} value={studentId} onChange={e => setStudentId(Number(e.target.value))} disabled={!bulkClass}>
+                <option value="">{bulkClass ? "Select student..." : "Select class first"}</option>
+                {students.filter(s => s.className === bulkClass).map(s => (
+                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
                 ))}
               </select>
             </Field>

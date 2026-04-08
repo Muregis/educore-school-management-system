@@ -5,6 +5,7 @@ import Btn from "../components/Btn";
 import Field from "../components/Field";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
+import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 
@@ -16,7 +17,9 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
   const [showForm, setShowForm]       = useState(false);
   const [term, setTerm]               = useState("Term 2");
   const [year, setYear]               = useState("2026");
+  const [filterClass, setFilterClass] = useState("all");
   const [form, setForm] = useState({ studentId: "", classTeacherComment: "", principalComment: "", conduct: "Good", daysPresent: "", daysAbsent: "", classPosition: "", outOf: "" });
+  const [formClass, setFormClass] = useState("");
 
   const load = async () => {
     if (!auth?.token) return;
@@ -116,14 +119,18 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
         <select style={{ ...inputStyle, width: "auto" }} value={year} onChange={e => setYear(e.target.value)}>
           <option>2024</option><option>2025</option><option>2026</option>
         </select>
+        <select style={{ ...inputStyle, width: "auto" }} value={filterClass} onChange={e => setFilterClass(e.target.value)}>
+          <option value="all">All classes</option>
+          {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
         {canEdit && <Btn onClick={() => setShowForm(true)}>+ Add Report Card</Btn>}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {/* Students list */}
         <div>
-          <div style={{ fontWeight: 700, color: C.text, marginBottom: 8 }}>Students ({students.length})</div>
-          {students.map(s => {
+          <div style={{ fontWeight: 700, color: C.text, marginBottom: 8 }}>Students ({(filterClass === "all" ? students : students.filter(s => (s.className ?? s.class_name) === filterClass)).length})</div>
+          {(filterClass === "all" ? students : students.filter(s => (s.className ?? s.class_name) === filterClass)).map(s => {
             const sid = s.id ?? s.student_id;
             const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
             const cls = s.className ?? s.class_name ?? "";
@@ -189,10 +196,16 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
       {showForm && (
         <Modal title="Add Report Card" onClose={() => setShowForm(false)}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Field label="Class" style={{ gridColumn: "1 / -1" }}>
+              <select style={inputStyle} value={formClass} onChange={e => { setFormClass(e.target.value); setForm({ ...form, studentId: "" }); }}>
+                <option value="">-- Select class first --</option>
+                {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
             <Field label="Student" style={{ gridColumn: "1 / -1" }}>
-              <select style={inputStyle} value={form.studentId} onChange={e => setForm({ ...form, studentId: e.target.value })}>
-                <option value="">-- Select student --</option>
-                {students.map(s => { const id = s.id ?? s.student_id; const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`; return <option key={id} value={id}>{name}</option>; })}
+              <select style={inputStyle} value={form.studentId} onChange={e => setForm({ ...form, studentId: e.target.value })} disabled={!formClass}>
+                <option value="">{formClass ? "-- Select student --" : "-- Select class first --"}</option>
+                {students.filter(s => (s.className ?? s.class_name) === formClass).map(s => { const id = s.id ?? s.student_id; const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`; return <option key={id} value={id}>{name}</option>; })}
               </select>
             </Field>
             <Field label="Days Present"><input type="number" style={inputStyle} value={form.daysPresent} onChange={e => setForm({ ...form, daysPresent: e.target.value })} /></Field>

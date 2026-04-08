@@ -16,7 +16,7 @@ router.get("/", async (req, res, next) => {
     const { data: rows, error } = await supabase
       .from('students')
       .select(
-        'student_id, admission_number, first_name, last_name, gender, class_id, class_name, status, date_of_birth, nemis_number, phone, email, parent_name, parent_phone, admission_date, created_at'
+        'student_id, admission_number, first_name, last_name, gender, class_id, class_name, status, date_of_birth, nemis_number, phone, email, address, parent_name, parent_phone, blood_group, allergies, medical_conditions, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, admission_date, created_at'
       )
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
@@ -55,7 +55,9 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
     const {
       admissionNumber, firstName, lastName, gender, className,
       classId = null, dateOfBirth = null, nemisNumber = null, phone = null, parentName = null,
-      parentPhone = null, email = null, address = null,
+      parentPhone = null, bloodGroup = null, allergies = null, medicalConditions = null,
+      emergencyContactName = null, emergencyContactPhone = null, emergencyContactRelationship = null,
+      email = null, address = null,
       admissionDate = null, status = "active"
     } = req.body;
     
@@ -115,6 +117,12 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
         address,
         parent_name: parentName,
         parent_phone: parentPhone,
+        blood_group: bloodGroup,
+        allergies: allergies,
+        medical_conditions: medicalConditions,
+        emergency_contact_name: emergencyContactName,
+        emergency_contact_phone: emergencyContactPhone,
+        emergency_contact_relationship: emergencyContactRelationship,
         admission_date: admissionDate || new Date().toISOString().slice(0, 10),
         status,
       })
@@ -194,7 +202,9 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
     const { schoolId } = req.user;
     const {
       firstName, lastName, gender, className, classId,
-      dateOfBirth, nemisNumber, phone, parentName, parentPhone, email, address, status
+      dateOfBirth, nemisNumber, phone, parentName, parentPhone,
+      bloodGroup, allergies, medicalConditions, emergencyContactName, emergencyContactPhone, emergencyContactRelationship,
+      email, address, status
     } = req.body;
 
     let resolvedClassId = classId || null;
@@ -228,6 +238,12 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
         address: address || null,
         parent_name: parentName || null,
         parent_phone: parentPhone || null,
+        blood_group: bloodGroup || null,
+        allergies: allergies || null,
+        medical_conditions: medicalConditions || null,
+        emergency_contact_name: emergencyContactName || null,
+        emergency_contact_phone: emergencyContactPhone || null,
+        emergency_contact_relationship: emergencyContactRelationship || null,
         status: status || 'active',
       })
       .eq('student_id', req.params.id)

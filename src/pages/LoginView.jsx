@@ -202,6 +202,8 @@ export default function LoginView({ onLogin }) {
         token: data.token,
         studentId: null,
       });
+      setEmail("");
+      setPassword("");
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {
@@ -233,7 +235,7 @@ export default function LoginView({ onLogin }) {
         studentId: data.user.studentId,
         admission: admission.trim(),
         feeBlocked: data.feeBlocked ?? false,
-      });
+      });`n      setAdmission("");"+"n      setPassword("");
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {
@@ -269,7 +271,7 @@ export default function LoginView({ onLogin }) {
 
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 14px", borderRadius: 999, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--primary-color)", fontSize: 12, fontWeight: 700, marginBottom: 24 }}>
               <span>{branding.location}</span>
-              {branding.established_year ? <span>• Since {branding.established_year}</span> : null}
+              {branding.established_year ? <span>ï¿½ Since {branding.established_year}</span> : null}
             </div>
 
             <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(36px, 4vw, 60px)", lineHeight: 1.05, margin: 0, maxWidth: 620 }}>
@@ -294,7 +296,7 @@ export default function LoginView({ onLogin }) {
           </div>
 
           <div style={{ color: "#6d819d", fontSize: 12 }}>
-            Powered by <span style={{ color: "var(--primary-color)" }}>EduCore</span> • Tenant-aware secure login
+            Powered by <span style={{ color: "var(--primary-color)" }}>EduCore</span> ï¿½ Tenant-aware secure login
           </div>
         </section>
 
@@ -500,3 +502,6 @@ const toggleButtonStyle = {
 LoginView.propTypes = {
   onLogin: PropTypes.func.isRequired,
 };
+
+
+
