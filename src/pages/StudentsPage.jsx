@@ -87,14 +87,14 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       if (editId) {
         await apiFetch(`/students/${editId}`, {
           method: "PUT",
-          body: { firstName: f.firstName, lastName: f.lastName, gender: f.gender, classId: null, dateOfBirth: f.dob || null, phone: f.parentPhone || null, email: null, address: null, status: f.status },
+          body: { firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, phone: f.parentPhone || null, email: null, address: null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
           token: auth?.token,
         });
         setStudents(prev => prev.map(s => (s.id === editId || s.student_id === editId) ? { ...normalise(s), ...f, id: editId } : s));
       } else {
         const res = await apiFetch(`/students`, {
           method: "POST",
-          body: { admissionNumber: f.admission || `ADM-${Date.now()}`, firstName: f.firstName, lastName: f.lastName, gender: f.gender, classId: null, dateOfBirth: f.dob || null, phone: f.parentPhone || null, email: null, address: null, status: f.status },
+          body: { admissionNumber: f.admission || `ADM-${Date.now()}`, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, phone: f.parentPhone || null, email: null, address: null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
           token: auth?.token,
         });
         setStudents(prev => [...prev, normalise(res)]);
