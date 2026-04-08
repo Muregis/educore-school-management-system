@@ -113,8 +113,9 @@ router.post("/mpesa/callback", async (req, res, next) => {
       });
     }
     
-    // Validate Kenyan phone number format (2547xxxxxxxx)
-    if (!/^2547[0-9]{8}$/.test(phone)) {
+    // Validate Kenyan phone number format (supports 07, 01, 254, +254 prefixes)
+    const phoneRegex = /^(\+?254|0)[17][0-9]{8}$/;
+    if (!phoneRegex.test(phone)) {
       console.warn('[M-Pesa Kenya] Invalid phone format', { phone });
       // Continue processing but log warning
     }

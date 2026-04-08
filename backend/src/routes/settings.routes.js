@@ -342,12 +342,13 @@ router.patch("/school/whatsapp", requireRoles("admin"), async (req, res, next) =
     const { schoolId } = req.user;
     const { whatsapp_business_number } = req.body;
 
-    // Validate WhatsApp number format (Kenyan)
+    // Validate WhatsApp number format (Kenyan) - supports 07, 01, 254, +254 prefixes
     if (whatsapp_business_number) {
-      const cleanNumber = whatsapp_business_number.replace(/[^\d]/g, '');
-      if (!/^2547[0-9]{8}$/.test(cleanNumber)) {
+      const cleanNumber = whatsapp_business_number.replace(/[^\d+]/g, '');
+      const phoneRegex = /^(\+?254|0)[17][0-9]{8}$/;
+      if (!phoneRegex.test(cleanNumber)) {
         return res.status(400).json({ 
-          message: "Invalid WhatsApp number format. Use: 2547xxxxxxxx or +2547xxxxxxxx" 
+          message: "Invalid WhatsApp number format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx" 
         });
       }
     }
