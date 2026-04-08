@@ -64,16 +64,17 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
     if (!admissionNumber || !firstName || !lastName || !gender)
       return res.status(400).json({ message: "admissionNumber, firstName, lastName, gender are required" });
 
-    // Kenyan phone number validation
-    if (phone && !/^2547[0-9]{8}$/.test(phone)) {
+    // Kenyan phone number validation (supports: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, +2541xxxxxxxx)
+    const phoneRegex = /^(\+?254|0)[17][0-9]{8}$/;
+    if (phone && !phoneRegex.test(phone)) {
       return res.status(400).json({ 
-        message: "Invalid Kenyan phone number format. Use format: 2547xxxxxxxx" 
+        message: "Invalid Kenyan phone number format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx" 
       });
     }
     
-    if (parentPhone && !/^2547[0-9]{8}$/.test(parentPhone)) {
+    if (parentPhone && !phoneRegex.test(parentPhone)) {
       return res.status(400).json({ 
-        message: "Invalid Kenyan parent phone number format. Use format: 2547xxxxxxxx" 
+        message: "Invalid Kenyan parent phone number format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx" 
       });
     }
 
@@ -81,14 +82,18 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
     let resolvedClassId = classId;
     const resolvedClassName = className || null;
     if (className && !classId) {
-      const { data: cls } = await supabase
-        .from('classes')
-        .select('class_id')
-        .eq('school_id', schoolId)
-        .eq('class_name', className)
-        .limit(1)
-        .single();
-      if (cls) resolvedClassId = cls.class_id;
+      try {
+        const { data: cls } = await supabase
+          .from('classes')
+          .select('class_id')
+          .eq('school_id', schoolId)
+          .eq('class_name', className)
+          .maybeSingle();
+        if (cls) resolvedClassId = cls.class_id;
+      } catch (clsErr) {
+        // Class lookup failed, but we can still save with null class_id
+        console.log('[DEBUG] Class lookup failed for:', className, '- saving with null class_id');
+      }
     }
 
     console.log('[DEBUG] Inserting student with class_name:', resolvedClassName, 'parent_name:', parentName, 'parent_phone:', parentPhone);
@@ -193,14 +198,18 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
 
     let resolvedClassId = classId || null;
     if (className && !classId) {
-      const { data: cls } = await supabase
-        .from('classes')
-        .select('class_id')
-        .eq('school_id', schoolId)
-        .eq('class_name', className)
-        .limit(1)
-        .single();
-      if (cls) resolvedClassId = cls.class_id;
+      try {
+        const { data: cls } = await supabase
+          .from('classes')
+          .select('class_id')
+          .eq('school_id', schoolId)
+          .eq('class_name', className)
+          .maybeSingle();
+        if (cls) resolvedClassId = cls.class_id;
+      } catch (clsErr) {
+        // Class lookup failed, but we can still update with null class_id
+        console.log('[DEBUG] Class lookup failed for:', className, '- updating with null class_id');
+      }
     }
 
     const { data: updated, error } = await supabase

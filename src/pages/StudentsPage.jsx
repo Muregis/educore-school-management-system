@@ -75,11 +75,13 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     setErr("");
     if (!f.firstName.trim() || !f.lastName.trim()) return setErr("First and last name are required.");
     
-    // Validate WhatsApp number format (Kenyan)
+    // Validate WhatsApp number format (Kenyan) - supports 07, 01, 254, +254 prefixes
     if (f.parentPhone) {
-      const cleanPhone = f.parentPhone.replace(/[^\d]/g, '');
-      if (!/^2547[0-9]{8}$/.test(cleanPhone)) {
-        return setErr("Invalid WhatsApp number format. Use: 2547xxxxxxxx or +2547xxxxxxxx");
+      const cleanPhone = f.parentPhone.replace(/[^\d+]/g, '');
+      // Accept: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, +2541xxxxxxxx
+      const phoneRegex = /^(\+?254|0)[17][0-9]{8}$/;
+      if (!phoneRegex.test(cleanPhone)) {
+        return setErr("Invalid Kenyan phone format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx");
       }
     }
     
@@ -167,7 +169,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
             <Field label="Gender"><select style={inputStyle} value={f.gender} onChange={e => setF({ ...f, gender: e.target.value })}><option value="female">female</option><option value="male">male</option></select></Field>
             <Field label="Status"><select style={inputStyle} value={f.status} onChange={e => setF({ ...f, status: e.target.value })}><option value="active">active</option><option value="inactive">inactive</option></select></Field>
             <Field label="Parent"><input style={inputStyle} value={f.parentName || ""} onChange={e => setF({ ...f, parentName: e.target.value })} /></Field>
-            <Field label="Parent WhatsApp"><input style={inputStyle} value={f.parentPhone || ""} onChange={e => setF({ ...f, parentPhone: e.target.value })} placeholder="2547xxxxxxxx" /></Field>
+            <Field label="Parent WhatsApp"><input style={inputStyle} value={f.parentPhone || ""} onChange={e => setF({ ...f, parentPhone: e.target.value })} placeholder="07xxxxxxxx, 01xxxxxxxx, 2547..." /></Field>
           </div>
           {err && <Msg text={err} tone="error" />}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
