@@ -3,7 +3,7 @@
 
 import express from "express";
 const router = express.Router();
-import { supabase } from "../db.js";
+import { supabase } from "../config/supabaseClient.js";
 import { requireAuth, requireRoles } from "../middleware/auth.js";
 
 // GET /api/exams - List all exams
