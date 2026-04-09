@@ -320,5 +320,4 @@ async function calculatePositions(examId, subjectId) {
   }
 }
 
-export { router as default };
 export default router;
