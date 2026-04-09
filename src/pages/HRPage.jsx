@@ -269,6 +269,7 @@ export default function HRPage({ auth, canEdit, toast }) {
               <option value="all">All Departments</option>
               {DEPARTMENTS.map(d=><option key={d}>{d}</option>)}
             </select>
+            {canEdit && <Btn tone="secondary" size="sm" onClick={async () => { try { const res = await apiFetch("/hr/sync-teachers", { method:"POST", token:auth.token }); toast(`Synced ${res.synced} teachers`, "success"); } catch (e) { toast("Sync failed", "error"); } }}>🔄 Sync to Teachers</Btn>}
             {canEdit && <Btn onClick={()=>{ setEditStaff(null); setStaffForm(BLANK_STAFF); setErr(""); setShowStaff(true); }}>+ Add Staff</Btn>}
           </div>
           {filteredStaff.length===0 ? <Msg text="No staff found." /> : (

@@ -1,10 +1,10 @@
 // backend/src/routes/exams.routes.js
 // Exam management routes
 
-const express = require("express");
+import express from "express";
 const router = express.Router();
-const { supabase } = require("../db");
-const { requireAuth, requireRoles } = require("../middleware/auth");
+import { supabase } from "../db.js";
+import { requireAuth, requireRoles } from "../middleware/auth.js";
 
 // GET /api/exams - List all exams
 router.get("/", requireAuth, async (req, res, next) => {
@@ -320,4 +320,4 @@ async function calculatePositions(examId, subjectId) {
   }
 }
 
-module.exports = router;
+export default router;

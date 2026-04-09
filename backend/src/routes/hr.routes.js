@@ -50,6 +50,26 @@ router.post("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
       .select('staff_id')
       .single();
     if (insertError) throw insertError;
+
+    // Sync to teachers table if job title indicates teacher
+    if (jobTitle && /teacher|tutor|instructor|lecturer/i.test(jobTitle)) {
+      try {
+        await supabase.from('teachers').insert({
+          school_id: schoolId,
+          first_name: fullName.split(' ')[0] || fullName,
+          last_name: fullName.split(' ').slice(1).join(' ') || '',
+          email: email || null,
+          phone: phone || null,
+          subject: department || 'General',
+          qualification: jobTitle,
+          status: status || 'active',
+          staff_id: inserted.staff_id
+        });
+      } catch (e) {
+        // Teacher sync failed, but staff was created successfully
+        console.log('Teacher sync failed:', e.message);
+      }
+    }
     const { data: row, error: selectError } = await supabase
       .from('hr_staff')
       .select('*')
