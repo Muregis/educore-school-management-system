@@ -496,7 +496,7 @@ export default function App() {
               <span>{n.label.length > 8 ? n.label.slice(0,7)+"…" : n.label}</span>
             </button>
           ))}
-   w2        <button className="ec-bottom-nav-item" onClick={() => setDrawerOpen(true)}>
+          <button className="ec-bottom-nav-item" onClick={() => setDrawerOpen(true)}>
             <span className="icon">⋯</span>
             <span>More</span>
           </button>
