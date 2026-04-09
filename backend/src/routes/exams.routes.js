@@ -4,7 +4,7 @@
 import express from "express";
 const router = express.Router();
 import { supabase } from "../config/supabaseClient.js";
-import { requireAuth, requireRoles } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
 
 // GET /api/exams - List all exams
 router.get("/", requireAuth, async (req, res, next) => {

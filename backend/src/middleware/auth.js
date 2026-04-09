@@ -176,3 +176,6 @@ export function authRequired(req, res, next) {
     });
   }
 }
+
+// Alias for backward compatibility
+export { authRequired as requireAuth };
