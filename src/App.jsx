@@ -18,6 +18,7 @@ import TransportPage from "./pages/TransportPage";
 import CommunicationPage from "./pages/CommunicationPage";
 import AccountsPage from "./pages/AdminAccountsPage";
 import ReportsPage from "./pages/ReportsPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 import AnalysisPage from "./pages/AnalysisPage";
 import TimetablePage from "./pages/TimetablePage";
 import AdmissionsPage from "./pages/AdmissionsPage";
@@ -33,6 +34,7 @@ import PortalDashboardPage from "./pages/PortalDashboardPage";
 import SubjectsPage from "./pages/SubjectsPage";
 import MpesaReconciliationPage from "./pages/MpesaReconciliationPage";
 import BulkImportPage from "./pages/BulkImportPage";
+import ExamsPage from "./pages/ExamsPage";
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import { apiFetch } from "./lib/api";
 
@@ -298,14 +300,16 @@ export default function App() {
     dashboard:     isPortal 
       ? <PortalDashboardPage auth={auth} school={school} student={activeChild} attendance={myAttendance} results={myResults} payments={myPayments} feeStructures={feeStructures} toast={toast} onViewGrades={() => setPage("grades")} onViewFees={() => setPage("fees")} onViewAttendance={() => setPage("attendance")} />
       : <DashboardPage auth={auth} school={school} students={myStudents} teachers={teachers} attendance={myAttendance} payments={myPayments} feeStructures={feeStructures} results={myResults} toast={toast} />,
-    students:      <StudentsPage auth={auth} students={myStudents} setStudents={setStudents} canEdit={canEdit} results={myResults} payments={myPayments} feeStructures={feeStructures} toast={toast} />,
-    teachers:      <TeachersPage auth={auth} teachers={teachers} setTeachers={setTeachers} canEdit={canEdit} toast={toast} />,
+    reports:       <ReportsPage auth={auth} students={students} results={results} setResults={setResults} attendance={attendance} payments={payments} smsLogs={smsLogs} setSmsLogs={setSmsLogs} notifications={notifications} setNotifications={setNotifications} toast={toast} />,
+    analytics:     <AnalyticsPage students={students} teachers={teachers} payments={payments} results={results} attendance={attendance} feeStructures={feeStructures} />,
+    analysis:      <AnalysisPage auth={auth} teachers={teachers} setTeachers={setTeachers} canEdit={canEdit} toast={toast} />,
     attendance:    <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     grades:        <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     subjects:      <SubjectsPage auth={auth} toast={toast} />,
     fees:          <FeesPage auth={auth} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     "mpesa-reconcile": <MpesaReconciliationPage auth={auth} students={students} toast={toast} />,
     "bulk-import": <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} />,
+    exams: <ExamsPage auth={auth} students={students} subjects={[]} toast={toast} />,
     admissions:    <AdmissionsPage auth={auth} canEdit={canEdit} toast={toast} />,
     invoices:      <InvoicesPage auth={auth} school={school} students={students} canEdit={canEdit} toast={toast} />,
     reportcards:   <ReportCardsPage auth={auth} school={school} students={myStudents} canEdit={canEdit} toast={toast} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,

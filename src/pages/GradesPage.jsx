@@ -37,15 +37,33 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const [term, setTerm]                   = useState("Term 2");
   const [filterClass, setFilterClass]     = useState("all");
   const [filterStudent, setFilterStudent] = useState("all");
+  const [filterSubject, setFilterSubject] = useState("all");
   const [page, setPage]                   = useState(1);
   const [showBulk, setShowBulk]           = useState(false);
   const [bulkClass, setBulkClass]          = useState("");
   const [studentId, setStudentId]         = useState("");
+  const [selectedSubject, setSelectedSubject] = useState("");
   const [total, setTotal]                 = useState("100");
-  const [bulkMarks, setBulkMarks]         = useState(() =>
-    SUBJECTS.reduce((a, s) => ({ ...a, [s]: "" }), {})
-  );
+  const [subjects, setSubjects]           = useState([]);
+  const [bulkMarks, setBulkMarks]         = useState({});
   const [editing, setEditing] = useState(null);
+
+  // Load subjects from API
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch("/subjects", { token: auth.token })
+      .then(data => {
+        const subjs = (data || []).map(s => s.name);
+        setSubjects(subjs);
+        // Initialize bulkMarks with subjects
+        setBulkMarks(subjs.reduce((a, s) => ({ ...a, [s]: "" }), {}));
+      })
+      .catch(() => {
+        // Fallback to constants if API fails
+        setSubjects(SUBJECTS);
+        setBulkMarks(SUBJECTS.reduce((a, s) => ({ ...a, [s]: "" }), {}));
+      });
+  }, [auth]);
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -59,7 +77,8 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const filtered = results.filter(r =>
     (term === "all" || r.term === term) &&
     (filterClass === "all" || r.className === filterClass) &&
-    (filterStudent === "all" || String(r.studentId) === String(filterStudent))
+    (filterStudent === "all" || String(r.studentId) === String(filterStudent)) &&
+    (filterSubject === "all" || r.subject === filterSubject)
   );
 
   const { pages, rows } = pager(filtered, page);
@@ -70,7 +89,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
     if (!s) return toast("Select student", "error");
     const t = Number(total);
     if (!t) return toast("Total marks required", "error");
-    const entered = SUBJECTS.filter(sub => bulkMarks[sub] !== "");
+    const entered = subjects.filter(sub => bulkMarks[sub] !== "");
     if (entered.length === 0) return toast("Enter at least one subject mark", "error");
     try {
       const classId = s.classId ?? s.class_id ?? null;
@@ -90,7 +109,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
       });
       const data = await apiFetch("/grades", { token: auth?.token });
       setResults(data);
-      setBulkMarks(SUBJECTS.reduce((a, sub) => ({ ...a, [sub]: "" }), {}));
+      setBulkMarks(subjects.reduce((a, sub) => ({ ...a, [sub]: "" }), {}));
       setShowBulk(false);
       toast("Bulk results saved", "success");
     } catch (err) { toast(err.message || "Save failed", "error"); }
@@ -178,6 +197,10 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
             <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
           ))}
         </select>
+        <select style={inputStyle} value={filterSubject} onChange={e => setFilterSubject(e.target.value)}>
+          <option value="all">All subjects</option>
+          {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
         <Btn variant="ghost" onClick={() => {
           csv("results.csv",
             ["Student","Class","Subject","Term","Marks","Total","Grade"],
@@ -230,6 +253,12 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                 ))}
               </select>
             </Field>
+            <Field label="Subject (Optional)">
+              <select style={inputStyle} value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)}>
+                <option value="">All subjects (multi-entry mode)</option>
+                {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
             <Field label="Term">
               <select style={inputStyle} value={term === "all" ? "Term 2" : term} onChange={e => setTerm(e.target.value)}>
                 <option value="Term 1">Term 1</option>
@@ -251,7 +280,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           </div>
 
           <div style={{ maxHeight:340, overflowY:"auto", border:`1px solid ${C.border}`, borderRadius:10, padding:8, marginBottom:10 }}>
-            {SUBJECTS.map(sub => (
+            {subjects.map(sub => (
               <div key={sub} style={{ display:"grid", gridTemplateColumns:"1fr 180px", gap:8, alignItems:"center", borderBottom:`1px solid ${C.border}`, padding:"8px 4px" }}>
                 <div style={{ color:C.text, fontSize:13 }}>{sub}</div>
                 <select

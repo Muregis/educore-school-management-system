@@ -235,7 +235,9 @@ export default function LoginView({ onLogin }) {
         studentId: data.user.studentId,
         admission: admission.trim(),
         feeBlocked: data.feeBlocked ?? false,
-      });`n      setAdmission("");"+"n      setPassword("");
+      });
+      setAdmission("");
+      setPassword("");
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {

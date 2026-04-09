@@ -11,8 +11,8 @@ export const DEFAULTS = {
 };
 
 export const ROLE = {
-  admin:     { pages:["dashboard","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analysis","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import"], edit:true },
-  teacher:   { pages:["dashboard","students","attendance","grades","subjects","reportcards","discipline","timetable","communication","library","analysis","lessonplans","announcements"], edit:true },
+  admin:     { pages:["dashboard","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams"], edit:true },
+  teacher:   { pages:["dashboard","students","attendance","grades","subjects","reportcards","discipline","timetable","communication","library","analysis","lessonplans","announcements","exams"], edit:true },
   finance:   { pages:["dashboard","fees","mpesa-reconcile","invoices","announcements"], edit:true },
   hr:        { pages:["dashboard","hr","staff","announcements"], edit:true },
   librarian: { pages:["dashboard","library","announcements"], edit:true },
@@ -36,12 +36,14 @@ export const NAV = [
   { id:"transport",     label:"Transport",    icon:"🚌" },
   { id:"communication", label:"Communication",icon:"💬" },
   { id:"timetable",     label:"Timetable",    icon:"🗓" },
-  { id:"reports",       label:"Reports",      icon:"📈" },
-  { id:"analysis",      label:"Analysis",     icon:"🤖" },
+  { id:"reports",       label:"Reports",      icon:"📊" },
+  { id:"analytics",     label:"Analytics",    icon:"📈" },
+  { id:"analysis",      label:"Analysis",     icon:"🔍" },
   { id:"accounts",      label:"Accounts",     icon:"🔑" },
   { id:"hr",            label:"HR",           icon:"🧑" },
   { id:"library",       label:"Library",      icon:"📚" },
   { id:"announcements", label:"Announcements", icon:"📢" },
+  { id:"exams",         label:"Exams",         icon:"📝" },
   { id:"bulk-import",   label:"Import/Export", icon:"📁" },
   { id:"settings",      label:"Settings",     icon:"⚙"  },
 ];
