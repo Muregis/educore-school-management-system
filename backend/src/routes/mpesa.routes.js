@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
+import { requireRoles } from "../middleware/roles.js";
 import { authRateLimit } from "../middleware/rateLimit.js";
 import { env } from "../config/env.js";
 // OLD AFRICA'S TALKING CODE - MIGRATED TO WHATSAPP BUSINESS PER SCHOOL

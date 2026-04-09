@@ -2,9 +2,10 @@
 // Exam management routes
 
 import express from "express";
-const router = express.Router();
 import { supabase } from "../config/supabaseClient.js";
 import { requireAuth } from "../middleware/auth.js";
+
+const router = express.Router();
 
 // GET /api/exams - List all exams
 router.get("/", requireAuth, async (req, res, next) => {

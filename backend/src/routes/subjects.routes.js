@@ -1,10 +1,12 @@
 // backend/src/routes/subjects.routes.js
 // Subject management routes for schools
 
-const express = require("express");
+import express from "express";
+import { supabase } from "../config/supabaseClient.js";
+import { requireAuth } from "../middleware/auth.js";
+import { requireRoles } from "../middleware/roles.js";
+
 const router = express.Router();
-const { supabase } = require("../db");
-const { requireAuth, requireRoles } = require("../middleware/auth");
 
 // GET /api/subjects - List all subjects for school
 router.get("/", requireAuth, async (req, res, next) => {
@@ -273,5 +275,4 @@ router.post("/seed-defaults", requireAuth, requireRoles("admin"), async (req, re
   }
 });
 
-module.exports = router;
 export default router;
