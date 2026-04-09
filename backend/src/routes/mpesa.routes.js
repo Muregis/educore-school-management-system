@@ -278,7 +278,7 @@ router.get("/status/:checkoutRequestId", authRequired, async (req, res, next) =>
 });
 
 // GET /api/mpesa/unmatched - List unmatched M-Pesa payments
-router.get("/unmatched", authRequired, requireRoles("admin", "finance"), async (req, res, next) => {
+router.get("/unmatched", authRequired, async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { status = 'unmatched', limit = 50 } = req.query;
