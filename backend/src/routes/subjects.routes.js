@@ -274,3 +274,4 @@ router.post("/seed-defaults", requireAuth, requireRoles("admin"), async (req, re
 });
 
 module.exports = router;
+export default router;
