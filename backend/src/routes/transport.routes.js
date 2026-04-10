@@ -61,7 +61,16 @@ router.get("/assignments", async (req, res, next) => {
     const { schoolId } = req.user;
     const { data: rows, error } = await supabase
       .from("student_transport")
-      .select("id, student_id, transport_id, start_date, end_date, status")
+      .select(`
+        id,
+        student_id,
+        transport_id,
+        start_date,
+        end_date,
+        status,
+        student:student_id (student_id, admission_number, first_name, last_name, class_name, parent_phone),
+        route:transport_id (transport_id, route_name, fee)
+      `)
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
       .order("id", { ascending: false });

@@ -136,18 +136,17 @@ export default function TransportPage({ auth, canEdit, toast, students }) {
               <Table
                 headers={["Student", "Admission", "Class", "Route", "Transport Fee", "Paid", "Start Date", "End Date", "Status"]}
                 rows={assignments.map(a => {
-                  const studentId = a.student_id;
-                  const routeFee = a.transport_fee || 0;
-                  // For now, we'll need to calculate from payments
-                  // This is a placeholder - in real scenario would check payments
+                  const student = a.student || {};
+                  const route = a.route || {};
+                  const routeFee = route.fee || 0;
                   return [
-                    <span key={a.id} style={{ color: C.text, fontWeight: 600 }}>{a.first_name} {a.last_name}</span>,
-                    a.admission_number,
-                    a.class_name || "-",
-                    a.route_name,
+                    <span key={a.id} style={{ color: C.text, fontWeight: 600 }}>{student.first_name || student.firstName || "Unknown"} {student.last_name || student.lastName || ""}</span>,
+                    student.admission_number || student.admission || "-",
+                    student.class_name || student.className || "-",
+                    route.route_name || "-",
                     Number(routeFee).toLocaleString(),
                     <Badge key="p" text="Check Fees" tone="info" />,
-                    a.start_date?.slice(0, 10),
+                    a.start_date?.slice(0, 10) || "-",
                     a.end_date?.slice(0, 10) || "-",
                     <Badge key="s" text={a.status} tone={a.status === "active" ? "success" : "danger"} />,
                   ];
@@ -256,13 +255,16 @@ export default function TransportPage({ auth, canEdit, toast, students }) {
               <div style={{ overflowX: "auto" }}>
                 <Table
                   headers={["Student", "Admission", "Class", "Parent Phone", "Start Date"]}
-                  rows={routeAssignments.map(a => [
-                    <span style={{ color: C.text, fontWeight: 600 }}>{a.first_name} {a.last_name}</span>,
-                    a.admission_number,
-                    a.class_name || "-",
-                    a.parent_phone || "-",
-                    a.start_date?.slice(0, 10),
-                  ])}
+                  rows={routeAssignments.map(a => {
+                    const student = a.student || {};
+                    return [
+                      <span style={{ color: C.text, fontWeight: 600 }}>{student.first_name || student.firstName || "Unknown"} {student.last_name || student.lastName || ""}</span>,
+                      student.admission_number || student.admission || "-",
+                      student.class_name || student.className || "-",
+                      student.parent_phone || student.parentPhone || "-",
+                      a.start_date?.slice(0, 10) || "-",
+                    ];
+                  })}
                 />
               </div>
             );
