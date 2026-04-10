@@ -10,10 +10,10 @@ const router = express.Router();
 
 const EXAM_SELECT = [
   "exam_id",
-  "name",
+  "exam_name:name",
   "exam_type",
   "term",
-  "year",
+  "academic_year:year",
   "start_date",
   "end_date",
   "status",

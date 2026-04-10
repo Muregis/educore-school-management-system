@@ -248,24 +248,36 @@ export default function TransportPage({ auth, canEdit, toast, students }) {
         <Modal title={`Students on ${viewRouteStudents.route_name}`} onClose={() => setViewRouteStudents(null)}>
           {(() => {
             const routeAssignments = assignments.filter(a => a.transport_id === viewRouteStudents.transport_id && a.status === "active");
-            if (routeAssignments.length === 0) {
-              return <Msg text="No students assigned to this route." />;
-            }
             return (
-              <div style={{ overflowX: "auto" }}>
-                <Table
-                  headers={["Student", "Admission", "Class", "Parent Phone", "Start Date"]}
-                  rows={routeAssignments.map(a => {
-                    const student = a.student || {};
-                    return [
-                      <span style={{ color: C.text, fontWeight: 600 }}>{student.first_name || student.firstName || "Unknown"} {student.last_name || student.lastName || ""}</span>,
-                      student.admission_number || student.admission || "-",
-                      student.class_name || student.className || "-",
-                      student.parent_phone || student.parentPhone || "-",
-                      a.start_date?.slice(0, 10) || "-",
-                    ];
-                  })}
-                />
+              <div>
+                {canEdit && (
+                  <div style={{ marginBottom: 16 }}>
+                    <Btn onClick={() => {
+                      setAf({ studentClass: "", studentId: "", transportId: viewRouteStudents.transport_id, startDate: new Date().toISOString().slice(0, 10), endDate: "", status: "active" });
+                      setViewRouteStudents(null);
+                      setShowAssign(true);
+                    }}>+ Add Student to this Route</Btn>
+                  </div>
+                )}
+                {routeAssignments.length === 0 ? (
+                  <Msg text="No students assigned to this route." />
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    <Table
+                      headers={["Student", "Admission", "Class", "Parent Phone", "Start Date"]}
+                      rows={routeAssignments.map(a => {
+                        const student = a.student || {};
+                        return [
+                          <span style={{ color: C.text, fontWeight: 600 }}>{student.first_name || student.firstName || "Unknown"} {student.last_name || student.lastName || ""}</span>,
+                          student.admission_number || student.admission || "-",
+                          student.class_name || student.className || "-",
+                          student.parent_phone || student.parentPhone || "-",
+                          a.start_date?.slice(0, 10) || "-",
+                        ];
+                      })}
+                    />
+                  </div>
+                )}
               </div>
             );
           })()}
