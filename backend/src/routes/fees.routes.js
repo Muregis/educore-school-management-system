@@ -12,10 +12,10 @@ router.get("/", async (req, res, next) => {
     const { schoolId } = req.user;
     const { data: rows, error } = await supabase
       .from('fee_structures')
-      .select('fee_structure_id, class_id, term, academic_year, is_active, created_at')
+      .select('fee_structure_id, class_name, term, tuition, activity, misc, created_at')
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
-      .order('academic_year', { ascending: false });
+      .order('created_at', { ascending: false });
     if (error) throw error;
     res.json(rows || []);
   } catch (err) {
