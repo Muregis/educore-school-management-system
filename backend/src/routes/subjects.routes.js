@@ -16,7 +16,7 @@ router.get("/", requireAuth, async (req, res, next) => {
 
     let query = supabase
       .from("subjects")
-      .select("subject_id, subject_name as name, code, category, description, class_levels, max_marks, pass_marks, is_active, created_at")
+      .select("subject_id, name, code, category, description, class_levels, max_marks, pass_marks, is_active, created_at")
       .eq("school_id", schoolId)
       .eq("is_deleted", false);
 
@@ -28,15 +28,128 @@ router.get("/", requireAuth, async (req, res, next) => {
       query = query.eq("category", category);
     }
 
-    query = query.order("category", { ascending: true }).order("subject_name", { ascending: true });
+    query = query.order("category", { ascending: true }).order("name", { ascending: true });
 
     const { data, error } = await query;
     if (error) throw error;
 
     res.json(data || []);
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
+});
+
+// GET /api/subjects/:id - Get single subject
+router.get("/:id", requireAuth, async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { id } = req.params;
+
+    const { data, error } = await supabase
+      .from("subjects")
+      .select("subject_id, name, code, category, description, class_levels, max_marks, pass_marks, is_active, created_at")
+      .eq("subject_id", id)
+      .eq("school_id", schoolId)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+      throw error;
+    }
+
+    res.json(data);
+  } catch (err) { next(err); }
+});
+
+// POST /api/subjects - Create new subject
+router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { name, code, category, description, classLevels, maxMarks = 100, passMarks = 40 } = req.body;
+
+    if (!name || !code) {
+      return res.status(400).json({ message: "Name and code are required" });
+    }
+
+    const { data, error } = await supabase
+      .from("subjects")
+      .insert({
+        school_id: schoolId,
+        name: name.trim(),
+        code: code.trim().toUpperCase(),
+        category,
+        description,
+        class_levels: classLevels,
+        max_marks: maxMarks,
+        pass_marks: passMarks,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        return res.status(400).json({ message: "Subject with this code already exists" });
+      }
+      throw error;
+    }
+
+    res.status(201).json(data);
+  } catch (err) { next(err); }
+});
+
+// PUT /api/subjects/:id - Update subject
+router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { id } = req.params;
+    const { name, code, category, description, classLevels, maxMarks, passMarks, isActive } = req.body;
+
+    const updates = {};
+    if (name !== undefined) updates.name = name.trim();
+    if (code !== undefined) updates.code = code.trim().toUpperCase();
+    if (category !== undefined) updates.category = category;
+    if (description !== undefined) updates.description = description;
+    if (classLevels !== undefined) updates.class_levels = classLevels;
+    if (maxMarks !== undefined) updates.max_marks = maxMarks;
+    if (passMarks !== undefined) updates.pass_marks = passMarks;
+    if (isActive !== undefined) updates.is_active = isActive;
+
+    const { data, error } = await supabase
+      .from("subjects")
+      .update(updates)
+      .eq("subject_id", id)
+      .eq("school_id", schoolId)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+      throw error;
+    }
+
+    res.json(data);
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/subjects/:id - Delete subject (soft delete)
+router.delete("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { id } = req.params;
+
+    const { error } = await supabase
+      .from("subjects")
+      .update({ is_deleted: true })
+      .eq("subject_id", id)
+      .eq("school_id", schoolId);
+
+    if (error) throw error;
+
+    res.json({ message: "Subject deleted successfully" });
+  } catch (err) { next(err); }
 });
 
 // GET /api/subjects/:id - Get single subject
@@ -253,7 +366,7 @@ router.post("/seed-defaults", requireAuth, requireRoles("admin"), async (req, re
           is_active: true,
           is_deleted: false,
         })
-        .select("subject_id, subject_name as name, code, category")
+            .select("subject_id, name, code, category")
         .maybeSingle();
 
       if (error) {
