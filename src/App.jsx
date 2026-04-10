@@ -300,9 +300,7 @@ export default function App() {
     dashboard:     isPortal 
       ? <PortalDashboardPage auth={auth} school={school} student={activeChild} attendance={myAttendance} results={myResults} payments={myPayments} feeStructures={feeStructures} toast={toast} onViewGrades={() => setPage("grades")} onViewFees={() => setPage("fees")} onViewAttendance={() => setPage("attendance")} />
       : <DashboardPage auth={auth} school={school} students={myStudents} teachers={teachers} attendance={myAttendance} payments={myPayments} feeStructures={feeStructures} results={myResults} toast={toast} />,
-    reports:       <ReportsPage auth={auth} students={students} results={results} setResults={setResults} attendance={attendance} payments={payments} smsLogs={smsLogs} setSmsLogs={setSmsLogs} notifications={notifications} setNotifications={setNotifications} toast={toast} />,
     analytics:     <AnalyticsPage students={students} teachers={teachers} payments={payments} results={results} attendance={attendance} feeStructures={feeStructures} />,
-    analysis:      <AnalysisPage auth={auth} teachers={teachers} setTeachers={setTeachers} canEdit={canEdit} toast={toast} />,
     attendance:    <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     grades:        <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     subjects:      <SubjectsPage auth={auth} toast={toast} />,
