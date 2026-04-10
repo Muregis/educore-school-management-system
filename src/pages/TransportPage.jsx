@@ -7,9 +7,8 @@ import Table from "../components/Table";
 import Modal from "../components/Modal";
 import { Msg } from "../components/Helpers";
 import { C, inputStyle } from "../lib/theme";
-// Bug #11 fixed: was using hardcoded raw fetch with API_BASE const.
-// Now uses the shared apiFetch helper from lib/api.
 import { apiFetch } from "../lib/api";
+import { ALL_CLASSES } from "../lib/constants";
 
 export default function TransportPage({ auth, canEdit, toast, students }) {
   const [tab, setTab]           = useState("routes");
@@ -20,8 +19,11 @@ export default function TransportPage({ auth, canEdit, toast, students }) {
   const [showAssign, setShowAssign] = useState(false);
   const [viewRouteStudents, setViewRouteStudents] = useState(null);
   const [rf, setRf] = useState({ routeName: "", driverName: "", vehicleNumber: "", fee: "", status: "active" });
-  const [af, setAf] = useState({ studentId: "", transportId: "", startDate: new Date().toISOString().slice(0, 10), endDate: "", status: "active" });
+  const [af, setAf] = useState({ studentClass: "", studentId: "", transportId: "", startDate: new Date().toISOString().slice(0, 10), endDate: "", status: "active" });
   const [err, setErr] = useState("");
+
+  // Filter students by class for assignment
+  const filteredStudents = af.studentClass ? students.filter(s => (s.className || s.class_name) === af.studentClass) : students;
 
   const token = auth?.token;
 
@@ -80,7 +82,7 @@ export default function TransportPage({ auth, canEdit, toast, students }) {
         token,
       });
       setShowAssign(false);
-      setAf({ studentId: "", transportId: "", startDate: new Date().toISOString().slice(0, 10), endDate: "", status: "active" });
+      setAf({ studentClass: "", studentId: "", transportId: "", startDate: new Date().toISOString().slice(0, 10), endDate: "", status: "active" });
       toast("Student assigned", "success");
       load();
     } catch (e) { setErr(e.message || "Network error"); }
@@ -132,15 +134,24 @@ export default function TransportPage({ auth, canEdit, toast, students }) {
           {loading ? <Msg text="Loading..." /> : assignments.length === 0 ? <Msg text="No assignments found." /> : (
             <div style={{ overflowX: "auto" }}>
               <Table
-                headers={["Student", "Admission", "Route", "Start Date", "End Date", "Status"]}
-                rows={assignments.map(a => [
-                  <span key={a.id} style={{ color: C.text, fontWeight: 600 }}>{a.first_name} {a.last_name}</span>,
-                  a.admission_number,
-                  a.route_name,
-                  a.start_date?.slice(0, 10),
-                  a.end_date?.slice(0, 10) || "-",
-                  <Badge key="s" text={a.status} tone={a.status === "active" ? "success" : "danger"} />,
-                ])}
+                headers={["Student", "Admission", "Class", "Route", "Transport Fee", "Paid", "Start Date", "End Date", "Status"]}
+                rows={assignments.map(a => {
+                  const studentId = a.student_id;
+                  const routeFee = a.transport_fee || 0;
+                  // For now, we'll need to calculate from payments
+                  // This is a placeholder - in real scenario would check payments
+                  return [
+                    <span key={a.id} style={{ color: C.text, fontWeight: 600 }}>{a.first_name} {a.last_name}</span>,
+                    a.admission_number,
+                    a.class_name || "-",
+                    a.route_name,
+                    Number(routeFee).toLocaleString(),
+                    <Badge key="p" text="Check Fees" tone="info" />,
+                    a.start_date?.slice(0, 10),
+                    a.end_date?.slice(0, 10) || "-",
+                    <Badge key="s" text={a.status} tone={a.status === "active" ? "success" : "danger"} />,
+                  ];
+                })}
               />
             </div>
           )}
@@ -186,12 +197,23 @@ export default function TransportPage({ auth, canEdit, toast, students }) {
       {showAssign && (
         <Modal title="Assign Student to Route" onClose={() => setShowAssign(false)}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Student ID">
-              <input style={inputStyle} value={af.studentId}
-                onChange={e => setAf({ ...af, studentId: e.target.value })}
-                placeholder="e.g. 3" />
+            <Field label="Class">
+              <select style={inputStyle} value={af.studentClass} onChange={e => setAf({ ...af, studentClass: e.target.value, studentId: "" })}>
+                <option value="">All Classes</option>
+                {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </Field>
-            <Field label="Route ID">
+            <Field label="Student">
+              <select style={inputStyle} value={af.studentId} onChange={e => setAf({ ...af, studentId: e.target.value })}>
+                <option value="">-- Select Student --</option>
+                {filteredStudents.map(s => (
+                  <option key={s.id ?? s.student_id} value={s.id ?? s.student_id}>
+                    {s.firstName || s.first_name} {s.lastName || s.last_name} ({s.admission_number || s.admission})
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Route">
               <select style={inputStyle} value={af.transportId}
                 onChange={e => setAf({ ...af, transportId: e.target.value })}>
                 <option value="">Select route</option>
