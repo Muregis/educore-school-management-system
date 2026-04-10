@@ -9,7 +9,7 @@ router.use(authRequired);
 // GET report cards
 router.get("/", async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
+    const { schoolId, role } = req.user;
     const { studentId, term, academicYear } = req.query;
     let query = supabase
       .from("report_cards")
@@ -17,6 +17,11 @@ router.get("/", async (req, res, next) => {
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
       .order("created_at", { ascending: false });
+
+    // Parents and students can only see published report cards
+    if (role === "parent" || role === "student") {
+      query = query.eq("is_published", true).eq("is_approved", true);
+    }
 
     if (studentId) query = query.eq("student_id", studentId);
     if (term) query = query.eq("term", term);
@@ -59,7 +64,7 @@ router.get("/", async (req, res, next) => {
 // GET full report card data for one student (with grades)
 router.get("/:studentId/full", async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
+    const { schoolId, role } = req.user;
     const { term = "Term 2", academicYear = "2026" } = req.query;
     const { studentId } = req.params;
 
@@ -75,6 +80,23 @@ router.get("/:studentId/full", async (req, res, next) => {
       ? { ...studentRow, full_name: `${studentRow.first_name || ""} ${studentRow.last_name || ""}`.trim() }
       : null;
     if (!student) return res.status(404).json({ message: "Student not found" });
+
+    // Build report card query based on role
+    let rcQuery = supabase
+      .from("report_cards")
+      .select("*")
+      .eq("school_id", schoolId)
+      .eq("student_id", studentId)
+      .eq("term", term)
+      .eq("academic_year", academicYear)
+      .eq("is_deleted", false)
+      .limit(1)
+      .maybeSingle();
+
+    // Parents and students can only see approved and published report cards
+    if (role === "parent" || role === "student") {
+      rcQuery = rcQuery.eq("is_published", true).eq("is_approved", true);
+    }
 
     const { data: resultsRows, error: resultsErr } = await supabase
       .from("results")
@@ -158,10 +180,70 @@ router.post("/", requireRoles("admin","teacher"), async (req, res, next) => {
         days_absent: daysAbsent,
         class_position: classPosition || null,
         out_of: outOf || null,
-        generated_at: new Date().toISOString()
+        generated_at: new Date().toISOString(),
+        is_published: false,
+        is_approved: false,
       }, { onConflict: 'school_id,student_id,term,academic_year' });
     if (error) throw error;
     res.status(201).json({ saved: true });
+  } catch (err) { next(err); }
+});
+
+// PUT approve report card (admin only)
+router.put("/:id/approve", requireRoles("admin"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { id } = req.params;
+    const { approve = true } = req.body;
+
+    const { data: existing, error: fetchErr } = await supabase
+      .from("report_cards")
+      .select("school_id")
+      .eq("report_id", id)
+      .eq("school_id", schoolId)
+      .single();
+    if (fetchErr) return res.status(404).json({ message: "Report card not found" });
+
+    const { error } = await supabase
+      .from("report_cards")
+      .update({
+        is_approved: approve,
+        approved_by: approve ? req.user.name || "Admin" : null,
+        approved_at: approve ? new Date().toISOString() : null,
+      })
+      .eq("report_id", id);
+    if (error) throw error;
+
+    res.json({ approved: approve });
+  } catch (err) { next(err); }
+});
+
+// PUT publish report card (admin only)
+router.put("/:id/publish", requireRoles("admin"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { id } = req.params;
+    const { publish = true } = req.body;
+
+    const { data: existing, error: fetchErr } = await supabase
+      .from("report_cards")
+      .select("school_id, is_approved")
+      .eq("report_id", id)
+      .eq("school_id", schoolId)
+      .single();
+    if (fetchErr) return res.status(404).json({ message: "Report card not found" });
+
+    if (publish && !existing.is_approved) {
+      return res.status(400).json({ message: "Cannot publish: report card must be approved first" });
+    }
+
+    const { error } = await supabase
+      .from("report_cards")
+      .update({ is_published: publish })
+      .eq("report_id", id);
+    if (error) throw error;
+
+    res.json({ published: publish });
   } catch (err) { next(err); }
 });
 

@@ -53,6 +53,30 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
     } catch (e) { toast(e.message, "error"); }
   };
 
+  const approveCard = async (reportId, approve) => {
+    try {
+      await apiFetch(`/reportcards/${reportId}/approve`, {
+        method: "PUT",
+        body: { approve },
+        token: auth.token,
+      });
+      await load();
+      toast(approve ? "Report card approved" : "Approval removed", "success");
+    } catch (e) { toast(e.message, "error"); }
+  };
+
+  const publishCard = async (reportId, publish) => {
+    try {
+      await apiFetch(`/reportcards/${reportId}/publish`, {
+        method: "PUT",
+        body: { publish },
+        token: auth.token,
+      });
+      await load();
+      toast(publish ? "Report card published" : "Report card unpublished", "success");
+    } catch (e) { toast(e.message, "error"); }
+  };
+
   const printCard = () => {
     if (!fullData) return;
     const { student, results, attendance, reportCard, average } = fullData;
@@ -145,13 +169,23 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
                 {grouped[cls].map(s => {
                   const sid = s.id ?? s.student_id;
                   const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
-                  const hasCard = reportCards.some(r => String(r.student_id) === String(sid));
+                  const card = reportCards.find(r => String(r.student_id) === String(sid));
                   return (
                     <div key={sid} onClick={() => viewFull(sid)} style={{ background: selected === sid ? C.accent + "22" : C.card, border: `1px solid ${selected === sid ? C.accent : C.border}`, borderRadius: 8, padding: "10px 14px", marginBottom: 6, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", marginLeft: 8 }}>
                       <div>
                         <div style={{ fontWeight: 600, color: C.text }}>{name}</div>
+                        {card && auth.role === "admin" && (
+                          <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+                            <button onClick={(e) => { e.stopPropagation(); approveCard(card.report_id, !card.is_approved); }} style={{ fontSize: 10, padding: "2px 6px", background: card.is_approved ? "#22c55e" : C.bg, color: card.is_approved ? "#fff" : C.text, border: "1px solid", borderRadius: 4, cursor: "pointer" }}>
+                              {card.is_approved ? "Approved" : "Approve"}
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); publishCard(card.report_id, !card.is_published); }} style={{ fontSize: 10, padding: "2px 6px", background: card.is_published ? "#3b82f6" : C.bg, color: card.is_published ? "#fff" : C.text, border: "1px solid", borderRadius: 4, cursor: "pointer", opacity: card.is_approved ? 1 : 0.5 }}>
+                              {card.is_published ? "Published" : "Publish"}
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <Badge text={hasCard ? "card ready" : "no card"} tone={hasCard ? "success" : "warning"} />
+                      <Badge text={card ? (card.is_approved ? "Approved" : "Pending") : "no card"} tone={card ? (card.is_approved ? "success" : "warning") : "danger"} />
                     </div>
                   );
                 })}

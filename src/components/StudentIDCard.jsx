@@ -140,7 +140,10 @@ export default function StudentIDCard({ student, school, onClose }) {
             <div class="id-type">STUDENT</div>
             <div class="photo-area">Photo</div>
             <div class="info-area">
-              <div class="school-name">${school.name}</div>
+              <div class="school-name">
+                ${school.logo_url ? `<img src="${school.logo_url}" style="width:16px;height:16px;border-radius:2px;margin-right:4px;vertical-align:middle" />` : ''}
+                ${school.name}
+              </div>
               <div class="student-name">${student.firstName || student.first_name} ${student.lastName || student.last_name}</div>
               <div class="student-class">${student.className || student.class_name || "Grade 1"}</div>
               <div class="admission-no">${student.admission || student.admission_number}</div>
@@ -298,8 +301,13 @@ export default function StudentIDCard({ student, school, onClose }) {
 
           {/* Info */}
           <div style={{ color: "#fff" }}>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", opacity: 0.9, marginBottom: 8 }}>
-              {school.name || "School Name"}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              {school.logo_url && (
+                <img src={school.logo_url} alt="Logo" style={{ width: 24, height: 24, borderRadius: 4, objectFit: "cover" }} />
+              )}
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", opacity: 0.9 }}>
+                {school.name || "School Name"}
+              </div>
             </div>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 2 }}>
               {student.firstName || student.first_name} {student.lastName || student.last_name}

@@ -29,10 +29,39 @@ Lbl.propTypes = { children: PropTypes.node };
 function SchoolTab({ school, setSchool, toast, auth }) {
   const [form, setForm] = useState({ ...school });
   const [saving, setSaving] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
 
   useEffect(() => {
     setForm({ ...school });
   }, [school]);
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith("image/")) {
+      toast("Please select an image file", "error");
+      return;
+    }
+    
+    if (file.size > 2 * 1024 * 1024) {
+      toast("Image must be less than 2MB", "error");
+      return;
+    }
+    
+    setLogoUploading(true);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setForm(prev => ({ ...prev, logo_url: event.target.result }));
+      setLogoUploading(false);
+      toast("Logo uploaded", "success");
+    };
+    reader.onerror = () => {
+      setLogoUploading(false);
+      toast("Failed to read file", "error");
+    };
+    reader.readAsDataURL(file);
+  };
 
   const save = async () => {
     setSaving(true);
@@ -139,7 +168,47 @@ function SchoolTab({ school, setSchool, toast, auth }) {
           <Lbl>Hero Message</Lbl><textarea {...f("hero_message")} rows={3} style={{ ...inp, resize: "vertical" }} placeholder="Short welcome message for your login page" />
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
-          <Lbl>Logo URL</Lbl><input {...f("logo_url")} placeholder="https://..." />
+          <Lbl>School Logo</Lbl>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <label style={{ 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center",
+              width: 80, 
+              height: 80, 
+              borderRadius: 12, 
+              border: `2px dashed ${C.border}`,
+              cursor: "pointer",
+              background: C.bg,
+              overflow: "hidden",
+              flexShrink: 0,
+            }}>
+              {logoUploading ? (
+                <span style={{ color: C.textSub, fontSize: 12 }}>Uploading...</span>
+              ) : form.logo_url ? (
+                <img src={form.logo_url} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <span style={{ fontSize: 24, color: C.textMuted }}>+</span>
+              )}
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleLogoUpload} 
+                style={{ display: "none" }}
+              />
+            </label>
+            <div style={{ flex: 1 }}>
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleLogoUpload}
+                style={{ ...inp, padding: "6px 12px" }}
+              />
+              <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
+                Click to upload. Use PNG or JPG. Max 2MB.
+              </div>
+            </div>
+          </div>
         </div>
         <div><Lbl>Primary Color</Lbl><input {...f("primary_color")} value={normalizeColor(form.primary_color, C.accent)} type="color" style={{ ...inp, padding: 4, height: 42 }} /></div>
         <div><Lbl>Secondary Color</Lbl><input {...f("secondary_color")} value={normalizeColor(form.secondary_color, "#6366F1")} type="color" style={{ ...inp, padding: 4, height: 42 }} /></div>

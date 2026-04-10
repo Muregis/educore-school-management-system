@@ -313,6 +313,8 @@ export default function App() {
     dashboard: isPortal 
       ? <PortalDashboardPage auth={auth} school={school} student={activeChild} attendance={myAttendance} results={myResults} payments={myPayments} feeStructures={feeStructures} toast={toast} onViewGrades={() => setPage("grades")} onViewFees={() => setPage("fees")} onViewAttendance={() => setPage("attendance")} />
       : <DashboardPage auth={auth} school={school} students={myStudents} teachers={teachers} attendance={myAttendance} payments={myPayments} feeStructures={feeStructures} results={myResults} toast={toast} />,
+    students: <StudentsPage auth={auth} students={students} setStudents={setStudents} canEdit={canEdit} results={results} payments={payments} feeStructures={feeStructures} toast={toast} />,
+    staff: ["admin","hr"].includes(auth.role) ? <StaffPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
     attendance: <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     grades: <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     subjects: <SubjectsPage auth={auth} toast={toast} />,
@@ -351,7 +353,11 @@ export default function App() {
   const SidebarContent = ({ collapsed }) => (
     <>
       <div style={{ padding:"16px 12px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:10, minHeight:64 }}>
-        <div style={{ width:36, height:36, borderRadius:10, flexShrink:0, background:`linear-gradient(135deg, ${C.accent}, #6366f1)`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, fontSize:16, color:"#fff", letterSpacing:-1 }}>E</div>
+        {school.logo_url ? (
+          <img src={school.logo_url} alt="Logo" style={{ width:36, height:36, borderRadius:10, objectFit:"cover", flexShrink:0 }} />
+        ) : (
+          <div style={{ width:36, height:36, borderRadius:10, flexShrink:0, background:`linear-gradient(135deg, ${C.accent}, #6366f1)`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, fontSize:16, color:"#fff", letterSpacing:-1 }}>E</div>
+        )}
         {!collapsed && (
           <div>
             <div style={{ fontWeight:800, fontSize:15, color:C.text, lineHeight:1.1 }}>EduCore</div>
@@ -457,11 +463,15 @@ export default function App() {
             {isMobile && (
               <button onClick={() => setDrawerOpen(true)} style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:8, color:C.textMuted, cursor:"pointer", padding:"6px 10px", fontSize:16 }}>☰</button>
             )}
-            <div>
-              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                <span style={{ fontSize:16 }}>{currentNav?.icon}</span>
-                <span style={{ fontWeight:800, fontSize: isMobile ? 15 : 18, color:C.text }}>{currentNav?.label || page}</span>
-              </div>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              {school.logo_url && !isMobile && (
+                <img src={school.logo_url} alt="Logo" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
+              )}
+              <div>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <span style={{ fontSize:16 }}>{currentNav?.icon}</span>
+                  <span style={{ fontWeight:800, fontSize: isMobile ? 15 : 18, color:C.text }}>{currentNav?.label || page}</span>
+                </div>
               {!isMobile && (
                 <div style={{ color:C.textMuted, fontSize:11, marginTop:1 }}>
                   {isPortal
