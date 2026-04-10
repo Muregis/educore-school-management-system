@@ -335,13 +335,12 @@ export default function App() {
     lessonplans: ["admin","teacher"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     pendingplans: auth.role === "admin" ? <PendingPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     announcements: perms?.pages.includes("announcements") ? <AnnouncementsPage auth={auth} toast={toast} /> : <Forbidden />,
+    reports: ["admin","teacher"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
+    analysis: ["admin","teacher"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,
     settings: auth.role === "admin"
       ? <div><SettingsPage auth={auth} school={school} setSchool={setSchool} users={users} setUsers={setUsers} toast={toast} /><div style={{ marginTop:12 }}><Btn variant="danger" onClick={() => { if (window.confirm("Reset demo data?")) resetDemo(); }}>Reset Demo Data</Btn></div></div>
       : <Forbidden />,
   };
-
-  pages.reports = ["admin","teacher"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />;
-  pages.analysis = ["admin","teacher"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />;
 
   const currentNav = nav.find(n => n.id === page);
   const bottomNavIds = [...new Set(BOTTOM_NAV_PAGES[auth.role] || ["dashboard"])].slice(0, 5);
