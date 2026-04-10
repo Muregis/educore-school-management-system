@@ -7,7 +7,7 @@ import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { Msg } from "../components/Helpers";
 
-export default function BulkImportPage({ auth, students, setStudents, toast }) {
+export default function BulkImportPage({ auth, students, setStudents, toast, payments, feeStructures }) {
   const [activeTab, setActiveTab] = useState("import");
   const [csvContent, setCsvContent] = useState("");
   const [parsing, setParsing] = useState(false);
@@ -15,6 +15,12 @@ export default function BulkImportPage({ auth, students, setStudents, toast }) {
   const [importing, setImporting] = useState(false);
   const [importResults, setImportResults] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Export filter state
+  const [exportFilter, setExportFilter] = useState("all"); // all, class, defaulter, individual
+  const [exportClass, setExportClass] = useState("all");
+  const [exportDefaulterAmount, setExportDefaulterAmount] = useState(0);
+  const [selectedStudents, setSelectedStudents] = useState([]);
 
   // CSV Template
   const csvTemplate = `first_name,last_name,gender,class_name,admission_number,parent_name,parent_phone,date_of_birth,nemis_number,status
@@ -138,36 +144,74 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
     setImporting(false);
   };
 
-  // Export students to CSV
+  // Export students to CSV with filters
   const handleExport = () => {
-    const headers = ["first_name", "last_name", "gender", "class_name", "admission_number", "parent_name", "parent_phone", "date_of_birth", "nemis_number", "blood_group", "allergies", "emergency_contact_name", "emergency_contact_phone", "status"];
-    
-    const rows = students.map(s => [
-      s.firstName || s.first_name || "",
-      s.lastName || s.last_name || "",
-      s.gender || "",
-      s.className || s.class_name || "",
-      s.admission || s.admission_number || "",
-      s.parentName || s.parent_name || "",
-      s.parentPhone || s.parent_phone || "",
-      s.dob || s.date_of_birth || "",
-      s.nemisNumber || s.nemis_number || "",
-      s.bloodGroup || s.blood_group || "",
-      s.allergies || "",
-      s.emergencyContactName || s.emergency_contact_name || "",
-      s.emergencyContactPhone || s.emergency_contact_phone || "",
-      s.status || "active",
-    ]);
+    let filteredStudents = students;
 
-    const csv = [headers.join(","), ...rows.map(r => r.map(v => `"${(v || "").replace(/"/g, '""')}"`).join(","))].join("\n");
+    // Apply filters
+    if (exportFilter === "class" && exportClass !== "all") {
+      filteredStudents = students.filter(s => (s.className || s.class_name) === exportClass);
+    } else if (exportFilter === "defaulter") {
+      filteredStudents = students.filter(s => {
+        const studentId = s.id ?? s.student_id;
+        const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
+        const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
+        const paidAmount = payments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid").reduce((sum, p) => sum + Number(p.amount || 0), 0);
+        const balance = expectedAmount - paidAmount;
+        return balance > exportDefaulterAmount;
+      });
+    } else if (exportFilter === "individual") {
+      filteredStudents = students.filter(s => selectedStudents.includes(s.id ?? s.student_id));
+    }
+
+    const headers = ["first_name", "last_name", "gender", "class_name", "admission_number", "parent_name", "parent_phone", "date_of_birth", "nemis_number", "blood_group", "allergies", "medical_conditions", "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship", "status"];
+    
+    const rows = filteredStudents.map(s => {
+      const studentId = s.id ?? s.student_id;
+      const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
+      const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
+      const paidAmount = payments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid").reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const balance = expectedAmount - paidAmount;
+      
+      return [
+        s.firstName || s.first_name || "",
+        s.lastName || s.last_name || "",
+        s.gender || "",
+        s.className || s.class_name || "",
+        s.admission || s.admission_number || "",
+        s.parentName || s.parent_name || "",
+        s.parentPhone || s.parent_phone || "",
+        s.dob || s.date_of_birth || "",
+        s.nemisNumber || s.nemis_number || "",
+        s.bloodGroup || s.blood_group || "",
+        s.allergies || "",
+        s.medicalConditions || s.medical_conditions || "",
+        s.emergencyContactName || s.emergency_contact_name || "",
+        s.emergencyContactPhone || s.emergency_contact_phone || "",
+        s.emergencyContactRelationship || s.emergency_contact_relationship || "",
+        s.status || "active",
+        balance > 0 ? balance.toString() : "0", // balance column
+      ];
+    });
+
+    const csvHeaders = [...headers, "balance"];
+    const csv = [csvHeaders.join(","), ...rows.map(r => r.map(v => `"${(v || "").replace(/"/g, '""')}"`).join(","))].join("\n");
     
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `students_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    const suffix = exportFilter === "defaulter" ? "defaulters" : exportFilter === "class" ? exportClass.replace(" ", "_") : "all";
+    link.download = `students_export_${suffix}_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     
-    toast(`Exported ${students.length} students`, "success");
+    toast(`Exported ${filteredStudents.length} students`, "success");
+  };
+
+  // Toggle student selection for individual export
+  const toggleStudent = (studentId) => {
+    setSelectedStudents(prev => 
+      prev.includes(studentId) ? prev.filter(id => id !== studentId) : [...prev, studentId]
+    );
   };
 
   // Download template
@@ -362,16 +406,142 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
         </div>
       ) : (
         <div>
-          {/* Export */}
+          {/* Export Filter Options */}
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20, marginBottom: 20 }}>
+            <h4 style={{ margin: "0 0 16px", color: C.text }}>Export Options</h4>
+            
+            <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+              <button
+                onClick={() => setExportFilter("all")}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: exportFilter === "all" ? C.accent : C.bg,
+                  color: exportFilter === "all" ? "#fff" : C.text,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                All Students
+              </button>
+              <button
+                onClick={() => setExportFilter("class")}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: exportFilter === "class" ? C.accent : C.bg,
+                  color: exportFilter === "class" ? "#fff" : C.text,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                By Class
+              </button>
+              <button
+                onClick={() => setExportFilter("defaulter")}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: exportFilter === "defaulter" ? C.accent : C.bg,
+                  color: exportFilter === "defaulter" ? "#fff" : C.text,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                Fee Defaulters
+              </button>
+              <button
+                onClick={() => setExportFilter("individual")}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: exportFilter === "individual" ? C.accent : C.bg,
+                  color: exportFilter === "individual" ? "#fff" : C.text,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                Individual Select
+              </button>
+            </div>
+
+            {/* Class filter */}
+            {exportFilter === "class" && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ color: C.textSub, marginRight: 12 }}>Select Class:</label>
+                <select 
+                  style={{ ...inputStyle, width: "auto" }} 
+                  value={exportClass} 
+                  onChange={e => setExportClass(e.target.value)}
+                >
+                  <option value="all">All Classes</option>
+                  {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
+
+            {/* Defaulter filter */}
+            {exportFilter === "defaulter" && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ color: C.textSub, marginRight: 12 }}>Balance above (KES):</label>
+                <input 
+                  type="number" 
+                  style={{ ...inputStyle, width: 120 }} 
+                  value={exportDefaulterAmount} 
+                  onChange={e => setExportDefaulterAmount(Number(e.target.value))}
+                  placeholder="0"
+                />
+                <span style={{ color: C.textSub, marginLeft: 8, fontSize: 13 }}>Students with balance greater than this amount</span>
+              </div>
+            )}
+
+            {/* Individual select */}
+            {exportFilter === "individual" && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ color: C.textSub, marginBottom: 8 }}>Select students ({selectedStudents.length} selected):</div>
+                <div style={{ maxHeight: 200, overflow: "auto", background: C.bg, padding: 10, borderRadius: 8 }}>
+                  {students.map(s => {
+                    const sid = s.id ?? s.student_id;
+                    return (
+                      <label key={sid} style={{ display: "flex", alignItems: "center", gap: 8, padding: 4, cursor: "pointer" }}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedStudents.includes(sid)}
+                          onChange={() => toggleStudent(sid)}
+                        />
+                        <span style={{ color: C.text }}>{s.firstName || s.first_name} {s.lastName || s.last_name} ({s.admission || s.admission_number})</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Export Button */}
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 24, textAlign: "center" }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
-            <h4 style={{ margin: "0 0 8px", color: C.text }}>Export All Students</h4>
+            <h4 style={{ margin: "0 0 8px", color: C.text }}>
+              {exportFilter === "all" && "Export All Students"}
+              {exportFilter === "class" && `Export ${exportClass === "all" ? "All Classes" : exportClass}`}
+              {exportFilter === "defaulter" && "Export Fee Defaulters"}
+              {exportFilter === "individual" && `Export ${selectedStudents.length} Selected Students`}
+            </h4>
             <p style={{ color: C.textSub, fontSize: 14, margin: "0 0 20px" }}>
-              Download a CSV file containing all {students.length} students with their complete information.
+              Download a CSV file with complete student information including medical data and fee balance.
             </p>
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
               <Btn variant="ghost" onClick={() => setActiveTab("import")}>Cancel</Btn>
-              <Btn onClick={handleExport}>📤 Export to CSV</Btn>
+              <Btn 
+                onClick={handleExport}
+                disabled={exportFilter === "individual" && selectedStudents.length === 0}
+              >
+                📤 Export to CSV
+              </Btn>
             </div>
           </div>
 
@@ -390,9 +560,12 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
               <div>• nemis_number</div>
               <div>• blood_group</div>
               <div>• allergies</div>
+              <div>• medical_conditions</div>
               <div>• emergency_contact_name</div>
               <div>• emergency_contact_phone</div>
+              <div>• emergency_contact_relationship</div>
               <div>• status</div>
+              <div>• balance (KES)</div>
             </div>
           </div>
         </div>

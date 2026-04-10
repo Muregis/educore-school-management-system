@@ -11,13 +11,14 @@ import { C, inputStyle } from "../lib/theme";
 // Now uses the shared apiFetch helper from lib/api.
 import { apiFetch } from "../lib/api";
 
-export default function TransportPage({ auth, canEdit, toast }) {
+export default function TransportPage({ auth, canEdit, toast, students }) {
   const [tab, setTab]           = useState("routes");
   const [routes, setRoutes]     = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [showRoute, setShowRoute]   = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+  const [viewRouteStudents, setViewRouteStudents] = useState(null);
   const [rf, setRf] = useState({ routeName: "", driverName: "", vehicleNumber: "", fee: "", status: "active" });
   const [af, setAf] = useState({ studentId: "", transportId: "", startDate: new Date().toISOString().slice(0, 10), endDate: "", status: "active" });
   const [err, setErr] = useState("");
@@ -104,14 +105,19 @@ export default function TransportPage({ auth, canEdit, toast }) {
           {loading ? <Msg text="Loading..." /> : routes.length === 0 ? <Msg text="No transport routes found." /> : (
             <div style={{ overflowX: "auto" }}>
               <Table
-                headers={["Route", "Driver", "Vehicle", "Fee (KES)", "Status"]}
-                rows={routes.map(r => [
-                  <span key={r.transport_id} style={{ color: C.text, fontWeight: 600 }}>{r.route_name}</span>,
-                  r.driver_name    || "-",
-                  r.vehicle_number || "-",
-                  Number(r.fee || 0).toLocaleString(),
-                  <Badge key="s" text={r.status} tone={r.status === "active" ? "success" : "danger"} />,
-                ])}
+                headers={["Route", "Driver", "Vehicle", "Fee (KES)", "Students", "Status", "Actions"]}
+                rows={routes.map(r => {
+                  const routeAssignments = assignments.filter(a => a.transport_id === r.transport_id && a.status === "active");
+                  return [
+                    <span key={r.transport_id} style={{ color: C.text, fontWeight: 600 }}>{r.route_name}</span>,
+                    r.driver_name    || "-",
+                    r.vehicle_number || "-",
+                    Number(r.fee || 0).toLocaleString(),
+                    <Badge key="sb" text={`${routeAssignments.length} students`} tone="info" />,
+                    <Badge key="s" text={r.status} tone={r.status === "active" ? "success" : "danger"} />,
+                    <Btn variant="ghost" onClick={() => setViewRouteStudents(r)}>View Students</Btn>,
+                  ];
+                })}
               />
             </div>
           )}
@@ -216,6 +222,34 @@ export default function TransportPage({ auth, canEdit, toast }) {
           </div>
         </Modal>
       )}
+
+      {viewRouteStudents && (
+        <Modal title={`Students on ${viewRouteStudents.route_name}`} onClose={() => setViewRouteStudents(null)}>
+          {(() => {
+            const routeAssignments = assignments.filter(a => a.transport_id === viewRouteStudents.transport_id && a.status === "active");
+            if (routeAssignments.length === 0) {
+              return <Msg text="No students assigned to this route." />;
+            }
+            return (
+              <div style={{ overflowX: "auto" }}>
+                <Table
+                  headers={["Student", "Admission", "Class", "Parent Phone", "Start Date"]}
+                  rows={routeAssignments.map(a => [
+                    <span style={{ color: C.text, fontWeight: 600 }}>{a.first_name} {a.last_name}</span>,
+                    a.admission_number,
+                    a.class_name || "-",
+                    a.parent_phone || "-",
+                    a.start_date?.slice(0, 10),
+                  ])}
+                />
+              </div>
+            );
+          })()}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+            <Btn onClick={() => setViewRouteStudents(null)}>Close</Btn>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -224,4 +258,5 @@ TransportPage.propTypes = {
   auth:    PropTypes.object,
   canEdit: PropTypes.bool,
   toast:   PropTypes.func.isRequired,
+  students: PropTypes.array,
 };

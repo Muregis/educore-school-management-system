@@ -34,7 +34,6 @@ import SubjectsPage from "./pages/SubjectsPage";
 import MpesaReconciliationPage from "./pages/MpesaReconciliationPage";
 import BulkImportPage from "./pages/BulkImportPage";
 import ExamsPage from "./pages/ExamsPage";
-import MessagingPage from "./pages/MessagingPage";
 import MedicalRecordsPage from "./pages/MedicalRecordsPage";
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import { apiFetch } from "./lib/api";
@@ -319,7 +318,7 @@ export default function App() {
     subjects: <SubjectsPage auth={auth} toast={toast} />,
     fees: <FeesPage auth={auth} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     "mpesa-reconcile": <MpesaReconciliationPage auth={auth} students={students} toast={toast} />,
-    "bulk-import": <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} />,
+    "bulk-import": <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} payments={payments} feeStructures={feeStructures} />,
     exams: <ExamsPage auth={auth} students={students} subjects={[]} toast={toast} />,
     admissions: <AdmissionsPage auth={auth} canEdit={canEdit} toast={toast} />,
     invoices: <InvoicesPage auth={auth} school={school} students={students} canEdit={canEdit} toast={toast} />,
@@ -328,9 +327,8 @@ export default function App() {
     staff: ["admin","hr"].includes(auth.role) ? <StaffPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
     library: <LibraryPage auth={auth} students={myStudents} teachers={teachers} toast={toast} />,
     discipline: <DisciplinePage auth={auth} students={myStudents} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
-    transport: <TransportPage auth={auth} canEdit={canEdit} toast={toast} />,
+    transport: <TransportPage auth={auth} canEdit={canEdit} toast={toast} students={students} />,
     communication: <CommunicationPage auth={auth} canEdit={canEdit} toast={toast} />,
-    messaging: <MessagingPage auth={auth} />,
     timetable: <TimetablePage auth={auth} teachers={teachers} canEdit={canEdit} toast={toast} />,
     accounts: auth.role === "admin" ? <AccountsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
     lessonplans: ["admin","teacher"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
