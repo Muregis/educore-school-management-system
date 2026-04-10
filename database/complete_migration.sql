@@ -408,13 +408,16 @@ CREATE TABLE IF NOT EXISTS exams (
   exam_id BIGSERIAL PRIMARY KEY,
   school_id BIGINT REFERENCES schools(school_id),
   exam_name VARCHAR(100) NOT NULL,
-  class_name VARCHAR(80),
+  exam_type VARCHAR(40) DEFAULT 'internal',
   term VARCHAR(40),
-  academic_year VARCHAR(20),
+  academic_year INTEGER,
   start_date DATE,
   end_date DATE,
-  is_published BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  description TEXT,
+  status VARCHAR(20) DEFAULT 'draft',
+  is_deleted BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Activity logs table
@@ -429,6 +432,22 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Exam schedules table
+CREATE TABLE IF NOT EXISTS exam_schedules (
+  schedule_id BIGSERIAL PRIMARY KEY,
+  exam_id BIGINT REFERENCES exams(exam_id),
+  subject_id BIGINT REFERENCES subjects(subject_id),
+  class_name VARCHAR(80),
+  exam_date DATE NOT NULL,
+  start_time TIME,
+  end_time TIME,
+  venue VARCHAR(100),
+  max_marks INTEGER DEFAULT 100,
+  instructions TEXT,
+  is_deleted BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_students_school ON students(school_id);
 CREATE INDEX IF NOT EXISTS idx_students_class ON students(school_id, class_name);
@@ -437,4 +456,5 @@ CREATE INDEX IF NOT EXISTS idx_results_term ON results(term);
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
 CREATE INDEX IF NOT EXISTS idx_payments_student ON payments(student_id);
 CREATE INDEX IF NOT EXISTS idx_report_cards_student ON report_cards(student_id);
-CREATE INDEX IF NOT EXISTS idx_medical_records_student ON medical_records(student_id);
+CREATE INDEX IF NOT EXISTS idx_exam_schedules_exam ON exam_schedules(exam_id);
+CREATE INDEX IF NOT EXISTS idx_exam_schedules_date ON exam_schedules(exam_date);
