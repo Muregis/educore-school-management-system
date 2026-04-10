@@ -35,6 +35,7 @@ import MpesaReconciliationPage from "./pages/MpesaReconciliationPage";
 import BulkImportPage from "./pages/BulkImportPage";
 import ExamsPage from "./pages/ExamsPage";
 import MessagingPage from "./pages/MessagingPage";
+import MedicalRecordsPage from "./pages/MedicalRecordsPage";
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import { apiFetch } from "./lib/api";
 
@@ -335,6 +336,7 @@ export default function App() {
     lessonplans: ["admin","teacher"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     pendingplans: auth.role === "admin" ? <PendingPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     announcements: perms?.pages.includes("announcements") ? <AnnouncementsPage auth={auth} toast={toast} /> : <Forbidden />,
+    medical: auth.role === "admin" ? <MedicalRecordsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
     settings: auth.role === "admin"
       ? <div><SettingsPage auth={auth} school={school} setSchool={setSchool} users={users} setUsers={setUsers} toast={toast} /><div style={{ marginTop:12 }}><Btn variant="danger" onClick={() => { if (window.confirm("Reset demo data?")) resetDemo(); }}>Reset Demo Data</Btn></div></div>
       : <Forbidden />,
