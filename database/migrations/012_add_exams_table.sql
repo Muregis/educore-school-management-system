@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS exams (
   exam_id         BIGSERIAL PRIMARY KEY,
   school_id       BIGINT NOT NULL REFERENCES schools(school_id),
   name            VARCHAR(160) NOT NULL,
-  exam_type       VARCHAR(40) NOT NULL DEFAULT 'internal', -- internal, midterm, endterm, KCPE, KCSE
+  exam_type       VARCHAR(40) NOT NULL DEFAULT 'internal', -- internal, midterm, endterm
   term            VARCHAR(20) NOT NULL,
   year            INTEGER NOT NULL,
   start_date      DATE NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS exams (
 CREATE INDEX IF NOT EXISTS idx_exams_school ON exams(school_id, year, term);
 CREATE INDEX IF NOT EXISTS idx_exams_status ON exams(school_id, status);
 
-COMMENT ON TABLE exams IS 'Exam scheduling and management (internal exams, KCPE, KCSE)';
+COMMENT ON TABLE exams IS 'Exam scheduling and management (internal exams, CBC assessments)';
 
 -- Exam schedule (which subjects on which days)
 CREATE TABLE IF NOT EXISTS exam_schedules (
