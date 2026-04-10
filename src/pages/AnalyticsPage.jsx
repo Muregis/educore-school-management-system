@@ -100,7 +100,7 @@ function StatCard({ title, value, subtitle, trend, color = C.accent }) {
   );
 }
 
-export default function AnalyticsPage({ students, teachers, payments, results, attendance, feeStructures }) {
+export default function AnalyticsPage({ students = [], teachers = [], payments = [], results = [], attendance = [], feeStructures = [] }) {
   const [activeTab, setActiveTab] = useState("overview");
 
   // Calculate statistics
@@ -293,10 +293,10 @@ export default function AnalyticsPage({ students, teachers, payments, results, a
 }
 
 AnalyticsPage.propTypes = {
-  students: PropTypes.array.isRequired,
-  teachers: PropTypes.array.isRequired,
-  payments: PropTypes.array.isRequired,
-  results: PropTypes.array.isRequired,
-  attendance: PropTypes.array.isRequired,
-  feeStructures: PropTypes.array.isRequired,
+  students: PropTypes.array,
+  teachers: PropTypes.array,
+  payments: PropTypes.array,
+  results: PropTypes.array,
+  attendance: PropTypes.array,
+  feeStructures: PropTypes.array,
 };
