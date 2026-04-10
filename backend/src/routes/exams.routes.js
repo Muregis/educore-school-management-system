@@ -10,10 +10,10 @@ const router = express.Router();
 
 const EXAM_SELECT = [
   "exam_id",
-  "exam_name:name",
+  "exam_name",
   "exam_type",
   "term",
-  "academic_year:year",
+  "academic_year",
   "start_date",
   "end_date",
   "status",
@@ -31,10 +31,10 @@ router.get("/", requireAuth, async (req, res, next) => {
       .select(EXAM_SELECT)
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
-      .order("year", { ascending: false })
+      .order("academic_year", { ascending: false })
       .order("created_at", { ascending: false });
 
-    if (year) query = query.eq("year", year);
+    if (year) query = query.eq("academic_year", year);
     if (term) query = query.eq("term", term);
     if (status) query = query.eq("status", status);
 
