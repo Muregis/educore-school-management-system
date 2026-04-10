@@ -16,8 +16,8 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
   const [studentOptions, setStudentOptions] = useState([]);
   const [showSingle, setShowSingle] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
-  // OLD: const [singleForm, setSingleForm] = useState({ recipient: "", message: "" });
   const [singleForm, setSingleForm] = useState({ recipient: "", selectedStudentId: "", message: "" });
+  const [singleFormClass, setSingleFormClass] = useState("");
   const [bulkForm, setBulkForm] = useState({ className: "all", message: "" });
   const [sending, setSending] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
@@ -165,6 +165,20 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
       {showSingle && (
         <Modal title="Prepare WhatsApp Chat" onClose={() => setShowSingle(false)}>
           <div>
+            <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Class</div>
+            <select
+              value={singleFormClass}
+              onChange={e => {
+                setSingleFormClass(e.target.value);
+                setSingleForm(f => ({ ...f, selectedStudentId: "", recipient: "" }));
+              }}
+              style={{ ...inputStyle }}
+            >
+              <option value="">Select class first</option>
+              {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div style={{ marginTop: 10 }}>
             <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Parent or Student</div>
             <select
               value={singleForm.selectedStudentId}
@@ -178,13 +192,14 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
                 }));
               }}
               style={{ ...inputStyle }}
+              disabled={!singleFormClass}
             >
-              <option value="">Select student or parent</option>
+              <option value="">{singleFormClass ? "Select student or parent" : "Select class first"}</option>
               {studentOptions
-                .filter(student => student.parent_phone)
+                .filter(student => student.parent_phone && (student.class_name === singleFormClass))
                 .map(student => (
                   <option key={student.student_id} value={student.student_id}>
-                    {`${student.first_name} ${student.last_name}${student.class_name ? ` - ${student.class_name}` : ""}${student.parent_name ? ` - Parent: ${student.parent_name}` : ""}`}
+                    {`${student.first_name} ${student.last_name}${student.parent_name ? ` - Parent: ${student.parent_name}` : ""}`}
                   </option>
                 ))}
             </select>

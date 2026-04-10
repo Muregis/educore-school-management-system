@@ -17,6 +17,7 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
   const [showBulk, setShowBulk]       = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
   const [singleForm, setSingleForm]   = useState({ studentId: "", term: "Term 2", academicYear: "2026", tuition: "", activity: "", misc: "", transport: "", dueDate: "" });
+  const [singleFormClass, setSingleFormClass] = useState("");
   const [bulkForm, setBulkForm]       = useState({ className: "Grade 7", term: "Term 2", academicYear: "2026", dueDate: "" });
 
   const load = async () => {
@@ -135,10 +136,16 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
       {showSingle && (
         <Modal title="Create Invoice" onClose={() => setShowSingle(false)}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <Field label="Class" style={{ gridColumn: "1 / -1" }}>
+              <select style={inputStyle} value={singleFormClass} onChange={e => { setSingleFormClass(e.target.value); setSingleForm({ ...singleForm, studentId: "" }); }}>
+                <option value="">-- Select class first --</option>
+                {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </Field>
             <Field label="Student" style={{ gridColumn: "1 / -1" }}>
-              <select style={inputStyle} value={singleForm.studentId} onChange={e => setSingleForm({ ...singleForm, studentId: e.target.value })}>
-                <option value="">-- Select student --</option>
-                {students.map(s => { const id = s.id ?? s.student_id; const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`; return <option key={id} value={id}>{name} — {s.className ?? s.class_name}</option>; })}
+              <select style={inputStyle} value={singleForm.studentId} onChange={e => setSingleForm({ ...singleForm, studentId: e.target.value })} disabled={!singleFormClass}>
+                <option value="">{singleFormClass ? "-- Select student --" : "-- Select class first --"}</option>
+                {students.filter(s => (s.className ?? s.class_name) === singleFormClass).map(s => { const id = s.id ?? s.student_id; const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`; return <option key={id} value={id}>{name}</option>; })}
               </select>
             </Field>
             <Field label="Term"><select style={inputStyle} value={singleForm.term} onChange={e => setSingleForm({ ...singleForm, term: e.target.value })}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></Field>

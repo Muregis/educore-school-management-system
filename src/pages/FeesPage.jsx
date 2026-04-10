@@ -92,7 +92,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [editStruct, setEditStruct]   = useState(null);
   const [filterClass, setFilterClass] = useState("all");
   const [page, setPage]               = useState(1);
-  const [paymentForm, setPaymentForm] = useState({ studentId: students[0]?.id || "", amount: "", feeType: "tuition", method: "cash", date: new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
+  const [paymentForm, setPaymentForm] = useState({ studentId: "", amount: "", feeType: "tuition", method: "cash", date: new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
+  const [paymentClass, setPaymentClass] = useState("");
   const [structForm, setStructForm]   = useState({ className: "Grade 7", tuition: "", activity: "", misc: "" });
   const [bankDetails, setBankDetails] = useState(null);
   const [schoolWhatsApp, setSchoolWhatsApp] = useState("");
@@ -767,9 +768,16 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       {showPayment && (
         <Modal title="Record Manual Payment" onClose={()=>setShowPayment(false)}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <Field label="Student">
-              <select style={inputStyle} value={paymentForm.studentId} onChange={e=>setPaymentForm({...paymentForm,studentId:Number(e.target.value)})}>
-                {students.map(s=>{ 
+            <Field label="Class" style={{ gridColumn: "1 / -1" }}>
+              <select style={inputStyle} value={paymentClass} onChange={e=>{ setPaymentClass(e.target.value); setPaymentForm({...paymentForm,studentId:""}); }}>
+                <option value="">-- Select class first --</option>
+                {ALL_CLASSES.map(c=><option key={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Student" style={{ gridColumn: "1 / -1" }}>
+              <select style={inputStyle} value={paymentForm.studentId} onChange={e=>setPaymentForm({...paymentForm,studentId:Number(e.target.value)})} disabled={!paymentClass}>
+                <option value="">{paymentClass ? "-- Select student --" : "-- Select class first --"}</option>
+                {students.filter(s=>(s.className??s.class_name)===paymentClass).map(s=>{ 
                   const sid=s.id??s.student_id; 
                   const name=s.firstName?`${s.firstName} ${s.lastName}`:`${s.first_name} ${s.last_name}`; 
                   return <option key={sid} value={sid}>{name}</option>; 
