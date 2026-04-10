@@ -136,6 +136,19 @@ export default function App() {
   const [notifications, setNotifications] = useLocalState("educore.notifications",  DEFAULTS.notifications);
 
   const [auth, setAuth] = useState(() => {
+    // Check if this is a new browser session
+    // sessionStorage is cleared when browser closes, so if sessionStart is missing, it's a new session
+    const sessionStart = sessionStorage.getItem("educore.sessionStart");
+    
+    if (!sessionStart) {
+      // New browser session - clear any leftover auth and require login
+      sessionStorage.setItem("educore.sessionStart", Date.now().toString());
+      sessionStorage.removeItem("educore.auth");
+      sessionStorage.removeItem("token");
+      return null;
+    }
+    
+    // Existing session (page refresh) - restore auth from sessionStorage
     const raw = sessionStorage.getItem("educore.auth");
     if (!raw) return null;
     try { return JSON.parse(raw); } catch { return null; }
