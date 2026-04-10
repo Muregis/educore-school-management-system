@@ -472,13 +472,14 @@ export default function App() {
                   <span style={{ fontSize:16 }}>{currentNav?.icon}</span>
                   <span style={{ fontWeight:800, fontSize: isMobile ? 15 : 18, color:C.text }}>{currentNav?.label || page}</span>
                 </div>
-              {!isMobile && (
-                <div style={{ color:C.textMuted, fontSize:11, marginTop:1 }}>
-                  {isPortal
-                    ? `${isParent ? "Parent" : "Student"} · ${activeChild ? `${activeChild.firstName ?? activeChild.first_name} ${activeChild.lastName ?? activeChild.last_name}` : auth.name}`
-                    : school.name + " · " + school.term + " " + school.year}
-                </div>
-              )}
+                {!isMobile && (
+                  <div style={{ color:C.textMuted, fontSize:11, marginTop:1 }}>
+                    {isPortal
+                      ? `${isParent ? "Parent" : "Student"} · ${activeChild ? `${activeChild.firstName ?? activeChild.first_name} ${activeChild.lastName ?? activeChild.last_name}` : auth.name}`
+                      : school.name + " · " + school.term + " " + school.year}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

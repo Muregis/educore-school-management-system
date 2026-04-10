@@ -7,9 +7,8 @@ import Table from "../components/Table";
 import Modal from "../components/Modal";
 import { Pager, Msg } from "../components/Helpers";
 import { C, inputStyle } from "../lib/theme";
-// Bug #11 fixed: was using hardcoded raw fetch with API_BASE const.
-// Now uses the shared apiFetch helper from lib/api.
 import { apiFetch } from "../lib/api";
+import { ALL_CLASSES } from "../lib/constants";
 
 const PAGE_SIZE = 10;
 const pager = (arr, p) => ({
@@ -17,13 +16,15 @@ const pager = (arr, p) => ({
   rows:  arr.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE),
 });
 
-export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId = null }) {
+export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId = null, students }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [show, setShow]       = useState(false);
   const [page, setPage]       = useState(1);
   const [filter, setFilter]   = useState("all");
+  const [filterClass, setFilterClass] = useState("all");
   const [f, setF] = useState({
+    studentClass:   "",
     studentId:      "",
     incidentType:   "misconduct",
     incidentDetails:"",
@@ -32,6 +33,10 @@ export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId =
     status:         "open",
   });
   const [err, setErr] = useState("");
+
+  const filteredStudents = f.studentClass === "all" || !f.studentClass
+    ? students
+    : students.filter(s => (s.className || s.class_name) === f.studentClass);
 
   const token = auth?.token;
 
@@ -114,9 +119,21 @@ export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId =
       {show && (
         <Modal title="Log Discipline Incident" onClose={() => setShow(false)}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Student ID">
-              <input style={inputStyle} value={f.studentId}
-                onChange={e => setF({ ...f, studentId: e.target.value })} placeholder="e.g. 3" />
+            <Field label="Class">
+              <select style={inputStyle} value={f.studentClass} onChange={e => { setF({ ...f, studentClass: e.target.value, studentId: "" }); }}>
+                <option value="">All Classes</option>
+                {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Student">
+              <select style={inputStyle} value={f.studentId} onChange={e => setF({ ...f, studentId: e.target.value })}>
+                <option value="">-- Select Student --</option>
+                {filteredStudents.map(s => (
+                  <option key={s.id ?? s.student_id} value={s.id ?? s.student_id}>
+                    {s.firstName || s.first_name} {s.lastName || s.last_name} ({s.admission_number || s.admission})
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Incident Type">
               <select style={inputStyle} value={f.incidentType}

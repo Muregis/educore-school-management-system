@@ -8,6 +8,7 @@ import Table from "../components/Table";
 import { Pager, Msg } from "../components/Helpers";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
+import { ALL_CLASSES } from "../lib/constants";
 
 const RECORD_TYPES = [
   { id: "clinic_visit", label: "Clinic Visit" },
@@ -44,12 +45,18 @@ export default function MedicalRecordsPage({ auth, students, toast }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("all");
+  const [filterClass, setFilterClass] = useState("all");
 
   const [showRecord, setShowRecord] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(BLANK_RECORD);
+  const [formClass, setFormClass] = useState("");
   const [err, setErr] = useState("");
   const [page, setPage] = useState(1);
+
+  const filteredStudents = filterClass === "all" 
+    ? students 
+    : students.filter(s => (s.className || s.class_name) === filterClass);
 
   const load = async (signal) => {
     setLoading(true);
@@ -190,10 +197,16 @@ export default function MedicalRecordsPage({ auth, students, toast }) {
       {showRecord && (
         <Modal title={editId ? "Edit Medical Record" : "Add Medical Record"} onClose={() => setShowRecord(false)}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Student" style={{ gridColumn: "1 / -1" }}>
+            <Field label="Class">
+              <select style={inputStyle} value={formClass} onChange={e => { setFormClass(e.target.value); setForm({ ...form, student_id: "" }); }}>
+                <option value="">All Classes</option>
+                {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Student">
               <select style={inputStyle} value={form.student_id} onChange={e => setForm({ ...form, student_id: Number(e.target.value) })}>
                 <option value="">-- Select Student --</option>
-                {students.map(s => (
+                {(formClass ? filteredStudents : students).map(s => (
                   <option key={s.id ?? s.student_id} value={s.id ?? s.student_id}>
                     {s.firstName || s.first_name} {s.lastName || s.last_name} ({s.admission_number || s.admission})
                   </option>
