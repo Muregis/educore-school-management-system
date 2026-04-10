@@ -12,7 +12,7 @@ router.get("/", async (req, res, next) => {
     const { schoolId } = req.user;
     const { data: rows, error } = await supabase
       .from("teachers")
-      .select("teacher_id, staff_number, tsc_staff_id, first_name, last_name, email, phone, department, qualification, status, hire_date, created_at")
+      .select("teacher_id, staff_number, national_id, first_name, last_name, email, phone, department, qualification, status, hire_date, created_at")
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
       .order("first_name");
@@ -66,7 +66,7 @@ router.post("/", requireRoles("admin", "hr"), async (req, res, next) => {
         email,
         phone: phone || null,
         staff_number: finalStaffNumber,
-        tsc_staff_id: tscStaffId || null,
+        national_id: tscStaffId || null,
         department: department || null,
         qualification: qualification || null,
         hire_date: hireDate || null,

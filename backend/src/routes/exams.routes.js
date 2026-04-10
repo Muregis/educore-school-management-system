@@ -16,13 +16,13 @@ router.get("/", requireAuth, async (req, res, next) => {
 
     let query = supabase
       .from("exams")
-      .select("exam_id, name, exam_type, term, year, start_date, end_date, description, status, created_at")
+      .select("exam_id, exam_name as name, exam_type, term, academic_year as year, start_date, end_date, status, created_at")
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
-      .order("year", { ascending: false })
+      .order("academic_year", { ascending: false })
       .order("created_at", { ascending: false });
 
-    if (year) query = query.eq("year", year);
+    if (year) query = query.eq("academic_year", year);
     if (term) query = query.eq("term", term);
     if (status) query = query.eq("status", status);
 
@@ -49,13 +49,12 @@ router.post("/", requireAuth, requireRoles("admin", "teacher"), async (req, res,
       .from("exams")
       .insert({
         school_id: schoolId,
-        name: name.trim(),
+        exam_name: name.trim(),
         exam_type: examType,
         term: term.trim(),
-        year: Number(year),
+        academic_year: Number(year),
         start_date: startDate,
         end_date: endDate,
-        description: description?.trim() || null,
         status: "draft",
         is_deleted: false,
       })
@@ -90,7 +89,7 @@ router.get("/:id", requireAuth, async (req, res, next) => {
       .from("exam_schedules")
       .select(`
         *,
-        subject:subject_id (subject_id, name, code)
+        subject:subject_id (subject_id, subject_name AS name, code)
       `)
       .eq("exam_id", id)
       .eq("is_deleted", false)
