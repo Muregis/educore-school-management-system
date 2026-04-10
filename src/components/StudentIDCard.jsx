@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
-import QRCode from "qrcode";
+// import QRCode dynamically to avoid build issues
 import { C } from "../lib/theme";
 import Btn from "./Btn";
 
@@ -15,6 +15,9 @@ export default function StudentIDCard({ student, school, onClose }) {
 
   const generateQR = async () => {
     try {
+      // Dynamically import QRCode to avoid build issues
+      const QRCode = (await import("qrcode")).default;
+      
       // QR contains student verification URL or admission number
       const qrContent = JSON.stringify({
         admission: student.admission || student.admission_number,
