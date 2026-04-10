@@ -6,7 +6,8 @@ import Modal from "../components/Modal";
 import Table from "../components/Table";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
-import { Pager, Msg, pager, money } from "../components/Helpers";
+import { Pager, Msg, pager } from "../components/Helpers";
+import { money } from "../lib/utils";
 
 export default function MpesaReconciliationPage({ auth, students, toast }) {
   const [unmatched, setUnmatched] = useState([]);

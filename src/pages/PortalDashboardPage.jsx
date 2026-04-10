@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 import Badge from "../components/Badge";
 import Btn from "../components/Btn";
 import { C } from "../lib/theme";
-import { money } from "../components/Helpers";
+import { money } from "../lib/utils";
 
 export default function PortalDashboardPage({ 
   auth, 
