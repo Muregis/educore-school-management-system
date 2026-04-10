@@ -35,6 +35,7 @@ import SubjectsPage from "./pages/SubjectsPage";
 import MpesaReconciliationPage from "./pages/MpesaReconciliationPage";
 import BulkImportPage from "./pages/BulkImportPage";
 import ExamsPage from "./pages/ExamsPage";
+import MessagingPage from "./pages/MessagingPage";
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import { apiFetch } from "./lib/api";
 
@@ -120,8 +121,8 @@ const TENANT_STATE_KEYS = [
 
 function clearTenantLocalState() {
   TENANT_STATE_KEYS.forEach((key) => localStorage.removeItem(key));
-  localStorage.removeItem("educore.auth");
-  localStorage.removeItem("token");
+  sessionStorage.removeItem("educore.auth");
+  sessionStorage.removeItem("token");
 }
 export default function App() {
   const [school, setSchool]               = useLocalState("educore.school",        DEFAULTS.school);
@@ -135,7 +136,7 @@ export default function App() {
   const [notifications, setNotifications] = useLocalState("educore.notifications",  DEFAULTS.notifications);
 
   const [auth, setAuth] = useState(() => {
-    const raw = localStorage.getItem("educore.auth");
+    const raw = sessionStorage.getItem("educore.auth");
     if (!raw) return null;
     try { return JSON.parse(raw); } catch { return null; }
   });
@@ -251,8 +252,8 @@ export default function App() {
     clearTenantLocalState();
     resetClientData();
 
-    localStorage.setItem("educore.auth", JSON.stringify(u));
-    if (u?.token) localStorage.setItem("token", u.token);
+    sessionStorage.setItem("educore.auth", JSON.stringify(u));
+    if (u?.token) sessionStorage.setItem("token", u.token);
 
     setAuth(u);
     setActiveChildId(null);
@@ -317,6 +318,7 @@ export default function App() {
     discipline:    <DisciplinePage auth={auth} students={myStudents} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     transport:     <TransportPage auth={auth} canEdit={canEdit} toast={toast} />,
     communication: <CommunicationPage auth={auth} canEdit={canEdit} toast={toast} />,
+    messaging:     <MessagingPage auth={auth} />,
     timetable:     <TimetablePage auth={auth} teachers={teachers} canEdit={canEdit} toast={toast} />,
     reports:       ["admin","teacher"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
     analysis:      ["admin","teacher"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,

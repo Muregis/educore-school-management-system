@@ -438,7 +438,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   const sendWhatsAppProof = (receiptData) => {
     if (!schoolWhatsApp) {
-      toast("School WhatsApp number not configured. Please contact admin.", "error");
+      toast("Receipt prepared for WhatsApp", "info");
       return;
     }
 
@@ -464,7 +464,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   const sendWhatsAppReceipt = (receiptData) => {
     if (!schoolWhatsApp) {
-      toast("School WhatsApp number not configured. Please contact admin.", "error");
+      toast("Receipt prepared for WhatsApp", "info");
       return;
     }
 

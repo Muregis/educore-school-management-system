@@ -15,7 +15,7 @@ export async function apiFetch(
   // OLD: if (token) {
   // OLD:   headers["Authorization"] = `Bearer ${token}`;
   // OLD: }
-  const resolvedToken = token || localStorage.getItem("token") || null;
+  const resolvedToken = token || sessionStorage.getItem("token") || null;
   if (resolvedToken) {
     headers["Authorization"] = `Bearer ${resolvedToken}`;
   }

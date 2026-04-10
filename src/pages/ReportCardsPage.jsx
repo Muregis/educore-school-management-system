@@ -127,24 +127,37 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        {/* Students list */}
+        {/* Students list grouped by class */}
         <div>
-          <div style={{ fontWeight: 700, color: C.text, marginBottom: 8 }}>Students ({(filterClass === "all" ? students : students.filter(s => (s.className ?? s.class_name) === filterClass)).length})</div>
-          {(filterClass === "all" ? students : students.filter(s => (s.className ?? s.class_name) === filterClass)).map(s => {
-            const sid = s.id ?? s.student_id;
-            const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
-            const cls = s.className ?? s.class_name ?? "";
-            const hasCard = reportCards.some(r => String(r.student_id) === String(sid));
-            return (
-              <div key={sid} onClick={() => viewFull(sid)} style={{ background: selected === sid ? C.accent + "22" : C.card, border: `1px solid ${selected === sid ? C.accent : C.border}`, borderRadius: 8, padding: "10px 14px", marginBottom: 6, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontWeight: 600, color: C.text }}>{name}</div>
-                  <div style={{ fontSize: 12, color: C.textMuted }}>{cls}</div>
-                </div>
-                <Badge text={hasCard ? "card ready" : "no card"} tone={hasCard ? "success" : "warning"} />
+          <div style={{ fontWeight: 700, color: C.text, marginBottom: 8 }}>Students by Class</div>
+          {(() => {
+            const filteredStudents = filterClass === "all" ? students : students.filter(s => (s.className ?? s.class_name) === filterClass);
+            const grouped = filteredStudents.reduce((acc, s) => {
+              const cls = s.className ?? s.class_name ?? "No Class";
+              if (!acc[cls]) acc[cls] = [];
+              acc[cls].push(s);
+              return acc;
+            }, {});
+            const sortedClasses = Object.keys(grouped).sort();
+            return sortedClasses.map(cls => (
+              <div key={cls} style={{ marginBottom: 16 }}>
+                <div style={{ fontWeight: 700, color: C.accent, fontSize: 13, marginBottom: 6, padding: "4px 8px", background: C.accent + "15", borderRadius: 6 }}>{cls} ({grouped[cls].length})</div>
+                {grouped[cls].map(s => {
+                  const sid = s.id ?? s.student_id;
+                  const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
+                  const hasCard = reportCards.some(r => String(r.student_id) === String(sid));
+                  return (
+                    <div key={sid} onClick={() => viewFull(sid)} style={{ background: selected === sid ? C.accent + "22" : C.card, border: `1px solid ${selected === sid ? C.accent : C.border}`, borderRadius: 8, padding: "10px 14px", marginBottom: 6, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", marginLeft: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: C.text }}>{name}</div>
+                      </div>
+                      <Badge text={hasCard ? "card ready" : "no card"} tone={hasCard ? "success" : "warning"} />
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            ));
+          })()}
         </div>
 
         {/* Report card preview */}

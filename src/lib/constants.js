@@ -11,13 +11,13 @@ export const DEFAULTS = {
 };
 
 export const ROLE = {
-  admin:     { pages:["dashboard","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams"], edit:true },
-  teacher:   { pages:["dashboard","students","attendance","grades","subjects","reportcards","discipline","timetable","communication","library","analysis","lessonplans","announcements","exams"], edit:true },
-  finance:   { pages:["dashboard","fees","mpesa-reconcile","invoices","announcements"], edit:true },
-  hr:        { pages:["dashboard","hr","staff","announcements"], edit:true },
-  librarian: { pages:["dashboard","library","announcements"], edit:true },
-  parent:    { pages:["dashboard","grades","fees","reportcards","attendance","communication","announcements"], edit:false },
-  student:   { pages:["dashboard","grades","attendance","reportcards","library","announcements"], edit:false },
+  admin:     { pages:["dashboard","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams"], edit:true },
+  teacher:   { pages:["dashboard","students","attendance","grades","subjects","reportcards","discipline","timetable","communication","messaging","library","analysis","lessonplans","announcements","exams"], edit:true },
+  finance:   { pages:["dashboard","fees","mpesa-reconcile","invoices","announcements","messaging"], edit:true },
+  hr:        { pages:["dashboard","hr","staff","announcements","messaging"], edit:true },
+  librarian: { pages:["dashboard","library","announcements","messaging"], edit:true },
+  parent:    { pages:["dashboard","grades","fees","reportcards","attendance","communication","messaging","announcements"], edit:false },
+  student:   { pages:["dashboard","grades","attendance","reportcards","library","announcements","messaging"], edit:false },
 };
 
 export const NAV = [
@@ -35,6 +35,7 @@ export const NAV = [
   { id:"discipline",    label:"Discipline",   icon:"⚖"  },
   { id:"transport",     label:"Transport",    icon:"🚌" },
   { id:"communication", label:"Communication",icon:"💬" },
+  { id:"messaging",     label:"Messaging",    icon:"✉" },
   { id:"timetable",     label:"Timetable",    icon:"🗓" },
   { id:"reports",       label:"Reports",      icon:"📊" },
   { id:"analytics",     label:"Analytics",    icon:"📈" },

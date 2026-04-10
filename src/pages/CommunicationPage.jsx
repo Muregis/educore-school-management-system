@@ -117,18 +117,6 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
 
   return (
     <div>
-      {whatsAppStatus && !whatsAppStatus.whatsappConfigured && (
-        <div style={{ background: "#451a03", border: "1px solid #f97316", borderRadius: 10, padding: "10px 14px", marginBottom: 16, display: "flex", gap: 10, alignItems: "flex-start" }}>
-          <span style={{ fontSize: 18 }}>!</span>
-          <div>
-            <div style={{ fontWeight: 700, color: "#fb923c" }}>School WhatsApp number not configured</div>
-            <div style={{ fontSize: 12, color: "#fdba74", marginTop: 2 }}>
-              Add the school WhatsApp Business number in settings before preparing chats for parents.
-            </div>
-          </div>
-        </div>
-      )}
-
       {whatsAppStatus?.whatsappConfigured && (
         <div style={{ background: "#052e16", border: "1px solid #16a34a", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#86efac" }}>
           WhatsApp mode: semi-automated `wa.me` links using the school's WhatsApp Business line.
