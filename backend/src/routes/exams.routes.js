@@ -8,6 +8,18 @@ import { requireRoles } from "../middleware/roles.js";
 
 const router = express.Router();
 
+const EXAM_SELECT = [
+  "exam_id",
+  "name",
+  "exam_type",
+  "term",
+  "year",
+  "start_date",
+  "end_date",
+  "status",
+  "created_at",
+].join(",");
+
 // GET /api/exams - List all exams
 router.get("/", requireAuth, async (req, res, next) => {
   try {
@@ -16,7 +28,7 @@ router.get("/", requireAuth, async (req, res, next) => {
 
     let query = supabase
       .from("exams")
-      .select("exam_id, name, exam_type, term, year, start_date, end_date, status, created_at")
+      .select(EXAM_SELECT)
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
       .order("year", { ascending: false })
