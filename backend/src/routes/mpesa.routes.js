@@ -286,11 +286,7 @@ router.get("/unmatched", authRequired, async (req, res, next) => {
 
     let query = supabase
       .from('mpesa_unmatched')
-      .select(`
-        *,
-        student:matched_student_id (student_id, admission_number, first_name, last_name),
-        matcher:matched_by (full_name)
-      `)
+      .select('*')
       .eq('school_id', schoolId)
       .order('created_at', { ascending: false })
       .limit(Number(limit));
@@ -448,12 +444,7 @@ router.get("/reconciliation-logs", authRequired, requireRoles("admin", "finance"
 
     const { data, error } = await supabase
       .from('mpesa_reconciliation_logs')
-      .select(`
-        *,
-        unmatched:unmatched_id (transaction_id, amount),
-        student:student_id (admission_number, first_name, last_name),
-        performer:performed_by (full_name)
-      `)
+      .select('*')
       .eq('school_id', schoolId)
       .order('created_at', { ascending: false })
       .limit(Number(limit));

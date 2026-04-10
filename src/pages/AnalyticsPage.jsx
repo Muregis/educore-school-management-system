@@ -1,7 +1,15 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import PropTypes from "prop-types";
 import { C } from "../lib/theme";
 import { money, countBy } from "../lib/utils";
+import { apiFetch } from "../lib/api";
+import Btn from "../components/Btn";
+import { ALL_CLASSES } from "../lib/constants";
+
+const inputStyle = {
+  background: C.card, color: C.text, border: `1px solid ${C.border}`,
+  borderRadius: 8, padding: "6px 10px", fontSize: 13,
+};
 
 // Simple chart components without external library
 function BarChart({ data, height = 200 }) {
@@ -100,8 +108,10 @@ function StatCard({ title, value, subtitle, trend, color = C.accent }) {
   );
 }
 
-export default function AnalyticsPage({ students = [], teachers = [], payments = [], results = [], attendance = [], feeStructures = [] }) {
+export default function AnalyticsPage({ auth, students = [], teachers = [], payments = [], results = [], attendance = [], feeStructures = [] }) {
   const [activeTab, setActiveTab] = useState("overview");
+  const [aiReport, setAiReport] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -138,6 +148,63 @@ export default function AnalyticsPage({ students = [], teachers = [], payments =
       presentCount, absentCount, attendanceRate,
     };
   }, [students, payments, results, attendance, feeStructures]);
+
+  // Generate AI analysis
+  const generateAIReport = useCallback(async () => {
+    if (!auth?.token) return;
+    setAiLoading(true);
+    setAiReport("");
+
+    const prompt = `You are an academic performance analyst for a Kenyan school.
+
+Analyze the following school performance summary and provide actionable insights:
+
+School Overview:
+- Total Students: ${stats.totalStudents}
+- Active Students: ${stats.activeStudents}
+- Total Teachers: ${teachers.length}
+
+Financial Status:
+- Total Collected (KES): ${stats.totalCollected.toFixed(2)}
+- Outstanding Fees (KES): ${stats.pendingFees.toFixed(2)}
+- Collection Rate: ${stats.totalCollected > 0 ? ((stats.totalCollected / (stats.totalCollected + stats.pendingFees)) * 100).toFixed(1) : 100}%
+
+Academic Performance:
+- Average Marks: ${stats.avgMarks.toFixed(1)}/100
+- Total Results Recorded: ${results.length}
+
+Attendance:
+- Attendance Rate: ${stats.attendanceRate.toFixed(1)}%
+- Present: ${stats.presentCount}, Absent: ${stats.absentCount}
+
+Gender Distribution:
+- Male: ${stats.byGender.male || 0}, Female: ${stats.byGender.female || 0}
+
+Provide a structured analysis with:
+1. Overall Performance Assessment (1-2 sentences)
+2. Key Strengths (2-3 bullet points)
+3. Areas of Concern (2-3 bullet points)
+4. Specific Recommendations (3-4 bullet points)`;
+
+    try {
+      const result = await apiFetch("/analysis/ai-report", {
+        method: "POST",
+        token: auth.token,
+        body: { prompt },
+      });
+      
+      if (result?.text) {
+        setAiReport(result.text);
+      } else if (result?.choices?.[0]?.message?.content) {
+        setAiReport(result.choices[0].message.content);
+      }
+    } catch (e) {
+      setAiReport("Error generating AI report: " + (e?.message || "Unknown error"));
+    }
+    setAiLoading(false);
+  }, [auth, stats, teachers.length, results.length]);
+
+  // Chart data
 
   // Chart data
   const classChartData = useMemo(() => {
@@ -180,8 +247,8 @@ export default function AnalyticsPage({ students = [], teachers = [], payments =
   return (
     <div>
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-        {["overview", "academic", "financial", "attendance"].map(tab => (
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        {["overview", "academic", "financial", "attendance", "ai-analysis"].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -196,10 +263,37 @@ export default function AnalyticsPage({ students = [], teachers = [], payments =
               textTransform: "capitalize",
             }}
           >
-            {tab}
+            {tab === "ai-analysis" ? "🤖 AI Analysis" : tab}
           </button>
         ))}
       </div>
+
+      {/* AI Analysis Tab */}
+      {activeTab === "ai-analysis" && (
+        <div style={{ display: "grid", gap: 20 }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
+            <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+              <Btn onClick={generateAIReport} disabled={aiLoading}>
+                {aiLoading ? "Generating..." : "Generate AI Analysis"}
+              </Btn>
+            </div>
+            {aiReport && (
+              <div style={{
+                background: C.card,
+                border: `1px solid ${C.border}`,
+                borderRadius: 8,
+                padding: 16,
+                fontSize: 13,
+                lineHeight: 1.6,
+                color: C.text,
+                whiteSpace: "pre-wrap",
+              }}>
+                {aiReport}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Overview Tab */}
       {activeTab === "overview" && (
@@ -293,6 +387,7 @@ export default function AnalyticsPage({ students = [], teachers = [], payments =
 }
 
 AnalyticsPage.propTypes = {
+  auth: PropTypes.object,
   students: PropTypes.array,
   teachers: PropTypes.array,
   payments: PropTypes.array,
