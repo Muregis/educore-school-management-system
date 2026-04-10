@@ -18,7 +18,6 @@ import TransportPage from "./pages/TransportPage";
 import CommunicationPage from "./pages/CommunicationPage";
 import AccountsPage from "./pages/AdminAccountsPage";
 import ReportsPage from "./pages/ReportsPage";
-import AnalyticsPage from "./pages/AnalyticsPage";
 import AnalysisPage from "./pages/AnalysisPage";
 import TimetablePage from "./pages/TimetablePage";
 import AdmissionsPage from "./pages/AdmissionsPage";
