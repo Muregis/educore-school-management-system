@@ -6,6 +6,7 @@ import Modal from "../components/Modal";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { Msg } from "../components/Helpers";
+import { ALL_CLASSES } from "../lib/constants";
 
 export default function BulkImportPage({ auth, students, setStudents, toast, payments, feeStructures }) {
   const [activeTab, setActiveTab] = useState("import");

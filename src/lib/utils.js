@@ -1,5 +1,10 @@
 export const money = v => `KSh ${Number(v || 0).toLocaleString()}`;
 export const genId = () => Date.now() + Math.floor(Math.random() * 10000);
+export const countBy = (arr, key) => arr.reduce((acc, item) => {
+  const k = item[key];
+  acc[k] = (acc[k] || 0) + 1;
+  return acc;
+}, {});
 
 export const PAGE_SIZE = 8;
 

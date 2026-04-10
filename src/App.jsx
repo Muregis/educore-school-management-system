@@ -18,6 +18,7 @@ import TransportPage from "./pages/TransportPage";
 import CommunicationPage from "./pages/CommunicationPage";
 import AccountsPage from "./pages/AdminAccountsPage";
 import ReportsPage from "./pages/ReportsPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 import AnalysisPage from "./pages/AnalysisPage";
 import TimetablePage from "./pages/TimetablePage";
 import AdmissionsPage from "./pages/AdmissionsPage";
@@ -326,7 +327,6 @@ export default function App() {
     invoices: <InvoicesPage auth={auth} school={school} students={students} canEdit={canEdit} toast={toast} />,
     reportcards: <ReportCardsPage auth={auth} school={school} students={myStudents} canEdit={canEdit} toast={toast} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     hr: ["admin","hr"].includes(auth.role) ? <HRPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
-    staff: ["admin","hr"].includes(auth.role) ? <StaffPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
     library: <LibraryPage auth={auth} students={myStudents} teachers={teachers} toast={toast} />,
     discipline: <DisciplinePage auth={auth} students={myStudents} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     transport: <TransportPage auth={auth} canEdit={canEdit} toast={toast} students={students} />,
@@ -336,6 +336,7 @@ export default function App() {
     lessonplans: ["admin","teacher"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     pendingplans: auth.role === "admin" ? <PendingPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     announcements: perms?.pages.includes("announcements") ? <AnnouncementsPage auth={auth} toast={toast} /> : <Forbidden />,
+    analytics: auth.role === "admin" ? <AnalyticsPage auth={auth} toast={toast} /> : <Forbidden />,
     reports: ["admin","teacher"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
     analysis: ["admin","teacher"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,
     medical: auth.role === "admin" ? <MedicalRecordsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
