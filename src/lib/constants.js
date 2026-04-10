@@ -11,10 +11,10 @@ export const DEFAULTS = {
 };
 
 export const ROLE = {
-  admin:     { pages:["dashboard","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical"], edit:true },
+  admin:     { pages:["dashboard","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical","upgrade"], edit:true },
   teacher:   { pages:["dashboard","students","attendance","grades","subjects","reportcards","discipline","timetable","communication","library","analysis","lessonplans","announcements","exams"], edit:true },
-  finance:   { pages:["dashboard","fees","mpesa-reconcile","invoices","announcements"], edit:true },
-  hr:        { pages:["dashboard","hr","staff","announcements"], edit:true },
+  finance:   { pages:["dashboard","fees","mpesa-reconcile","invoices","announcements","upgrade"], edit:true },
+  hr:        { pages:["dashboard","hr","staff","announcements","upgrade"], edit:true },
   librarian: { pages:["dashboard","library","announcements"], edit:true },
   parent:    { pages:["dashboard","grades","fees","reportcards","attendance","communication","announcements"], edit:false },
   student:   { pages:["dashboard","grades","attendance","reportcards","library","announcements"], edit:false },
@@ -22,6 +22,7 @@ export const ROLE = {
 
 export const NAV = [
   { id:"dashboard",     label:"Dashboard",    icon:"⊞" },
+  { id:"upgrade",       label:"Upgrade Plan", icon:"⭐" },
   { id:"students",      label:"Students",     icon:"👥" },
   { id:"staff",         label:"Staff",        icon:"🏫" },
   { id:"attendance",    label:"Attendance",   icon:"✓"  },

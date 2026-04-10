@@ -70,7 +70,7 @@ router.get("/:studentId/full", async (req, res, next) => {
 
     const { data: studentRow, error: studentErr } = await supabase
       .from("students")
-      .select("*, first_name, last_name")
+      .select("*, first_name, last_name, photo_url")
       .eq("school_id", schoolId)
       .eq("student_id", studentId)
       .limit(1)
@@ -80,6 +80,30 @@ router.get("/:studentId/full", async (req, res, next) => {
       ? { ...studentRow, full_name: `${studentRow.first_name || ""} ${studentRow.last_name || ""}`.trim() }
       : null;
     if (!student) return res.status(404).json({ message: "Student not found" });
+
+    // Fetch school branding from settings
+    const { data: schoolRows, error: schoolErr } = await supabase
+      .from("school_settings")
+      .select("setting_key, setting_value")
+      .eq("school_id", schoolId);
+    if (schoolErr) console.error("School settings error:", schoolErr);
+    const settingsMap = new Map((schoolRows || []).map(s => [s.setting_key, s.setting_value]));
+    const schoolBranding = {
+      logoUrl: settingsMap.get("school_logo") || settingsMap.get("logo_url") || null,
+      schoolName: settingsMap.get("school_name") || null,
+      schoolAddress: settingsMap.get("school_address") || null,
+      schoolPhone: settingsMap.get("school_phone") || settingsMap.get("phone") || null,
+      schoolEmail: settingsMap.get("school_email") || settingsMap.get("email") || null,
+      primaryColor: settingsMap.get("primary_color") || "#C9A84C",
+      secondaryColor: settingsMap.get("secondary_color") || "#3B82F6",
+      headTeacherName: settingsMap.get("head_teacher_name") || null,
+      customRemarks: settingsMap.get("report_remarks") || null,
+      watermarkUrl: settingsMap.get("watermark_url") || null,
+      backgroundColor: settingsMap.get("report_background_color") || "#FFFFFF",
+      textColor: settingsMap.get("report_text_color") || "#1F2937",
+      schoolStampUrl: settingsMap.get("school_stamp_url") || null,
+      stampPosition: settingsMap.get("stamp_position") || "bottom-right",
+    };
 
     // Build report card query based on role
     let rcQuery = supabase
@@ -155,6 +179,7 @@ router.get("/:studentId/full", async (req, res, next) => {
       average: avg,
       term,
       academicYear,
+      branding: schoolBranding,
     });
   } catch (err) { next(err); }
 });
@@ -163,7 +188,7 @@ router.get("/:studentId/full", async (req, res, next) => {
 router.post("/", requireRoles("admin","teacher"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { studentId, term = "Term 2", academicYear = "2026", classTeacherComment, principalComment, conduct = "Good", daysPresent = 0, daysAbsent = 0, classPosition, outOf } = req.body;
+    const { studentId, term = "Term 2", academicYear = "2026", classTeacherComment, principalComment, conduct = "Good", daysPresent = 0, daysAbsent = 0, classPosition, outOf, customRemarks, examName, gradingSystem } = req.body;
     if (!studentId) return res.status(400).json({ message: "studentId is required" });
 
     const { error } = await supabase
@@ -180,6 +205,9 @@ router.post("/", requireRoles("admin","teacher"), async (req, res, next) => {
         days_absent: daysAbsent,
         class_position: classPosition || null,
         out_of: outOf || null,
+        custom_remarks: customRemarks || null,
+        exam_name: examName || null,
+        grading_system: gradingSystem || null,
         generated_at: new Date().toISOString(),
         is_published: false,
         is_approved: false,

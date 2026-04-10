@@ -39,6 +39,7 @@ import paymentConfigsRoutes from "./routes/payment-configs.routes.js";
 import subjectsRoutes      from "./routes/subjects.routes.js";
 import examsRoutes         from "./routes/exams.routes.js";
 import medicalRoutes       from "./routes/medical.routes.js";
+import subscriptionRoutes from "./routes/subscription.routes.js";
 // import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }    from "./middleware/error.js";
 import { authRequired } from "./middleware/auth.js";
@@ -131,6 +132,7 @@ app.use("/api/ledger",         ledgerRoutes);
 app.use("/api/payment-configs",  paymentConfigsRoutes);
 app.use("/api/subjects",        subjectsRoutes);
 app.use("/api/exams",           examsRoutes);
+app.use("/api/subscription", subscriptionRoutes);
 app.use("/api/medical",         medicalRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));

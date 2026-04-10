@@ -308,11 +308,24 @@ router.post("/login", authRateLimit, async (req, res, next) => {
 
     const { data: schoolData } = await supabase
       .from("schools")
-      .select("plan")
+      .select("plan, plan_expires_at")
       .eq("school_id", normalizedSchoolId)
       .single();
 
-    const schoolPlan = schoolData?.plan || "starter";
+    let schoolPlan = schoolData?.plan || "starter";
+
+    // Check if plan has expired
+    if (schoolData?.plan_expires_at) {
+      const expiresAt = new Date(schoolData.plan_expires_at);
+      const now = new Date();
+      if (expiresAt < now && schoolPlan !== 'starter') {
+        await supabase
+          .from('schools')
+          .update({ plan: 'starter' })
+          .eq('school_id', normalizedSchoolId);
+        schoolPlan = 'starter';
+      }
+    }
 
     req.user = userPayload;
     logActivity(req, { action: "auth.login", description: `${role} login: ${name}` });
@@ -583,10 +596,38 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
     req.user = { user_id: user.user_id, school_id: resolvedSchoolId, role, name };
     logActivity(req, { action: "auth.portal_login", description: `${role} login: ${name}` });
 
+    // Check if defaulter blocking is enabled by admin
+    let feeBlocked = false;
+    const { data: settingsData } = await supabase
+      .from("school_settings")
+      .select("setting_value")
+      .eq("school_id", resolvedSchoolId)
+      .eq("setting_key", "block_defaulters")
+      .maybeSingle();
+    const blockDefaulters = settingsData?.setting_value !== "false";
+
+    // Check student fee balance if blocking enabled
+    if (blockDefaulters) {
+      try {
+        const { data: ledgerData } = await supabase
+          .from("student_ledger")
+          .select("balance_after")
+          .eq("school_id", resolvedSchoolId)
+          .eq("student_id", student.student_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const balance = Number(ledgerData?.balance_after || 0);
+        feeBlocked = balance > 0;
+      } catch (err) {
+        console.error("Fee balance check error:", err);
+      }
+    }
+
     res.json({
       token,
       supabaseToken,
-      feeBlocked: false,
+      feeBlocked,
       user: {
         userId: user.user_id,
         schoolId: resolvedSchoolId,

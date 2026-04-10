@@ -453,7 +453,7 @@ CREATE INDEX IF NOT EXISTS idx_students_school ON students(school_id);
 CREATE INDEX IF NOT EXISTS idx_students_class ON students(school_id, class_name);
 CREATE INDEX IF NOT EXISTS idx_results_student ON results(student_id);
 CREATE INDEX IF NOT EXISTS idx_results_term ON results(term);
-CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(date);
+CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(attendance_date);
 CREATE INDEX IF NOT EXISTS idx_payments_student ON payments(student_id);
 CREATE INDEX IF NOT EXISTS idx_report_cards_student ON report_cards(student_id);
 CREATE INDEX IF NOT EXISTS idx_exam_schedules_exam ON exam_schedules(exam_id);
