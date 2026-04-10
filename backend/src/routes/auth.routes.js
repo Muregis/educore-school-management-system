@@ -306,13 +306,21 @@ router.post("/login", authRateLimit, async (req, res, next) => {
       console.error("Failed to generate Supabase JWT:", error.message);
     }
 
+    const { data: schoolData } = await supabase
+      .from("schools")
+      .select("plan")
+      .eq("school_id", normalizedSchoolId)
+      .single();
+
+    const schoolPlan = schoolData?.plan || "starter";
+
     req.user = userPayload;
     logActivity(req, { action: "auth.login", description: `${role} login: ${name}` });
 
     res.json({
       token,
       supabaseToken,
-      user: { userId: user.user_id, schoolId: normalizedSchoolId, role, name, email: user.email },
+      user: { userId: user.user_id, schoolId: normalizedSchoolId, role, name, email: user.email, plan: schoolPlan },
     });
   } catch (err) {
     next(err);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DEFAULTS, NAV, ROLE } from "./lib/constants";
 import { C } from "./lib/theme";
 import { genId } from "./lib/utils";
+import { PLAN_FEATURES } from "./lib/plans";
 import { useLocalState } from "./hooks/useLocalState";
 import Btn from "./components/Btn";
 import NotificationPanel from "./components/NotificationPanel";
@@ -212,12 +213,16 @@ export default function App() {
   const myResults    = isPortal ? results.filter(r => (r.studentId ?? r.student_id) === linkedStudentId) : results;
   const myPayments   = isPortal ? payments.filter(p => (p.studentId ?? p.student_id) === linkedStudentId) : payments;
 
+  const planFeatures = PLAN_FEATURES[auth?.plan || "starter"];
   const fullNav = useMemo(() => {
     const existing = new Set(NAV.map(n => n.id));
     return [...NAV, ...NAV_EXTRAS.filter(n => !existing.has(n.id))];
   }, []);
 
-  const nav = useMemo(() => perms ? fullNav.filter(n => perms.pages.includes(n.id)) : [], [perms, fullNav]);
+  const nav = useMemo(() => {
+    if (!perms) return [];
+    return fullNav.filter(n => perms.pages.includes(n.id) && (!planFeatures.pages || planFeatures.pages.includes(n.id)));
+  }, [perms, fullNav, planFeatures]);
   useEffect(() => { if (perms && !perms.pages.includes(page)) setPage(perms.pages[0]); }, [perms, page]);
 
   const resetClientData = useCallback(() => {

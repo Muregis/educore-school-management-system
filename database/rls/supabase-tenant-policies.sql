@@ -223,7 +223,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_school_id ON audit_logs(school_id);
 CREATE INDEX IF NOT EXISTS idx_users_school_email ON users(school_id, email);
 CREATE INDEX IF NOT EXISTS idx_students_school_class ON students(school_id, class_name);
 CREATE INDEX IF NOT EXISTS idx_payments_school_status ON payments(school_id, status);
-CREATE INDEX IF NOT EXISTS idx_attendance_school_date ON attendance(school_id, attendance_date);
+CREATE INDEX IF NOT EXISTS idx_attendance_school_date ON attendance(school_id, date);
 CREATE INDEX IF NOT EXISTS idx_ledger_school_student ON student_ledger(school_id, student_id);
 
 -- =====================================================
