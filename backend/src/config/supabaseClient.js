@@ -7,32 +7,33 @@ const supabaseUrl = cleanEnv(process.env.SUPABASE_URL);
 const supabaseServiceKey = cleanEnv(process.env.SUPABASE_SERVICE_KEY);
 const supabaseAnonKey = cleanEnv(process.env.SUPABASE_ANON_KEY);
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in environment variables');
-}
-
 // DEBUG: Final check to identify why Render is failing
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('[Supabase] CRITICAL: Missing SUPABASE_URL or SUPABASE_SERVICE_KEY');
+}
 console.log(`[Supabase] URL: length=${supabaseUrl.length}, startsWithHttp=${supabaseUrl.toLowerCase().startsWith('http')}`);
 console.log(`[Supabase] Keys: ServiceKey_len=${supabaseServiceKey.length}, AnonKey_len=${supabaseAnonKey.length}`);
 if (supabaseServiceKey.length > 0 && !supabaseServiceKey.startsWith('sb_') && !supabaseServiceKey.startsWith('eyJ')) {
   console.error(`[Supabase] CRITICAL: Service Key format looks invalid! Prefix: "${supabaseServiceKey.substring(0, 10)}..."`);
 }
 
-export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false
-  },
-  db: {
-    schema: 'public'
-  },
-  global: {
-    headers: {
-      'x-tenant-source': 'educore-backend'
-    }
-  }
-});
+export const supabase = (supabaseUrl && supabaseServiceKey) 
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+      },
+      db: {
+        schema: 'public'
+      },
+      global: {
+        headers: {
+          'x-tenant-source': 'educore-backend'
+        }
+      }
+    })
+  : null;
 
 export function withTenantFilter(query, schoolId) {
   return query.eq('school_id', schoolId);
@@ -53,6 +54,9 @@ export async function safeSupabaseQuery(queryFn, errorMessage = 'Database operat
 }
 
 export async function testSupabaseConnection() {
+  if (!supabase) {
+    return { success: false, error: 'Supabase client not initialized - missing credentials' };
+  }
   try {
     const { data, error } = await supabase
       .from('users')

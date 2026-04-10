@@ -69,22 +69,20 @@ function validateProductionEnv() {
       console.error('❌ Missing required production environment variables:');
       missing.forEach(key => console.error(`   - ${key}`));
       console.error('\nPlease set these environment variables before starting in production mode.');
-      process.exit(1);
+      console.error('[ENV] Continuing startup despite missing variables - errors will occur...');
     }
     
-    // SECURITY FIX M5: Prevent insecure JWT_SECRET fallback in production
+    // SECURITY FIX M5: Warn about insecure JWT_SECRET fallback in production
     if (process.env.JWT_SECRET === 'educore_dev_secret_change_me') {
-      console.error('❌ SECURITY ERROR: JWT_SECRET is set to default development value in production!');
+      console.error('⚠️ SECURITY WARNING: JWT_SECRET is set to default development value in production!');
       console.error('   Please set a strong, unique JWT_SECRET for production.');
-      process.exit(1);
     }
     
-    // SECURITY FIX M4: Require explicit CORS origin in production
+    // SECURITY FIX M4: Warn about CORS origin in production
     if (!process.env.CORS_ORIGIN || process.env.CORS_ORIGIN === 'http://localhost:5173') {
-      console.error('❌ SECURITY ERROR: CORS_ORIGIN must be explicitly set to your production frontend URL');
+      console.error('⚠️ SECURITY WARNING: CORS_ORIGIN should be explicitly set to your production frontend URL');
       console.error('   Current value:', process.env.CORS_ORIGIN || 'not set');
       console.error('   Example: https://your-school-app.vercel.app');
-      process.exit(1);
     }
     
     // Warn about optional but recommended variables

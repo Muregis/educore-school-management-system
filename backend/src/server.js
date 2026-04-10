@@ -1,7 +1,11 @@
 // src/server.js
+console.log('[Server] Starting server.js...');
 import app from "./app.js";
+console.log('[Server] App imported successfully');
 import { env } from "./config/env.js";
+console.log('[Server] Env loaded, port:', env.port);
 import { testDbConnection } from "./config/db.js";
+console.log('[Server] DB module imported');
 
 // Debug: Log all registered routes
 function logRoutes() {
