@@ -76,7 +76,9 @@ export function authRequired(req, res, next) {
       });
     }
 
-    if (!payload.school_id && !payload.schoolId) {
+    const isSuperadminToken = payload.email === SUPERADMIN_EMAIL || payload.role === 'superadmin';
+
+    if (!payload.school_id && !payload.schoolId && !isSuperadminToken) {
       logAuthEvent("ERROR", "JWT_MISSING_SCHOOL_ID", {
         requestId: req.requestId,
         path: req.path,
@@ -90,7 +92,7 @@ export function authRequired(req, res, next) {
     }
 
     // Allow superadmin to bypass school_id requirement
-    if (payload.email === SUPERADMIN_EMAIL || payload.role === 'superadmin') {
+    if (isSuperadminToken) {
       req.user = {
         ...payload,
         user_id: payload.user_id || payload.userId,

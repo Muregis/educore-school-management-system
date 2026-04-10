@@ -16,7 +16,7 @@ router.get("/", requireAuth, async (req, res, next) => {
 
     let query = supabase
       .from("subjects")
-      .select("subject_id, name, code, category, description, class_levels, max_marks, pass_marks, is_active, created_at")
+      .select("subject_id, subject_name as name, code, category, description, class_levels, max_marks, pass_marks, is_active, created_at")
       .eq("school_id", schoolId)
       .eq("is_deleted", false);
 
@@ -28,7 +28,7 @@ router.get("/", requireAuth, async (req, res, next) => {
       query = query.eq("category", category);
     }
 
-    query = query.order("category", { ascending: true }).order("name", { ascending: true });
+    query = query.order("category", { ascending: true }).order("subject_name", { ascending: true });
 
     const { data, error } = await query;
     if (error) throw error;
@@ -47,7 +47,7 @@ router.get("/:id", requireAuth, async (req, res, next) => {
 
     const { data, error } = await supabase
       .from("subjects")
-      .select("subject_id, name, code, category, description, class_levels, max_marks, pass_marks, is_active, created_at")
+      .select("subject_id, subject_name as name, code, category, description, class_levels, max_marks, pass_marks, is_active, created_at")
       .eq("subject_id", id)
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
@@ -84,7 +84,7 @@ router.post("/", requireAuth, requireRoles("admin", "teacher"), async (req, res,
       .from("subjects")
       .insert({
         school_id: schoolId,
-        name: name.trim(),
+        subject_name: name.trim(),
         code: code ? code.trim().toUpperCase() : null,
         category: category ? category.trim() : null,
         description: description ? description.trim() : null,
@@ -94,7 +94,7 @@ router.post("/", requireAuth, requireRoles("admin", "teacher"), async (req, res,
         is_active: true,
         is_deleted: false,
       })
-      .select("subject_id, name, code, category, description, class_levels, max_marks, pass_marks, is_active, created_at")
+      .select("subject_id, subject_name as name, code, category, description, class_levels, max_marks, pass_marks, is_active, created_at")
       .single();
 
     if (error) {
@@ -127,7 +127,7 @@ router.put("/:id", requireAuth, requireRoles("admin", "teacher"), async (req, re
     } = req.body;
 
     const updates = {};
-    if (name !== undefined) updates.name = name.trim();
+    if (name !== undefined) updates.subject_name = name.trim();
     if (code !== undefined) updates.code = code ? code.trim().toUpperCase() : null;
     if (category !== undefined) updates.category = category ? category.trim() : null;
     if (description !== undefined) updates.description = description ? description.trim() : null;
@@ -143,7 +143,7 @@ router.put("/:id", requireAuth, requireRoles("admin", "teacher"), async (req, re
       .eq("subject_id", id)
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
-      .select("subject_id, name, code, category, description, class_levels, max_marks, pass_marks, is_active, created_at")
+      .select("subject_id, subject_name as name, code, category, description, class_levels, max_marks, pass_marks, is_active, created_at")
       .single();
 
     if (error) {
@@ -245,7 +245,7 @@ router.post("/seed-defaults", requireAuth, requireRoles("admin"), async (req, re
         .from("subjects")
         .insert({
           school_id: schoolId,
-          name: subj.name,
+          subject_name: subj.name,
           code: subj.code,
           category: subj.category,
           max_marks: 100,
@@ -253,7 +253,7 @@ router.post("/seed-defaults", requireAuth, requireRoles("admin"), async (req, re
           is_active: true,
           is_deleted: false,
         })
-        .select("subject_id, name, code, category")
+        .select("subject_id, subject_name as name, code, category")
         .maybeSingle();
 
       if (error) {

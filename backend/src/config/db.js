@@ -1,5 +1,12 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { supabase, database, testSupabaseConnection } from "./supabaseClient.js";
+import { pgPool } from "./pg.js";
 import { env } from "./env.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // PRIMARY DATABASE: Unified Supabase interface
 export const pool = database;
@@ -38,6 +45,27 @@ export async function testDbConnection() {
   } catch (supabaseError) {
     console.error('Supabase connection failed:', supabaseError.message);
     throw new Error(`Database connection failed: ${supabaseError.message}`);
+  }
+}
+
+export async function applyDatabaseMigrations() {
+  const migrationPath = path.resolve(__dirname, '../../../database/migrations/011_add_mpesa_reconciliation.sql');
+  if (!fs.existsSync(migrationPath)) {
+    throw new Error(`Migration file not found: ${migrationPath}`);
+  }
+
+  const migrationSql = fs.readFileSync(migrationPath, 'utf8').trim();
+  if (!migrationSql) {
+    throw new Error(`Migration file is empty: ${migrationPath}`);
+  }
+
+  try {
+    console.log(`🔧 Applying database migration from ${migrationPath}`);
+    await pgPool.query(migrationSql);
+    console.log('✅ M-Pesa reconciliation migration applied successfully');
+  } catch (err) {
+    console.error('❌ Failed to apply database migration:', err.message);
+    throw err;
   }
 }
 

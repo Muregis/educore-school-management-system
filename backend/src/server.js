@@ -4,7 +4,7 @@ import app from "./app.js";
 console.log('[Server] App imported successfully');
 import { env } from "./config/env.js";
 console.log('[Server] Env loaded, port:', env.port);
-import { testDbConnection } from "./config/db.js";
+import { testDbConnection, applyDatabaseMigrations } from "./config/db.js";
 console.log('[Server] DB module imported');
 
 // Debug: Log all registered routes
@@ -47,6 +47,13 @@ async function start() {
     } catch (dbErr) {
       console.error("❌ Supabase connection failed:", dbErr.message);
       process.exit(1);
+    }
+
+    try {
+      await applyDatabaseMigrations();
+    } catch (migrationErr) {
+      console.error("❌ Database migration step failed:", migrationErr.message);
+      console.error("Continuing startup, but MPesa reconciliation routes may still fail until the database schema is fixed.");
     }
 
     // Start the server regardless of DB status
