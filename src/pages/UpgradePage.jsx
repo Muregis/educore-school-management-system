@@ -86,11 +86,11 @@ export default function UpgradePage({ auth, toast }) {
       const res = await apiFetch("/subscription/upgrade", {
         method: "POST",
         token: auth?.token,
-        body: JSON.stringify({
+        body: {
           plan: planId,
           studentCount: students,
           billingCycle: billing
-        })
+        }
       });
       toast(`Successfully upgraded to ${planId} plan!`, "success");
       setCurrentPlan(planId);
