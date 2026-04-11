@@ -263,12 +263,58 @@ async function ensurePermissionsTable() {
   const { error } = await supabase
     .from('role_permissions')
     .select('*', { count: 'exact', head: true });
-  
+
   if (error && error.code === 'PGRST205') {
-    // Table doesn't exist - create it via RPC or migration
-    console.warn('role_permissions table does not exist. Please run the migration to create it.');
+    // Table doesn't exist - create it
+    console.log('role_permissions table does not exist. Creating it...');
+
+    try {
+      // Create the table using raw SQL via RPC if available, or try direct creation
+      const createTableSQL = `
+        CREATE TABLE IF NOT EXISTS role_permissions (
+          id SERIAL PRIMARY KEY,
+          school_id INTEGER NOT NULL,
+          role_name VARCHAR(50) NOT NULL,
+          can_edit BOOLEAN DEFAULT false,
+          pages_json TEXT DEFAULT '[]',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(school_id, role_name)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_role_permissions_school_role ON role_permissions(school_id, role_name);
+
+        ALTER TABLE role_permissions ENABLE ROW LEVEL SECURITY;
+
+        CREATE POLICY "Users can access role permissions for their school" ON role_permissions
+          FOR ALL USING (school_id = current_setting('app.current_school_id', true)::integer);
+
+        GRANT ALL ON role_permissions TO authenticated;
+        GRANT USAGE ON SEQUENCE role_permissions_id_seq TO authenticated;
+      `;
+
+      // Try to execute via Supabase client (this might not work depending on permissions)
+      const { error: createError } = await supabase.rpc('exec_sql', { sql: createTableSQL });
+
+      if (createError) {
+        console.error('Failed to create table via RPC:', createError);
+        // If RPC fails, we'll return missing and let the frontend handle it
+        return { missing: true };
+      }
+
+      console.log('role_permissions table created successfully');
+      return { missing: false };
+    } catch (createErr) {
+      console.error('Error creating role_permissions table:', createErr);
+      return { missing: true };
+    }
+  }
+
+  if (error) {
+    console.error('Error checking role_permissions table:', error);
     return { missing: true };
   }
+
   return { missing: false };
 }
 

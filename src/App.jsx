@@ -37,6 +37,7 @@ import MpesaReconciliationPage from "./pages/MpesaReconciliationPage";
 import BulkImportPage from "./pages/BulkImportPage";
 import ExamsPage from "./pages/ExamsPage";
 import MedicalRecordsPage from "./pages/MedicalRecordsPage";
+import QRScannerPage from "./pages/QRScannerPage";
 import UpgradePage from "./pages/UpgradePage";
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import { apiFetch } from "./lib/api";
@@ -344,6 +345,7 @@ export default function App() {
     fees: <FeesPage auth={auth} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     "mpesa-reconcile": <MpesaReconciliationPage auth={auth} students={students} toast={toast} />,
     "bulk-import": <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} payments={payments} feeStructures={feeStructures} />,
+    "qr-scanner": auth.role === "admin" ? <QRScannerPage auth={auth} students={students} payments={payments} feeStructures={feeStructures} toast={toast} /> : <Forbidden />,
     exams: <ExamsPage auth={auth} students={students} subjects={[]} toast={toast} />,
     admissions: <AdmissionsPage auth={auth} canEdit={canEdit} toast={toast} />,
     invoices: <InvoicesPage auth={auth} school={school} students={students} canEdit={canEdit} toast={toast} />,
