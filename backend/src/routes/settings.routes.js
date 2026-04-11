@@ -278,11 +278,15 @@ async function ensurePermissionsTable() {
 
   return { missing: false };
 }
+
+router.get("/permissions", requireRoles("admin"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
     const check = await ensurePermissionsTable();
     if (check.missing) {
       return res.json({ permissions: {} });
     }
-    
+
     const { data: rows, error: queryError } = await supabase
       .from('role_permissions')
       .select('role_name, can_edit, pages_json')
