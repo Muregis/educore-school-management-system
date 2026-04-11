@@ -346,6 +346,7 @@ export default function App() {
     "mpesa-reconcile": <MpesaReconciliationPage auth={auth} students={students} toast={toast} />,
     "bulk-import": <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} payments={payments} feeStructures={feeStructures} />,
     "qr-scanner": auth.role === "admin" ? <QRScannerPage auth={auth} students={students} payments={payments} feeStructures={feeStructures} toast={toast} /> : <Forbidden />,
+    upgrade: auth.role === "admin" ? <UpgradePage auth={auth} toast={toast} /> : <Forbidden />,
     exams: <ExamsPage auth={auth} students={students} subjects={[]} toast={toast} />,
     admissions: <AdmissionsPage auth={auth} canEdit={canEdit} toast={toast} />,
     invoices: <InvoicesPage auth={auth} school={school} students={students} canEdit={canEdit} toast={toast} />,
