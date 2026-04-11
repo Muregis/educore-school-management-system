@@ -52,3 +52,8 @@ export const NAV = [
   { id:"admin-settings", label:"Admin Settings", icon:"⚙"  },
   { id:"settings",      label:"Settings",     icon:"⚙"  },
 ];
+
+export const NAV_EXTRAS = [
+  { id: "lessonplans",  label: "Lesson Plans",  icon: "📝" },
+  { id: "pendingplans", label: "Pending Plans", icon: "⏳" },
+];

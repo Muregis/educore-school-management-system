@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../lib/api";
+import { NAV, NAV_EXTRAS, ROLE } from "../lib/constants";
 import PropTypes from "prop-types";
 
 // ─── DESIGN TOKENS (matching EduCore) ────────────────────────────────────────
@@ -342,6 +343,7 @@ BackupsTab.propTypes = { auth: PropTypes.object };
 const TABS = [
   { id: "school",        label: "School Info",    icon: "school" },
   { id: "users",         label: "User Accounts",  icon: "users" },
+  { id: "permissions",   label: "Permissions",    icon: "lock" },
   { id: "security",      label: "Security",       icon: "shield" },
   { id: "notifications", label: "Notifications",  icon: "bell" },
   { id: "activity",      label: "Activity Logs",  icon: "activity" },
@@ -743,6 +745,130 @@ const UsersTab = ({ onSave, auth }) => {
 
 UsersTab.propTypes = { onSave: PropTypes.func.isRequired, auth: PropTypes.object };
 
+const PermissionsTab = ({ auth, onSave, onPermissionsSaved }) => {
+  const defaultPermissions = useMemo(() => Object.fromEntries(
+    Object.entries(ROLE).map(([role, cfg]) => [role, { edit: Boolean(cfg.edit), pages: Array.isArray(cfg.pages) ? [...cfg.pages] : [] }])
+  ), []);
+
+  const [permissions, setPermissions] = useState(defaultPermissions);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState(null);
+
+  const allPages = useMemo(() => [...NAV, ...NAV_EXTRAS], []);
+  const roles = useMemo(() => Object.keys(defaultPermissions), [defaultPermissions]);
+
+  const loadPermissions = async () => {
+    setLoading(true);
+    try {
+      const data = await apiFetch("/settings/permissions", { token: auth?.token });
+      setPermissions({ ...defaultPermissions, ...(data.permissions || {}) });
+    } catch (err) {
+      console.error("[permissions] Load failed", err.message || err);
+      setMessage({ type: "error", text: err.message || "Failed to load permissions." });
+      setPermissions(defaultPermissions);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (auth?.token) loadPermissions();
+  }, [auth?.token]);
+
+  const updateRole = (role, changes) => {
+    setPermissions(prev => ({
+      ...prev,
+      [role]: {
+        ...prev[role],
+        ...changes,
+      },
+    }));
+  };
+
+  const togglePage = (role, pageId) => {
+    const current = permissions[role]?.pages || [];
+    const next = current.includes(pageId) ? current.filter(p => p !== pageId) : [...current, pageId];
+    updateRole(role, { pages: next });
+  };
+
+  const save = async () => {
+    setLoading(true);
+    try {
+      await apiFetch("/settings/permissions", {
+        method: "PUT",
+        token: auth?.token,
+        body: { permissions },
+      });
+      setMessage({ type: "success", text: "Permissions saved successfully." });
+      onSave();
+      onPermissionsSaved?.();
+    } catch (err) {
+      console.error("[permissions] Save failed", err.message || err);
+      setMessage({ type: "error", text: err.message || "Failed to save permissions." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <div style={{ color: C.textSub }}>Loading permissions...</div>;
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+        <div style={{ fontSize: 13, color: C.textSub }}>Role-based page access and edit permissions</div>
+        <Btn icon="save" onClick={save}>Save Permissions</Btn>
+      </div>
+
+      {message && (
+        <div style={{
+          marginBottom: 16,
+          padding: "10px 14px",
+          borderRadius: 8,
+          fontSize: 13,
+          background: message.type === "success" ? C.greenDim : C.roseDim,
+          border: `1px solid ${message.type === "success" ? C.green : C.rose}44`,
+          color: message.type === "success" ? C.green : C.rose,
+        }}>
+          {message.text}
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 20 }}>
+        {roles.map(role => {
+          const roleMeta = ROLE_META[role] || { label: role, color: C.textMuted, dim: C.surface };
+          const rolePermissions = permissions[role] || defaultPermissions[role];
+          return (
+            <div key={role} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{roleMeta.label || role}</div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>Manage pages and edit rights for {role} users.</div>
+                </div>
+                <Toggle value={Boolean(rolePermissions.edit)} onChange={value => updateRole(role, { edit: value })}
+                  label="Can edit" description="Allow this role to create and modify records" />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 }}>
+                {allPages.map(page => {
+                  const enabled = (rolePermissions.pages || []).includes(page.id);
+                  return (
+                    <label key={`${role}-${page.id}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: 10, borderRadius: 12, background: enabled ? "rgba(59,130,246,0.08)" : C.surface, border: `1px solid ${enabled ? "rgba(59,130,246,0.25)" : C.border}`, cursor: "pointer", color: C.text }}>
+                      <input type="checkbox" checked={enabled} onChange={() => togglePage(role, page.id)} style={{ width: 16, height: 16 }} />
+                      <span>{page.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+PermissionsTab.propTypes = { auth: PropTypes.object, onSave: PropTypes.func.isRequired, onPermissionsSaved: PropTypes.func };
+
 // ─── SECURITY TAB ─────────────────────────────────────────────────────────────
 const SecurityTab = ({ onSave }) => {
   const [form, setForm] = useState({ current: "", newPwd: "", confirm: "" });
@@ -1067,7 +1193,7 @@ const NotificationsTab = ({ onSave }) => {
 NotificationsTab.propTypes = { onSave: PropTypes.func.isRequired };
 
 // ─── ADMIN SETTINGS PAGE ──────────────────────────────────────────────────────
-export default function AdminSettings({ auth, initialTab }) {
+export default function AdminSettings({ auth, initialTab, onPermissionsSaved }) {
   const [activeTab, setActiveTab] = useState(initialTab || "school");
   const [toast, setToast] = useState(null);
 
@@ -1081,6 +1207,7 @@ export default function AdminSettings({ auth, initialTab }) {
     switch (activeTab) {
       case "school":        return <SchoolInfoTab onSave={save} auth={auth} />;
       case "users":         return <UsersTab onSave={save} auth={auth} />;
+      case "permissions":   return <PermissionsTab onSave={save} onPermissionsSaved={onPermissionsSaved} auth={auth} />;
       case "security":      return <SecurityTab onSave={save} />;
       case "notifications": return <NotificationsTab onSave={save} />;
       case "activity":      return <ActivityLogsTab auth={auth} />;
