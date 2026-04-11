@@ -270,17 +270,24 @@ async function ensurePermissionsTable() {
     console.warn('role_permissions table does not exist. Please create it in Supabase dashboard using the migration SQL.');
     return { missing: true };
   }
-    const { schoolId } = req.user;
+
+  if (error) {
+    console.error('Error checking role_permissions table:', error);
+    return { missing: true };
+  }
+
+  return { missing: false };
+}
     const check = await ensurePermissionsTable();
     if (check.missing) {
       return res.json({ permissions: {} });
     }
     
-    const { data: rows, error } = await supabase
+    const { data: rows, error: queryError } = await supabase
       .from('role_permissions')
       .select('role_name, can_edit, pages_json')
       .eq('school_id', schoolId);
-    if (error) throw error;
+    if (queryError) throw queryError;
 
     const permissions = Object.fromEntries(
       (rows || []).map(r => [r.role_name, { edit: Boolean(r.can_edit), pages: JSON.parse(r.pages_json || "[]") }])
