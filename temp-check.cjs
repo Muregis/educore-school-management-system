@@ -1,0 +1,23 @@
+const fs = require('fs');
+const path = require('path');
+const app = fs.readFileSync('src/App.jsx','utf8');
+const constants = fs.readFileSync('src/lib/constants.js','utf8');
+const pages = fs.readdirSync('src/pages').filter(f=>f.endsWith('.jsx')).map(f=>path.basename(f,'.jsx')).sort();
+const navMatches = [...constants.matchAll(/\{\s*id:\s*"([a-z0-9\-]+)"/g)].map(m=>m[1]);
+const roleMatches = [...constants.matchAll(/([a-z]+):\s*\{\s*pages:\[([^\]]*)\]/g)].map(m=>({role:m[1], pages:m[2].match(/"([^"]+)"/g)?.map(x=>x.slice(1,-1))||[]}));
+const pageIds = Object.keys(Object.fromEntries([...app.matchAll(/\s*("[a-z0-9\-]+"|'[a-z0-9\-]+')\s*:\s*<[^>]+Page/g)].map(m=>[m[1].replace(/['\"]+/g,''), m[0]])));
+const imported = app.split('\n').filter(l=>l.startsWith('import ')).filter(l=>l.includes('from "./pages/')||l.includes("from './pages/")).map(l=>l.match(/\.\/pages\/([A-Za-z0-9_]+)(?:\.jsx)?/)).filter(Boolean).map(m=>m[1]);
+console.log('pages:', pages);
+console.log('nav:', navMatches);
+console.log('pages object ids:', pageIds);
+console.log('missing from App imports:', pages.filter(p=>!imported.includes(p)).sort());
+console.log('missing from pages object:', pages.filter(p=>!pageIds.includes(p.replace(/[A-Z]/g,m=>"-"+m.toLowerCase()).replace(/^-/,'')) && p!=='LoginView').sort());
+console.log('roles missing which nav items?');
+roleMatches.forEach(r=>{ const miss = navMatches.filter(n=>!r.pages.includes(n)); console.log(r.role, miss.join(', ')); });
+const plans = fs.readFileSync('src/lib/plans.js','utf8');
+const planMatches = [...plans.matchAll(/([a-z]+):\s*\{[\s\S]*?pages:\[([\s\S]*?)\]/g)].map(m=>({plan:m[1], pages:m[2].match(/"([^\"]+)"/g)?.map(x=>x.slice(1,-1))||[]}));
+console.log('plan filters:');
+planMatches.forEach(p=>{
+  const miss = navMatches.filter(n=>!p.pages.includes(n));
+  console.log(p.plan, miss.join(', '));
+});

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { DEFAULTS, NAV, ROLE } from "./lib/constants";
 import { C } from "./lib/theme";
 import { genId } from "./lib/utils";
-import { PLAN_FEATURES } from "./lib/plans";
 import { useLocalState } from "./hooks/useLocalState";
 import Btn from "./components/Btn";
 import NotificationPanel from "./components/NotificationPanel";
@@ -18,6 +17,8 @@ import DisciplinePage from "./pages/DisciplinePage";
 import TransportPage from "./pages/TransportPage";
 import CommunicationPage from "./pages/CommunicationPage";
 import AccountsPage from "./pages/AdminAccountsPage";
+import AdminSettings from "./pages/AdminSettings";
+import MessagingPage from "./pages/MessagingPage";
 import ReportsPage from "./pages/ReportsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import AnalysisPage from "./pages/AnalysisPage";
@@ -214,7 +215,6 @@ export default function App() {
   const myResults    = isPortal ? results.filter(r => (r.studentId ?? r.student_id) === linkedStudentId) : results;
   const myPayments   = isPortal ? payments.filter(p => (p.studentId ?? p.student_id) === linkedStudentId) : payments;
 
-  const planFeatures = PLAN_FEATURES[auth?.plan || "starter"];
   const fullNav = useMemo(() => {
     const existing = new Set(NAV.map(n => n.id));
     return [...NAV, ...NAV_EXTRAS.filter(n => !existing.has(n.id))];
@@ -222,8 +222,8 @@ export default function App() {
 
   const nav = useMemo(() => {
     if (!perms) return [];
-    return fullNav.filter(n => perms.pages.includes(n.id) && (!planFeatures.pages || planFeatures.pages.includes(n.id)));
-  }, [perms, fullNav, planFeatures]);
+    return fullNav.filter(n => perms.pages.includes(n.id));
+  }, [perms, fullNav]);
   useEffect(() => { if (perms && !perms.pages.includes(page)) setPage(perms.pages[0]); }, [perms, page]);
 
   const resetClientData = useCallback(() => {
@@ -321,6 +321,7 @@ export default function App() {
       ? <PortalDashboardPage auth={auth} school={school} student={activeChild} attendance={myAttendance} results={myResults} payments={myPayments} feeStructures={feeStructures} toast={toast} onViewGrades={() => setPage("grades")} onViewFees={() => setPage("fees")} onViewAttendance={() => setPage("attendance")} />
       : <DashboardPage auth={auth} school={school} students={myStudents} teachers={teachers} attendance={myAttendance} payments={myPayments} feeStructures={feeStructures} results={myResults} toast={toast} />,
     students: <StudentsPage auth={auth} students={students} setStudents={setStudents} canEdit={canEdit} results={results} payments={payments} feeStructures={feeStructures} toast={toast} />,
+    teachers: <TeachersPage auth={auth} canEdit={canEdit} toast={toast} />,
     staff: ["admin","hr"].includes(auth.role) ? <StaffPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
     attendance: <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     grades: <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
@@ -342,10 +343,12 @@ export default function App() {
     lessonplans: ["admin","teacher"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     pendingplans: auth.role === "admin" ? <PendingPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     announcements: perms?.pages.includes("announcements") ? <AnnouncementsPage auth={auth} toast={toast} /> : <Forbidden />,
+    messaging: ["admin","teacher"].includes(auth.role) ? <MessagingPage auth={auth} /> : <Forbidden />,
     analytics: auth.role === "admin" ? <AnalyticsPage auth={auth} students={students} teachers={teachers} payments={payments} results={results} attendance={attendance} feeStructures={feeStructures} toast={toast} /> : <Forbidden />,
     reports: ["admin","teacher"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
     analysis: ["admin","teacher"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,
     medical: auth.role === "admin" ? <MedicalRecordsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
+    "admin-settings": auth.role === "admin" ? <AdminSettings auth={auth} /> : <Forbidden />,
     upgrade: auth.role === "admin" ? <UpgradePage auth={auth} toast={toast} /> : <Forbidden />,
     settings: auth.role === "admin"
       ? <div><SettingsPage auth={auth} school={school} setSchool={setSchool} users={users} setUsers={setUsers} toast={toast} /><div style={{ marginTop:12 }}><Btn variant="danger" onClick={() => { if (window.confirm("Reset demo data?")) resetDemo(); }}>Reset Demo Data</Btn></div></div>
