@@ -11,7 +11,7 @@ export const DEFAULTS = {
 };
 
 export const ROLE = {
-  admin:     { pages:["dashboard","upgrade","students","teachers","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","admin-settings","bulk-import","exams","medical"], edit:true },
+  admin:     { pages:["dashboard","upgrade","students","teachers","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical"], edit:true },
   teacher:   { pages:["dashboard","students","teachers","attendance","grades","subjects","reportcards","discipline","timetable","communication","messaging","library","analysis","lessonplans","announcements","exams"], edit:true },
   finance:   { pages:["dashboard","fees","mpesa-reconcile","invoices","announcements","upgrade"], edit:true },
   hr:        { pages:["dashboard","hr","staff","announcements","upgrade"], edit:true },
@@ -49,7 +49,6 @@ export const NAV = [
   { id:"exams",         label:"Exams",         icon:"📝" },
   { id:"bulk-import",   label:"Import/Export", icon:"📁" },
   { id:"medical",       label:"Medical",      icon:"🏥" },
-  { id:"admin-settings", label:"Admin Settings", icon:"⚙"  },
   { id:"settings",      label:"Settings",     icon:"⚙"  },
 ];
 
