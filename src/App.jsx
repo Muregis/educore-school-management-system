@@ -8,7 +8,6 @@ import NotificationPanel from "./components/NotificationPanel";
 import LoginView from "./pages/LoginView";
 import DashboardPage from "./pages/DashboardPage";
 import StudentsPage from "./pages/StudentsPage";
-import TeachersPage from "./pages/TeachersPage";
 import AttendancePage from "./pages/AttendancePage";
 import GradesPage from "./pages/GradesPage";
 import FeesPage from "./pages/FeesPage";
@@ -96,7 +95,7 @@ const ROLE_COLORS  = { admin:"#3B82F6", teacher:"#14B8A6", finance:"#F59E0B", hr
 const ROLE_AVATARS = { admin:"A", teacher:"T", finance:"F", hr:"H", librarian:"L", parent:"P", student:"S" };
 const BOTTOM_NAV_PAGES = {
   admin:     ["dashboard","students","grades","fees","reports"],
-  teacher:   ["dashboard","students","grades","attendance","timetable"],
+  teacher:   ["dashboard","grades","attendance","timetable"],
   finance:   ["dashboard","fees","invoices"],
   hr:        ["dashboard","hr","staff"],
   librarian: ["dashboard","library"],
@@ -338,7 +337,6 @@ export default function App() {
       ? <PortalDashboardPage auth={auth} school={school} student={activeChild} attendance={myAttendance} results={myResults} payments={myPayments} feeStructures={feeStructures} toast={toast} onViewGrades={() => setPage("grades")} onViewFees={() => setPage("fees")} onViewAttendance={() => setPage("attendance")} />
       : <DashboardPage auth={auth} school={school} students={myStudents} teachers={teachers} attendance={myAttendance} payments={myPayments} feeStructures={feeStructures} results={myResults} toast={toast} />,
     students: <StudentsPage auth={auth} students={students} setStudents={setStudents} canEdit={canEdit} results={results} payments={payments} feeStructures={feeStructures} toast={toast} />,
-    teachers: <TeachersPage auth={auth} canEdit={canEdit} toast={toast} />,
     staff: ["admin","hr"].includes(auth.role) ? <StaffPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
     attendance: <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     grades: <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
