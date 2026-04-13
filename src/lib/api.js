@@ -1,8 +1,19 @@
 // simple wrapper for calling backend API with optional auth token
+const DEFAULT_PROD_API_BASE = "https://educore-school-management-system.onrender.com/api";
+const DEFAULT_LOCAL_API_BASE = "http://localhost:10000/api";
+
+function getDefaultApiBase() {
+  if (typeof window === "undefined") return DEFAULT_PROD_API_BASE;
+
+  const host = window.location.hostname;
+  const isLocalHost = host === "localhost" || host === "127.0.0.1";
+  return isLocalHost ? DEFAULT_LOCAL_API_BASE : DEFAULT_PROD_API_BASE;
+}
+
 // OLD: export const API_BASE = "http://localhost:4001/api";
 export const API_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
-  "http://localhost:10000/api";
+  getDefaultApiBase();
 
 export async function apiFetch(
   path,
