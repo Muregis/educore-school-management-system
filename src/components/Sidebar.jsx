@@ -6,7 +6,7 @@ const NAVIGATION_GROUPS = [
   {
     id: "dashboard",
     label: "Dashboard",
-    icon: "ðŸ“Š",
+    icon: "\u{1F4CA}",
     items: []
   },
   {
@@ -14,11 +14,11 @@ const NAVIGATION_GROUPS = [
     label: "CORE",
     subtitle: "Daily Use",
     items: [
-      { id: "students", label: "Students", icon: "ðŸ‘¨â€ðŸŽ“" },
-      { id: "attendance", label: "Attendance", icon: "âœ…" },
-      { id: "grades", label: "Grades", icon: "ðŸ“" },
-      { id: "fees", label: "Fees", icon: "ðŸ’°" },
-      { id: "mpesa-reconcile", label: "M-Pesa Reconcile", icon: "ðŸ“±" }
+      { id: "students", label: "Students", icon: "\u{1F468}\u200D\u{1F393}" },
+      { id: "attendance", label: "Attendance", icon: "\u2714" },
+      { id: "grades", label: "Grades", icon: "\u{1F4DD}" },
+      { id: "fees", label: "Fees", icon: "\u{1F4B0}" },
+      { id: "mpesa-reconcile", label: "M-Pesa Reconcile", icon: "\u{1F4F1}" }
     ]
   },
   {
@@ -26,23 +26,23 @@ const NAVIGATION_GROUPS = [
     label: "OPERATIONS",
     subtitle: "Weekly Use",
     items: [
-      { id: "reportcards", label: "Report Cards", icon: "ðŸ“‹" },
-      { id: "admissions", label: "Admissions", icon: "ðŸšª" },
-      { id: "timetable", label: "Timetable", icon: "â°" },
-      { id: "discipline", label: "Discipline", icon: "âš–ï¸" },
-      { id: "communication", label: "Communication", icon: "ðŸ’¬" }
+      { id: "reportcards", label: "Report Cards", icon: "\u{1F4CB}" },
+      { id: "admissions", label: "Admissions", icon: "\u{1F6AA}" },
+      { id: "timetable", label: "Timetable", icon: "\u23F0" },
+      { id: "discipline", label: "Discipline", icon: "\u2696\uFE0F" },
+      { id: "communication", label: "Communication", icon: "\u{1F4AC}" }
     ]
   },
   {
     id: "management",
     label: "MANAGEMENT",
     items: [
-      { id: "staff", label: "Staff", icon: "ðŸ‘¨â€ðŸ«" },
-      { id: "hr", label: "HR", icon: "ðŸ§‘" },
-      { id: "library", label: "Library", icon: "ðŸ“š" },
-      { id: "transport", label: "Transport", icon: "ðŸšŒ" },
-      { id: "lessonplans", label: "Lesson Plans", icon: "ðŸ“" },
-      { id: "pendingplans", label: "Pending Plans", icon: "â³" }
+      { id: "staff", label: "Staff", icon: "\u{1F468}\u200D\u{1F3EB}" },
+      { id: "hr", label: "HR", icon: "\u{1F9D1}" },
+      { id: "library", label: "Library", icon: "\u{1F4DA}" },
+      { id: "transport", label: "Transport", icon: "\u{1F68C}" },
+      { id: "lessonplans", label: "Lesson Plans", icon: "\u{1F4DD}" },
+      { id: "pendingplans", label: "Pending Plans", icon: "\u23F3" }
     ]
   },
   {
@@ -50,10 +50,10 @@ const NAVIGATION_GROUPS = [
     label: "SYSTEM",
     subtitle: "Admin Only",
     items: [
-      { id: "reports", label: "Reports", icon: "ðŸ“Š" },
-      { id: "analytics", label: "Analytics", icon: "ðŸ“ˆ" },
-      { id: "accounts", label: "Accounts", icon: "ðŸ‘¥" },
-      { id: "settings", label: "Settings", icon: "âš™ï¸" }
+      { id: "reports", label: "Reports", icon: "\u{1F4CA}" },
+      { id: "analytics", label: "Analytics", icon: "\u{1F4C8}" },
+      { id: "accounts", label: "Accounts", icon: "\u{1F465}" },
+      { id: "settings", label: "Settings", icon: "\u2699\uFE0F" }
     ]
   }
 ];
@@ -70,7 +70,7 @@ const ROLE_COLORS = {
 
 function findGroupForPage(pageId) {
   const group = NAVIGATION_GROUPS.find(
-    entry => entry.id === pageId || entry.items.some(item => item.id === pageId)
+    (entry) => entry.id === pageId || entry.items.some((item) => item.id === pageId)
   );
   return group?.id ?? null;
 }
@@ -105,7 +105,7 @@ const Sidebar = ({
   };
 
   const handleGroupClick = (groupId) => {
-    setOpenGroup(currentGroup => (currentGroup === groupId ? null : groupId));
+    setOpenGroup((currentGroup) => (currentGroup === groupId ? null : groupId));
   };
 
   const renderNavItem = (item, isActive = false) => (
@@ -154,7 +154,7 @@ const Sidebar = ({
     }
 
     const isOpen = openGroup === group.id;
-    const hasActiveItem = group.items.some(item => page === item.id);
+    const hasActiveItem = group.items.some((item) => page === item.id);
 
     return (
       <div key={group.id} style={{ marginBottom: collapsed ? 12 : 16 }}>
@@ -185,7 +185,7 @@ const Sidebar = ({
               {group.label}
               {group.subtitle && (
                 <span style={{ fontWeight: 400, marginLeft: 6 }}>
-                  â€¢ {group.subtitle}
+                  {"\u2022"} {group.subtitle}
                 </span>
               )}
             </div>
@@ -196,7 +196,7 @@ const Sidebar = ({
                 transition: "transform 0.15s ease"
               }}
             >
-              â–¶
+              {"\u25B6"}
             </span>
           </button>
         )}
@@ -209,7 +209,7 @@ const Sidebar = ({
               transition: "max-height 0.3s ease"
             }}
           >
-            {group.items.map(item => renderNavItem(item, page === item.id))}
+            {group.items.map((item) => renderNavItem(item, page === item.id))}
           </div>
         )}
       </div>
@@ -297,11 +297,11 @@ const Sidebar = ({
               fontSize: 14
             }}
           >
-            âœ•
+            {"\u2715"}
           </button>
         ) : (
           <button
-            onClick={() => setSideCollapsed(v => !v)}
+            onClick={() => setSideCollapsed((v) => !v)}
             style={{
               marginLeft: "auto",
               background: "transparent",
@@ -314,7 +314,7 @@ const Sidebar = ({
               flexShrink: 0
             }}
           >
-            {collapsed ? "â–¶" : "â—€"}
+            {collapsed ? "\u25B6" : "\u25C0"}
           </button>
         )}
       </div>
@@ -360,14 +360,14 @@ const Sidebar = ({
                 fontSize: 13
               }}
               value={linkedStudentId || ""}
-              onChange={e => {
+              onChange={(e) => {
                 setActiveChildId(Number(e.target.value));
                 setOpenGroup(findGroupForPage("dashboard"));
                 setPage("dashboard");
                 if (isMobile) setDrawerOpen(false);
               }}
             >
-              {myChildren.map(s => {
+              {myChildren.map((s) => {
                 const sid = s.id ?? s.student_id;
                 const name = s.firstName
                   ? `${s.firstName} ${s.lastName}`
@@ -507,7 +507,7 @@ const Sidebar = ({
           }}
           title="Logout"
         >
-          <span>â‡</span>
+          <span>{"\u21D0"}</span>
           {!collapsed && <span>Logout</span>}
         </button>
       </div>
