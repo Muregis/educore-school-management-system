@@ -340,6 +340,15 @@ export default function App() {
     }
   }, [auth, hydrateTenantData, resetClientData, toast]);
 
+  if (isQRVerification) {
+    return (
+      <div style={{ minHeight:"100vh", display:"flex", background:C.bg, color:C.text, fontFamily:"'DM Sans','Segoe UI',sans-serif" }}>
+        <QRVerificationPage studentId={studentId} />
+        <Toasts items={toasts} remove={id => setToasts(prev => prev.filter(t => t.id !== id))} />
+      </div>
+    );
+  }
+
   if (!auth) return (
     <LoginView onLogin={handleLogin} />
   );
