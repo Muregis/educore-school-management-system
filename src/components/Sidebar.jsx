@@ -1,5 +1,5 @@
 import PropTypes from "prop-types";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { C } from "../lib/theme";
 
 const Sidebar = ({
@@ -17,20 +17,6 @@ const Sidebar = ({
   setActiveChildId,
   handleLogout
 }) => {
-  const [openGroup, setOpenGroup] = useState('core'); // Default to CORE open
-  const roleColors = {
-    admin: "#ef4444",
-    teacher: "#3b82f6",
-    finance: "#10b981",
-    hr: "#f59e0b",
-    librarian: "#8b5cf6",
-    parent: "#ec4899",
-    student: "#06b6d4"
-  };
-  const roleColor = auth?.role ? roleColors[auth.role] || C.accent : C.accent;
-  const isParent = auth?.role === "parent";
-
-  // Navigation structure organized by usage frequency and logical grouping
   const navigationGroups = [
     {
       id: "dashboard",
@@ -86,6 +72,27 @@ const Sidebar = ({
       ]
     }
   ];
+  const findGroupForPage = (pageId) => {
+    const group = navigationGroups.find(entry => entry.id === pageId || entry.items.some(item => item.id === pageId));
+    return group?.id ?? null;
+  };
+
+  const [openGroup, setOpenGroup] = useState(() => findGroupForPage(page));
+  const roleColors = {
+    admin: "#ef4444",
+    teacher: "#3b82f6",
+    finance: "#10b981",
+    hr: "#f59e0b",
+    librarian: "#8b5cf6",
+    parent: "#ec4899",
+    student: "#06b6d4"
+  };
+  const roleColor = auth?.role ? roleColors[auth.role] || C.accent : C.accent;
+  const isParent = auth?.role === "parent";
+
+  useEffect(() => {
+    setOpenGroup(findGroupForPage(page));
+  }, [page]);
 
   const handleNavClick = (navId) => {
     setPage(navId);

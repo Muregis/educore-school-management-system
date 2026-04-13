@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import FeeBlock from "../components/FeeBlock";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
@@ -10,6 +10,7 @@ import QRScanner from "../components/QRScanner";
 import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
+import { parseStudentQrContent } from "../lib/qr";
 import { Pager, Msg, csv, pager } from "../components/Helpers";
 
 // NEW: More robust normalise with multiple fallbacks
@@ -167,27 +168,18 @@ export default function AttendancePage({
   // Handle QR scan for attendance marking
   const handleQRScan = async (qrText) => {
     try {
-      let studentData;
-
-      // Check if it's a URL-based QR code
-      if (qrText.startsWith('https://educore.app/verify/')) {
-        const token = qrText.split('/verify/')[1];
-        // Decode the token to get student info
-        try {
-          studentData = JSON.parse(atob(token.replace(/-/g, '+').replace(/_/g, '/')));
-        } catch (decodeErr) {
-          toast("Invalid QR token", "error");
-          setShowQRScanner(false);
-          return;
-        }
-      } else {
-        // Fallback for old JSON format
-        studentData = JSON.parse(qrText);
+      const parsedQr = parseStudentQrContent(qrText);
+      if (!parsedQr?.studentId) {
+        toast("Invalid QR code", "error");
+        setShowQRScanner(false);
+        return;
       }
 
+      const scannedId = String(parsedQr.studentId).trim();
+
       const student = students.find(s =>
-        (s.id || s.student_id) === studentData.id ||
-        (s.admission || s.admission_number) === studentData.admission
+        String(s.id ?? s.student_id ?? "") === scannedId ||
+        String(s.admission ?? s.admission_number ?? "") === scannedId
       );
 
       if (!student) {

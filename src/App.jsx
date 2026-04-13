@@ -37,6 +37,7 @@ import MpesaReconciliationPage from "./pages/MpesaReconciliationPage";
 import BulkImportPage from "./pages/BulkImportPage";
 import ExamsPage from "./pages/ExamsPage";
 import MedicalRecordsPage from "./pages/MedicalRecordsPage";
+import QRVerificationPage from "./pages/QRVerificationPage";
 import UpgradePage from "./pages/UpgradePage";
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import Sidebar from "./components/Sidebar";
@@ -127,6 +128,12 @@ function clearTenantLocalState() {
   sessionStorage.removeItem("token");
 }
 export default function App() {
+  // Check if this is a QR verification URL
+  const urlPath = window.location.pathname;
+  const verifyMatch = urlPath.match(/^\/verify\/(.+)$/);
+  const isQRVerification = !!verifyMatch;
+  const studentId = verifyMatch ? verifyMatch[1] : null;
+
   const [school, setSchool]               = useLocalState("educore.school",        DEFAULTS.school);
   const [users, setUsers]                 = useLocalState("educore.users",          DEFAULTS.users);
   const [students, setStudents]           = useLocalState("educore.students",       DEFAULTS.students);
@@ -411,22 +418,34 @@ export default function App() {
   return (
     <div style={{ minHeight:"100vh", display:"flex", background:C.bg, color:C.text, fontFamily:"'DM Sans','Segoe UI',sans-serif" }}>
 
-      {!isMobile && (
-        <aside style={{ width:sideW, height:"100vh", background:C.surface, borderRight:`1px solid ${C.border}`, position:"fixed", top:0, left:0, display:"flex", flexDirection:"column", zIndex:50, transition:"width 0.2s ease", overflow:"hidden" }}>
-          <SidebarContent collapsed={sideCollapsed} />
-        </aside>
-      )}
-
-      {isMobile && drawerOpen && (
+      {/* QR Verification Page - Public Access */}
+      {isQRVerification ? (
+        <QRVerificationPage studentId={studentId} />
+      ) : !auth ? (
+        <LoginView
+          onLogin={handleLogin}
+          school={school}
+          setSchool={setSchool}
+          toast={toast}
+        />
+      ) : (
         <>
-          <div className="ec-drawer-overlay" onClick={() => setDrawerOpen(false)} />
-          <div className={`ec-drawer ${drawerOpen ? "open" : ""}`}>
-            <SidebarContent collapsed={false} />
-          </div>
-        </>
-      )}
+          {!isMobile && (
+            <aside style={{ width:sideW, height:"100vh", background:C.surface, borderRight:`1px solid ${C.border}`, position:"fixed", top:0, left:0, display:"flex", flexDirection:"column", zIndex:50, transition:"width 0.2s ease", overflow:"hidden" }}>
+              <SidebarContent collapsed={sideCollapsed} />
+            </aside>
+          )}
 
-      <main style={{ marginLeft: isMobile ? 0 : sideW, flex:1, transition:"margin-left 0.2s ease", minWidth:0 }}>
+          {isMobile && drawerOpen && (
+            <>
+              <div className="ec-drawer-overlay" onClick={() => setDrawerOpen(false)} />
+              <div className={`ec-drawer ${drawerOpen ? "open" : ""}`}>
+                <SidebarContent collapsed={false} />
+              </div>
+            </>
+          )}
+
+          <main style={{ marginLeft: isMobile ? 0 : sideW, flex:1, transition:"margin-left 0.2s ease", minWidth:0 }}>
         <div className="ec-topbar" style={{ height:62, background:C.surface, borderBottom:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", padding:"0 20px", position:"sticky", top:0, zIndex:40 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             {isMobile && (
@@ -493,6 +512,8 @@ export default function App() {
             <span>More</span>
           </button>
         </nav>
+      )}
+        </>
       )}
 
       <Toasts items={toasts} remove={id => setToasts(prev => prev.filter(t => t.id !== id))} />

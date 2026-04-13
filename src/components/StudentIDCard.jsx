@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import qrcode from "qrcode-generator";
 import { C } from "../lib/theme";
+import { buildStudentVerificationUrl } from "../lib/qr";
 import Btn from "./Btn";
 
 export default function StudentIDCard({ student, school, onClose }) {
@@ -15,15 +16,7 @@ export default function StudentIDCard({ student, school, onClose }) {
 
   const generateQR = async () => {
     try {
-      // Generate secure token-based URL for QR code
-      // In production, this would call an API to generate a secure token
-      const secureToken = btoa(JSON.stringify({
-        id: student.id || student.student_id,
-        admission: student.admission || student.admission_number,
-        timestamp: Date.now()
-      })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-
-      const qrContent = `https://educore.app/verify/${secureToken}`;
+      const qrContent = buildStudentVerificationUrl(student);
 
       const qr = qrcode(0, 'L');
       qr.addData(qrContent);

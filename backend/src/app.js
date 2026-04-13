@@ -40,6 +40,7 @@ import subjectsRoutes      from "./routes/subjects.routes.js";
 import examsRoutes         from "./routes/exams.routes.js";
 import medicalRoutes       from "./routes/medical.routes.js";
 import subscriptionRoutes from "./routes/subscription.routes.js";
+import publicRoutes        from "./routes/public.routes.js";
 // import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }    from "./middleware/error.js";
 import { authRequired } from "./middleware/auth.js";
@@ -91,6 +92,7 @@ app.use(apiRateLimit); // Apply rate limiting to all API routes
 // Note: auth routes are excluded from global auth and handled separately
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/public", publicRoutes);
 app.use("/api", authRequired);
 app.use("/api", tenantContext);
 app.use("/api", tenantSecurityCheck);

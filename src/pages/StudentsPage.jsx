@@ -11,6 +11,7 @@ import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
+import { parseStudentQrContent } from "../lib/qr";
 import { Pager, Msg } from "../components/Helpers";
 import { csv, pager } from "../lib/utils";
 
@@ -130,39 +131,23 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
   const handleQRScan = async (qrText) => {
     try {
-      // Check if it's a URL-based QR code
-      if (qrText.startsWith('https://educore.app/verify/')) {
-        const token = qrText.split('/verify/')[1];
-        // Decode the token to get student info
-        try {
-          const decoded = JSON.parse(atob(token.replace(/-/g, '+').replace(/_/g, '/')));
-          const student = students.find(s =>
-            (s.id || s.student_id) === decoded.id ||
-            (s.admission || s.admission_number) === decoded.admission
-          );
-          if (student) {
-            setProfile(student);
-            toast("Student found and profile opened", "success");
-          } else {
-            toast("Student not found", "error");
-          }
-        } catch (decodeErr) {
-          toast("Invalid QR token", "error");
-        }
-      } else {
-        // Fallback for old JSON format
-        const data = JSON.parse(qrText);
-        const student = students.find(s =>
-          (s.id || s.student_id) === data.id ||
-          (s.admission || s.admission_number) === data.admission
-        );
+      const parsedQr = parseStudentQrContent(qrText);
+      if (!parsedQr?.studentId) {
+        toast("Invalid QR code", "error");
+        return;
+      }
 
-        if (student) {
-          setProfile(student);
-          toast("Student found and profile opened", "success");
-        } else {
-          toast("Student not found", "error");
-        }
+      const scannedId = String(parsedQr.studentId).trim();
+      const student = students.find(s =>
+        String(s.id ?? s.student_id ?? "") === scannedId ||
+        String(s.admission ?? s.admission_number ?? "") === scannedId
+      );
+
+      if (student) {
+        setProfile(student);
+        toast("Student found and profile opened", "success");
+      } else {
+        toast("Student not found", "error");
       }
     } catch (err) {
       console.error("QR scan error:", err);
