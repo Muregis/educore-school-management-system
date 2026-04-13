@@ -40,6 +40,7 @@ import MedicalRecordsPage from "./pages/MedicalRecordsPage";
 import QRScannerPage from "./pages/QRScannerPage";
 import UpgradePage from "./pages/UpgradePage";
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
+import Sidebar from "./components/Sidebar";
 import { apiFetch } from "./lib/api";
 
 // Mobile portal imports
@@ -392,92 +393,21 @@ export default function App() {
 
 
   const SidebarContent = ({ collapsed }) => (
-    <>
-      <div style={{ padding:"16px 12px", borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:10, minHeight:64 }}>
-        {school.logo_url ? (
-          <img src={school.logo_url} alt="Logo" style={{ width:36, height:36, borderRadius:10, objectFit:"cover", flexShrink:0 }} />
-        ) : (
-          <div style={{ width:36, height:36, borderRadius:10, flexShrink:0, background:`linear-gradient(135deg, ${C.accent}, #6366f1)`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900, fontSize:16, color:"#fff", letterSpacing:-1 }}>E</div>
-        )}
-        {!collapsed && (
-          <div>
-            <div style={{ fontWeight:800, fontSize:15, color:C.text, lineHeight:1.1 }}>EduCore</div>
-            <div style={{ fontSize:10, color:C.textMuted, marginTop:2 }}>{school.name}</div>
-          </div>
-        )}
-        {isMobile ? (
-          <button onClick={() => setDrawerOpen(false)} style={{ marginLeft:"auto", background:"transparent", border:`1px solid ${C.border}`, borderRadius:7, color:C.textMuted, cursor:"pointer", padding:"3px 8px", fontSize:14 }}>✕</button>
-        ) : (
-          <button onClick={() => setSideCollapsed(v => !v)} style={{ marginLeft:"auto", background:"transparent", border:`1px solid ${C.border}`, borderRadius:7, color:C.textMuted, cursor:"pointer", padding:"3px 7px", fontSize:12, flexShrink:0 }}>{collapsed ? "▶" : "◀"}</button>
-        )}
-      </div>
-
-      {!collapsed && isParent && myChildren.length > 0 && (
-        <div style={{ padding:"8px 12px", borderBottom:`1px solid ${C.border}`, background:C.bg }}>
-          <div style={{ fontSize:10, color:C.textMuted, marginBottom:4, textTransform:"uppercase", letterSpacing:1 }}>Viewing child</div>
-          {myChildren.length === 1 ? (
-            <div style={{ fontSize:13, color:C.text, fontWeight:600 }}>{activeChild?.firstName} {activeChild?.lastName}</div>
-          ) : (
-            <select style={{ width:"100%", background:C.card, color:C.text, border:`1px solid ${C.border}`, borderRadius:8, padding:"5px 8px", fontSize:13 }}
-              value={linkedStudentId || ""} onChange={e => { setActiveChildId(Number(e.target.value)); setPage("dashboard"); if (isMobile) setDrawerOpen(false); }}>
-              {myChildren.map(s => {
-                const sid  = s.id ?? s.student_id;
-                const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
-                return <option key={sid} value={sid}>{name}</option>;
-              })}
-            </select>
-          )}
-        </div>
-      )}
-
-      <nav style={{ flex:1, overflowY:"auto", padding:"10px 8px", minHeight:0 }}>
-        {nav.map(n => {
-          const active = page === n.id;
-          return (
-            <button key={n.id} onClick={() => { setPage(n.id); if (isMobile) setDrawerOpen(false); }} title={collapsed ? n.label : ""} style={{
-              width:"100%", textAlign:"left", marginBottom:3,
-              border:`1px solid ${active ? C.accentDim : "transparent"}`,
-              borderRadius:9, padding: collapsed ? "9px 0" : "9px 11px",
-              background: active ? C.accentGlow : "transparent",
-              color: active ? C.accent : C.textSub,
-              cursor:"pointer", fontSize:13, display:"flex", alignItems:"center",
-              gap:9, justifyContent: collapsed ? "center" : "flex-start",
-              transition:"background 0.15s, color 0.15s",
-            }}>
-              <span style={{ fontSize:15, flexShrink:0 }}>{n.icon}</span>
-              {!collapsed && <span>{n.label}</span>}
-              {!collapsed && active && <span style={{ marginLeft:"auto", width:5, height:5, borderRadius:"50%", background:C.accent, flexShrink:0 }} />}
-            </button>
-          );
-        })}
-      </nav>
-
-      <div style={{ padding:"10px 8px", borderTop:`1px solid ${C.border}`, flexShrink:0 }}>
-        {!collapsed ? (
-          <div style={{ background:C.card, borderRadius:10, padding:"10px 12px", border:`1px solid ${C.border}`, marginBottom:8 }}>
-            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-              <div style={{ width:32, height:32, borderRadius:8, background:`${roleColor}22`, border:`1px solid ${roleColor}44`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:14, color:roleColor, flexShrink:0 }}>{ROLE_AVATARS[auth.role] || "?"}</div>
-              <div style={{ minWidth:0 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:C.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{auth.name}</div>
-                <div style={{ fontSize:10, color:roleColor, textTransform:"capitalize", fontWeight:600 }}>{auth.role}</div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ display:"flex", justifyContent:"center", marginBottom:8 }}>
-            <div style={{ width:32, height:32, borderRadius:8, background:`${roleColor}22`, border:`1px solid ${roleColor}44`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:14, color:roleColor }}>{ROLE_AVATARS[auth.role] || "?"}</div>
-          </div>
-        )}
-        <button onClick={handleLogout} style={{
-          width:"100%", padding: collapsed ? "7px 0" : "7px 12px", borderRadius:8,
-          background:"transparent", border:`1px solid ${C.border}`,
-          color:C.textSub, cursor:"pointer", fontSize:12,
-          display:"flex", alignItems:"center", justifyContent: collapsed ? "center" : "flex-start", gap:7,
-        }} title="Logout">
-          <span>⇐</span>{!collapsed && <span>Logout</span>}
-        </button>
-      </div>
-    </>
+    <Sidebar
+      auth={auth}
+      school={school}
+      page={page}
+      setPage={setPage}
+      collapsed={collapsed}
+      setSideCollapsed={setSideCollapsed}
+      isMobile={isMobile}
+      setDrawerOpen={setDrawerOpen}
+      myChildren={myChildren}
+      activeChild={activeChild}
+      linkedStudentId={linkedStudentId}
+      setActiveChildId={setActiveChildId}
+      handleLogout={handleLogout}
+    />
   );
 
   return (
