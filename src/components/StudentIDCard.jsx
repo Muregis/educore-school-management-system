@@ -15,14 +15,16 @@ export default function StudentIDCard({ student, school, onClose }) {
 
   const generateQR = async () => {
     try {
-      // QR contains student verification URL or admission number
-      const qrContent = JSON.stringify({
-        admission: student.admission || student.admission_number,
-        school: school.name,
-        name: student.firstName || student.first_name,
+      // Generate secure token-based URL for QR code
+      // In production, this would call an API to generate a secure token
+      const secureToken = btoa(JSON.stringify({
         id: student.id || student.student_id,
-      });
-      
+        admission: student.admission || student.admission_number,
+        timestamp: Date.now()
+      })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+      const qrContent = `https://educore.app/verify/${secureToken}`;
+
       const qr = qrcode(0, 'L');
       qr.addData(qrContent);
       qr.make();

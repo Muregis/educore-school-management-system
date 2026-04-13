@@ -6,6 +6,7 @@ import Field from "../components/Field";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
 import Table from "../components/Table";
+import QRScanner from "../components/QRScanner";
 import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
@@ -53,6 +54,7 @@ export default function AttendancePage({
   const [showBulk, setShowBulk] = useState(false);
   const [editing, setEditing] = useState(null);
   const [bulk, setBulk] = useState([]);
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   // Fetch attendance records on mount
   useEffect(() => {
@@ -162,6 +164,67 @@ export default function AttendancePage({
     }
   };
 
+  // Handle QR scan for attendance marking
+  const handleQRScan = async (qrText) => {
+    try {
+      let studentData;
+
+      // Check if it's a URL-based QR code
+      if (qrText.startsWith('https://educore.app/verify/')) {
+        const token = qrText.split('/verify/')[1];
+        // Decode the token to get student info
+        try {
+          studentData = JSON.parse(atob(token.replace(/-/g, '+').replace(/_/g, '/')));
+        } catch (decodeErr) {
+          toast("Invalid QR token", "error");
+          setShowQRScanner(false);
+          return;
+        }
+      } else {
+        // Fallback for old JSON format
+        studentData = JSON.parse(qrText);
+      }
+
+      const student = students.find(s =>
+        (s.id || s.student_id) === studentData.id ||
+        (s.admission || s.admission_number) === studentData.admission
+      );
+
+      if (!student) {
+        toast("Student not found", "error");
+        setShowQRScanner(false);
+        return;
+      }
+
+      // Mark attendance for today
+      const today = new Date().toISOString().slice(0, 10);
+      const resolvedClassId = student.class_id ?? student.classId ?? null;
+
+      await apiFetch("/attendance/bulk", {
+        method: "POST",
+        body: {
+          classId: resolvedClassId,
+          className: student.className || student.class_name,
+          date: today,
+          records: [{ studentId: student.id || student.student_id, status: "present" }]
+        },
+        token: auth?.token,
+      });
+
+      // Refresh attendance data
+      const data_response = await apiFetch("/attendance", { token: auth?.token });
+      setAttendance(data_response.map(normalise));
+
+      const studentName = student.firstName || student.first_name;
+      const studentLastName = student.lastName || student.last_name;
+      toast(`Attendance marked for ${studentName} ${studentLastName}`, "success");
+    } catch (err) {
+      console.error("QR scan error:", err);
+      toast("Invalid QR code or attendance marking failed", "error");
+    }
+    setShowQRScanner(false);
+  };
+
   // Fee block check
   if (feeBlocked) {
     return <FeeBlock onGoFees={onGoFees} pageName="Attendance Records" />;
@@ -220,6 +283,10 @@ export default function AttendancePage({
           }}
         >
           Export CSV
+        </Btn>
+        
+        <Btn variant="secondary" onClick={() => setShowQRScanner(true)}>
+          📱 Scan QR
         </Btn>
         
         {canEdit && (
@@ -398,6 +465,13 @@ export default function AttendancePage({
             </Btn>
           </div>
         </Modal>
+      )}
+      {showQRScanner && (
+        <QRScanner
+          title="Scan Student QR for Attendance"
+          onScan={handleQRScan}
+          onClose={() => setShowQRScanner(false)}
+        />
       )}
     </div>
   );

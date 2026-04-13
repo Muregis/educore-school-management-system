@@ -1,4 +1,5 @@
 import PropTypes from "prop-types";
+import { useState } from "react";
 import { C } from "../lib/theme";
 
 const Sidebar = ({
@@ -16,6 +17,7 @@ const Sidebar = ({
   setActiveChildId,
   handleLogout
 }) => {
+  const [openGroup, setOpenGroup] = useState('core'); // Default to CORE open
   const roleColors = {
     admin: "#ef4444",
     teacher: "#3b82f6",
@@ -68,7 +70,8 @@ const Sidebar = ({
         { id: "hr", label: "HR", icon: "🧑" },
         { id: "library", label: "Library", icon: "📚" },
         { id: "transport", label: "Transport", icon: "🚌" },
-        { id: "lessonplans", label: "Lesson Plans", icon: "📝" }
+        { id: "lessonplans", label: "Lesson Plans", icon: "📝" },
+        { id: "pendingplans", label: "Pending Plans", icon: "⏳" }
       ]
     },
     {
@@ -87,6 +90,10 @@ const Sidebar = ({
   const handleNavClick = (navId) => {
     setPage(navId);
     if (isMobile) setDrawerOpen(false);
+  };
+
+  const handleGroupClick = (groupId) => {
+    setOpenGroup(openGroup === groupId ? null : groupId);
   };
 
   const renderNavItem = (item, isActive = false) => (
@@ -134,30 +141,61 @@ const Sidebar = ({
       return renderNavItem(group, page === "dashboard");
     }
 
+    const isOpen = openGroup === group.id;
+    const hasActiveItem = group.items.some(item => page === item.id);
+
     return (
       <div key={group.id} style={{ marginBottom: collapsed ? 12 : 16 }}>
         {!collapsed && (
+          <button
+            onClick={() => handleGroupClick(group.id)}
+            style={{
+              width: "100%",
+              textAlign: "left",
+              padding: "4px 12px 6px",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 10,
+              fontWeight: 700,
+              color: hasActiveItem ? C.accent : C.textMuted,
+              textTransform: "uppercase",
+              letterSpacing: 0.5,
+              borderBottom: `1px solid ${C.border}`,
+              marginBottom: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              transition: "all 0.15s ease"
+            }}
+          >
+            <div>
+              {group.label}
+              {group.subtitle && (
+                <span style={{ fontWeight: 400, marginLeft: 6 }}>
+                  • {group.subtitle}
+                </span>
+              )}
+            </div>
+            <span style={{
+              fontSize: 12,
+              transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
+              transition: "transform 0.15s ease"
+            }}>
+              ▶
+            </span>
+          </button>
+        )}
+        {(!collapsed || isOpen) && (
           <div style={{
-            padding: "4px 12px 6px",
-            fontSize: 10,
-            fontWeight: 700,
-            color: C.textMuted,
-            textTransform: "uppercase",
-            letterSpacing: 0.5,
-            borderBottom: `1px solid ${C.border}`,
-            marginBottom: 8
+            padding: collapsed ? "0 4px" : "0 4px",
+            maxHeight: isOpen ? "500px" : "0",
+            overflow: "hidden",
+            transition: "max-height 0.3s ease"
           }}>
-            {group.label}
-            {group.subtitle && (
-              <span style={{ fontWeight: 400, marginLeft: 6 }}>
-                • {group.subtitle}
-              </span>
-            )}
+            {group.items.map(item => renderNavItem(item, page === item.id))}
           </div>
         )}
-        <div style={{ padding: collapsed ? "0 4px" : "0 4px" }}>
-          {group.items.map(item => renderNavItem(item, page === item.id))}
-        </div>
       </div>
     );
   };

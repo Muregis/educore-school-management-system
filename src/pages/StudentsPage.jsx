@@ -6,6 +6,7 @@ import Badge from "../components/Badge";
 import Modal from "../components/Modal";
 import Table from "../components/Table";
 import StudentIDCard from "../components/StudentIDCard";
+import QRScanner from "../components/QRScanner";
 import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
@@ -46,6 +47,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [profile, setProfile] = useState(null);
   const [idCardStudent, setIdCardStudent] = useState(null);
   const [err, setErr] = useState("");
+  const [showQRScanner, setShowQRScanner] = useState(false);
   const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", status: "active", admission: "" });
 
   useEffect(() => {
@@ -126,6 +128,49 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     } catch (err) { toast(err.message || "Delete failed", "error"); }
   };
 
+  const handleQRScan = async (qrText) => {
+    try {
+      // Check if it's a URL-based QR code
+      if (qrText.startsWith('https://educore.app/verify/')) {
+        const token = qrText.split('/verify/')[1];
+        // Decode the token to get student info
+        try {
+          const decoded = JSON.parse(atob(token.replace(/-/g, '+').replace(/_/g, '/')));
+          const student = students.find(s =>
+            (s.id || s.student_id) === decoded.id ||
+            (s.admission || s.admission_number) === decoded.admission
+          );
+          if (student) {
+            setProfile(student);
+            toast("Student found and profile opened", "success");
+          } else {
+            toast("Student not found", "error");
+          }
+        } catch (decodeErr) {
+          toast("Invalid QR token", "error");
+        }
+      } else {
+        // Fallback for old JSON format
+        const data = JSON.parse(qrText);
+        const student = students.find(s =>
+          (s.id || s.student_id) === data.id ||
+          (s.admission || s.admission_number) === data.admission
+        );
+
+        if (student) {
+          setProfile(student);
+          toast("Student found and profile opened", "success");
+        } else {
+          toast("Student not found", "error");
+        }
+      }
+    } catch (err) {
+      console.error("QR scan error:", err);
+      toast("Invalid QR code", "error");
+    }
+    setShowQRScanner(false);
+  };
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
@@ -145,6 +190,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <option value="inactive">inactive</option>
         </select>
         <Btn variant="ghost" onClick={() => { csv("students.csv", ["Admission","First","Last","Class","Gender","Parent","Phone","Status"], filtered.map(s => [s.admission,s.firstName,s.lastName,s.className,s.gender,s.parentName||"",s.parentPhone||"",s.status])); toast("Students CSV exported","success"); }}>Export CSV</Btn>
+        <Btn variant="secondary" onClick={() => setShowQRScanner(true)}>📱 Scan QR</Btn>
         {canEdit && auth.role !== "finance" && <Btn onClick={openAdd}>Add Student</Btn>}
       </div>
       {filtered.length === 0 ? <Msg text="No students found." /> : (
@@ -235,6 +281,13 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           student={idCardStudent} 
           school={feeStructures[0]?.school || { name: "School", year: new Date().getFullYear() }} 
           onClose={() => setIdCardStudent(null)} 
+        />
+      )}
+      {showQRScanner && (
+        <QRScanner
+          title="Scan Student QR Code"
+          onScan={handleQRScan}
+          onClose={() => setShowQRScanner(false)}
         />
       )}
     </div>
