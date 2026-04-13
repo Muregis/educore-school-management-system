@@ -8,6 +8,7 @@ export const DEFAULTS = {
   teachers: [],
   attendance:[], results:[], payments:[], smsLogs:[], notifications:[],
   feeStructures: [],
+  timetable: [],
 };
 
 export const ROLE = {

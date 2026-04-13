@@ -42,6 +42,10 @@ import UpgradePage from "./pages/UpgradePage";
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import { apiFetch } from "./lib/api";
 
+// Mobile portal imports
+import ParentPortalMobile from "./pages/ParentPortalMobile";
+import StudentPortalMobile from "./pages/StudentPortalMobile";
+
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   useEffect(() => {
@@ -114,6 +118,7 @@ const TENANT_STATE_KEYS = [
   "educore.feeStructures",
   "educore.payments",
   "educore.notifications",
+  "educore.timetable",
 ];
 
 function clearTenantLocalState() {
@@ -131,6 +136,7 @@ export default function App() {
   const [feeStructures, setFeeStructures] = useLocalState("educore.feeStructures",  DEFAULTS.feeStructures);
   const [payments, setPayments]           = useLocalState("educore.payments",       DEFAULTS.payments);
   const [notifications, setNotifications] = useLocalState("educore.notifications",  DEFAULTS.notifications);
+  const [timetable, setTimetable]         = useLocalState("educore.timetable",      DEFAULTS.timetable);
 
   const [auth, setAuth] = useState(() => {
     // Check if this is a new browser session
@@ -247,12 +253,13 @@ export default function App() {
     setSchool(DEFAULTS.school); setUsers(DEFAULTS.users); setStudents(DEFAULTS.students);
     setTeachers(DEFAULTS.teachers); setAttendance(DEFAULTS.attendance); setResults(DEFAULTS.results);
     setFeeStructures(DEFAULTS.feeStructures); setPayments(DEFAULTS.payments); setNotifications(DEFAULTS.notifications);
-  }, [setSchool, setUsers, setStudents, setTeachers, setAttendance, setResults, setFeeStructures, setPayments, setNotifications]);
+    setTimetable(DEFAULTS.timetable);
+  }, [setSchool, setUsers, setStudents, setTeachers, setAttendance, setResults, setFeeStructures, setPayments, setNotifications, setTimetable]);
 
   const hydrateTenantData = useCallback(async (loggedInAuth) => {
     if (!loggedInAuth?.token) return;
     const token = loggedInAuth.token;
-    const [schoolRes, studentsRes, teachersRes, attendanceRes, gradesRes, paymentsRes, feeRes] = await Promise.allSettled([
+    const [schoolRes, studentsRes, teachersRes, attendanceRes, gradesRes, paymentsRes, feeRes, timetableRes] = await Promise.allSettled([
       apiFetch("/settings/school", { token }),
       apiFetch("/students", { token }),
       apiFetch("/teachers", { token }),
@@ -260,6 +267,7 @@ export default function App() {
       apiFetch("/grades", { token }),
       apiFetch("/payments", { token }),
       apiFetch("/payments/fee-structures", { token }),
+      apiFetch("/timetable", { token }),
     ]);
 
     if (schoolRes.status === "fulfilled" && schoolRes.value) {
@@ -274,7 +282,8 @@ export default function App() {
     setResults(gradesRes.status === "fulfilled" ? (gradesRes.value || []) : []);
     setPayments(paymentsRes.status === "fulfilled" ? (paymentsRes.value || []) : []);
     setFeeStructures(feeRes.status === "fulfilled" ? (feeRes.value || []) : []);
-  }, [setSchool, setStudents, setTeachers, setAttendance, setResults, setPayments, setFeeStructures]);
+    setTimetable(timetableRes.status === "fulfilled" ? (timetableRes.value || []) : []);
+  }, [setSchool, setStudents, setTeachers, setAttendance, setResults, setPayments, setFeeStructures, setTimetable]);
 
   const handleLogout = useCallback(() => {
     clearTenantLocalState();
@@ -334,15 +343,21 @@ export default function App() {
   const sideW      = sideCollapsed ? 64 : 240;
 
   const pages = {
-    dashboard: isPortal 
-      ? <PortalDashboardPage auth={auth} school={school} student={activeChild} attendance={myAttendance} results={myResults} payments={myPayments} feeStructures={feeStructures} toast={toast} onViewGrades={() => setPage("grades")} onViewFees={() => setPage("fees")} onViewAttendance={() => setPage("attendance")} />
-      : <DashboardPage auth={auth} school={school} students={myStudents} teachers={teachers} attendance={myAttendance} payments={myPayments} feeStructures={feeStructures} results={myResults} toast={toast} />,
+    dashboard: isPortal && isMobile
+      ? (auth.role === "parent"
+          ? <ParentPortalMobile auth={auth} school={school} students={students} attendance={attendance} results={results} payments={payments} feeStructures={feeStructures} onNavigate={setPage} onLogout={handleLogout} />
+          : <StudentPortalMobile auth={auth} school={school} student={activeChild} attendance={myAttendance} results={myResults} library={[]} timetable={timetable} onNavigate={setPage} onLogout={handleLogout} />
+        )
+      : (isPortal
+          ? <PortalDashboardPage auth={auth} school={school} student={activeChild} attendance={myAttendance} results={myResults} payments={myPayments} feeStructures={feeStructures} toast={toast} onViewGrades={() => setPage("grades")} onViewFees={() => setPage("fees")} onViewAttendance={() => setPage("attendance")} />
+          : <DashboardPage auth={auth} school={school} students={myStudents} teachers={teachers} attendance={myAttendance} payments={myPayments} feeStructures={feeStructures} results={myResults} toast={toast} />
+        ),
     students: <StudentsPage auth={auth} students={students} setStudents={setStudents} canEdit={canEdit} results={results} payments={payments} feeStructures={feeStructures} toast={toast} />,
     staff: ["admin","hr"].includes(auth.role) ? <StaffPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
-    attendance: <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
-    grades: <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
+    attendance: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
+    grades: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     subjects: <SubjectsPage auth={auth} toast={toast} />,
-    fees: <FeesPage auth={auth} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
+    fees: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <FeesPage auth={auth} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     "mpesa-reconcile": <MpesaReconciliationPage auth={auth} students={students} toast={toast} />,
     "bulk-import": <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} payments={payments} feeStructures={feeStructures} />,
     "qr-scanner": auth.role === "admin" ? <QRScannerPage auth={auth} students={students} payments={payments} feeStructures={feeStructures} toast={toast} /> : <Forbidden />,
@@ -352,11 +367,11 @@ export default function App() {
     invoices: <InvoicesPage auth={auth} school={school} students={students} canEdit={canEdit} toast={toast} />,
     reportcards: <ReportCardsPage auth={auth} school={school} students={myStudents} canEdit={canEdit} toast={toast} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     hr: ["admin","hr"].includes(auth.role) ? <HRPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
-    library: <LibraryPage auth={auth} students={myStudents} teachers={teachers} toast={toast} />,
+    library: isPortal && isMobile && auth.role === "student" ? (() => { setPage("dashboard"); return null; })() : <LibraryPage auth={auth} students={myStudents} teachers={teachers} toast={toast} />,
     discipline: <DisciplinePage auth={auth} students={myStudents} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     transport: <TransportPage auth={auth} canEdit={canEdit} toast={toast} students={students} />,
-    communication: <CommunicationPage auth={auth} canEdit={canEdit} toast={toast} />,
-    timetable: <TimetablePage auth={auth} teachers={teachers} canEdit={canEdit} toast={toast} />,
+    communication: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <CommunicationPage auth={auth} canEdit={canEdit} toast={toast} />,
+    timetable: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <TimetablePage auth={auth} teachers={teachers} canEdit={canEdit} toast={toast} />,
     accounts: auth.role === "admin" ? <AccountsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
     lessonplans: ["admin","teacher"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     pendingplans: auth.role === "admin" ? <PendingPlansPage auth={auth} toast={toast} /> : <Forbidden />,

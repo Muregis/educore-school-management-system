@@ -1,0 +1,489 @@
+/* Mobile-first styles for EduCore portals */
+
+/* Safe area insets for iOS notch and Android status bar */
+:root {
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Base mobile styles */
+.mobile-container {
+  min-height: 100vh;
+  background: #0B1120;
+  color: #E2EAF8;
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  padding-top: var(--safe-area-inset-top);
+  padding-bottom: var(--safe-area-inset-bottom);
+}
+
+/* Mobile header */
+.mobile-header {
+  position: sticky;
+  top: var(--safe-area-inset-top, 0px);
+  z-index: 100;
+  background: #0B1120;
+  border-bottom: 1px solid #1A2A42;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 56px;
+}
+
+.mobile-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.mobile-header-school {
+  font-size: 16px;
+  font-weight: 700;
+  color: #E2EAF8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-header-student {
+  font-size: 12px;
+  color: #7A92B8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Mobile navigation */
+.mobile-nav {
+  position: fixed;
+  bottom: var(--safe-area-inset-bottom, 0px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: #0B1120;
+  border-top: 1px solid #1A2A42;
+  display: flex;
+  align-items: stretch;
+  padding-bottom: var(--safe-area-inset-bottom, 0px);
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+}
+
+.mobile-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px 6px;
+  gap: 3px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #3D5070;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  transition: color 0.15s;
+  min-height: 56px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-nav-item.active {
+  color: #3B82F6;
+}
+
+.mobile-nav-item .icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* Page content */
+.mobile-page {
+  padding: 16px;
+  padding-bottom: calc(80px + var(--safe-area-inset-bottom, 0px));
+  min-height: calc(100vh - 56px - var(--safe-area-inset-top, 0px));
+}
+
+/* Cards */
+.mobile-card {
+  background: #0E1420;
+  border: 1px solid #1A2A42;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.mobile-card-large {
+  background: #0E1420;
+  border: 1px solid #1A2A42;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+/* Buttons */
+.mobile-btn {
+  background: #3B82F6;
+  color: #E2EAF8;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mobile-btn:hover {
+  background: #2563EB;
+}
+
+.mobile-btn-secondary {
+  background: #0E1420;
+  border: 1px solid #1A2A42;
+  color: #E2EAF8;
+}
+
+.mobile-btn-secondary:hover {
+  background: #131F31;
+}
+
+.mobile-btn-ghost {
+  background: transparent;
+  border: 1px solid #1A2A42;
+  color: #7A92B8;
+}
+
+.mobile-btn-ghost:hover {
+  background: #131F31;
+  color: #E2EAF8;
+}
+
+/* Text styles */
+.mobile-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #E2EAF8;
+  margin-bottom: 8px;
+}
+
+.mobile-subtitle {
+  font-size: 14px;
+  color: #7A92B8;
+  margin-bottom: 16px;
+}
+
+.mobile-body {
+  font-size: 14px;
+  color: #E2EAF8;
+  line-height: 1.5;
+}
+
+/* Scroll containers */
+.mobile-scroll {
+  -webkit-overflow-scrolling: touch;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mobile-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Horizontal scroll chips */
+.mobile-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 4px 0;
+}
+
+.mobile-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-chip {
+  background: #0E1420;
+  border: 1px solid #1A2A42;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 14px;
+  color: #E2EAF8;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+.mobile-chip.active {
+  background: #3B82F6;
+  border-color: #3B82F6;
+  color: #E2EAF8;
+}
+
+.mobile-chip:hover {
+  background: #131F31;
+}
+
+/* Progress rings */
+.mobile-progress-ring {
+  width: 80px;
+  height: 80px;
+  position: relative;
+  margin: 0 auto;
+}
+
+.mobile-progress-ring circle {
+  width: 80px;
+  height: 80px;
+  fill: none;
+  stroke-width: 8;
+  transform: translate(4px, 4px);
+  stroke-dasharray: 220;
+  stroke-linecap: round;
+}
+
+.mobile-progress-ring-bg {
+  stroke: #1A2A42;
+}
+
+.mobile-progress-ring-fill {
+  stroke: #3B82F6;
+  stroke-dashoffset: 220;
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+/* Grade badges */
+.grade-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  color: #E2EAF8;
+}
+
+.grade-ee { background: #22C55E; } /* Excellent */
+.grade-me { background: #14B8A6; } /* Very Good */
+.grade-ae { background: #3B82F6; } /* Good */
+.grade-be { background: #F59E0B; } /* Satisfactory */
+
+/* Pull to refresh */
+.mobile-pull-refresh {
+  position: relative;
+  overflow: hidden;
+}
+
+.mobile-pull-refresh-indicator {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #7A92B8;
+  font-size: 12px;
+  transition: transform 0.2s;
+}
+
+.mobile-pull-refresh-indicator.visible {
+  transform: translateX(-50%) translateY(40px);
+}
+
+/* Ripple effect for Android */
+.mobile-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.mobile-ripple::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.3s, height 0.3s;
+  pointer-events: none;
+}
+
+.mobile-ripple:active::before {
+  width: 200px;
+  height: 200px;
+}
+
+/* iOS specific fixes */
+@supports (-webkit-touch-callout: none) {
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-btn,
+  .mobile-chip,
+  .mobile-nav-item {
+    touch-action: manipulation;
+  }
+
+  * {
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+/* Android specific fixes */
+@supports not (-webkit-touch-callout: none) {
+  .mobile-btn,
+  .mobile-chip,
+  .mobile-nav-item {
+    -webkit-tap-highlight-color: rgba(59, 130, 246, 0.1);
+  }
+}
+
+/* Viewport meta for Android Chrome */
+@media screen and (max-width: 767px) {
+  .mobile-container {
+    -webkit-text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Loading spinner */
+.mobile-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #1A2A42;
+  border-top: 2px solid #3B82F6;
+  border-radius: 50%;
+  animation: mobile-spin 1s linear infinite;
+}
+
+@keyframes mobile-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Status badges */
+.status-paid {
+  background: #22C55E;
+  color: #E2EAF8;
+}
+
+.status-owing {
+  background: #F43F5E;
+  color: #E2EAF8;
+}
+
+.status-active {
+  background: #3B82F6;
+  color: #E2EAF8;
+}
+
+/* Timetable cards */
+.timetable-card {
+  background: #0E1420;
+  border: 1px solid #1A2A42;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.timetable-day {
+  font-size: 16px;
+  font-weight: 700;
+  color: #E2EAF8;
+  margin-bottom: 12px;
+}
+
+.timetable-subject {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #1A2A42;
+}
+
+.timetable-subject:last-child {
+  border-bottom: none;
+}
+
+.timetable-time {
+  font-size: 12px;
+  color: #7A92B8;
+}
+
+.timetable-name {
+  font-size: 14px;
+  color: #E2EAF8;
+  font-weight: 600;
+}
+
+/* Library book cards */
+.book-card {
+  background: #0E1420;
+  border: 1px solid #1A2A42;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.book-info h4 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #E2EAF8;
+  margin: 0 0 4px 0;
+}
+
+.book-info p {
+  font-size: 12px;
+  color: #7A92B8;
+  margin: 0;
+}
+
+.book-due {
+  text-align: right;
+}
+
+.book-due .days {
+  font-size: 18px;
+  font-weight: 700;
+  color: #F59E0B;
+}
+
+.book-due .label {
+  font-size: 12px;
+  color: #7A92B8;
+}
