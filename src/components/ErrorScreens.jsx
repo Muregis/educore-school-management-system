@@ -186,15 +186,15 @@ export const OfflineScreen = () => (
 );
 
 // Maintenance Screen
-export const MaintenanceScreen = ({ minutesRemaining = 15 }) => {
+export const MaintenanceScreen = ({ showCountdown = false, minutesRemaining = 15 }) => {
   const [timeLeft, setTimeLeft] = useState(minutesRemaining * 60);
 
   useEffect(() => {
-    if (timeLeft > 0) {
+    if (showCountdown && timeLeft > 0) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
     }
-  }, [timeLeft]);
+  }, [showCountdown, timeLeft]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -234,36 +234,38 @@ export const MaintenanceScreen = ({ minutesRemaining = 15 }) => {
           color: COLORS.textMuted,
           fontSize: 16,
           lineHeight: 1.5,
-          marginBottom: 20
+          marginBottom: showCountdown ? 20 : 0
         }}>
           We&apos;re performing scheduled maintenance to improve your experience.
         </div>
-        <div style={{
-          background: COLORS.surface,
-          borderRadius: 12,
-          padding: 16,
-          border: `1px solid ${COLORS.border}`,
-          marginBottom: 20
-        }}>
+        {showCountdown && (
           <div style={{
-            color: COLORS.textMuted,
-            fontSize: 12,
-            marginBottom: 8,
-            fontWeight: 600,
-            textTransform: 'uppercase',
-            letterSpacing: 1
+            background: COLORS.surface,
+            borderRadius: 12,
+            padding: 16,
+            border: `1px solid ${COLORS.border}`,
+            marginBottom: 20
           }}>
-            Estimated Time Remaining
+            <div style={{
+              color: COLORS.textMuted,
+              fontSize: 12,
+              marginBottom: 8,
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: 1
+            }}>
+              Estimated Time Remaining
+            </div>
+            <div style={{
+              fontSize: 32,
+              fontWeight: 800,
+              color: COLORS.accent,
+              fontFamily: 'monospace'
+            }}>
+              {formatTime(timeLeft)}
+            </div>
           </div>
-          <div style={{
-            fontSize: 32,
-            fontWeight: 800,
-            color: COLORS.accent,
-            fontFamily: 'monospace'
-          }}>
-            {formatTime(timeLeft)}
-          </div>
-        </div>
+        )}
       </div>
       <RetryButton />
       <ContactInfo />
@@ -272,6 +274,7 @@ export const MaintenanceScreen = ({ minutesRemaining = 15 }) => {
 };
 
 MaintenanceScreen.propTypes = {
+  showCountdown: PropTypes.bool,
   minutesRemaining: PropTypes.number
 };
 
@@ -511,11 +514,12 @@ ErrorBoundary.propTypes = {
 };
 
 // App Error Handler Component
-export const AppErrorHandler = ({ children }) => {
+export const AppErrorHandler = ({ children, enableHealthCheck = false }) => {
   const [errorState, setErrorState] = useState({
     isOffline: false,
     isMaintenance: false,
-    isSlowConnection: false
+    isSlowConnection: false,
+    healthCheckFailures: 0 // Track consecutive failures
   });
 
   // Check online status
@@ -535,8 +539,10 @@ export const AppErrorHandler = ({ children }) => {
     };
   }, []);
 
-  // Health check ping
+  // Health check ping (only if enabled)
   useEffect(() => {
+    if (!enableHealthCheck) return;
+
     const pingHealth = async () => {
       try {
         const controller = new AbortController();
@@ -552,18 +558,36 @@ export const AppErrorHandler = ({ children }) => {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          setErrorState(prev => ({ ...prev, isMaintenance: true }));
+          setErrorState(prev => {
+            const newFailures = prev.healthCheckFailures + 1;
+            return {
+              ...prev,
+              healthCheckFailures: newFailures,
+              isMaintenance: newFailures >= 3 // Only show maintenance after 3 consecutive failures
+            };
+          });
         } else {
-          setErrorState(prev => ({ ...prev, isMaintenance: false }));
+          setErrorState(prev => ({
+            ...prev,
+            isMaintenance: false,
+            healthCheckFailures: 0 // Reset on success
+          }));
         }
       } catch (error) {
         if (error.name === 'AbortError') {
           // Slow connection detected
           setErrorState(prev => ({ ...prev, isSlowConnection: true }));
         } else {
-          // Network error, assume maintenance
+          // Network error, increment failure count
           console.error('Health check failed:', error.message);
-          setErrorState(prev => ({ ...prev, isMaintenance: true }));
+          setErrorState(prev => {
+            const newFailures = prev.healthCheckFailures + 1;
+            return {
+              ...prev,
+              healthCheckFailures: newFailures,
+              isMaintenance: newFailures >= 3 // Only show maintenance after 3 consecutive failures
+            };
+          });
         }
       }
     };
@@ -575,7 +599,7 @@ export const AppErrorHandler = ({ children }) => {
     const interval = setInterval(pingHealth, 60000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [enableHealthCheck]);
 
   // API response interceptor for slow connections
   useEffect(() => {
@@ -613,7 +637,7 @@ export const AppErrorHandler = ({ children }) => {
   }
 
   if (errorState.isMaintenance) {
-    return <MaintenanceScreen />;
+    return <MaintenanceScreen showCountdown={false} />;
   }
 
   if (errorState.isSlowConnection) {
@@ -625,5 +649,6 @@ export const AppErrorHandler = ({ children }) => {
 };
 
 AppErrorHandler.propTypes = {
-  children: PropTypes.node.isRequired
+  children: PropTypes.node.isRequired,
+  enableHealthCheck: PropTypes.bool
 };

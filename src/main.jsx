@@ -9,7 +9,7 @@ import { ErrorBoundary, AppErrorHandler } from './components/ErrorScreens.jsx'
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
-      <AppErrorHandler>
+      <AppErrorHandler enableHealthCheck={false}>
         <App />
       </AppErrorHandler>
     </ErrorBoundary>
