@@ -524,14 +524,27 @@ export const AppErrorHandler = ({ children, enableHealthCheck = false }) => {
 
   // Check online status
   useEffect(() => {
-    const handleOnline = () => setErrorState(prev => ({ ...prev, isOffline: false }));
-    const handleOffline = () => setErrorState(prev => ({ ...prev, isOffline: true }));
+    const handleOnline = () => setErrorState(prev => ({
+      ...prev,
+      isOffline: false,
+      isSlowConnection: false
+    }));
+
+    const handleOffline = () => setErrorState(prev => ({
+      ...prev,
+      isOffline: true,
+      isSlowConnection: false
+    }));
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
     // Initial check
-    setErrorState(prev => ({ ...prev, isOffline: !navigator.onLine }));
+    setErrorState(prev => ({
+      ...prev,
+      isOffline: !navigator.onLine,
+      isSlowConnection: false
+    }));
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -613,13 +626,18 @@ export const AppErrorHandler = ({ children, enableHealthCheck = false }) => {
       }, 8000); // 8 seconds
 
       try {
-        const response = await originalFetch(...args);
+        const [resource, config = {}] = args;
+        const response = await originalFetch(resource, {
+          ...config,
+          signal: controller.signal
+        });
+
         clearTimeout(timeoutId);
         setErrorState(prev => ({ ...prev, isSlowConnection: false }));
         return response;
       } catch (error) {
         clearTimeout(timeoutId);
-        if (error.name === 'AbortError') {
+        if (error.name === 'AbortError' && navigator.onLine) {
           setErrorState(prev => ({ ...prev, isSlowConnection: true }));
         }
         throw error;
