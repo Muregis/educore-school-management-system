@@ -8,6 +8,7 @@ import Table from "../components/Table";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { Pager, Msg, pager } from "../components/Helpers";
+import { csv } from "../lib/utils";
 
 const CATEGORIES = ["Languages", "Sciences", "Humanities", "Technical", "Creative", "Other"];
 
@@ -194,6 +195,24 @@ export default function SubjectsPage({ auth, toast }) {
     }
   };
 
+  // Export subjects to CSV
+  const exportCSV = () => {
+    csv("subjects.csv",
+      ["Name", "Code", "Category", "Description", "Class Levels", "Max Marks", "Pass Marks", "Status"],
+      filtered.map(s => [
+        s.name || "",
+        s.code || "",
+        s.category || "",
+        s.description || "",
+        s.classLevels || "",
+        s.maxMarks || "",
+        s.passMarks || "",
+        s.isActive ? "Active" : "Inactive"
+      ])
+    );
+    toast("Subjects CSV exported", "success");
+  };
+
   // Unique categories from data
   const categories = useMemo(() => [...new Set(subjects.map(s => s.category).filter(Boolean))], [subjects]);
 
@@ -204,6 +223,14 @@ export default function SubjectsPage({ auth, toast }) {
         <Badge text={`Total: ${subjects.length}`} tone="info" />
         <Badge text={`Active: ${subjects.filter(s => s.isActive).length}`} tone="success" />
         <Badge text={`Categories: ${categories.length}`} tone="warning" />
+      </div>
+
+      {/* Operations */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, marginBottom: 12 }}>
+        <h4 style={{ margin: "0 0 12px", color: C.text, fontSize: 16 }}>Operations</h4>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Btn variant="ghost" onClick={exportCSV}>📤 Export CSV</Btn>
+        </div>
       </div>
 
       {/* Actions & Filters */}

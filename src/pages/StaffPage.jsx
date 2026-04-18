@@ -6,6 +6,7 @@ import Table from "../components/Table";
 import Modal from "../components/Modal";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
+import { csv } from "../lib/utils";
 
 const DEPT_COLORS = {
   Academic:"#3b82f6", Administration:"#8b5cf6", Finance:"#22c55e",
@@ -120,6 +121,26 @@ export default function StaffPage({ auth, canEdit, toast }) {
     } catch (e) { toast(e.message, "error"); }
   };
 
+  const exportCSV = () => {
+    csv("staff.csv", 
+      ["Full Name", "Email", "Phone", "National ID", "Department", "Job Title", "Contract Type", "Start Date", "Salary", "Status", "Notes"],
+      filtered.map(s => [
+        s.full_name || "",
+        s.email || "",
+        s.phone || "",
+        s.national_id || "",
+        s.department || "",
+        s.job_title || "",
+        s.contract_type || "",
+        s.start_date || "",
+        s.salary || "",
+        s.status || "",
+        s.notes || ""
+      ])
+    );
+    toast("Staff CSV exported", "success");
+  };
+
   const byDept      = DEPARTMENTS.map(d => ({ dept:d, count:staff.filter(s=>s.department===d).length })).filter(d=>d.count>0);
   const totalPayroll = staff.reduce((sum,s) => sum+Number(s.salary||0), 0);
 
@@ -152,6 +173,14 @@ export default function StaffPage({ auth, canEdit, toast }) {
             {d.dept} ({d.count})
           </div>
         ))}
+      </div>
+
+      {/* Operations */}
+      <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:16, marginBottom:16 }}>
+        <h4 style={{ margin:"0 0 12px", color:C.text, fontSize:16 }}>Operations</h4>
+        <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+          <Btn variant="ghost" onClick={exportCSV}>📤 Export CSV</Btn>
+        </div>
       </div>
 
       {/* Toolbar */}

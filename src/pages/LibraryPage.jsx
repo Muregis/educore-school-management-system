@@ -8,6 +8,7 @@ import Modal from "../components/Modal";
 import { Pager, Msg } from "../components/Helpers";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
+import { csv } from "../lib/utils";
 
 const PAGE_SIZE = 12;
 const pager = (arr, p) => ({ pages: Math.max(1, Math.ceil(arr.length / PAGE_SIZE)), rows: arr.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE) });
@@ -127,6 +128,41 @@ export default function LibraryPage({ auth, students = [], teachers = [] }) {
     }
   };
 
+  // Export functions
+  const exportBooks = () => {
+    csv("library_books.csv",
+      ["Title", "Author", "Category", "ISBN", "Total Quantity", "Available", "Checked Out"],
+      filteredBooks.map(b => [
+        b.title || "",
+        b.author || "",
+        b.category || "",
+        b.isbn || "",
+        b.quantity_total || "",
+        b.quantity_available || "",
+        (Number(b.quantity_total) - Number(b.quantity_available)) || ""
+      ])
+    );
+    toast("Books CSV exported", "success");
+  };
+
+  const exportBorrows = () => {
+    const data = tab === "borrows" ? borrows : borrows.filter(b => b.status === "borrowed" && b.due_date < today());
+    csv("library_borrows.csv",
+      ["Book Title", "Borrower", "Borrower Type", "Borrow Date", "Due Date", "Status", "Days Out", "Notes"],
+      data.map(b => [
+        b.book_title || "",
+        borrowerName(b),
+        b.borrower_type || "",
+        b.borrow_date || "",
+        b.due_date || "",
+        b.status || "",
+        b.status === "borrowed" ? daysOut(b.borrow_date) : "",
+        b.notes || ""
+      ])
+    );
+    toast("Borrows CSV exported", "success");
+  };
+
   const borrowerName = (b) => b.borrower_name || `#${b.borrower_id}`;
   const daysOut      = (borrow_date) => {
     const diff = Math.floor((new Date() - new Date(borrow_date)) / 86400000);
@@ -165,6 +201,15 @@ export default function LibraryPage({ auth, students = [], teachers = [] }) {
         <div style={{ flex: 1 }} />
         {isLibrarian && tab === "books" && <Btn onClick={() => { setEditBook(null); setFb(BLANK_BOOK); setErr(""); setShowBook(true); }}>+ Add Book</Btn>}
         {isLibrarian && tab === "borrows" && <Btn onClick={() => { setFw(BLANK_BORROW); setErr(""); setShowBorrow(true); }}>+ Issue Book</Btn>}
+      </div>
+
+      {/* Operations */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
+        <h4 style={{ margin: "0 0 12px", color: C.text, fontSize: 16 }}>Operations</h4>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {tab === "books" && <Btn variant="ghost" onClick={exportBooks}>📤 Export Books CSV</Btn>}
+          {(tab === "borrows" || tab === "overdue") && <Btn variant="ghost" onClick={exportBorrows}>📤 Export {tab === "overdue" ? "Overdue" : "Borrows"} CSV</Btn>}
+        </div>
       </div>
 
       {loading && <Msg text="Loading library..." />}
