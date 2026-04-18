@@ -348,7 +348,7 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       return res.status(400).json({ message: "admissionNumber and password are required" });
     }
 
-    const trimmedAdmissionNumber = admissionNumber.trim();
+    const trimmedAdmissionNumber = admissionNumber.trim().toLowerCase();
     const normalizedSchoolId = schoolId != null && schoolId !== "" ? Number(schoolId) : null;
     
     // Validate school identification is provided

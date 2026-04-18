@@ -22,7 +22,7 @@ const router = Router();
 router.use(authRequired);
 
 function normalizeAdmissionNumber(value) {
-  return String(value ?? "").trim();
+  return String(value ?? "").trim().toLowerCase();
 }
 
 function normalizePhoneNumber(value) {
@@ -156,6 +156,17 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
         // Class lookup failed, but we can still save with null class_id
         console.log('[DEBUG] Class lookup failed for:', className, '- saving with null class_id');
       }
+    }
+
+    const { data: existing } = await supabase
+      .from('students')
+      .select('student_id')
+      .eq('school_id', schoolId)
+      .ilike('admission_number', normalizedAdmissionNumber)
+      .eq('is_deleted', false)
+      .limit(1);
+    if (existing?.length) {
+      return res.status(409).json({ message: "Admission number already exists" });
     }
 
     console.log('[DEBUG] Inserting student with class_name:', resolvedClassName, 'parent_name:', parentName, 'parent_phone:', parentPhone);

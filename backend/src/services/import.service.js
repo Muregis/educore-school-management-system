@@ -4,7 +4,7 @@ import { LedgerService } from "./ledger.service.js";
 import bcrypt from "bcryptjs";
 
 function normalizeAdmissionNumber(value) {
-  return String(value ?? "").trim();
+  return String(value ?? "").trim().toLowerCase();
 }
 
 function normalizeDateInput(value) {
@@ -112,9 +112,9 @@ export class ImportService {
           const normalizedAdmissionNumber = normalizeAdmissionNumber(student.admission_number);
           const normalizedDateOfBirth = normalizeDateInput(student.date_of_birth);
           const normalizedAdmissionDate = normalizeDateInput(student.admission_date) || new Date().toISOString().slice(0,10);
-          const { rows } = await pgPool.query(
+const { rows } = await pgPool.query(
             `SELECT student_id FROM students 
-             WHERE admission_number = $1 AND school_id = $2 AND is_deleted = false`,
+             WHERE LOWER(admission_number) = LOWER($1) AND school_id = $2 AND is_deleted = false`,
             [normalizedAdmissionNumber, schoolId]
           );
           const [existing] = rows;
