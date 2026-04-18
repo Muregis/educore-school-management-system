@@ -3,6 +3,37 @@ import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import { LedgerService } from "./ledger.service.js";
 import bcrypt from "bcryptjs";
 
+function normalizeAdmissionNumber(value) {
+  return String(value ?? "").trim();
+}
+
+function normalizeDateInput(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  const match = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (!match) {
+    throw new Error(`Invalid date format: ${raw}. Use YYYY-MM-DD or DD/MM/YYYY.`);
+  }
+
+  const [, dayStr, monthStr, yearStr] = match;
+  const day = Number(dayStr);
+  const month = Number(monthStr);
+  const year = Number(yearStr);
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    candidate.getUTCFullYear() !== year ||
+    candidate.getUTCMonth() !== month - 1 ||
+    candidate.getUTCDate() !== day
+  ) {
+    throw new Error(`Invalid date value: ${raw}`);
+  }
+
+  return `${yearStr}-${monthStr.padStart(2, "0")}-${dayStr.padStart(2, "0")}`;
+}
+
 // Student CSV Import Service
 export class ImportService {
   // Parse CSV buffer into array of objects
@@ -36,6 +67,7 @@ export class ImportService {
       headers.forEach((header, index) => {
         student[header] = values[index] || null;
       });
+      student.admission_number = normalizeAdmissionNumber(student.admission_number);
 
       // Validate required fields
       if (!student.admission_number || !student.first_name || !student.last_name || !student.gender) {
@@ -77,17 +109,20 @@ export class ImportService {
       for (const student of students) {
         try {
           // Check for duplicate admission number
+          const normalizedAdmissionNumber = normalizeAdmissionNumber(student.admission_number);
+          const normalizedDateOfBirth = normalizeDateInput(student.date_of_birth);
+          const normalizedAdmissionDate = normalizeDateInput(student.admission_date) || new Date().toISOString().slice(0,10);
           const { rows } = await pgPool.query(
             `SELECT student_id FROM students 
              WHERE admission_number = $1 AND school_id = $2 AND is_deleted = false`,
-            [student.admission_number, schoolId]
+            [normalizedAdmissionNumber, schoolId]
           );
           const [existing] = rows;
 
           if (existing) {
-            results.duplicates.push({
+              results.duplicates.push({
               row: student.row,
-              admissionNumber: student.admission_number,
+              admissionNumber: normalizedAdmissionNumber,
               message: 'Admission number already exists'
             });
             continue;
@@ -124,12 +159,12 @@ export class ImportService {
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
              RETURNING student_id`,
             [
-              schoolId, classId, className, student.admission_number, 
+              schoolId, classId, className, normalizedAdmissionNumber, 
               student.first_name, student.last_name, student.gender.toLowerCase(),
-              student.date_of_birth || null, student.phone || null, 
+              normalizedDateOfBirth, student.phone || null, 
               student.email || null, student.parent_name || null, 
               student.parent_phone || null,
-              student.admission_date || new Date().toISOString().slice(0,10), 
+              normalizedAdmissionDate, 
               'active'
             ]
           );
@@ -138,14 +173,14 @@ export class ImportService {
 
           // Auto-create student portal account
           try {
-            const hash = await bcrypt.hash(student.admission_number, 10);
+            const hash = await bcrypt.hash(normalizedAdmissionNumber, 10);
             await pgPool.query(
               `INSERT INTO users 
                (school_id, student_id, full_name, email, password_hash, role, status)
                VALUES ($1, $2, $3, $4, $5, 'student', 'active')
                ON CONFLICT (school_id, student_id) DO NOTHING`,
               [schoolId, studentId, `${student.first_name} ${student.last_name}`, 
-               student.admission_number, hash]
+               normalizedAdmissionNumber, hash]
             );
           } catch (accountError) {
             // Ignore if account already exists
@@ -156,21 +191,21 @@ export class ImportService {
           await logAuditEvent(req, AUDIT_ACTIONS.STUDENT_UPDATE, {
             entityId: studentId,
             entityType: 'student',
-            description: `Student imported via CSV: ${student.first_name} ${student.last_name} (${student.admission_number})`,
-            newValues: { admissionNumber: student.admission_number, firstName: student.first_name, lastName: student.last_name }
+            description: `Student imported via CSV: ${student.first_name} ${student.last_name} (${normalizedAdmissionNumber})`,
+            newValues: { admissionNumber: normalizedAdmissionNumber, firstName: student.first_name, lastName: student.last_name }
           });
 
           results.imported.push({
             row: student.row,
             studentId,
-            admissionNumber: student.admission_number,
+            admissionNumber: normalizedAdmissionNumber,
             name: `${student.first_name} ${student.last_name}`
           });
 
         } catch (error) {
           results.errors.push({
             row: student.row,
-            admissionNumber: student.admission_number,
+            admissionNumber: normalizeAdmissionNumber(student.admission_number),
             message: error.message
           });
         }

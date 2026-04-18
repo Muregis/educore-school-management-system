@@ -8,6 +8,35 @@ import { apiFetch } from "../lib/api";
 import { Msg } from "../components/Helpers";
 import { ALL_CLASSES } from "../lib/constants";
 
+function normalizeAdmission(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function normalizeDate(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  const match = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (!match) return raw;
+
+  const [, dayStr, monthStr, yearStr] = match;
+  const day = Number(dayStr);
+  const month = Number(monthStr);
+  const year = Number(yearStr);
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    candidate.getUTCFullYear() !== year ||
+    candidate.getUTCMonth() !== month - 1 ||
+    candidate.getUTCDate() !== day
+  ) {
+    return raw;
+  }
+
+  return `${yearStr}-${monthStr.padStart(2, "0")}-${dayStr.padStart(2, "0")}`;
+}
+
 export default function BulkImportPage({ auth, students, setStudents, toast, payments, feeStructures }) {
   const [activeTab, setActiveTab] = useState("import");
   const [csvContent, setCsvContent] = useState("");
@@ -62,18 +91,33 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
         return;
       }
 
+      const existingAdmissions = new Set(
+        students.map(s => normalizeAdmission(s.admission || s.admission_number))
+      );
+      const fileAdmissions = new Set();
       const rows = [];
       for (let i = 1; i < lines.length; i++) {
         const values = lines[i].split(",").map(v => v.trim());
         if (values.length === headers.length) {
           const row = {};
           headers.forEach((h, idx) => row[h] = values[idx]);
+          row.admission_number = String(row.admission_number || "").trim();
+          row.date_of_birth = normalizeDate(row.date_of_birth);
+          row.admission_date = normalizeDate(row.admission_date);
+          const normalizedAdmission = normalizeAdmission(row.admission_number);
           
           // Validate required fields
           row._valid = row.first_name && row.last_name && row.admission_number;
-          row._existing = students.find(s => 
-            (s.admission || s.admission_number) === row.admission_number
+          row._existing = normalizedAdmission ? existingAdmissions.has(normalizedAdmission) : false;
+          row._duplicateInFile = normalizedAdmission ? fileAdmissions.has(normalizedAdmission) : false;
+          row._invalidDate = Boolean(
+            row.date_of_birth && !/^\d{4}-\d{2}-\d{2}$/.test(row.date_of_birth)
           );
+          row._valid = Boolean(row._valid && !row._duplicateInFile && !row._invalidDate);
+
+          if (normalizedAdmission) {
+            fileAdmissions.add(normalizedAdmission);
+          }
           
           rows.push(row);
         }
@@ -110,7 +154,7 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
             className: row.class_name || "Grade 1",
             parentName: row.parent_name || null,
             parentPhone: row.parent_phone || null,
-            dateOfBirth: row.date_of_birth || null,
+            dateOfBirth: normalizeDate(row.date_of_birth),
             nemisNumber: row.nemis_number || null,
             status: row.status || "active",
           },
@@ -346,7 +390,13 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
                         <td style={{ padding: 8 }}>{row.first_name} {row.last_name}</td>
                         <td style={{ padding: 8 }}><code>{row.admission_number}</code></td>
                         <td style={{ padding: 8 }}>{row.class_name || "-"}</td>
-                        <td style={{ padding: 8 }}>{row.parent_name || "-"}</td>
+                        <td style={{ padding: 8 }}>
+                          {row._duplicateInFile
+                            ? "Duplicate in file"
+                            : row._invalidDate
+                              ? `Bad date: ${row.date_of_birth}`
+                              : row.parent_name || "-"}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

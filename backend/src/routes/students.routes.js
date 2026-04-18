@@ -21,6 +21,47 @@ const upload = multer({
 const router = Router();
 router.use(authRequired);
 
+function normalizeAdmissionNumber(value) {
+  return String(value ?? "").trim();
+}
+
+function normalizePhoneNumber(value) {
+  const trimmed = String(value ?? "").trim();
+  return trimmed || null;
+}
+
+function normalizeDateInput(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+
+  // Accept ISO dates directly.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
+  }
+
+  // Accept common spreadsheet exports like 14/09/2010 or 14-09-2010.
+  const match = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (match) {
+    const [, dayStr, monthStr, yearStr] = match;
+    const day = Number(dayStr);
+    const month = Number(monthStr);
+    const year = Number(yearStr);
+    const candidate = new Date(Date.UTC(year, month - 1, day));
+
+    if (
+      candidate.getUTCFullYear() === year &&
+      candidate.getUTCMonth() === month - 1 &&
+      candidate.getUTCDate() === day
+    ) {
+      return `${yearStr}-${monthStr.padStart(2, "0")}-${dayStr.padStart(2, "0")}`;
+    }
+  }
+
+  throw Object.assign(new Error(`Invalid date format: ${raw}. Use YYYY-MM-DD or DD/MM/YYYY.`), {
+    statusCode: 400,
+  });
+}
+
 // ─── GET / — list all students for this school ────────────────────────────────
 router.get("/", async (req, res, next) => {
   try {
@@ -76,18 +117,24 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
     
     console.log('[DEBUG] POST /students req.body:', req.body);
 
-    if (!admissionNumber || !firstName || !lastName || !gender)
+    const normalizedAdmissionNumber = normalizeAdmissionNumber(admissionNumber);
+    const normalizedDateOfBirth = normalizeDateInput(dateOfBirth);
+    const normalizedAdmissionDate = normalizeDateInput(admissionDate) || new Date().toISOString().slice(0, 10);
+    const normalizedPhone = normalizePhoneNumber(phone);
+    const normalizedParentPhone = normalizePhoneNumber(parentPhone);
+
+    if (!normalizedAdmissionNumber || !firstName || !lastName || !gender)
       return res.status(400).json({ message: "admissionNumber, firstName, lastName, gender are required" });
 
     // Kenyan phone number validation (supports: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, +2541xxxxxxxx)
     const phoneRegex = /^(\+?254|0)[17][0-9]{8}$/;
-    if (phone && !phoneRegex.test(phone)) {
+    if (normalizedPhone && !phoneRegex.test(normalizedPhone)) {
       return res.status(400).json({ 
         message: "Invalid Kenyan phone number format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx" 
       });
     }
     
-    if (parentPhone && !phoneRegex.test(parentPhone)) {
+    if (normalizedParentPhone && !phoneRegex.test(normalizedParentPhone)) {
       return res.status(400).json({ 
         message: "Invalid Kenyan parent phone number format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx" 
       });
@@ -119,17 +166,17 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
         school_id: schoolId,
         class_id: resolvedClassId,
         class_name: resolvedClassName,
-        admission_number: admissionNumber,
+        admission_number: normalizedAdmissionNumber,
         first_name: firstName,
         last_name: lastName,
         gender,
-        date_of_birth: dateOfBirth,
+        date_of_birth: normalizedDateOfBirth,
         nemis_number: nemisNumber,
-        phone,
+        phone: normalizedPhone,
         email,
         address,
         parent_name: parentName,
-        parent_phone: parentPhone,
+        parent_phone: normalizedParentPhone,
         blood_group: bloodGroup,
         allergies: allergies,
         medical_conditions: medicalConditions,
@@ -137,7 +184,7 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
         emergency_contact_phone: emergencyContactPhone,
         emergency_contact_relationship: emergencyContactRelationship,
         photo_url: photoUrl,
-        admission_date: admissionDate || new Date().toISOString().slice(0, 10),
+        admission_date: normalizedAdmissionDate,
         status,
       })
       .select()
@@ -149,7 +196,7 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
 
     // Auto-create portal accounts (login: admissionNumber, pass: admissionNumber)
     try {
-      const hash = await bcrypt.hash(admissionNumber, 10);
+      const hash = await bcrypt.hash(normalizedAdmissionNumber, 10);
       const parentDisplayName = parentName?.trim() || `Parent of ${firstName} ${lastName}`;
       // OLD: await supabase
       // OLD:   .from('users')
@@ -172,7 +219,7 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
             school_id: schoolId,
             student_id: studentId,
             full_name: `${firstName} ${lastName}`,
-            email: `${String(admissionNumber).trim().toLowerCase()}.student@portal`,
+            email: `${normalizedAdmissionNumber.toLowerCase()}.student@portal`,
             password_hash: hash,
             role: 'student',
             status: 'active',
@@ -181,7 +228,7 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
             school_id: schoolId,
             student_id: studentId,
             full_name: parentDisplayName,
-            email: `${String(admissionNumber).trim().toLowerCase()}.parent@portal`,
+            email: `${normalizedAdmissionNumber.toLowerCase()}.parent@portal`,
             password_hash: hash,
             role: 'parent',
             status: 'active',
@@ -204,6 +251,9 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
     logActivity(req, { action: "student.create", entity: "student", entityId: studentId, description: `Student admitted: ${firstName} ${lastName}` });
     res.status(201).json(newRow);
   } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ message: err.message });
+    }
     if (err.code === "23505" || err.code === "ER_DUP_ENTRY")
       return res.status(409).json({ message: "Admission number already exists" });
     next(err);
@@ -220,6 +270,10 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
       bloodGroup, allergies, medicalConditions, emergencyContactName, emergencyContactPhone, emergencyContactRelationship,
       email, address, photoUrl, status
     } = req.body;
+
+    const normalizedDateOfBirth = normalizeDateInput(dateOfBirth);
+    const normalizedPhone = normalizePhoneNumber(phone);
+    const normalizedParentPhone = normalizePhoneNumber(parentPhone);
 
     let resolvedClassId = classId || null;
     if (className && !classId) {
@@ -245,13 +299,13 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
         gender,
         class_id: resolvedClassId,
         class_name: className || null,
-        date_of_birth: dateOfBirth || null,
+        date_of_birth: normalizedDateOfBirth,
         nemis_number: nemisNumber || null,
-        phone: phone || null,
+        phone: normalizedPhone,
         email: email || null,
         address: address || null,
         parent_name: parentName || null,
-        parent_phone: parentPhone || null,
+        parent_phone: normalizedParentPhone,
         blood_group: bloodGroup || null,
         allergies: allergies || null,
         medical_conditions: medicalConditions || null,
@@ -272,7 +326,12 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
 
     logActivity(req, { action: "student.update", entity: "student", entityId: req.params.id, description: `Student updated: ${firstName} ${lastName}` });
     res.json({ updated: true });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ message: err.message });
+    }
+    next(err);
+  }
 });
 
 // ─── DELETE /:id — soft delete student ───────────────────────────────────────
