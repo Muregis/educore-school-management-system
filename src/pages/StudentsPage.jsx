@@ -10,7 +10,7 @@ import QRScanner from "../components/QRScanner";
 import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
-import { API_BASE } from "../lib/api";
+import { API_BASE, apiFetch } from "../lib/api";
 import { parseStudentQrContent } from "../lib/qr";
 import { Pager, Msg } from "../components/Helpers";
 import { csv, pager } from "../lib/utils";
