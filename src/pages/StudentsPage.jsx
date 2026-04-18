@@ -10,7 +10,7 @@ import QRScanner from "../components/QRScanner";
 import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
-import { apiFetch } from "../lib/api";
+import { API_BASE } from "../lib/api";
 import { parseStudentQrContent } from "../lib/qr";
 import { Pager, Msg } from "../components/Helpers";
 import { csv, pager } from "../lib/utils";
@@ -141,7 +141,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       formData.append('file', selectedFile);
       formData.append('studentId', studentId);
 
-      const response = await fetch('/api/students/upload-photo', {
+      const response = await fetch(`${API_BASE}/students/upload-photo`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${auth?.token}`,
@@ -183,6 +183,8 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   };
 
   const handleQRScan = async (qrText) => {
+    try {
+      const parsedQr = parseStudentQrContent(qrText);
       if (!parsedQr?.studentId) {
         toast("Invalid QR code", "error");
         return;
