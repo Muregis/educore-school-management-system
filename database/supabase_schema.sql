@@ -124,12 +124,33 @@ CREATE TABLE IF NOT EXISTS students (
   UNIQUE (school_id, admission_number)
 );
 
+-- Backfill student columns for databases where `students` already existed before
+-- newer fields were added. `CREATE TABLE IF NOT EXISTS` will not add missing columns.
+ALTER TABLE students
+  ADD COLUMN IF NOT EXISTS class_id BIGINT NULL REFERENCES classes(class_id),
+  ADD COLUMN IF NOT EXISTS class_name VARCHAR(80) NULL,
+  ADD COLUMN IF NOT EXISTS date_of_birth DATE NULL,
+  ADD COLUMN IF NOT EXISTS nemis_number VARCHAR(40) NULL,
+  ADD COLUMN IF NOT EXISTS phone VARCHAR(40) NULL,
+  ADD COLUMN IF NOT EXISTS email VARCHAR(160) NULL,
+  ADD COLUMN IF NOT EXISTS address VARCHAR(255) NULL,
+  ADD COLUMN IF NOT EXISTS blood_group VARCHAR(10) NULL,
+  ADD COLUMN IF NOT EXISTS allergies TEXT NULL,
+  ADD COLUMN IF NOT EXISTS medical_conditions TEXT NULL,
+  ADD COLUMN IF NOT EXISTS emergency_contact_name VARCHAR(160) NULL,
+  ADD COLUMN IF NOT EXISTS emergency_contact_phone VARCHAR(40) NULL,
+  ADD COLUMN IF NOT EXISTS emergency_contact_relationship VARCHAR(50) NULL,
+  ADD COLUMN IF NOT EXISTS admission_date DATE NULL,
+  ADD COLUMN IF NOT EXISTS photo_url TEXT NULL,
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW();
+
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_students_school_class ON students(school_id, class_id);
 CREATE INDEX IF NOT EXISTS idx_students_school_status ON students(school_id, status);
 CREATE INDEX IF NOT EXISTS idx_students_parent_phone ON students(school_id, parent_phone);
 CREATE INDEX IF NOT EXISTS idx_students_deleted ON students(is_deleted);
 CREATE INDEX IF NOT EXISTS idx_students_class_name ON students(school_id, class_name);
+CREATE INDEX IF NOT EXISTS idx_students_photo_url ON students(photo_url) WHERE photo_url IS NOT NULL;
 
 -- SUBJECTS TABLE - School curriculum management
 CREATE TABLE IF NOT EXISTS subjects (
