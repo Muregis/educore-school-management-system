@@ -296,8 +296,6 @@ export class TermTransitionService {
    * Close an academic term
    */
   static async closeTerm(schoolId, termId, userId) {
-    const client = await supabase.rpc('begin_transaction');
-
     try {
       // 1. Validate term can be closed
       const eligibility = await TermService.canCloseTerm(termId);
@@ -317,7 +315,10 @@ export class TermTransitionService {
       // 3. Calculate and create carry-forward entries
       await this.createCarryForwards(schoolId, termId, userId);
 
-      // 4. Record transition
+      // 4. Promote students to next class
+      await this.promoteStudents(schoolId, termId, userId);
+
+      // 5. Record transition
       await supabase
         .from('term_transitions')
         .insert({
@@ -335,6 +336,113 @@ export class TermTransitionService {
       return { success: true, termId };
     } catch (error) {
       console.error('Error closing term:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Promote students to next class based on promotion rules
+   */
+  static async promoteStudents(schoolId, termId, userId) {
+    try {
+      // Get current term
+      const { data: currentTerm } = await supabase
+        .from('terms')
+        .select('term_id, term_name, academic_year_id')
+        .eq('term_id', termId)
+        .single();
+
+      if (!currentTerm) throw new Error('Term not found');
+
+      // Get active classes for this school
+      const { data: classes } = await supabase
+        .from('classes')
+        .select('class_id, class_name, next_class_name')
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false)
+        .eq('status', 'active')
+        .order('class_order');
+
+      // Get promotion rules
+      const { data: rules } = await supabase
+        .from('promotion_rules')
+        .select('*')
+        .eq('school_id', schoolId)
+        .eq('is_active', true)
+        .eq('is_deleted', false);
+
+      // Get students with their results for the term
+      const { data: students } = await supabase
+        .from('students')
+        .select('student_id, first_name, last_name, class_id, class_name, status')
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false)
+        .eq('status', 'active');
+
+      const promoted = [];
+      const classMap = new Map((classes || []).map(c => [c.class_name, c]));
+      const ruleMap = new Map((rules || []).map(r => [r.from_class_name, r]));
+
+      for (const student of students || []) {
+        const currentClass = classMap.get(student.class_name);
+        const nextClassName = currentClass?.next_class_name;
+
+        if (!nextClassName) {
+          // No next class - student graduates or stays (handled elsewhere)
+          continue;
+        }
+
+        const nextClass = classMap.get(nextClassName);
+        if (!nextClass) {
+          console.log(`Next class "${nextClassName}" not found for promotion`);
+          continue;
+        }
+
+        // Check promotion rule
+        const rule = ruleMap.get(student.class_name);
+        const shouldAutoPromote = rule?.auto_promote ?? true;
+
+        if (shouldAutoPromote) {
+          // Update student to next class
+          const { error: updateError } = await supabase
+            .from('students')
+            .update({
+              class_id: nextClass.class_id,
+              class_name: nextClassName,
+              updated_at: new Date()
+            })
+            .eq('student_id', student.student_id);
+
+          if (updateError) {
+            console.error('Error promoting student:', updateError);
+            continue;
+          }
+
+          // Record promotion decision
+          await supabase
+            .from('promotion_decisions')
+            .insert({
+              student_id: student.student_id,
+              academic_year_id: currentTerm.academic_year_id,
+              from_class_id: student.class_id,
+              to_class_id: nextClass.class_id,
+              decision: 'promoted',
+              decision_date: new Date().toISOString().split('T')[0],
+              decided_by: userId
+            });
+
+          promoted.push({
+            student_id: student.student_id,
+            from_class: student.class_name,
+            to_class: nextClassName
+          });
+        }
+      }
+
+      console.log(`Promoted ${promoted.length} students`);
+      return { promoted };
+    } catch (error) {
+      console.error('Error promoting students:', error);
       throw error;
     }
   }

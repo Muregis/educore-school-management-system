@@ -718,3 +718,99 @@ export function useFeatureFlags() {
 
   return flags;
 }
+
+// =====================================================
+// CLASS PROMOTION CHAIN MANAGER
+// =====================================================
+
+export function ClassPromotionChain({ auth }) {
+  const [classes, setClasses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(null);
+
+  useEffect(() => {
+    loadClasses();
+  }, []);
+
+  const loadClasses = async () => {
+    try {
+      setLoading(true);
+      const res = await apiFetch('/api/classes/promotion-chain');
+      setClasses(res.data || res || []);
+    } catch (err) {
+      console.error('Error loading classes:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateNextClass = async (classId, nextClassName) => {
+    setSaving(classId);
+    try {
+      await apiFetch(`/api/classes/${classId}/promotion`, {
+        method: 'PUT',
+        body: { nextClassName }
+      });
+      loadClasses();
+    } catch (err) {
+      console.error('Error updating:', err);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const availableClasses = classes.map(c => c.class_name);
+
+  if (loading) return <div className="loading">Loading promotion chain...</div>;
+
+  return (
+    <div className="promotion-chain-manager">
+      <div className="page-header">
+        <h2>Class Promotion Chain</h2>
+        <p>Set up which class students promote to next term</p>
+      </div>
+
+      <div className="promotion-chain-grid">
+        {classes.map(cls => (
+          <div key={cls.class_id} className="promotion-chain-card">
+            <div className="current-class">
+              <strong>{cls.class_name}</strong>
+            </div>
+            <div className="promotion-arrow">↓</div>
+            <select 
+              value={cls.next_class_name || ""}
+              onChange={e => updateNextClass(cls.class_id, e.target.value)}
+              disabled={saving === cls.class_id}
+              style={inputStyle}
+            >
+              <option value="">No promotion (final class)</option>
+              {availableClasses
+                .filter(c => c !== cls.class_name)
+                .map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+            </select>
+          </div>
+        ))}
+      </div>
+
+      <div className="promotion-flow-preview">
+        <h3>Promotion Flow Preview</h3>
+        <div className="flow-chart">
+          {classes.filter(c => c.next_class_name).map((cls, i) => (
+            <React.Fragment key={cls.class_id}>
+              <span className="flow-class">{cls.class_name}</span>
+              <span className="flow-arrow">→</span>
+              <span className="flow-next">{cls.next_class_name}</span>
+              {i < classes.filter(c => c.next_class_name).length - 1 && <br />}
+            </React.Fragment>
+          ))}
+          {classes.every(c => !c.next_class_name) && (
+            <p className="no-flow">No promotion chain configured</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+}

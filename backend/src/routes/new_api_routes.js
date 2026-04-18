@@ -360,6 +360,54 @@ router.post("/promotion/rules", requirePermission("promotion.approve"), async (r
   }
 });
 
+// GET /api/classes/promotion-chain - Get all classes with their promotion chain
+router.get("/classes/promotion-chain", requirePermission("academic.view"), async (req, res) => {
+  try {
+    const { schoolId } = req.user;
+
+    const { data: classes, error } = await supabase
+      .from('classes')
+      .select('class_id, class_name, next_class_name, class_order, status')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .order('class_order');
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) {
+    console.error('Error fetching promotion chain:', err);
+    res.status(500).json({ message: "Failed to fetch promotion chain" });
+  }
+});
+
+// PUT /api/classes/:id/promotion - Set next class for promotion
+router.put("/classes/:id/promotion", requirePermission("academic.manage"), async (req, res) => {
+  try {
+    const { schoolId } = req.user;
+    const classId = req.params.id;
+    const { nextClassName, classOrder } = req.body;
+
+    const updateData = {};
+    if (nextClassName !== undefined) updateData.next_class_name = nextClassName;
+    if (classOrder !== undefined) updateData.class_order = classOrder;
+    updateData.updated_at = new Date();
+
+    const { data, error } = await supabase
+      .from('classes')
+      .update(updateData)
+      .eq('class_id', classId)
+      .eq('school_id', schoolId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error('Error updating class promotion:', err);
+    res.status(500).json({ message: "Failed to update class promotion" });
+  }
+});
+
 // =====================================================
 // PERMISSIONS ROUTES
 // =====================================================
