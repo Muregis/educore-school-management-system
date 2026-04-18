@@ -61,12 +61,12 @@ router.get("/", async (req, res, next) => {
     if (admErr) throw admErr;
 
     const counts = {
-      totalStudents: totalStudents || 0,
-      totalTeachers: totalTeachers || 0,
-      portalUsers: portalUsers || 0,
-      totalCollected,
-      totalPending,
-      pendingAdmissions: pendingAdmissions || 0
+      totalStudents: Number(totalStudents) || 0,
+      totalTeachers: Number(totalTeachers) || 0,
+      portalUsers: Number(portalUsers) || 0,
+      totalCollected: Number(totalCollected) || 0,
+      totalPending: Number(totalPending) || 0,
+      pendingAdmissions: Number(pendingAdmissions) || 0
     };
 
     // Monthly collections - last 6 months (manual grouping)

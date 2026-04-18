@@ -373,7 +373,7 @@ router.get("/classes/promotion-chain", requirePermission("academic.view"), async
       .order('class_order');
 
     if (error) throw error;
-    res.json(data || []);
+    res.json({ data: classes || [] });
   } catch (err) {
     console.error('Error fetching promotion chain:', err);
     res.status(500).json({ message: "Failed to fetch promotion chain" });

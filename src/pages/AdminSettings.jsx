@@ -51,6 +51,7 @@ const Icon = ({ name, size = 16, color = "currentColor" }) => {
     user:     <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
     key:      <><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></>,
     toggle:   <><rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="16" cy="12" r="3"/></>,
+    "arrow-up": <><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -340,6 +341,94 @@ const BackupsTab = ({ auth }) => {
 };
 BackupsTab.propTypes = { auth: PropTypes.object };
 
+// ─── PROMOTION CHAIN TAB ─────────────────────────────────────────────────
+const PromotionChainTab = ({ auth }) => {
+  const [classes, setClasses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(null);
+
+  useEffect(() => { loadClasses(); }, []);
+
+  const loadClasses = async () => {
+    try {
+      setLoading(true);
+      const res = await apiFetch('/api/classes/promotion-chain', { token: auth.token });
+      setClasses(res.data || res || []);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  };
+
+  const updateNextClass = async (classId, nextClassName) => {
+    setSaving(classId);
+    try {
+      await apiFetch(`/api/classes/${classId}/promotion`, {
+        method: 'PUT',
+        token: auth.token,
+        body: { nextClassName }
+      });
+      loadClasses();
+    } catch (err) { console.error(err); }
+    finally { setSaving(null); }
+  };
+
+  const availableClasses = classes.map(c => c.class_name);
+
+  if (loading) return <div>Loading...</div>;
+
+  return (
+    <div style={{ display: "grid", gap: 16 }}>
+      <p style={{ color: C.textSub, fontSize: 13 }}>
+        Set which class students will be promoted to when the term ends. Students will automatically move to their next class when you close the term.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12 }}>
+        {classes.map(cls => (
+          <div key={cls.class_id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8, color: C.text }}>{cls.class_name}</div>
+            <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>Promotes to:</div>
+            <select
+              value={cls.next_class_name || ""}
+              onChange={e => updateNextClass(cls.class_id, e.target.value)}
+              disabled={saving === cls.class_id}
+              style={{
+                width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`,
+                background: C.bg, color: C.text, fontSize: 13,
+              }}
+            >
+              <option value="">No promotion (final class)</option>
+              {availableClasses.filter(c => c !== cls.class_name).map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <h4 style={{ color: C.text, marginBottom: 12 }}>Promotion Flow</h4>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          {classes.filter(c => c.next_class_name).map((cls, i) => (
+            <React.Fragment key={cls.class_id}>
+              <span style={{ background: C.accentGlow, color: C.accent, padding: "6px 12px", borderRadius: 8, fontSize: 13 }}>
+                {cls.class_name}
+              </span>
+              <span style={{ color: C.textMuted }}>→</span>
+              <span style={{ background: C.tealDim, color: C.teal, padding: "6px 12px", borderRadius: 8, fontSize: 13 }}>
+                {cls.next_class_name}
+              </span>
+              {i < classes.filter(c => c.next_class_name).length - 1 && <span style={{ color: C.textMuted }}>&nbsp;→&nbsp;</span>}
+            </React.Fragment>
+          ))}
+          {classes.every(c => !c.next_class_name) && (
+            <p style={{ color: C.textMuted, fontSize: 13 }}>No promotion chain configured yet</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+PromotionChainTab.propTypes = { auth: PropTypes.object };
+
 const TABS = [
   { id: "school",        label: "School Info",    icon: "school" },
   { id: "users",         label: "User Accounts",  icon: "users" },
@@ -349,6 +438,7 @@ const TABS = [
   { id: "activity",      label: "Activity Logs",  icon: "activity" },
   { id: "backups",       label: "DB Backups",     icon: "database" },
   { id: "integrations",  label: "Integrations",   icon: "key" },
+  { id: "promotion",    label: "Promotion Chain", icon: "arrow-up" },
 ];
 
 // ─── SCHOOL INFO TAB ──────────────────────────────────────────────────────────
@@ -1213,6 +1303,7 @@ export default function AdminSettings({ auth, initialTab, onPermissionsSaved }) 
       case "activity":      return <ActivityLogsTab auth={auth} />;
       case "backups":       return <BackupsTab auth={auth} />;
       case "integrations":  return <IntegrationsTab auth={auth} />;
+      case "promotion":    return <PromotionChainTab auth={auth} />;
       default:              return null;
     }
   };

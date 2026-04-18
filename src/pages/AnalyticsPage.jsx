@@ -13,10 +13,12 @@ const inputStyle = {
 
 // Simple chart components without external library
 function BarChart({ data, height = 200 }) {
-  const max = Math.max(...data.map(d => d.value));
+  if (!data?.length) return <div style={{ color: C.textSub }}>No data</div>;
+  const validData = data.map(d => ({ ...d, value: Number(d.value) || 0 }));
+  const max = Math.max(...validData.map(d => d.value), 1);
   return (
     <div style={{ display: "flex", alignItems: "flex-end", height, gap: 8, padding: "20px 0" }}>
-      {data.map((d, i) => (
+      {validData.map((d, i) => (
         <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{ 
             width: "100%", 
@@ -38,7 +40,8 @@ function BarChart({ data, height = 200 }) {
 }
 
 function PieChart({ data, size = 150 }) {
-  const total = data.reduce((sum, d) => sum + d.value, 0);
+  const total = data.reduce((sum, d) => sum + (Number(d.value) || 0), 0);
+  if (!total || total <= 0) return <div style={{ color: C.textSub }}>No data</div>;
   let currentAngle = 0;
   
   return (
