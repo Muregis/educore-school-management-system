@@ -380,6 +380,27 @@ router.get("/classes/promotion-chain", requirePermission("academic.view"), async
   }
 });
 
+// GET /api/classes - Get all class names for dropdowns
+router.get("/classes", requirePermission("academic.view"), async (req, res) => {
+  try {
+    const { schoolId } = req.user;
+
+    const { data: classes, error } = await supabase
+      .from('classes')
+      .select('class_id, class_name')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .eq('status', 'active')
+      .order('class_name');
+
+    if (error) throw error;
+    res.json({ data: classes || [] });
+  } catch (err) {
+    console.error('Error fetching classes:', err);
+    res.status(500).json({ message: "Failed to fetch classes" });
+  }
+});
+
 // PUT /api/classes/:id/promotion - Set next class for promotion
 router.put("/classes/:id/promotion", requirePermission("academic.manage"), async (req, res) => {
   try {

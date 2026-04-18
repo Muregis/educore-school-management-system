@@ -604,6 +604,13 @@ export default function ReportsPage({ auth }) {
   const [tab, setTab]               = useState("overview");
   const [filterClass, setFilterClass] = useState("all");
   const [loading, setLoading]       = useState(true);
+  const [classOptions, setClassOptions] = useState([]);
+
+  useEffect(() => {
+    apiFetch('/api/classes', { token: auth?.token })
+      .then(res => setClassOptions(res.data || res || []))
+      .catch(() => {});
+  }, [auth]);
 
   useEffect(() => {
     if (!auth?.token) { setLoading(false); return; }
@@ -675,7 +682,7 @@ export default function ReportsPage({ auth }) {
           borderRadius:8, padding:"6px 10px", marginBottom:12, fontSize:13 }}
           value={filterClass} onChange={e => setFilterClass(e.target.value)}>
           <option value="all">All classes</option>
-          {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
+          {classOptions.map(c => <option key={c.class_id} value={c.class_name}>{c.class_name}</option>)}
         </select>
       )}
 

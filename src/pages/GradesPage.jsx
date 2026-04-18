@@ -38,6 +38,13 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const [filterClass, setFilterClass]     = useState("all");
   const [filterStudent, setFilterStudent] = useState("all");
   const [filterSubject, setFilterSubject] = useState("all");
+  const [classOptions, setClassOptions] = useState([]);
+
+  useEffect(() => {
+    apiFetch('/api/classes', { token: auth?.token })
+      .then(res => setClassOptions(res.data || res || []))
+      .catch(() => {});
+  }, [auth]);
   const [page, setPage]                   = useState(1);
   const [showBulk, setShowBulk]           = useState(false);
   const [bulkClass, setBulkClass]          = useState("");
@@ -189,7 +196,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
         </select>
         <select style={inputStyle} value={filterClass} onChange={e => setFilterClass(e.target.value)}>
           <option value="all">All classes</option>
-          {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
+          {classOptions.map(c => <option key={c.class_id} value={c.class_name}>{c.class_name}</option>)}
         </select>
         <select style={inputStyle} value={filterStudent} onChange={e => setFilterStudent(e.target.value)}>
           <option value="all">{filterClass === "all" ? "All students" : `Students in ${filterClass}`}</option>
