@@ -110,10 +110,10 @@ router.get("/", async (req, res, next) => {
     });
     const attendance = Object.entries(attendanceStats).map(([status, count]) => ({ status, count }));
 
-    // Students per class
+    // Students per class (with gender breakdown)
     const { data: studentsByClass, error: classErr } = await supabase
       .from('students')
-      .select('class_name')
+      .select('class_name, gender')
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
       .eq('status', 'active');
@@ -121,9 +121,21 @@ router.get("/", async (req, res, next) => {
 
     const classCounts = {};
     studentsByClass?.forEach(s => {
-      classCounts[s.class_name] = (classCounts[s.class_name] || 0) + 1;
+      if (s.class_name) {
+        if (!classCounts[s.class_name]) {
+          classCounts[s.class_name] = { total: 0, boys: 0, girls: 0 };
+        }
+        classCounts[s.class_name].total++;
+        if (s.gender === 'male') classCounts[s.class_name].boys++;
+        else if (s.gender === 'female') classCounts[s.class_name].girls++;
+      }
     });
-    const byClass = Object.entries(classCounts).map(([class_name, count]) => ({ class_name, count })).sort((a, b) => a.class_name.localeCompare(b.class_name));
+    const byClass = Object.entries(classCounts).map(([class_name, data]) => ({ 
+      class_name, 
+      total: Number(data.total),
+      boys: Number(data.boys),
+      girls: Number(data.girls)
+    })).sort((a, b) => String(a.class_name || "").localeCompare(String(b.class_name || "")));
 
     // Grade distribution
     const { data: gradesData, error: gradeErr } = await supabase
@@ -135,9 +147,11 @@ router.get("/", async (req, res, next) => {
 
     const gradeCounts = {};
     gradesData?.forEach(r => {
-      gradeCounts[r.grade] = (gradeCounts[r.grade] || 0) + 1;
+      if (r.grade) {
+        gradeCounts[r.grade] = (gradeCounts[r.grade] || 0) + 1;
+      }
     });
-    const grades = Object.entries(gradeCounts).map(([grade, count]) => ({ grade, count })).sort((a, b) => a.grade.localeCompare(b.grade));
+    const grades = Object.entries(gradeCounts).map(([grade, count]) => ({ grade, count: Number(count) })).sort((a, b) => String(a.grade || "").localeCompare(String(b.grade || "")));
 
     // Recent payments with student join
     const { data: recentPaymentsData, error: recentErr } = await supabase

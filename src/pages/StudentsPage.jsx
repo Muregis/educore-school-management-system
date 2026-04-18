@@ -212,9 +212,9 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <Badge text={`Boys: ${normalised.filter(s => s.gender === "male").length}`} tone="info" />
-        <Badge text={`Girls: ${normalised.filter(s => s.gender === "female").length}`} tone="warning" />
-        <Badge text={`Total: ${normalised.length}`} tone="success" />
+        <Badge text={`Total: ${filtered.length}`} tone="success" />
+        <Badge text={`Boys: ${filtered.filter(s => s.gender === "male").length}`} tone="info" />
+        <Badge text={`Girls: ${filtered.filter(s => s.gender === "female").length}`} tone="warning" />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 8, marginBottom: 10 }}>
         <input style={inputStyle} value={q} onChange={e => setQ(e.target.value)} placeholder="Search students" />
