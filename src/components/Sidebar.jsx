@@ -28,6 +28,7 @@ const NAVIGATION_GROUPS = [
     items: [
       { id: "reportcards", label: "Report Cards", icon: "\u{1F4CB}" },
       { id: "admissions", label: "Admissions", icon: "\u{1F6AA}" },
+      { id: "bulk-import", label: "Import/Export", icon: "\u{1F4C1}" },
       { id: "timetable", label: "Timetable", icon: "\u23F0" },
       { id: "discipline", label: "Discipline", icon: "\u2696\uFE0F" },
       { id: "communication", label: "Communication", icon: "\u{1F4AC}" }
