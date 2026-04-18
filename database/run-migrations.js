@@ -2,8 +2,8 @@
 
 import fs from 'fs';
 import path from 'path';
-import { pool } from '../src/config/db.js';
-import { pgPool } from '../src/config/pg.js';
+import { pool } from '../backend/src/config/db.js';
+import { pgPool } from '../backend/src/config/pg.js';
 
 // Migration runner for PostgreSQL
 const MIGRATIONS_DIR = path.join(process.cwd(), 'database', 'migrations');

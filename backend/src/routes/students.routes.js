@@ -4,6 +4,19 @@ import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { requireRoles } from "../middleware/roles.js";
+import multer from "multer";
+
+// Configure multer for photo uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 2 * 1024 * 1024, // 2MB limit for photos
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    cb(null, allowedTypes.includes(file.mimetype));
+  }
+});
 
 const router = Router();
 router.use(authRequired);
@@ -16,7 +29,7 @@ router.get("/", async (req, res, next) => {
     const { data: rows, error } = await supabase
       .from('students')
       .select(
-        'student_id, admission_number, first_name, last_name, gender, class_id, class_name, status, date_of_birth, nemis_number, phone, email, address, parent_name, parent_phone, blood_group, allergies, medical_conditions, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, admission_date, created_at'
+        'student_id, admission_number, first_name, last_name, gender, class_id, class_name, status, date_of_birth, nemis_number, phone, email, address, parent_name, parent_phone, blood_group, allergies, medical_conditions, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, admission_date, photo_url, created_at'
       )
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
@@ -57,7 +70,7 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
       classId = null, dateOfBirth = null, nemisNumber = null, phone = null, parentName = null,
       parentPhone = null, bloodGroup = null, allergies = null, medicalConditions = null,
       emergencyContactName = null, emergencyContactPhone = null, emergencyContactRelationship = null,
-      email = null, address = null,
+      email = null, address = null, photoUrl = null,
       admissionDate = null, status = "active"
     } = req.body;
     
@@ -123,6 +136,7 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
         emergency_contact_name: emergencyContactName,
         emergency_contact_phone: emergencyContactPhone,
         emergency_contact_relationship: emergencyContactRelationship,
+        photo_url: photoUrl,
         admission_date: admissionDate || new Date().toISOString().slice(0, 10),
         status,
       })
@@ -204,7 +218,7 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
       firstName, lastName, gender, className, classId,
       dateOfBirth, nemisNumber, phone, parentName, parentPhone,
       bloodGroup, allergies, medicalConditions, emergencyContactName, emergencyContactPhone, emergencyContactRelationship,
-      email, address, status
+      email, address, photoUrl, status
     } = req.body;
 
     let resolvedClassId = classId || null;
@@ -244,6 +258,7 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
         emergency_contact_name: emergencyContactName || null,
         emergency_contact_phone: emergencyContactPhone || null,
         emergency_contact_relationship: emergencyContactRelationship || null,
+        photo_url: photoUrl || null,
         status: status || 'active',
       })
       .eq('student_id', req.params.id)
@@ -279,6 +294,78 @@ router.delete("/:id", requireRoles("admin"), async (req, res, next) => {
     logActivity(req, { action: "student.delete", entity: "student", entityId: req.params.id, description: `Student soft-deleted` });
     res.json({ deleted: true });
   } catch (err) { next(err); }
+});
+
+// ─── POST /upload-photo — upload student photo ─────────────────────────────
+router.post("/upload-photo", requireRoles("admin", "teacher"), upload.single('file'), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const { studentId } = req.body;
+
+    if (!studentId) {
+      return res.status(400).json({ message: "Student ID is required" });
+    }
+
+    // Verify student belongs to this school
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('student_id, first_name, last_name')
+      .eq('student_id', studentId)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (studentError || !student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const file = req.file;
+    const timestamp = Date.now();
+    const fileExt = file.originalname.split('.').pop();
+    const filename = `student-photo-${studentId}-${timestamp}.${fileExt}`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('student-photos')
+      .upload(filename, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('student-photos')
+      .getPublicUrl(filename);
+
+    // Update student's photo_url
+    const { error: updateError } = await supabase
+      .from('students')
+      .update({ photo_url: publicUrl })
+      .eq('student_id', studentId)
+      .eq('school_id', schoolId);
+
+    if (updateError) throw updateError;
+
+    logActivity(req, {
+      action: "student.photo_uploaded",
+      entity: "student",
+      entityId: studentId,
+      description: `Photo uploaded for student ${student.first_name} ${student.last_name}`
+    });
+
+    res.json({
+      photoUrl: publicUrl,
+      filename: filename
+    });
+
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;

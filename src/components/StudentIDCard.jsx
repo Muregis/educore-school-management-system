@@ -65,6 +65,12 @@ export default function StudentIDCard({ student, school, onClose }) {
               color: #4a5568;
               font-size: 10px;
               flex-shrink: 0;
+              overflow: hidden;
+            }
+            .photo-area img {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
             }
             .info-area {
               flex: 1;
@@ -133,7 +139,7 @@ export default function StudentIDCard({ student, school, onClose }) {
         <body>
           <div class="id-card id-card-front">
             <div class="id-type">STUDENT</div>
-            <div class="photo-area">Photo</div>
+            <div class="photo-area">${student.photoUrl ? `<img src="${student.photoUrl}" alt="Photo" />` : 'Photo'}</div>
             <div class="info-area">
               <div class="school-name">
                 ${school.logo_url ? `<img src="${school.logo_url}" style="width:16px;height:16px;border-radius:2px;margin-right:4px;vertical-align:middle" />` : ''}
@@ -180,12 +186,54 @@ export default function StudentIDCard({ student, school, onClose }) {
     ctx.font = "bold 10px Arial";
     ctx.fillText("STUDENT", width - 65, 23);
 
-    // Photo placeholder
-    ctx.fillStyle = "#e2e8f0";
-    ctx.fillRect(12, 15, 50, 60);
-    ctx.fillStyle = "#4a5568";
-    ctx.font = "10px Arial";
-    ctx.fillText("Photo", 25, 48);
+    // Photo
+    let photoLoaded = false;
+    let qrLoaded = false;
+    let photoImg, qrImg;
+
+    const checkComplete = () => {
+      if (photoLoaded && qrLoaded) {
+        // Validity
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.font = "8px Arial";
+        ctx.fillText(`Valid: ${school.year || new Date().getFullYear()}`, 12, height - 15);
+
+        // Download
+        const link = document.createElement("a");
+        link.download = `ID-${student.admission || student.admission_number}.png`;
+        link.href = canvas.toDataURL();
+        link.click();
+      }
+    };
+
+    if (student.photoUrl) {
+      photoImg = new Image();
+      photoImg.crossOrigin = "anonymous";
+      photoImg.onload = () => {
+        ctx.drawImage(photoImg, 12, 15, 50, 60);
+        photoLoaded = true;
+        checkComplete();
+      };
+      photoImg.onerror = () => {
+        // Fallback to placeholder
+        ctx.fillStyle = "#e2e8f0";
+        ctx.fillRect(12, 15, 50, 60);
+        ctx.fillStyle = "#4a5568";
+        ctx.font = "10px Arial";
+        ctx.fillText("Photo", 25, 48);
+        photoLoaded = true;
+        checkComplete();
+      };
+      photoImg.src = student.photoUrl;
+    } else {
+      // Photo placeholder
+      ctx.fillStyle = "#e2e8f0";
+      ctx.fillRect(12, 15, 50, 60);
+      ctx.fillStyle = "#4a5568";
+      ctx.font = "10px Arial";
+      ctx.fillText("Photo", 25, 48);
+      photoLoaded = true;
+    }
 
     // School name
     ctx.fillStyle = "rgba(255,255,255,0.9)";
@@ -211,24 +259,18 @@ export default function StudentIDCard({ student, school, onClose }) {
 
     // QR Code
     if (qrDataUrl) {
-      const img = new Image();
-      img.onload = () => {
+      qrImg = new Image();
+      qrImg.onload = () => {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(width - 70, height - 70, 58, 58);
-        ctx.drawImage(img, width - 68, height - 68, 54, 54);
-        
-        // Validity
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
-        ctx.font = "8px Arial";
-        ctx.fillText(`Valid: ${school.year || new Date().getFullYear()}`, 12, height - 15);
-
-        // Download
-        const link = document.createElement("a");
-        link.download = `ID-${student.admission || student.admission_number}.png`;
-        link.href = canvas.toDataURL();
-        link.click();
+        ctx.drawImage(qrImg, width - 68, height - 68, 54, 54);
+        qrLoaded = true;
+        checkComplete();
       };
-      img.src = qrDataUrl;
+      qrImg.src = qrDataUrl;
+    } else {
+      qrLoaded = true;
+      checkComplete();
     }
   };
 
@@ -292,7 +334,22 @@ export default function StudentIDCard({ student, school, onClose }) {
             fontSize: 11,
             float: "left",
             marginRight: 12,
-          }}>Photo</div>
+            overflow: "hidden",
+          }}>
+            {student.photoUrl ? (
+              <img
+                src={student.photoUrl}
+                alt="Student photo"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
+              />
+            ) : (
+              "Photo"
+            )}
+          </div>
 
           {/* Info */}
           <div style={{ color: "#fff" }}>

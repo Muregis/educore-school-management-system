@@ -34,6 +34,7 @@ function normalise(s) {
     emergencyContactName: s.emergency_contact_name ?? s.emergencyContactName ?? "",
     emergencyContactPhone: s.emergency_contact_phone ?? s.emergencyContactPhone ?? "",
     emergencyContactRelationship: s.emergency_contact_relationship ?? s.emergencyContactRelationship ?? "",
+    photoUrl:    s.photo_url ?? s.photoUrl ?? "",
     status:      s.status      ?? "active",
   };
 }
@@ -49,7 +50,9 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [idCardStudent, setIdCardStudent] = useState(null);
   const [err, setErr] = useState("");
   const [showQRScanner, setShowQRScanner] = useState(false);
-  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", status: "active", admission: "" });
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "" });
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -79,7 +82,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
   const openAdd = () => {
     setEditId(null); setErr("");
-    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", status: "active", admission: "" });
+    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "" });
     setShow(true);
   };
 
@@ -101,14 +104,14 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       if (editId) {
         await apiFetch(`/students/${editId}`, {
           method: "PUT",
-          body: { firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
+          body: { firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
           token: auth?.token,
         });
         setStudents(prev => prev.map(s => (s.id === editId || s.student_id === editId) ? { ...normalise(s), ...f, id: editId } : s));
       } else {
         const res = await apiFetch(`/students`, {
           method: "POST",
-          body: { admissionNumber: f.admission || `ADM-${Date.now()}`, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
+          body: { admissionNumber: f.admission || `ADM-${Date.now()}`, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
           token: auth?.token,
         });
         setStudents(prev => [...prev, normalise(res)]);
@@ -129,9 +132,57 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     } catch (err) { toast(err.message || "Delete failed", "error"); }
   };
 
-  const handleQRScan = async (qrText) => {
+  const uploadPhoto = async (studentId) => {
+    if (!selectedFile) return;
+
+    setUploadingPhoto(true);
     try {
-      const parsedQr = parseStudentQrContent(qrText);
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('studentId', studentId);
+
+      const response = await fetch('/api/students/upload-photo', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${auth?.token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const result = await response.json();
+      setF({ ...f, photoUrl: result.photoUrl });
+      setSelectedFile(null);
+      toast("Photo uploaded successfully", "success");
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast("Failed to upload photo", "error");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast("Please select an image file", "error");
+        return;
+      }
+      // Validate file size (2MB limit)
+      if (file.size > 2 * 1024 * 1024) {
+        toast("File size must be less than 2MB", "error");
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleQRScan = async (qrText) => {
       if (!parsedQr?.studentId) {
         toast("Invalid QR code", "error");
         return;
@@ -233,6 +284,35 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
             <Field label="Emergency Contact"><input style={inputStyle} value={f.emergencyContactName || ""} onChange={e => setF({ ...f, emergencyContactName: e.target.value })} placeholder="Name" /></Field>
             <Field label="Emergency Phone"><input style={inputStyle} value={f.emergencyContactPhone || ""} onChange={e => setF({ ...f, emergencyContactPhone: e.target.value })} placeholder="07xxxxxxxx" /></Field>
             <Field label="Relationship"><input style={inputStyle} value={f.emergencyContactRelationship || ""} onChange={e => setF({ ...f, emergencyContactRelationship: e.target.value })} placeholder="e.g. Parent, Guardian" /></Field>
+            <Field label="Photo" style={{ gridColumn: "1 / -1" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  style={{ flex: 1 }}
+                />
+                {f.photoUrl && (
+                  <img
+                    src={f.photoUrl}
+                    alt="Student photo"
+                    style={{ width: 50, height: 50, objectFit: "cover", borderRadius: 4 }}
+                  />
+                )}
+                {selectedFile && editId && (
+                  <Btn
+                    onClick={() => uploadPhoto(editId)}
+                    disabled={uploadingPhoto}
+                    style={{ whiteSpace: "nowrap" }}
+                  >
+                    {uploadingPhoto ? "Uploading..." : "Upload"}
+                  </Btn>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
+                Upload a photo for the student ID card (max 2MB, JPG/PNG only)
+              </div>
+            </Field>
           </div>
           {err && <Msg text={err} tone="error" />}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
