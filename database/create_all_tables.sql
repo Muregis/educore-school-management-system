@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS students (
   blood_group VARCHAR(10),
   allergies TEXT,
   medical_conditions TEXT,
+  photo_url TEXT NULL,
   status VARCHAR(20) DEFAULT 'active',
   is_deleted BOOLEAN DEFAULT FALSE
 );

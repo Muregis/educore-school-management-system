@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS public.students (
   parent_name      VARCHAR(160) NULL,
   parent_phone     VARCHAR(40)  NULL,
   admission_date   DATE NULL,
+  photo_url        TEXT NULL,
   status           public.student_status NOT NULL DEFAULT 'active',
   is_deleted       BOOLEAN NOT NULL DEFAULT FALSE,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS students (
   emergency_contact_phone VARCHAR(40),
   emergency_contact_relationship VARCHAR(50),
   admission_date DATE,
+  photo_url TEXT NULL,
   status VARCHAR(20) DEFAULT 'active',
   is_deleted BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),

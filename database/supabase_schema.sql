@@ -41,7 +41,19 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Add foreign key for student_id after users table exists
-ALTER TABLE users ADD CONSTRAINT fk_users_student FOREIGN KEY (student_id) REFERENCES users(user_id) ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'fk_users_student'
+      AND conrelid = 'users'::regclass
+  ) THEN
+    ALTER TABLE users
+      ADD CONSTRAINT fk_users_student
+      FOREIGN KEY (student_id) REFERENCES users(user_id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 -- Teachers table
 CREATE TABLE IF NOT EXISTS teachers (
@@ -104,6 +116,7 @@ CREATE TABLE IF NOT EXISTS students (
   emergency_contact_phone VARCHAR(40) NULL,
   emergency_contact_relationship VARCHAR(50) NULL,
   admission_date   DATE NULL,
+  photo_url        TEXT NULL,
   status           VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive','graduated','transferred')),
   is_deleted       BOOLEAN NOT NULL DEFAULT FALSE,
   created_at       TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -181,12 +194,19 @@ END;
 $$ language 'plpgsql';
 
 -- Create triggers for updated_at
+DROP TRIGGER IF EXISTS update_schools_updated_at ON schools;
 CREATE TRIGGER update_schools_updated_at BEFORE UPDATE ON schools FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_teachers_updated_at ON teachers;
 CREATE TRIGGER update_teachers_updated_at BEFORE UPDATE ON teachers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_classes_updated_at ON classes;
 CREATE TRIGGER update_classes_updated_at BEFORE UPDATE ON classes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_students_updated_at ON students;
 CREATE TRIGGER update_students_updated_at BEFORE UPDATE ON students FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_guardians_updated_at ON guardians;
 CREATE TRIGGER update_guardians_updated_at BEFORE UPDATE ON guardians FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_student_guardians_updated_at ON student_guardians;
 CREATE TRIGGER update_student_guardians_updated_at BEFORE UPDATE ON student_guardians FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Row Level Security (RLS) policies for multi-tenancy
@@ -199,13 +219,72 @@ ALTER TABLE guardians ENABLE ROW LEVEL SECURITY;
 ALTER TABLE student_guardians ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can only see their own school's data
-CREATE POLICY school_isolation ON schools USING (school_id = current_setting('app.current_school_id')::BIGINT);
-CREATE POLICY user_isolation ON users USING (school_id = current_setting('app.current_school_id')::BIGINT);
-CREATE POLICY teacher_isolation ON teachers USING (school_id = current_setting('app.current_school_id')::BIGINT);
-CREATE POLICY class_isolation ON classes USING (school_id = current_setting('app.current_school_id')::BIGINT);
-CREATE POLICY student_isolation ON students USING (school_id = current_setting('app.current_school_id')::BIGINT);
-CREATE POLICY guardian_isolation ON guardians USING (school_id = current_setting('app.current_school_id')::BIGINT);
-CREATE POLICY student_guardian_isolation ON student_guardians USING (school_id = current_setting('app.current_school_id')::BIGINT);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'schools' AND policyname = 'school_isolation') THEN
+    CREATE POLICY school_isolation ON schools USING (school_id = current_setting('app.current_school_id')::BIGINT);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'users' AND policyname = 'user_isolation') THEN
+    CREATE POLICY user_isolation ON users USING (school_id = current_setting('app.current_school_id')::BIGINT);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'teachers' AND policyname = 'teacher_isolation') THEN
+    CREATE POLICY teacher_isolation ON teachers USING (school_id = current_setting('app.current_school_id')::BIGINT);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'classes' AND policyname = 'class_isolation') THEN
+    CREATE POLICY class_isolation ON classes USING (school_id = current_setting('app.current_school_id')::BIGINT);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'students' AND policyname = 'student_isolation') THEN
+    CREATE POLICY student_isolation ON students USING (school_id = current_setting('app.current_school_id')::BIGINT);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'guardians' AND policyname = 'guardian_isolation') THEN
+    CREATE POLICY guardian_isolation ON guardians USING (school_id = current_setting('app.current_school_id')::BIGINT);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'student_guardians' AND policyname = 'student_guardian_isolation') THEN
+    CREATE POLICY student_guardian_isolation ON student_guardians USING (school_id = current_setting('app.current_school_id')::BIGINT);
+  END IF;
+END $$;
+
+-- Align BIGSERIAL sequences with current table data so reruns don't reuse old IDs.
+SELECT setval(
+  pg_get_serial_sequence('schools', 'school_id'),
+  GREATEST(COALESCE((SELECT MAX(school_id) FROM schools), 0), 1),
+  true
+);
+SELECT setval(
+  pg_get_serial_sequence('users', 'user_id'),
+  GREATEST(COALESCE((SELECT MAX(user_id) FROM users), 0), 1),
+  true
+);
+SELECT setval(
+  pg_get_serial_sequence('teachers', 'teacher_id'),
+  GREATEST(COALESCE((SELECT MAX(teacher_id) FROM teachers), 0), 1),
+  true
+);
+SELECT setval(
+  pg_get_serial_sequence('classes', 'class_id'),
+  GREATEST(COALESCE((SELECT MAX(class_id) FROM classes), 0), 1),
+  true
+);
+SELECT setval(
+  pg_get_serial_sequence('students', 'student_id'),
+  GREATEST(COALESCE((SELECT MAX(student_id) FROM students), 0), 1),
+  true
+);
+SELECT setval(
+  pg_get_serial_sequence('subjects', 'subject_id'),
+  GREATEST(COALESCE((SELECT MAX(subject_id) FROM subjects), 0), 1),
+  true
+);
+SELECT setval(
+  pg_get_serial_sequence('guardians', 'guardian_id'),
+  GREATEST(COALESCE((SELECT MAX(guardian_id) FROM guardians), 0), 1),
+  true
+);
+SELECT setval(
+  pg_get_serial_sequence('student_guardians', 'id'),
+  GREATEST(COALESCE((SELECT MAX(id) FROM student_guardians), 0), 1),
+  true
+);
 
 -- Insert default school (for testing)
 INSERT INTO schools (name, code, country) VALUES 
