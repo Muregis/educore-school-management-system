@@ -14,6 +14,9 @@ import {
   DataCache 
 } from "../utils/dataDeduplication";
 
+// Create data cache outside component to avoid issues with React hooks
+const dataCache = new DataCache(10 * 60 * 1000); // 10 minutes cache
+
 function normalizeAdmission(value) {
   return String(value ?? "").trim().toLowerCase();
 }
@@ -56,9 +59,6 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
   const [exportClass, setExportClass] = useState("all");
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [exporting, setExporting] = useState(false);
-  
-  // Data cache and optimization
-  const dataCache = new DataCache(10 * 60 * 1000); // 10 minutes cache
   
   // Optimize incoming data to prevent duplicates
   const optimizedStudents = useMemo(() => {

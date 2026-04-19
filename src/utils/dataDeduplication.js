@@ -1,5 +1,3 @@
-import { useState, useCallback } from 'react';
-
 /**
  * Data Deduplication Utilities
  * Prevents repeated data in UI components
@@ -254,51 +252,3 @@ export function optimizeDataForDisplay(data, options = {}) {
   return result;
 }
 
-/**
- * React hook for data deduplication and caching
- */
-export function useDataOptimization(options = {}) {
-  const {
-    cacheKey = 'default',
-    ttl = 5 * 60 * 1000,
-    maxItems = 100,
-    debounceMs = 300
-  } = options;
-  
-  const cache = new DataCache(ttl);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  
-  const fetchData = useCallback(async (fetchFn, dependencies = []) => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Check cache first
-      const cacheKeyWithDeps = `${cacheKey}_${JSON.stringify(dependencies)}`;
-      let data = cache.get(cacheKeyWithDeps);
-      
-      if (data) {
-        // Optimize cached data
-        data = optimizeDataForDisplay(data, { maxItems });
-        return data;
-      }
-      
-      // Fetch new data
-      const rawData = await fetchFn();
-      
-      // Optimize and cache
-      const optimizedData = optimizeDataForDisplay(rawData, { maxItems });
-      cache.set(cacheKeyWithDeps, optimizedData);
-      
-      return optimizedData;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [cache, cacheKey, maxItems]);
-  
-  return { fetchData, isLoading, error, cache };
-}
