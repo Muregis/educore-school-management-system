@@ -3,8 +3,8 @@
  * Handles role-based access control for API endpoints
  */
 
-const jwt = require('jsonwebtoken');
-const { promisify } = require('util');
+import jwt from 'jsonwebtoken';
+import { promisify } from 'util';
 
 // Role permissions mapping
 const ROLE_PERMISSIONS = {
@@ -226,7 +226,7 @@ const canAccessStudentData = (req, res, next) => {
   return res.status(403).json({ message: 'Access denied' });
 };
 
-module.exports = {
+export {
   authenticate,
   authorize,
   requireRole,
