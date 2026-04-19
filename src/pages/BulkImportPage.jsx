@@ -1,12 +1,18 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
-import Btn from "../components/Btn";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { Msg } from "../components/Helpers";
 import { ALL_CLASSES } from "../lib/constants";
+import { 
+  deduplicateStudents, 
+  deduplicatePayments, 
+  deduplicateGrades,
+  optimizeDataForDisplay,
+  DataCache 
+} from "../utils/dataDeduplication";
 
 function normalizeAdmission(value) {
   return String(value ?? "").trim().toLowerCase();
@@ -39,17 +45,40 @@ function normalizeDate(value) {
 
 export default function BulkImportPage({ auth, students, setStudents, toast, payments, feeStructures, results }) {
   const [activeTab, setActiveTab] = useState("import");
-  const [csvContent, setCsvContent] = useState("");
-  const [parsing, setParsing] = useState(false);
+  const [file, setFile] = useState(null);
+  const [importMode, setImportMode] = useState("create"); // "create" or "update"
+  const [csvData, setCsvData] = useState([]);
   const [preview, setPreview] = useState([]);
   const [importing, setImporting] = useState(false);
+  const [parsing, setParsing] = useState(false);
   const [importResults, setImportResults] = useState(null);
-  const [exporting, setExporting] = useState(false);
-  const fileInputRef = useRef(null);
-
-  // Export filter state
-  const [exportFilter, setExportFilter] = useState("all"); // all, class, defaulter, individual
+  const [exportFilter, setExportFilter] = useState("all");
   const [exportClass, setExportClass] = useState("all");
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [exporting, setExporting] = useState(false);
+  
+  // Data cache and optimization
+  const dataCache = new DataCache(10 * 60 * 1000); // 10 minutes cache
+  
+  // Optimize incoming data to prevent duplicates
+  const optimizedStudents = useMemo(() => {
+    return optimizeDataForDisplay(students, {
+      maxItems: 1000,
+      removeDuplicates: true,
+      uniqueKey: 'admission_number',
+      sortBy: 'created_at',
+      sortOrder: 'desc'
+    });
+  }, [students]);
+  
+  const optimizedPayments = useMemo(() => {
+    return deduplicatePayments(payments || []);
+  }, [payments]);
+  
+  const optimizedResults = useMemo(() => {
+    return deduplicateGrades(results || []);
+  }, [results]);
+  
   const [exportDefaulterAmount, setExportDefaulterAmount] = useState(0);
   const [selectedStudents, setSelectedStudents] = useState([]);
 
