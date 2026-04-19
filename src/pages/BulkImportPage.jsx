@@ -65,13 +65,19 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
   const optimizedStudents = useMemo(() => {
     if (!students || !Array.isArray(students)) return [];
     try {
-      return optimizeDataForDisplay(students, {
-        maxItems: 1000,
-        removeDuplicates: true,
-        uniqueKey: 'admission_number',
-        sortBy: 'created_at',
-        sortOrder: 'desc'
-      });
+      // Simple inline optimization to avoid import issues
+      const uniqueStudents = [];
+      const seenAdmissions = new Set();
+      
+      for (const student of students) {
+        const admission = student.admission_number || student.admission;
+        if (!seenAdmissions.has(admission)) {
+          seenAdmissions.add(admission);
+          uniqueStudents.push(student);
+        }
+      }
+      
+      return uniqueStudents.slice(0, 1000);
     } catch (err) {
       console.error('Error optimizing students:', err);
       return students;
@@ -81,7 +87,19 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
   const optimizedPayments = useMemo(() => {
     if (!payments || !Array.isArray(payments)) return [];
     try {
-      return deduplicatePayments(payments);
+      // Simple inline deduplication to avoid import issues
+      const uniquePayments = [];
+      const seenIds = new Set();
+      
+      for (const payment of payments) {
+        const id = payment.transaction_id || payment.id;
+        if (!seenIds.has(id)) {
+          seenIds.add(id);
+          uniquePayments.push(payment);
+        }
+      }
+      
+      return uniquePayments;
     } catch (err) {
       console.error('Error optimizing payments:', err);
       return payments;
@@ -91,7 +109,19 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
   const optimizedResults = useMemo(() => {
     if (!results || !Array.isArray(results)) return [];
     try {
-      return deduplicateGrades(results);
+      // Simple inline deduplication to avoid import issues
+      const uniqueResults = [];
+      const seenKeys = new Set();
+      
+      for (const result of results) {
+        const key = `${result.student_id}-${result.subject}-${result.term || ''}-${result.academic_year || ''}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          uniqueResults.push(result);
+        }
+      }
+      
+      return uniqueResults;
     } catch (err) {
       console.error('Error optimizing results:', err);
       return results;
