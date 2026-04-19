@@ -250,8 +250,8 @@ export function StudentPromotionPage({ auth }) {
     try {
       setLoading(true);
       const [studentsRes, rulesRes] = await Promise.all([
-        apiFetch(`/students/promotion-eligible${selectedClass ? `?classId=${selectedClass}` : ''}`),
-        apiFetch('/promotion/rules')
+        apiFetch(`/students/promotion-eligible${selectedClass ? `?classId=${selectedClass}` : ''}`, { token: auth?.token }),
+        apiFetch('/promotion/rules', { token: auth?.token })
       ]);
 
       setStudents(studentsRes.data || []);
@@ -270,6 +270,7 @@ export function StudentPromotionPage({ auth }) {
     try {
       const res = await apiFetch('/students/bulk-promote', {
         method: 'POST',
+        token: auth?.token,
         body: {
           studentIds: selectedStudents,
           toClassId: selectedClass,
@@ -382,7 +383,7 @@ export function EnhancedFeesPage({ auth, students, feeStructures, setFeeStructur
 
   const checkNewSystemAvailability = async () => {
     try {
-      await apiFetch('/finance/ledger/_check');
+      await apiFetch('/finance/ledger/_check', { token: auth?.token });
       setUseNewSystem(true);
     } catch {
       // New system not available, use legacy
@@ -612,7 +613,7 @@ function FeeAnalyticsView() {
 
   const loadAnalytics = async () => {
     try {
-      const res = await apiFetch('/finance/analytics');
+      const res = await apiFetch('/finance/analytics', { token: auth?.token });
       setAnalytics(res.data || {});
     } catch (error) {
       console.error('Error loading fee analytics:', error);
@@ -700,9 +701,9 @@ export function useFeatureFlags() {
     try {
       // Check which new features are available
       const checks = await Promise.allSettled([
-        apiFetch('/academic/years/current'),
-        apiFetch('/finance/ledger/_check'),
-        apiFetch('/students/promotion-eligible')
+        apiFetch('/academic/years/current', { token: auth?.token }),
+        apiFetch('/finance/ledger/_check', { token: auth?.token }),
+        apiFetch('/students/promotion-eligible', { token: auth?.token })
       ]);
 
       setFlags({
@@ -751,6 +752,7 @@ export function ClassPromotionChain({ auth }) {
     try {
       await apiFetch(`/classes/${classId}/promotion`, {
         method: 'PUT',
+        token: sessionStorage.getItem("token") || localStorage.getItem("token"),
         body: { nextClassName }
       });
       loadClasses();
