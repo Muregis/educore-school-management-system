@@ -63,21 +63,39 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
   
   // Optimize incoming data to prevent duplicates
   const optimizedStudents = useMemo(() => {
-    return optimizeDataForDisplay(students, {
-      maxItems: 1000,
-      removeDuplicates: true,
-      uniqueKey: 'admission_number',
-      sortBy: 'created_at',
-      sortOrder: 'desc'
-    });
+    if (!students || !Array.isArray(students)) return [];
+    try {
+      return optimizeDataForDisplay(students, {
+        maxItems: 1000,
+        removeDuplicates: true,
+        uniqueKey: 'admission_number',
+        sortBy: 'created_at',
+        sortOrder: 'desc'
+      });
+    } catch (err) {
+      console.error('Error optimizing students:', err);
+      return students;
+    }
   }, [students]);
   
   const optimizedPayments = useMemo(() => {
-    return deduplicatePayments(payments || []);
+    if (!payments || !Array.isArray(payments)) return [];
+    try {
+      return deduplicatePayments(payments);
+    } catch (err) {
+      console.error('Error optimizing payments:', err);
+      return payments;
+    }
   }, [payments]);
   
   const optimizedResults = useMemo(() => {
-    return deduplicateGrades(results || []);
+    if (!results || !Array.isArray(results)) return [];
+    try {
+      return deduplicateGrades(results);
+    } catch (err) {
+      console.error('Error optimizing results:', err);
+      return results;
+    }
   }, [results]);
   
   const [exportDefaulterAmount, setExportDefaulterAmount] = useState(0);
