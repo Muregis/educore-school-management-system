@@ -1,3 +1,5 @@
+import { useState, useCallback } from 'react';
+
 /**
  * Data Deduplication Utilities
  * Prevents repeated data in UI components
