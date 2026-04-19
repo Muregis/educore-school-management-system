@@ -11,7 +11,11 @@ export function removeDuplicates(array, key) {
   
   const seen = new Set();
   return array.filter(item => {
-    const value = item[key];
+    const value = item && item[key];
+    if (value == null) {
+      // Keep items with null/undefined values but don't track them for deduplication
+      return true;
+    }
     if (seen.has(value)) {
       return false;
     }
@@ -48,13 +52,19 @@ export function deduplicateStudents(students) {
  * Deduplicate payments by transaction ID
  */
 export function deduplicatePayments(payments) {
-  return removeDuplicates(payments, 'transaction_id');
+  if (!Array.isArray(payments)) return [];
+  // Try different possible keys for payment identification
+  const key = payments.length > 0 && payments[0].transaction_id ? 'transaction_id' : 
+              payments.length > 0 && payments[0].id ? 'id' : 'transaction_id';
+  return removeDuplicates(payments, key);
 }
 
 /**
  * Deduplicate grades by student+subject+term+year combination
  */
 export function deduplicateGrades(grades) {
+  if (!Array.isArray(grades)) return [];
+  // Handle different possible key structures for grades
   return removeDuplicatesByMultipleKeys(grades, ['student_id', 'subject', 'term', 'academic_year']);
 }
 
