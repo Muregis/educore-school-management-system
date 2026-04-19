@@ -3,11 +3,11 @@
  * Handles parent update requests for student information
  */
 
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const { authenticate, authorize, canAccessStudentData } = require('../middleware/permissions');
-const { supabase } = require('../config/supabaseClient.js');
-const { safeSupabaseQuery } = require('../config/supabaseClient.js');
+import { authenticate, authorize, canAccessStudentData } from '../middleware/permissions.js';
+import { supabase } from '../config/supabaseClient.js';
+import { safeSupabaseQuery } from '../config/supabaseClient.js';
 
 /**
  * GET /api/students/pending-updates
@@ -204,4 +204,4 @@ router.post('/pending-updates/:updateId/reject', authenticate, authorize('update
   }
 });
 
-module.exports = router;
+export default router;

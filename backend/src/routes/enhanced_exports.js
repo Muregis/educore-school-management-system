@@ -3,9 +3,9 @@
  * Handles bulk data export with comprehensive information
  */
 
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const { authenticate, authorize } = require('../middleware/permissions');
+import { authenticate, authorize } from '../middleware/permissions.js';
 
 // Mock data - replace with actual Supabase calls
 const mockStudents = [
@@ -163,4 +163,4 @@ router.get('/payments/export', authenticate, authorize('bulk-import'), async (re
   }
 });
 
-module.exports = router;
+export default router;

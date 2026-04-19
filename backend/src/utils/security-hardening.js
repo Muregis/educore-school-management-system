@@ -1,3 +1,7 @@
+import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import speakeasy from 'speakeasy';
+import QRCode from 'qrcode';
 import helmet from 'helmet';
 import csrf from 'csurf';
 import rateLimit from 'express-rate-limit';
@@ -110,7 +114,7 @@ export class SecurityHardeningManager {
   createCsrfMiddleware() {
     if (!this.options.csrfSecret) {
       console.warn('CSRF secret not configured, CSRF protection disabled');
-      return (req: Request, res: Response, next: NextFunction) => next();
+      return (req, res, next) => next();
     }
 
     return csrf({
@@ -134,7 +138,7 @@ export class SecurityHardeningManager {
       standardHeaders: true,
       legacyHeaders: false,
       // Skip rate limiting for health checks
-      skip: (req: Request) => {
+      skip: (req) => {
         return req.path === '/api/health' || req.path === '/api/health/tenant';
       }
     });
@@ -144,7 +148,7 @@ export class SecurityHardeningManager {
 
   // Bot detection middleware
   createBotDetectionMiddleware() {
-    return (req: Request, res: Response, next: NextFunction) => {
+    return (req, res, next) => {
       const userAgent = req.get('User-Agent') || '';
       const suspiciousPatterns = [
         /bot/i,
@@ -182,7 +186,7 @@ export class SecurityHardeningManager {
 
   // Geo-blocking middleware
   createGeoBlockingMiddleware() {
-    return async (req: Request, res: Response, next: NextFunction) => {
+    return async (req, res, next) => {
       const clientIp = req.ip || req.connection.remoteAddress;
       
       try {
@@ -209,7 +213,7 @@ export class SecurityHardeningManager {
 
   // Input validation middleware
   createInputValidationMiddleware() {
-    return (req: Request, res: Response, next: NextFunction) => {
+    return (req, res, next) => {
       // Check for common injection patterns
       const suspiciousPatterns = [
         /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, // XSS
@@ -221,7 +225,7 @@ export class SecurityHardeningManager {
         /<embed/gi // Embed injection
       ];
 
-      const checkValue = (value: any): boolean => {
+      const checkValue = (value) => {
         if (typeof value === 'string') {
           return suspiciousPatterns.some(pattern => pattern.test(value));
         }
@@ -260,13 +264,13 @@ export class SecurityHardeningManager {
 
   // Security monitoring middleware
   createSecurityMonitoringMiddleware() {
-    return (req: Request, res: Response, next: NextFunction) => {
+    return (req, res, next) => {
       const startTime = Date.now();
       
       // Store original send method
       const originalSend = res.send;
       
-      res.send = function(data: any) {
+      res.send = function(data) {
         const endTime = Date.now();
         const responseTime = endTime - startTime;
         
@@ -296,7 +300,7 @@ export class SecurityHardeningManager {
   }
 
   // Log security events
-  logSecurityEvent(req: Request, res: Response, eventType: string) {
+  logSecurityEvent(req, res, eventType) {
     const securityEvent = {
       eventType,
       ip: req.ip,
@@ -314,8 +318,8 @@ export class SecurityHardeningManager {
   }
 
   // Password policy validator
-  validatePassword(password: string): { isValid: boolean; errors: string[] } {
-    const errors: string[] = [];
+  validatePassword(password) {
+    const errors = [];
 
     // Minimum length
     if (password.length < 8) {
@@ -364,30 +368,27 @@ export class SecurityHardeningManager {
   }
 
   // Generate secure random token
-  generateSecureToken(length: number = 32): string {
-    const crypto = require('crypto');
+  generateSecureToken(length = 32) {
     return crypto.randomBytes(length).toString('hex');
   }
 
   // Hash password securely
-  async hashPassword(password: string): Promise<string> {
-    const bcrypt = require('bcryptjs');
+  async hashPassword(password) {
     const saltRounds = 12;
     return bcrypt.hash(password, saltRounds);
   }
 
   // Verify password
-  async verifyPassword(password: string, hash: string): Promise<boolean> {
-    const bcrypt = require('bcryptjs');
+  async verifyPassword(password, hash) {
     return bcrypt.compare(password, hash);
   }
 
   // Create tenant-aware rate limiter
-  createTenantRateLimit(options: { maxRequests?: number; windowMs?: number }) {
+  createTenantRateLimit(options) {
     const tenantRateLimit = rateLimit({
       windowMs: options.windowMs || this.options.rateLimitWindowMs,
       max: options.maxRequests || this.options.maxRequestsPerWindow,
-      keyGenerator: (req: Request) => {
+      keyGenerator: (req) => {
         // Use tenant ID as key for rate limiting
         return `tenant_${req.user?.schoolId || 'anonymous'}_${req.ip}`;
       },
@@ -401,7 +402,7 @@ export class SecurityHardeningManager {
   }
 
   // Security headers for API responses
-  addSecurityHeaders(res: Response) {
+  addSecurityHeaders(res) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
@@ -425,8 +426,7 @@ export class MFAManager {
   }
 
   // Generate TOTP secret
-  generateTOTPSecret(userEmail: string): string {
-    const speakeasy = require('speakeasy');
+  generateTOTPSecret(userEmail) {
     return speakeasy.generateSecret({
       name: `${this.options.issuer} (${userEmail})`,
       issuer: this.options.issuer,
@@ -435,10 +435,7 @@ export class MFAManager {
   }
 
   // Generate QR code for TOTP setup
-  generateTOTPQRCode(secret: string, userEmail: string): string {
-    const speakeasy = require('speakeasy');
-    const QRCode = require('qrcode');
-    
+  generateTOTPQRCode(secret, userEmail) {
     const otpauthUrl = speakeasy.otpauthURL({
       secret: secret,
       label: `${this.options.issuer} (${userEmail})`,
@@ -449,8 +446,7 @@ export class MFAManager {
   }
 
   // Verify TOTP token
-  verifyTOTPToken(token: string, secret: string): boolean {
-    const speakeasy = require('speakeasy');
+  verifyTOTPToken(token, secret) {
     return speakeasy.totp.verify({
       secret: secret,
       encoding: 'base32',
@@ -460,9 +456,8 @@ export class MFAManager {
   }
 
   // Generate backup codes
-  generateBackupCodes(count: number = 10): string[] {
-    const crypto = require('crypto');
-    const codes: string[] = [];
+  generateBackupCodes(count = 10) {
+    const codes = [];
     
     for (let i = 0; i < count; i++) {
       codes.push(crypto.randomBytes(4).toString('hex').toUpperCase());
@@ -481,13 +476,7 @@ export class SecurityMonitor {
   }
 
   // Monitor for suspicious activity
-  async monitorSuspiciousActivity(event: {
-    ip: string;
-    schoolId?: number;
-    userId?: number;
-    eventType: string;
-    timestamp: Date;
-  }) {
+  async monitorSuspiciousActivity(event) {
     const key = `${event.ip}_${event.schoolId || 'no-school'}`;
     const now = Date.now();
     
@@ -507,20 +496,14 @@ export class SecurityMonitor {
   }
 
   // Count recent suspicious events
-  async countRecentEvents(event: {
-    ip: string;
-    schoolId?: number;
-    userId?: number;
-    eventType: string;
-    timestamp: Date;
-  }): Promise<number> {
+  async countRecentEvents(event) {
     // This would query your audit logs or security events
     // For now, return a mock count
     return 5;
   }
 
   // Send security alert
-  async sendSecurityAlert(event: any, eventCount: number) {
+  async sendSecurityAlert(event, eventCount) {
     const alert = {
       type: 'SECURITY_ALERT',
       severity: 'HIGH',
