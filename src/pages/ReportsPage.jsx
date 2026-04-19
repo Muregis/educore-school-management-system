@@ -607,14 +607,23 @@ export default function ReportsPage({ auth }) {
   const [classOptions, setClassOptions] = useState([]);
 
   useEffect(() => {
-    apiFetch('/classes', { token: auth?.token })
-      .then(res => setClassOptions(res.data || res || []))
-      .catch(() => {});
+    const token = auth?.token || sessionStorage.getItem("token") || localStorage.getItem("token");
+    if (token) {
+      apiFetch('/classes', { token })
+        .then(res => setClassOptions(res.data || res || []))
+        .catch(() => {});
+    }
   }, [auth]);
 
   useEffect(() => {
-    if (!auth?.token) { setLoading(false); return; }
+    const token = auth?.token || sessionStorage.getItem("token") || localStorage.getItem("token");
+    if (!token) { setLoading(false); return; }
     Promise.all([
+      apiFetch("/reports/summary",                { token }),
+      apiFetch("/reports/monthly-fee-collection", { token }),
+      apiFetch("/reports/attendance-rate",        { token }),
+      apiFetch("/reports/fee-defaulters",         { token }),
+      apiFetch("/reports/grade-distribution",     { token }),
       apiFetch("/reports/summary",                { token: auth.token }),
       apiFetch("/reports/monthly-fee-collection", { token: auth.token }),
       apiFetch("/reports/attendance-rate",        { token: auth.token }),
