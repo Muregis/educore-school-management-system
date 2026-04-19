@@ -6,7 +6,7 @@
 import express from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
-import { requirePermission } from "../middleware/permissions.js";
+import { authorize } from "../middleware/permissions.js";
 import {
   AcademicYearService,
   TermService,
@@ -25,7 +25,7 @@ router.use(authRequired);
 // =====================================================
 
 // GET /api/academic/years - List academic years
-router.get("/academic/years", requirePermission("academic.view"), async (req, res) => {
+router.get("/academic/years", authorize("academic.view"), async (req, res) => {
   try {
     const { schoolId } = req.user;
     const { data: years, error } = await supabase
@@ -56,7 +56,7 @@ router.get("/academic/years/current", async (req, res) => {
 });
 
 // POST /api/academic/years - Create academic year
-router.post("/academic/years", requirePermission("academic.manage"), async (req, res) => {
+router.post("/academic/years", authorize("academic.manage"), async (req, res) => {
   try {
     const { schoolId } = req.user;
     const yearData = req.body;
@@ -70,7 +70,7 @@ router.post("/academic/years", requirePermission("academic.manage"), async (req,
 });
 
 // GET /api/academic/terms - List terms
-router.get("/academic/terms", requirePermission("academic.view"), async (req, res) => {
+router.get("/academic/terms", authorize("academic.view"), async (req, res) => {
   try {
     const { schoolId } = req.user;
     const { data: terms, error } = await supabase
@@ -104,7 +104,7 @@ router.get("/academic/terms/current", async (req, res) => {
 });
 
 // PUT /api/academic/terms/:id/close - Close term
-router.put("/academic/terms/:id/close", requirePermission("term.close"), async (req, res) => {
+router.put("/academic/terms/:id/close", authorize("term.close"), async (req, res) => {
   try {
     const { schoolId, user_id } = req.user;
     const termId = req.params.id;
@@ -118,7 +118,7 @@ router.put("/academic/terms/:id/close", requirePermission("term.close"), async (
 });
 
 // PUT /api/academic/terms/:id/open - Open term
-router.put("/academic/terms/:id/open", requirePermission("term.open"), async (req, res) => {
+router.put("/academic/terms/:id/open", authorize("term.open"), async (req, res) => {
   try {
     const { schoolId, user_id } = req.user;
     const termId = req.params.id;
@@ -132,7 +132,7 @@ router.put("/academic/terms/:id/open", requirePermission("term.open"), async (re
 });
 
 // GET /api/academic/terms/:id/can-close - Check if term can be closed
-router.get("/academic/terms/:id/can-close", requirePermission("term.close"), async (req, res) => {
+router.get("/academic/terms/:id/can-close", authorize("term.close"), async (req, res) => {
   try {
     const termId = req.params.id;
     const eligibility = await TermService.canCloseTerm(termId);
@@ -148,7 +148,7 @@ router.get("/academic/terms/:id/can-close", requirePermission("term.close"), asy
 // =====================================================
 
 // GET /api/students/:id/enrollments - Get enrollment history
-router.get("/students/:id/enrollments", requirePermission("enrollment.view"), async (req, res) => {
+router.get("/students/:id/enrollments", authorize("enrollment.view"), async (req, res) => {
   try {
     const studentId = req.params.id;
     const enrollments = await StudentEnrollmentService.getEnrollmentHistory(studentId);
@@ -160,7 +160,7 @@ router.get("/students/:id/enrollments", requirePermission("enrollment.view"), as
 });
 
 // GET /api/students/:id/enrollment/current - Get current enrollment
-router.get("/students/:id/enrollment/current", requirePermission("enrollment.view"), async (req, res) => {
+router.get("/students/:id/enrollment/current", authorize("enrollment.view"), async (req, res) => {
   try {
     const studentId = req.params.id;
     const enrollment = await StudentEnrollmentService.getCurrentEnrollment(studentId);
@@ -172,7 +172,7 @@ router.get("/students/:id/enrollment/current", requirePermission("enrollment.vie
 });
 
 // GET /api/students/promotion-eligible - Get promotion-eligible students
-router.get("/students/promotion-eligible", requirePermission("promotion.view"), async (req, res) => {
+router.get("/students/promotion-eligible", authorize("promotion.view"), async (req, res) => {
   try {
     const { schoolId } = req.user;
     const { classId } = req.query;
@@ -210,7 +210,7 @@ router.get("/students/promotion-eligible", requirePermission("promotion.view"), 
 });
 
 // POST /api/students/:id/promote - Promote student
-router.post("/students/:id/promote", requirePermission("promotion.approve"), async (req, res) => {
+router.post("/students/:id/promote", authorize("promotion.approve"), async (req, res) => {
   try {
     const studentId = req.params.id;
     const { toClassId, reason } = req.body;
@@ -225,7 +225,7 @@ router.post("/students/:id/promote", requirePermission("promotion.approve"), asy
 });
 
 // POST /api/students/bulk-promote - Bulk promote students
-router.post("/students/bulk-promote", requirePermission("promotion.approve"), async (req, res) => {
+router.post("/students/bulk-promote", authorize("promotion.approve"), async (req, res) => {
   try {
     const { studentIds, toClassId, reason } = req.body;
     const { user_id } = req.user;
@@ -252,7 +252,7 @@ router.post("/students/bulk-promote", requirePermission("promotion.approve"), as
 // =====================================================
 
 // GET /api/finance/balance/:studentId - Get student balance
-router.get("/finance/balance/:studentId", requirePermission("finance.view"), async (req, res) => {
+router.get("/finance/balance/:studentId", authorize("finance.view"), async (req, res) => {
   try {
     const { schoolId } = req.user;
     const studentId = req.params.studentId;
@@ -266,7 +266,7 @@ router.get("/finance/balance/:studentId", requirePermission("finance.view"), asy
 });
 
 // GET /api/finance/ledger - Get transaction ledger
-router.get("/finance/ledger", requirePermission("ledger.view"), async (req, res) => {
+router.get("/finance/ledger", authorize("ledger.view"), async (req, res) => {
   try {
     const { schoolId } = req.user;
     const { studentId, academicYearId, termId, limit = 50, offset = 0 } = req.query;
@@ -290,7 +290,7 @@ router.get("/finance/ledger", requirePermission("ledger.view"), async (req, res)
 });
 
 // GET /api/finance/term-summary/:termId - Get term financial summary
-router.get("/finance/term-summary/:termId", requirePermission("reports.financial"), async (req, res) => {
+router.get("/finance/term-summary/:termId", authorize("reports.financial"), async (req, res) => {
   try {
     const { schoolId } = req.user;
     const termId = req.params.termId;
@@ -328,7 +328,7 @@ router.get("/finance/term-summary/:termId", requirePermission("reports.financial
 // =====================================================
 
 // GET /api/promotion/rules - Get promotion rules
-router.get("/promotion/rules", requirePermission("promotion.view"), async (req, res) => {
+router.get("/promotion/rules", authorize("promotion.view"), async (req, res) => {
   try {
     const { schoolId } = req.user;
     const rules = await PromotionService.getPromotionRules(schoolId);
@@ -340,7 +340,7 @@ router.get("/promotion/rules", requirePermission("promotion.view"), async (req, 
 });
 
 // POST /api/promotion/rules - Create promotion rule
-router.post("/promotion/rules", requirePermission("promotion.approve"), async (req, res) => {
+router.post("/promotion/rules", authorize("promotion.approve"), async (req, res) => {
   try {
     const { schoolId } = req.user;
     const ruleData = { ...req.body, school_id: schoolId };
@@ -360,7 +360,7 @@ router.post("/promotion/rules", requirePermission("promotion.approve"), async (r
 });
 
 // GET /api/classes/promotion-chain - Get all classes with their promotion chain
-router.get("/classes/promotion-chain", requirePermission("academic.view"), async (req, res) => {
+router.get("/classes/promotion-chain", authorize("academic.view"), async (req, res) => {
   try {
     const { schoolId } = req.user;
 
@@ -380,7 +380,7 @@ router.get("/classes/promotion-chain", requirePermission("academic.view"), async
 });
 
 // GET /api/classes - Get all class names for dropdowns
-router.get("/classes", requirePermission("academic.view"), async (req, res) => {
+router.get("/classes", authorize("academic.view"), async (req, res) => {
   try {
     const { schoolId } = req.user;
 
@@ -401,7 +401,7 @@ router.get("/classes", requirePermission("academic.view"), async (req, res) => {
 });
 
 // PUT /api/classes/:id/promotion - Set next class for promotion
-router.put("/classes/:id/promotion", requirePermission("academic.manage"), async (req, res) => {
+router.put("/classes/:id/promotion", authorize("academic.manage"), async (req, res) => {
   try {
     const { schoolId } = req.user;
     const classId = req.params.id;
@@ -464,7 +464,7 @@ router.get("/permissions/my", async (req, res) => {
 // =====================================================
 
 // POST /api/migration/initialize-academic - Initialize academic data
-router.post("/migration/initialize-academic", requirePermission("academic.manage"), async (req, res) => {
+router.post("/migration/initialize-academic", authorize("academic.manage"), async (req, res) => {
   try {
     const { schoolId } = req.user;
 
@@ -485,7 +485,7 @@ router.post("/migration/initialize-academic", requirePermission("academic.manage
 });
 
 // GET /api/migration/status - Check migration status
-router.get("/migration/status", requirePermission("academic.view"), async (req, res) => {
+router.get("/migration/status", authorize("academic.view"), async (req, res) => {
   try {
     const { schoolId } = req.user;
 
