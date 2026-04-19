@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
+import Btn from "../components/Btn";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { Msg } from "../components/Helpers";
@@ -81,6 +82,8 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
   
   const [exportDefaulterAmount, setExportDefaulterAmount] = useState(0);
   const [selectedStudents, setSelectedStudents] = useState([]);
+  const [csvContent, setCsvContent] = useState("");
+  const fileInputRef = useRef(null);
 
   // CSV Template
   const csvTemplate = `first_name,last_name,gender,class_name,admission_number,parent_name,parent_phone,date_of_birth,nemis_number,status

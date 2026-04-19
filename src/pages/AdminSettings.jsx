@@ -352,7 +352,7 @@ const PromotionChainTab = ({ auth }) => {
   const loadClasses = async () => {
     try {
       setLoading(true);
-      const res = await apiFetch('/api/classes/promotion-chain', { token: auth.token });
+      const res = await apiFetch('/classes/promotion-chain', { token: auth.token });
       setClasses(res.data || res || []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -361,7 +361,7 @@ const PromotionChainTab = ({ auth }) => {
   const updateNextClass = async (classId, nextClassName) => {
     setSaving(classId);
     try {
-      await apiFetch(`/api/classes/${classId}/promotion`, {
+      await apiFetch(`/classes/${classId}/promotion`, {
         method: 'PUT',
         token: auth.token,
         body: { nextClassName }

@@ -735,7 +735,7 @@ export function ClassPromotionChain({ auth }) {
   const loadClasses = async () => {
     try {
       setLoading(true);
-      const res = await apiFetch('/api/classes/promotion-chain');
+      const res = await apiFetch('/classes/promotion-chain');
       setClasses(res.data || res || []);
     } catch (err) {
       console.error('Error loading classes:', err);
@@ -747,7 +747,7 @@ export function ClassPromotionChain({ auth }) {
   const updateNextClass = async (classId, nextClassName) => {
     setSaving(classId);
     try {
-      await apiFetch(`/api/classes/${classId}/promotion`, {
+      await apiFetch(`/classes/${classId}/promotion`, {
         method: 'PUT',
         body: { nextClassName }
       });

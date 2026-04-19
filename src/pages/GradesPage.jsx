@@ -41,7 +41,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const [classOptions, setClassOptions] = useState([]);
 
   useEffect(() => {
-    apiFetch('/api/classes', { token: auth?.token })
+    apiFetch('/classes', { token: auth?.token })
       .then(res => setClassOptions(res.data || res || []))
       .catch(() => {});
   }, [auth]);

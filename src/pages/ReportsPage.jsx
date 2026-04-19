@@ -607,7 +607,7 @@ export default function ReportsPage({ auth }) {
   const [classOptions, setClassOptions] = useState([]);
 
   useEffect(() => {
-    apiFetch('/api/classes', { token: auth?.token })
+    apiFetch('/classes', { token: auth?.token })
       .then(res => setClassOptions(res.data || res || []))
       .catch(() => {});
   }, [auth]);
