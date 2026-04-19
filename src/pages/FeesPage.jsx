@@ -386,7 +386,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       formData.append('studentId', sid);
       formData.append('amount', amt);
       
-      const uploadResponse = await fetch('/api/payments/upload-proof', {
+      const uploadResponse = await fetch('/payments/upload-proof', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${auth.token}`,

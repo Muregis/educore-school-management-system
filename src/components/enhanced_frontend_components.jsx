@@ -34,9 +34,9 @@ export function TermManagementPage({ auth }) {
     try {
       setLoading(true);
       const [termRes, statsRes, termsRes] = await Promise.all([
-        apiFetch('/api/academic/terms/current'),
-        apiFetch('/api/academic/terms/stats'),
-        apiFetch('/api/academic/terms')
+        apiFetch('/academic/terms/current'),
+        apiFetch('/academic/terms/stats'),
+        apiFetch('/academic/terms')
       ]);
 
       setCurrentTerm(termRes.data);
@@ -250,8 +250,8 @@ export function StudentPromotionPage({ auth }) {
     try {
       setLoading(true);
       const [studentsRes, rulesRes] = await Promise.all([
-        apiFetch(`/api/students/promotion-eligible${selectedClass ? `?classId=${selectedClass}` : ''}`),
-        apiFetch('/api/promotion/rules')
+        apiFetch(`/students/promotion-eligible${selectedClass ? `?classId=${selectedClass}` : ''}`),
+        apiFetch('/promotion/rules')
       ]);
 
       setStudents(studentsRes.data || []);
@@ -268,7 +268,7 @@ export function StudentPromotionPage({ auth }) {
 
     setPromoting(true);
     try {
-      const res = await apiFetch('/api/students/bulk-promote', {
+      const res = await apiFetch('/students/bulk-promote', {
         method: 'POST',
         body: {
           studentIds: selectedStudents,
@@ -382,7 +382,7 @@ export function EnhancedFeesPage({ auth, students, feeStructures, setFeeStructur
 
   const checkNewSystemAvailability = async () => {
     try {
-      await apiFetch('/api/finance/ledger/_check');
+      await apiFetch('/finance/ledger/_check');
       setUseNewSystem(true);
     } catch {
       // New system not available, use legacy
@@ -612,7 +612,7 @@ function FeeAnalyticsView() {
 
   const loadAnalytics = async () => {
     try {
-      const res = await apiFetch('/api/finance/analytics');
+      const res = await apiFetch('/finance/analytics');
       setAnalytics(res.data || {});
     } catch (error) {
       console.error('Error loading fee analytics:', error);
@@ -700,9 +700,9 @@ export function useFeatureFlags() {
     try {
       // Check which new features are available
       const checks = await Promise.allSettled([
-        apiFetch('/api/academic/years/current'),
-        apiFetch('/api/finance/ledger/_check'),
-        apiFetch('/api/students/promotion-eligible')
+        apiFetch('/academic/years/current'),
+        apiFetch('/finance/ledger/_check'),
+        apiFetch('/students/promotion-eligible')
       ]);
 
       setFlags({

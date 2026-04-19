@@ -561,7 +561,7 @@ export const AppErrorHandler = ({ children, enableHealthCheck = false }) => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-        const response = await fetch('/api/health', {
+        const response = await fetch('/health', {
           signal: controller.signal,
           headers: {
             'Cache-Control': 'no-cache'
