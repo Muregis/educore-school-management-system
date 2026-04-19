@@ -36,14 +36,85 @@ export default function AdmissionsPage({ auth, canEdit, toast }) {
   useEffect(() => { load(); }, [auth]);
 
   const save = async () => {
-    if (!form.fullName || !form.applyingClass) return toast("Full name and class are required", "error");
+    // Enhanced validation
+    const errors = [];
+    
+    if (!form.fullName?.trim()) errors.push("Full name is required");
+    if (!form.applyingClass) errors.push("Class selection is required");
+    if (!form.academicYear?.trim()) errors.push("Academic year is required");
+    
+    // Check for duplicate applications
+    const duplicateCheck = applications.find(a => 
+      a.full_name?.toLowerCase() === form.fullName.toLowerCase() &&
+      a.applying_class === form.applyingClass &&
+      a.academic_year === form.academicYear &&
+      ['pending', 'reviewed'].includes(a.status)
+    );
+    
+    if (duplicateCheck) {
+      errors.push(`An application for ${form.fullName} in ${form.applyingClass} (${form.academicYear}) already exists and is ${duplicateCheck.status}`);
+    }
+    
+    // Phone validation (Kenyan format)
+    if (form.parentPhone?.trim()) {
+      const cleanPhone = form.parentPhone.replace(/[^\d+]/g, '');
+      const phoneRegex = /^(\+?254|0)[17][0-9]{8}$/;
+      if (!phoneRegex.test(cleanPhone)) {
+        errors.push("Invalid Kenyan phone format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx");
+      }
+    }
+    
+    // Email validation
+    if (form.parentEmail?.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.parentEmail)) {
+        errors.push("Invalid email format");
+      }
+    }
+    
+    // Date validation
+    if (form.dateOfBirth) {
+      const dob = new Date(form.dateOfBirth);
+      const today = new Date();
+      const age = today.getFullYear() - dob.getFullYear();
+      if (age < 3 || age > 18) {
+        errors.push("Student age should be between 3 and 18 years");
+      }
+    }
+    
+    if (errors.length > 0) {
+      return toast(errors.join(", "), "error");
+    }
+    
     try {
-      await apiFetch("/admissions", { method: "POST", body: form, token: auth.token });
+      // Prepare clean form data
+      const cleanForm = {
+        fullName: form.fullName.trim(),
+        dateOfBirth: form.dateOfBirth || null,
+        gender: form.gender,
+        parentName: form.parentName?.trim() || null,
+        parentPhone: form.parentPhone?.trim() || null,
+        parentEmail: form.parentEmail?.trim() || null,
+        address: form.address?.trim() || null,
+        previousSchool: form.previousSchool?.trim() || null,
+        applyingClass: form.applyingClass,
+        academicYear: form.academicYear.trim(),
+        notes: form.notes?.trim() || null,
+      };
+      
+      await apiFetch("/admissions", { method: "POST", body: cleanForm, token: auth.token });
       await load();
       setShowModal(false);
-      setForm({ fullName: "", dateOfBirth: "", gender: "male", parentName: "", parentPhone: "", parentEmail: "", address: "", previousSchool: "", applyingClass: "Grade 7", academicYear: "2026", notes: "" });
-      toast("Application submitted", "success");
-    } catch (e) { toast(e.message, "error"); }
+      setForm({ 
+        fullName: "", dateOfBirth: "", gender: "male", parentName: "", parentPhone: "", 
+        parentEmail: "", address: "", previousSchool: "", applyingClass: "Grade 7", 
+        academicYear: "2026", notes: "" 
+      });
+      toast("Application submitted successfully", "success");
+    } catch (e) { 
+      console.error("Admission submission error:", e);
+      toast(e.message || "Failed to submit application. Please try again.", "error"); 
+    }
   };
 
   const updateStatus = async (id, status) => {
@@ -118,9 +189,24 @@ export default function AdmissionsPage({ auth, canEdit, toast }) {
       {/* New Application Modal */}
       {showModal && (
         <Modal title="New Admission Application" onClose={() => setShowModal(false)}>
+          <div style={{ background: "#f0f9ff", border: "1px solid #0ea5e9", borderRadius: 8, padding: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color: "#0c4a6e", fontWeight: 600, marginBottom: 4 }}>Application Requirements:</div>
+            <div style={{ fontSize: 12, color: "#0284c7" }}>
+              <div>â¢ Fields marked with * are required</div>
+              <div>â¢ Phone format: 07xxxxxxxx or +2547xxxxxxxx</div>
+              <div>â¢ Student age should be between 3-18 years</div>
+              <div>â¢ Check for existing applications before submitting</div>
+            </div>
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Full Name" style={{ gridColumn: "1 / -1" }}>
-              <input style={inputStyle} value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} placeholder="Student full name" />
+            <Field label="Full Name *" style={{ gridColumn: "1 / -1" }}>
+              <input 
+                style={inputStyle} 
+                value={form.fullName} 
+                onChange={e => setForm({ ...form, fullName: e.target.value })} 
+                placeholder="Enter student's full name (e.g., John Doe)" 
+                required
+              />
             </Field>
             <Field label="Date of Birth">
               <input type="date" style={inputStyle} value={form.dateOfBirth} onChange={e => setForm({ ...form, dateOfBirth: e.target.value })} />
@@ -132,22 +218,39 @@ export default function AdmissionsPage({ auth, canEdit, toast }) {
                 <option value="other">Other</option>
               </select>
             </Field>
-            <Field label="Applying For Class">
-              <select style={inputStyle} value={form.applyingClass} onChange={e => setForm({ ...form, applyingClass: e.target.value })}>
+            <Field label="Applying For Class *">
+              <select style={inputStyle} value={form.applyingClass} onChange={e => setForm({ ...form, applyingClass: e.target.value })} required>
                 {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
               </select>
             </Field>
-            <Field label="Academic Year">
-              <input style={inputStyle} value={form.academicYear} onChange={e => setForm({ ...form, academicYear: e.target.value })} />
+            <Field label="Academic Year *">
+              <input 
+                style={inputStyle} 
+                value={form.academicYear} 
+                onChange={e => setForm({ ...form, academicYear: e.target.value })} 
+                placeholder="e.g., 2026"
+                required
+              />
             </Field>
             <Field label="Parent/Guardian Name">
               <input style={inputStyle} value={form.parentName} onChange={e => setForm({ ...form, parentName: e.target.value })} />
             </Field>
             <Field label="Parent Phone">
-              <input style={inputStyle} value={form.parentPhone} onChange={e => setForm({ ...form, parentPhone: e.target.value })} />
+              <input 
+                style={inputStyle} 
+                value={form.parentPhone} 
+                onChange={e => setForm({ ...form, parentPhone: e.target.value })} 
+                placeholder="0712345678 or +254712345678"
+              />
             </Field>
             <Field label="Parent Email">
-              <input style={inputStyle} value={form.parentEmail} onChange={e => setForm({ ...form, parentEmail: e.target.value })} />
+              <input 
+                type="email"
+                style={inputStyle} 
+                value={form.parentEmail} 
+                onChange={e => setForm({ ...form, parentEmail: e.target.value })} 
+                placeholder="parent@example.com"
+              />
             </Field>
             <Field label="Previous School">
               <input style={inputStyle} value={form.previousSchool} onChange={e => setForm({ ...form, previousSchool: e.target.value })} />

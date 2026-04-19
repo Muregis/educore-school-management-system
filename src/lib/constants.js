@@ -9,15 +9,16 @@ export const DEFAULTS = {
   attendance:[], results:[], payments:[], smsLogs:[], notifications:[],
   feeStructures: [],
   timetable: [],
+  pendingUpdates: [],
 };
 
 export const ROLE = {
-  admin:     { pages:["dashboard","upgrade","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical"], edit:true },
+  admin:     { pages:["dashboard","upgrade","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical","update-requests"], edit:true },
   teacher:   { pages:["dashboard","attendance","grades","reportcards","discipline","timetable","communication","messaging","library","analysis","lessonplans","announcements","exams"], edit:true },
   finance:   { pages:["dashboard","fees","mpesa-reconcile","invoices","announcements","upgrade"], edit:true },
   hr:        { pages:["dashboard","hr","staff","announcements","upgrade"], edit:true },
   librarian: { pages:["dashboard","library","announcements"], edit:true },
-  parent:    { pages:["dashboard","grades","fees","reportcards","attendance","communication","announcements"], edit:false },
+  parent:    { pages:["dashboard","grades","fees","reportcards","attendance","communication","announcements","update-requests"], edit:false },
   student:   { pages:["dashboard","grades","attendance","reportcards","library","announcements"], edit:false },
 };
 
@@ -49,6 +50,7 @@ export const NAV = [
   { id:"exams",           label:"Exams",          icon:"\u{1F4DD}" },
   { id:"bulk-import",     label:"Import/Export",  icon:"\u{1F4C1}" },
   { id:"medical",         label:"Medical",        icon:"\u{1F3E5}" },
+  { id:"update-requests", label:"Update Requests",icon:"\u{1F4DD}" },
   { id:"settings",        label:"Settings",       icon:"\u2699" },
 ];
 

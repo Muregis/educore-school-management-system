@@ -13,10 +13,9 @@ import {
   TermTransitionService,
   StudentEnrollmentService,
   FeeBalanceService,
-  DualWriteService,
   PromotionService,
   PermissionService
-} from "../services/academicServices.js";
+} from "../services/backend_services.js";
 
 const router = express.Router();
 router.use(authRequired);

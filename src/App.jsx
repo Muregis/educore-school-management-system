@@ -39,6 +39,7 @@ import ExamsPage from "./pages/ExamsPage";
 import MedicalRecordsPage from "./pages/MedicalRecordsPage";
 import QRVerificationPage from "./pages/QRVerificationPage";
 import UpgradePage from "./pages/UpgradePage";
+import UpdateRequestsPage from "./pages/UpdateRequestsPage";
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import Sidebar from "./components/Sidebar";
 import { apiFetch } from "./lib/api";
@@ -120,6 +121,7 @@ const TENANT_STATE_KEYS = [
   "educore.payments",
   "educore.notifications",
   "educore.timetable",
+  "educore.pendingUpdates",
 ];
 
 function clearTenantLocalState() {
@@ -144,6 +146,7 @@ export default function App() {
   const [payments, setPayments]           = useLocalState("educore.payments",       DEFAULTS.payments);
   const [notifications, setNotifications] = useLocalState("educore.notifications",  DEFAULTS.notifications);
   const [timetable, setTimetable]         = useLocalState("educore.timetable",      DEFAULTS.timetable);
+  const [pendingUpdates, setPendingUpdates] = useLocalState("educore.pendingUpdates", DEFAULTS.pendingUpdates);
 
   const [auth, setAuth] = useState(() => {
     // Check if this is a new browser session
@@ -184,12 +187,18 @@ export default function App() {
 
   useEffect(() => { setDrawerOpen(false); }, [page]);
 
-  const toast = useCallback((text, type = "success") => {
+  const toast = useCallback((text, type = "success", category = "general") => {
     const id = genId();
     setToasts(prev => [...prev, { id, text, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
     if (auth && ["admin","teacher","finance"].includes(auth.role)) {
-      setNotifications(prev => [{ id: genId(), message: text, read: false, time: new Date().toLocaleString() }, ...prev].slice(0, 80));
+      setNotifications(prev => [{ 
+        id: genId(), 
+        message: text, 
+        read: false, 
+        time: new Date().toLocaleString(),
+        category: category
+      }, ...prev].slice(0, 80));
     }
   }, [auth, setNotifications]);
 
@@ -260,8 +269,8 @@ export default function App() {
     setSchool(DEFAULTS.school); setUsers(DEFAULTS.users); setStudents(DEFAULTS.students);
     setTeachers(DEFAULTS.teachers); setAttendance(DEFAULTS.attendance); setResults(DEFAULTS.results);
     setFeeStructures(DEFAULTS.feeStructures); setPayments(DEFAULTS.payments); setNotifications(DEFAULTS.notifications);
-    setTimetable(DEFAULTS.timetable);
-  }, [setSchool, setUsers, setStudents, setTeachers, setAttendance, setResults, setFeeStructures, setPayments, setNotifications, setTimetable]);
+    setTimetable(DEFAULTS.timetable); setPendingUpdates(DEFAULTS.pendingUpdates);
+  }, [setSchool, setUsers, setStudents, setTeachers, setAttendance, setResults, setFeeStructures, setPayments, setNotifications, setTimetable, setPendingUpdates]);
 
   const hydrateTenantData = useCallback(async (loggedInAuth) => {
     if (!loggedInAuth?.token) return;
@@ -375,7 +384,7 @@ export default function App() {
     subjects: <SubjectsPage auth={auth} toast={toast} />,
     fees: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <FeesPage auth={auth} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     "mpesa-reconcile": <MpesaReconciliationPage auth={auth} students={students} toast={toast} />,
-    "bulk-import": <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} payments={payments} feeStructures={feeStructures} />,
+    "bulk-import": auth.role === "admin" ? <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} payments={payments} feeStructures={feeStructures} results={results} /> : <Forbidden />,
     upgrade: auth.role === "admin" ? <UpgradePage auth={auth} toast={toast} /> : <Forbidden />,
     exams: <ExamsPage auth={auth} students={students} subjects={[]} toast={toast} />,
     admissions: <AdmissionsPage auth={auth} canEdit={canEdit} toast={toast} />,
@@ -396,6 +405,7 @@ export default function App() {
     reports: ["admin","teacher"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
     analysis: ["admin","teacher"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,
     medical: auth.role === "admin" ? <MedicalRecordsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
+    "update-requests": ["admin","parent"].includes(auth.role) ? <UpdateRequestsPage auth={auth} students={students} pendingUpdates={pendingUpdates} setPendingUpdates={setPendingUpdates} toast={toast} /> : <Forbidden />,
     settings: auth.role === "admin"
       ? <AdminSettings auth={auth} onPermissionsSaved={() => loadRolePermissions(auth.token)} />
       : <Forbidden />,

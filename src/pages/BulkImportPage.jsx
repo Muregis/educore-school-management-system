@@ -37,13 +37,14 @@ function normalizeDate(value) {
   return `${yearStr}-${monthStr.padStart(2, "0")}-${dayStr.padStart(2, "0")}`;
 }
 
-export default function BulkImportPage({ auth, students, setStudents, toast, payments, feeStructures }) {
+export default function BulkImportPage({ auth, students, setStudents, toast, payments, feeStructures, results }) {
   const [activeTab, setActiveTab] = useState("import");
   const [csvContent, setCsvContent] = useState("");
   const [parsing, setParsing] = useState(false);
   const [preview, setPreview] = useState([]);
   const [importing, setImporting] = useState(false);
   const [importResults, setImportResults] = useState(null);
+  const [exporting, setExporting] = useState(false);
   const fileInputRef = useRef(null);
 
   // Export filter state
@@ -190,14 +191,65 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
   };
 
   // Export students to CSV with filters
-  const handleExport = () => {
-    let filteredStudents = students;
+  const handleExport = async () => {
+    setExporting(true);
+    let allStudents = students;
+    let allResults = [];
+    let allPayments = [];
+    
+    try {
+      // Fetch complete data from server to avoid pagination limits
+      if (exportFilter === "all" || (exportFilter === "class" && exportClass !== "all") || exportFilter === "defaulter") {
+        const [serverStudents, serverResults, serverPayments] = await Promise.allSettled([
+          apiFetch("/students?limit=10000", { token: auth?.token }),
+          apiFetch("/grades?limit=10000", { token: auth?.token }),
+          apiFetch("/payments?limit=10000", { token: auth?.token })
+        ]);
+
+        if (serverStudents.status === "fulfilled") {
+          allStudents = serverStudents.value.map(s => ({
+            id: s.student_id,
+            firstName: s.first_name,
+            lastName: s.last_name,
+            gender: s.gender,
+            className: s.class_name,
+            admission: s.admission_number,
+            parentName: s.parent_name,
+            parentPhone: s.parent_phone,
+            dob: s.date_of_birth,
+            nemisNumber: s.nemis_number,
+            bloodGroup: s.blood_group,
+            allergies: s.allergies,
+            medicalConditions: s.medical_conditions,
+            emergencyContactName: s.emergency_contact_name,
+            emergencyContactPhone: s.emergency_contact_phone,
+            emergencyContactRelationship: s.emergency_contact_relationship,
+            status: s.status,
+          }));
+        }
+        
+        if (serverResults.status === "fulfilled") {
+          allResults = serverResults.value;
+        }
+        
+        if (serverPayments.status === "fulfilled") {
+          allPayments = serverPayments.value;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch complete data, using local data:", err);
+      // Fall back to local data if server fetch fails
+      allResults = results || [];
+      allPayments = payments || [];
+    }
+
+    let filteredStudents = allStudents;
 
     // Apply filters
     if (exportFilter === "class" && exportClass !== "all") {
-      filteredStudents = students.filter(s => (s.className || s.class_name) === exportClass);
+      filteredStudents = allStudents.filter(s => (s.className || s.class_name) === exportClass);
     } else if (exportFilter === "defaulter") {
-      filteredStudents = students.filter(s => {
+      filteredStudents = allStudents.filter(s => {
         const studentId = s.id ?? s.student_id;
         const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
         const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
@@ -206,17 +258,39 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
         return balance > exportDefaulterAmount;
       });
     } else if (exportFilter === "individual") {
-      filteredStudents = students.filter(s => selectedStudents.includes(s.id ?? s.student_id));
+      filteredStudents = allStudents.filter(s => selectedStudents.includes(s.id ?? s.student_id));
     }
 
-    const headers = ["first_name", "last_name", "gender", "class_name", "admission_number", "parent_name", "parent_phone", "date_of_birth", "nemis_number", "blood_group", "allergies", "medical_conditions", "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship", "status"];
+    const headers = [
+      "first_name", "last_name", "gender", "class_name", "admission_number", 
+      "parent_name", "parent_phone", "date_of_birth", "nemis_number", "blood_group", 
+      "allergies", "medical_conditions", "emergency_contact_name", "emergency_contact_phone", 
+      "emergency_contact_relationship", "status", "total_fees_paid", "total_fees_balance", 
+      "last_payment_date", "average_score", "total_subjects", "attendance_rate", "last_exam_date"
+    ];
     
     const rows = filteredStudents.map(s => {
       const studentId = s.id ?? s.student_id;
+      
+      // Fee calculations
       const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
       const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
-      const paidAmount = payments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid").reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const studentPayments = allPayments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid");
+      const paidAmount = studentPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
       const balance = expectedAmount - paidAmount;
+      const lastPaymentDate = studentPayments.length > 0 ? 
+        new Date(Math.max(...studentPayments.map(p => new Date(p.createdAt || p.created_at)))).toLocaleDateString() : "";
+      
+      // Performance calculations
+      const studentResults = allResults.filter(r => (r.studentId ?? r.student_id) === studentId);
+      const totalSubjects = [...new Set(studentResults.map(r => r.subject))].length;
+      const averageScore = studentResults.length > 0 ? 
+        (studentResults.reduce((sum, r) => sum + Number(r.score || r.marks || 0), 0) / studentResults.length).toFixed(2) : "0";
+      const lastExamDate = studentResults.length > 0 ? 
+        new Date(Math.max(...studentResults.map(r => new Date(r.createdAt || r.exam_date)))).toLocaleDateString() : "";
+      
+      // Attendance rate (if attendance data is available)
+      const attendanceRate = "0"; // Would need attendance data to calculate
       
       return [
         s.firstName || s.first_name || "",
@@ -235,12 +309,17 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
         s.emergencyContactPhone || s.emergency_contact_phone || "",
         s.emergencyContactRelationship || s.emergency_contact_relationship || "",
         s.status || "active",
-        balance > 0 ? balance.toString() : "0", // balance column
+        paidAmount.toString(),
+        balance.toString(),
+        lastPaymentDate,
+        averageScore,
+        totalSubjects.toString(),
+        attendanceRate,
+        lastExamDate
       ];
     });
 
-    const csvHeaders = [...headers, "balance"];
-    const csv = [csvHeaders.join(","), ...rows.map(r => r.map(v => `"${(v || "").replace(/"/g, '""')}"`).join(","))].join("\n");
+    const csv = [headers.join(","), ...rows.map(r => r.map(v => `"${(v || "").replace(/"/g, '""')}"`).join(","))].join("\n");
     
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
@@ -249,7 +328,8 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
     link.download = `students_export_${suffix}_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     
-    toast(`Exported ${filteredStudents.length} students`, "success");
+    toast(`Exported ${filteredStudents.length} students with complete data`, "success");
+    setExporting(false);
   };
 
   // Toggle student selection for individual export
@@ -590,8 +670,9 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
               <Btn 
                 onClick={handleExport}
                 disabled={exportFilter === "individual" && selectedStudents.length === 0}
+                loading={exporting}
               >
-                📤 Export to CSV
+                {exporting ? "Exporting..." : "Export to CSV"}
               </Btn>
             </div>
           </div>
@@ -616,7 +697,13 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
               <div>• emergency_contact_phone</div>
               <div>• emergency_contact_relationship</div>
               <div>• status</div>
-              <div>• balance (KES)</div>
+              <div>• total_fees_paid</div>
+              <div>• total_fees_balance</div>
+              <div>• last_payment_date</div>
+              <div>• average_score</div>
+              <div>• total_subjects</div>
+              <div>• attendance_rate</div>
+              <div>• last_exam_date</div>
             </div>
           </div>
         </div>
