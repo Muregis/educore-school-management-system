@@ -113,7 +113,7 @@ router.put("/:id", requireRoles("admin","teacher"), async (req, res, next) => {
 });
 
 // ─── Delete announcement ───────────────────────────────────────────────────
-router.delete("/:id", requireRoles("admin"), async (req, res, next) => {
+router.delete("/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { id } = req.params;

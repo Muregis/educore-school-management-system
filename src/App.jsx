@@ -41,6 +41,7 @@ import QRVerificationPage from "./pages/QRVerificationPage";
 import UpgradePage from "./pages/UpgradePage";
 import UpdateRequestsPage from "./pages/UpdateRequestsPage";
 import BranchManagementPage from "./pages/BranchManagementPage"; // NEW: Branch management
+import AdminPermissionsPage from "./pages/AdminPermissionsPage"; // NEW: Director admin permissions
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import Sidebar from "./components/Sidebar";
 import { BranchSelector } from "./components/BranchSelector"; // NEW: Branch/campus selector
@@ -409,6 +410,7 @@ export default function App() {
     medical: auth.role === "admin" ? <MedicalRecordsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
     "update-requests": ["admin","parent"].includes(auth.role) ? <UpdateRequestsPage auth={auth} students={students} pendingUpdates={pendingUpdates} setPendingUpdates={setPendingUpdates} toast={toast} /> : <Forbidden />,
     "branch-management": ["admin","director","superadmin"].includes(auth.role) ? <BranchManagementPage auth={auth} toast={toast} /> : <Forbidden />,
+    "admin-permissions": ["director","superadmin"].includes(auth.role) ? <AdminPermissionsPage auth={auth} toast={toast} /> : <Forbidden />,
     settings: auth.role === "admin"
       ? <AdminSettings auth={auth} onPermissionsSaved={() => loadRolePermissions(auth.token)} />
       : <Forbidden />,

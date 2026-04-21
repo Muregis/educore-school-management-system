@@ -13,14 +13,23 @@ export const DEFAULTS = {
 };
 
 export const ROLE = {
-  admin:     { pages:["dashboard","upgrade","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical","update-requests","branch-management"], edit:true },
-  director:  { pages:["dashboard","students","staff","attendance","grades","subjects","fees","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","announcements","exams","medical","branch-management"], edit:true },
+  // Director - HIGHEST ROLE - Full control over all schools, can delegate permissions
+  director:  { pages:["dashboard","upgrade","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical","update-requests","branch-management","admin-permissions"], edit:true, canDelegate:true },
+  // Superadmin - System-level full access
   superadmin:{ pages:["dashboard","upgrade","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical","update-requests","branch-management"], edit:true },
+  // Admin - LIMITED (secretary-level) - Basic operations, needs director delegation for advanced features
+  admin:     { pages:["dashboard","students","attendance","communication","announcements"], edit:false, needsDelegation:true },
+  // Teacher - Classroom operations
   teacher:   { pages:["dashboard","attendance","grades","reportcards","discipline","timetable","communication","messaging","library","analysis","lessonplans","announcements","exams"], edit:true },
+  // Finance - Fee operations
   finance:   { pages:["dashboard","fees","mpesa-reconcile","invoices","announcements","upgrade"], edit:true },
+  // HR - Staff management
   hr:        { pages:["dashboard","hr","staff","announcements","upgrade"], edit:true },
+  // Librarian - Library management
   librarian: { pages:["dashboard","library","announcements"], edit:true },
+  // Parent - View child data
   parent:    { pages:["dashboard","grades","fees","reportcards","attendance","communication","announcements","update-requests"], edit:false },
+  // Student - View own data
   student:   { pages:["dashboard","grades","attendance","reportcards","library","announcements"], edit:false },
 };
 
@@ -54,6 +63,7 @@ export const NAV = [
   { id:"medical",         label:"Medical",        icon:"\u{1F3E5}" },
   { id:"update-requests", label:"Update Requests",icon:"\u{1F4DD}" },
   { id:"branch-management", label:"Branches",   icon:"\u{1F3DB}" },
+  { id:"admin-permissions", label:"Admin Permissions",icon:"\u{1F510}" },
   { id:"settings",        label:"Settings",       icon:"\u2699" },
 ];
 

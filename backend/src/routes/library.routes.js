@@ -98,7 +98,7 @@ router.put("/books/:id", requireRoles("admin","librarian"), async (req, res, nex
 });
 
 // ── DELETE book ───────────────────────────────────────────────────────────────
-router.delete("/books/:id", requireRoles("admin"), async (req, res, next) => {
+router.delete("/books/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 

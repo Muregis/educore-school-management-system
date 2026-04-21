@@ -6,7 +6,7 @@ import { logTenantContext, logTenantQuery } from "../helpers/tenant-debug.logger
 
 const router = Router();
 router.use(authRequired);
-router.use(requireRoles("admin"));
+router.use(requireRoles("admin", "director", "superadmin"));
 
 function handleActivityLogsDbError(err, res, next, meta = {}) {
   const msg = String(err?.message || "");

@@ -274,7 +274,7 @@ router.put("/:id", requireAuth, requireRoles("admin", "teacher"), async (req, re
 });
 
 // DELETE /api/subjects/:id - Soft delete subject (admin only)
-router.delete("/:id", requireAuth, requireRoles("admin"), async (req, res, next) => {
+router.delete("/:id", requireAuth, requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { id } = req.params;
@@ -319,7 +319,7 @@ router.get("/categories/list", requireAuth, async (req, res, next) => {
 });
 
 // POST /api/subjects/seed-defaults - Seed default Kenyan curriculum subjects
-router.post("/seed-defaults", requireAuth, requireRoles("admin"), async (req, res, next) => {
+router.post("/seed-defaults", requireAuth, requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 

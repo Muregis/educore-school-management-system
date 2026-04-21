@@ -45,6 +45,7 @@ import newApiRoutes       from "./routes/new_api_routes.js";
 import updateRequestsRoutes from "./routes/update_requests.js";
 import enhancedExportsRoutes from "./routes/enhanced_exports.js";
 import branchRoutes          from "./routes/branch.routes.js"; // NEW: Branch support
+import adminPermissionsRoutes from "./routes/admin-permissions.routes.js"; // NEW: Director admin permissions
 // import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }    from "./middleware/error.js";
 import { authRequired } from "./middleware/auth.js";
@@ -144,6 +145,7 @@ app.use("/api/medical",         medicalRoutes);
 app.use("/api/students",        updateRequestsRoutes);
 app.use("/api",                 enhancedExportsRoutes);
 app.use("/api/branches",        branchRoutes); // NEW: Branch/campus support
+app.use("/api/admin-permissions", adminPermissionsRoutes); // NEW: Director admin permissions
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
 

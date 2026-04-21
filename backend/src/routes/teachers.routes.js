@@ -148,7 +148,7 @@ router.put("/:id", requireRoles("admin", "hr"), async (req, res, next) => {
   }
 });
 
-router.delete("/:id", requireRoles("admin"), async (req, res, next) => {
+router.delete("/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { data: deletedTeacher, error } = await supabase

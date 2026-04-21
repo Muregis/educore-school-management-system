@@ -55,7 +55,7 @@ router.post("/", async (req, res, next) => {
 });
 
 // PATCH update status
-router.patch("/:id", requireRoles("admin"), async (req, res, next) => {
+router.patch("/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { status, notes } = req.body;
@@ -82,7 +82,7 @@ router.patch("/:id", requireRoles("admin"), async (req, res, next) => {
 });
 
 // DELETE
-router.delete("/:id", requireRoles("admin"), async (req, res, next) => {
+router.delete("/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { error } = await supabase

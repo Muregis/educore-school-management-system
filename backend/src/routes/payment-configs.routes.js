@@ -190,7 +190,7 @@ router.post("/test", requireRoles("admin", "finance"), async (req, res, next) =>
 });
 
 // ─── DELETE payment configuration ───────────────────────────────────────────────
-router.delete("/", requireRoles("admin"), async (req, res, next) => {
+router.delete("/", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 

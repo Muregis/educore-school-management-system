@@ -22,7 +22,7 @@ router.get("/routes", async (req, res, next) => {
   }
 });
 
-router.post("/routes", requireRoles("admin"), async (req, res, next) => {
+router.post("/routes", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { routeName, driverName = null, vehicleNumber = null, fee = 0, status = "active" } = req.body;
@@ -81,7 +81,7 @@ router.get("/assignments", async (req, res, next) => {
   }
 });
 
-router.post("/assignments", requireRoles("admin"), async (req, res, next) => {
+router.post("/assignments", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId, transportId, startDate, endDate = null, status = "active" } = req.body;

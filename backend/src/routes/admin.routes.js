@@ -13,7 +13,7 @@ const router  = Router();
 const BACKUP_DIR = path.resolve("backups");
 
 router.use(authRequired);
-router.use(requireRoles("admin"));
+router.use(requireRoles("admin", "director", "superadmin"));
 // ── GET /api/admin/backups ────────────────────────────────────────────────────
 router.get("/backups", (req, res) => {
   const backups = listBackups().map(b => ({

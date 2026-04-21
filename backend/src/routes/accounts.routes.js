@@ -78,7 +78,7 @@ router.get("/staff", async (req, res, next) => {
 });
 
 // POST /api/accounts/staff — create a new staff account (admin-only)
-router.post("/staff", requireRoles("admin"), async (req, res, next) => {
+router.post("/staff", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { name, email, phone, role, password, status = "active" } = req.body;
@@ -188,7 +188,7 @@ router.patch("/staff/:id", async (req, res, next) => {
 });
 
 // DELETE /api/accounts/staff/:id — soft delete (admin-only, cannot delete yourself or last admin)
-router.delete("/staff/:id", requireRoles("admin"), async (req, res, next) => {
+router.delete("/staff/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const targetId = req.params.id;
@@ -291,7 +291,7 @@ router.get("/portal", async (req, res, next) => {
 });
 
 // POST /api/accounts/portal (admin-only)
-router.post("/portal", requireRoles("admin"), async (req, res, next) => {
+router.post("/portal", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId, role, password, name } = req.body;
@@ -387,7 +387,7 @@ router.patch("/portal/:id", async (req, res, next) => {
 });
 
 // DELETE /api/accounts/portal/:id (admin-only)
-router.delete("/portal/:id", requireRoles("admin"), async (req, res, next) => {
+router.delete("/portal/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { error } = await supabase

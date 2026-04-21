@@ -5,8 +5,9 @@
  */
 
 import { useState, useEffect } from "react";
+import { API_BASE } from "../lib/api.js";
 
-const API_URL = import.meta.env.VITE_API_URL || "";
+const API_URL = API_BASE;
 
 export function useBranches() {
   const [branches, setBranches] = useState([]);
@@ -18,10 +19,13 @@ export function useBranches() {
   const [canAccessBranches, setCanAccessBranches] = useState(false);
   const [isDirector, setIsDirector] = useState(false);
 
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
 
   const fetchBranches = async () => {
-    if (!token) return;
+    if (!token) {
+      setCanAccessBranches(false);
+      return;
+    }
     
     setLoading(true);
     try {

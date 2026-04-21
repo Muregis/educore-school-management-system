@@ -218,7 +218,7 @@ router.post("/", requireRoles("admin","teacher"), async (req, res, next) => {
 });
 
 // PUT approve report card (admin only)
-router.put("/:id/approve", requireRoles("admin"), async (req, res, next) => {
+router.put("/:id/approve", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { id } = req.params;
@@ -247,7 +247,7 @@ router.put("/:id/approve", requireRoles("admin"), async (req, res, next) => {
 });
 
 // PUT publish report card (admin only)
-router.put("/:id/publish", requireRoles("admin"), async (req, res, next) => {
+router.put("/:id/publish", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { id } = req.params;

@@ -314,7 +314,7 @@ router.put("/:id", requireRoles("teacher", "admin"), async (req, res, next) => {
 });
 
 // ── POST /api/lesson-plans/:id/analyze — admin runs AI compliance check ───────
-router.post("/:id/analyze", requireRoles("admin"), async (req, res, next) => {
+router.post("/:id/analyze", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { data: plan, error: fetchError } = await supabase
@@ -388,7 +388,7 @@ Respond in EXACTLY this JSON format (no markdown, no extra text):
 });
 
 // ── POST /api/lesson-plans/:id/approve ────────────────────────────────────────
-router.post("/:id/approve", requireRoles("admin"), async (req, res, next) => {
+router.post("/:id/approve", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const { error } = await supabase
@@ -409,7 +409,7 @@ router.post("/:id/approve", requireRoles("admin"), async (req, res, next) => {
 });
 
 // ── POST /api/lesson-plans/:id/reject ────────────────────────────────────────
-router.post("/:id/reject", requireRoles("admin"), async (req, res, next) => {
+router.post("/:id/reject", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const { feedback } = req.body;

@@ -141,7 +141,7 @@ router.put("/:id", requireAuth, requireRoles("admin", "teacher"), async (req, re
 });
 
 // DELETE /api/exams/:id
-router.delete("/:id", requireAuth, requireRoles("admin"), async (req, res, next) => {
+router.delete("/:id", requireAuth, requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { id } = req.params;

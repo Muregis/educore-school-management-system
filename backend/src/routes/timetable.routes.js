@@ -92,7 +92,7 @@ router.get("/", async (req, res, next) => {
 });
 
 // ─── POST /api/timetable ─────────────────────────────────────────────────────
-router.post("/", requireRoles("admin"), async (req, res, next) => {
+router.post("/", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { className, dayOfWeek, period, startTime, endTime, subject, teacherId } = req.body;
@@ -133,7 +133,7 @@ router.post("/", requireRoles("admin"), async (req, res, next) => {
 });
 
 // ─── PUT /api/timetable/:id ───────────────────────────────────────────────────
-router.put("/:id", requireRoles("admin"), async (req, res, next) => {
+router.put("/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { className, dayOfWeek, period, startTime, endTime, subject, teacherId } = req.body;
@@ -179,7 +179,7 @@ router.put("/:id", requireRoles("admin"), async (req, res, next) => {
 });
 
 // ─── DELETE /api/timetable/:id ────────────────────────────────────────────────
-router.delete("/:id", requireRoles("admin"), async (req, res, next) => {
+router.delete("/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { data: updated, error } = await supabase

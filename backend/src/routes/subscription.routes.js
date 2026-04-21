@@ -39,7 +39,7 @@ router.get("/", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post("/upgrade", requireRoles("admin"), async (req, res, next) => {
+router.post("/upgrade", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { plan, studentCount, billingCycle = 'monthly', paymentReference } = req.body;
@@ -104,7 +104,7 @@ router.post("/upgrade", requireRoles("admin"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post("/downgrade", requireRoles("admin"), async (req, res, next) => {
+router.post("/downgrade", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { plan } = req.body;
