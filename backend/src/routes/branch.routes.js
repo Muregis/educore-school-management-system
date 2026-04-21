@@ -53,6 +53,14 @@ router.get("/my-branches", authRequired, async (req, res) => {
   try {
     const { school_id, role, user_id } = req.user;
     
+    // DEBUG: Log user info
+    console.log('[BRANCH DEBUG] my-branches request:', {
+      user_id,
+      role,
+      school_id,
+      fullUser: req.user
+    });
+    
     // Parents cannot access branch info
     if (role === "parent" || role === "student") {
       return res.status(403).json({ 
@@ -120,8 +128,8 @@ router.get("/:schoolId", authRequired, async (req, res) => {
       return res.status(403).json({ error: "Unauthorized" });
     }
     
-    // Superadmin can view any school
-    if (role === "superadmin") {
+    // Superadmin and director can view any school
+    if (role === "superadmin" || role === "director") {
       const schoolWithBranches = await getSchoolWithBranches(Number(schoolId));
       if (!schoolWithBranches) {
         return res.status(404).json({ error: "School not found" });
@@ -162,7 +170,7 @@ router.post("/", authRequired, async (req, res) => {
     const { role, school_id } = req.user;
     const { name, branch_code, branch_address, branch_phone, branch_manager_id, email, phone, county } = req.body;
     
-    if (role !== "admin" && role !== "superadmin") {
+    if (role !== "admin" && role !== "superadmin" && role !== "director") {
       return res.status(403).json({ error: "Only admins can create branches" });
     }
     
@@ -170,7 +178,10 @@ router.post("/", authRequired, async (req, res) => {
       return res.status(400).json({ error: "name and branch_code are required" });
     }
     
-    const parentSchoolId = role === "superadmin" ? (req.body.parent_school_id || school_id) : school_id;
+    // Director and superadmin can specify parent_school_id, regular admin uses their own school
+    const parentSchoolId = (role === "superadmin" || role === "director") 
+      ? (req.body.parent_school_id || school_id) 
+      : school_id;
     
     const branch = await createBranch(parentSchoolId, {
       name,

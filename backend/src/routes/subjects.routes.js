@@ -14,6 +14,15 @@ router.get("/", requireAuth, async (req, res, next) => {
     const { schoolId, role } = req.user;
     const { category, active = "true", schoolId: querySchoolId } = req.query;
 
+    // DEBUG: Log request info
+    console.log('[SUBJECTS DEBUG] Request:', {
+      userRole: role,
+      userSchoolId: schoolId,
+      querySchoolId,
+      category,
+      active
+    });
+
     // Directors/superadmins can specify a school_id via query param, or see all subjects
     const effectiveSchoolId = querySchoolId ? Number(querySchoolId) : schoolId;
 

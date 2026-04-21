@@ -62,6 +62,15 @@ export function authRequired(req, res, next) {
   try {
     const payload = jwt.verify(token, env.jwtSecret);
     
+    // DEBUG: Log payload for troubleshooting
+    console.log('[AUTH DEBUG] Token payload:', {
+      role: payload.role,
+      user_id: payload.user_id || payload.userId,
+      school_id: payload.school_id || payload.schoolId,
+      email: payload.email,
+      keys: Object.keys(payload)
+    });
+    
     // Validate required claims
     if (!payload.user_id && !payload.userId) {
       logAuthEvent("ERROR", "JWT_MISSING_USER_ID", {
@@ -79,6 +88,15 @@ export function authRequired(req, res, next) {
     const isSuperadminToken = payload.email === SUPERADMIN_EMAIL || payload.role === 'superadmin';
     const isDirectorToken = payload.role === 'director';
     const isSystemAdmin = isSuperadminToken || isDirectorToken;
+    
+    // DEBUG: Log role detection
+    console.log('[AUTH DEBUG] Role detection:', {
+      isSuperadminToken,
+      isDirectorToken,
+      isSystemAdmin,
+      payloadRole: payload.role,
+      SUPERADMIN_EMAIL
+    });
 
     if (!payload.school_id && !payload.schoolId && !isSystemAdmin) {
       logAuthEvent("ERROR", "JWT_MISSING_SCHOOL_ID", {
