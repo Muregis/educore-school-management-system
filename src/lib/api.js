@@ -10,9 +10,10 @@ function getDefaultApiBase() {
   return isLocalHost ? DEFAULT_LOCAL_API_BASE : DEFAULT_PROD_API_BASE;
 }
 
-// TEMPORARY: Force localhost for testing director features
-// Change back to getDefaultApiBase() for production
-export const API_BASE = DEFAULT_LOCAL_API_BASE;
+// OLD: export const API_BASE = "http://localhost:4001/api";
+export const API_BASE =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
+  getDefaultApiBase();
 
 export async function apiFetch(
   path,
