@@ -25,7 +25,7 @@ export function useBranches() {
     
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/branches/my-branches`, {
+      const response = await fetch(`${API_URL}/branches/my-branches`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -67,7 +67,7 @@ export function useBranches() {
     if (!token) return;
     
     try {
-      const response = await fetch(`${API_URL}/api/branches/switch/${branchId}`, {
+      const response = await fetch(`${API_URL}/branches/switch/${branchId}`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
