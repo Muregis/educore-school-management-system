@@ -53,10 +53,6 @@ router.get("/my-branches", authRequired, async (req, res) => {
   try {
     const { school_id, role, user_id } = req.user;
     
-    if (!school_id) {
-      return res.status(400).json({ error: "No school context" });
-    }
-    
     // Parents cannot access branch info
     if (role === "parent" || role === "student") {
       return res.status(403).json({ 
@@ -65,7 +61,7 @@ router.get("/my-branches", authRequired, async (req, res) => {
       });
     }
     
-    // Director/Superadmin sees ALL schools
+    // Director/Superadmin sees ALL schools (bypass school_id check)
     if (role === "director" || role === "superadmin") {
       const { data: allSchools, error } = await supabase
         .from("schools")
@@ -81,6 +77,11 @@ router.get("/my-branches", authRequired, async (req, res) => {
         totalSchools: allSchools?.length || 0,
         canManageAll: true
       });
+    }
+    
+    // Regular users need school context
+    if (!school_id) {
+      return res.status(400).json({ error: "No school context" });
     }
     
     // Regular admin - get their school + branches

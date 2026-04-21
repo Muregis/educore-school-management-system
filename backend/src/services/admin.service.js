@@ -1,4 +1,5 @@
 import { database } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -331,6 +332,53 @@ export class AdminService {
       };
     } catch (error) {
       console.error('User management data error:', error);
+      throw new Error(`Failed to get user management data: ${error.message}`);
+    }
+  }
+
+  // Get user management data for multiple schools (directors only)
+  static async getUserManagementDataMultiSchool(schoolIds) {
+    try {
+      // Get users from all specified schools using Supabase
+      const { data: users, error } = await supabase
+        .from('users')
+        .select('user_id, full_name, email, role, status, last_login_at, created_at, school_id')
+        .in('school_id', schoolIds)
+        .eq('is_deleted', false)
+        .order('school_id', { ascending: true })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Aggregate stats by role
+      const userStats = {};
+      users?.forEach(user => {
+        if (!userStats[user.role]) {
+          userStats[user.role] = { total: 0, active: 0, recent_logins: 0 };
+        }
+        userStats[user.role].total++;
+        if (user.status === 'active') userStats[user.role].active++;
+        
+        const lastLogin = new Date(user.last_login_at);
+        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        if (lastLogin > weekAgo) userStats[user.role].recent_logins++;
+      });
+
+      // Get recent users from all schools (top 50)
+      const recentUsers = users?.slice(0, 50).map(user => ({
+        ...user,
+        school_id: user.school_id
+      })) || [];
+
+      return {
+        stats: Object.entries(userStats).map(([role, stats]) => ({ role, ...stats })),
+        recentUsers,
+        totalUsers: users?.length || 0,
+        schoolCount: schoolIds.length,
+        schools: [...new Set(users?.map(u => u.school_id) || [])]
+      };
+    } catch (error) {
+      console.error('Multi-school user management data error:', error);
       throw new Error(`Failed to get user management data: ${error.message}`);
     }
   }

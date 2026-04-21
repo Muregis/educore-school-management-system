@@ -55,21 +55,34 @@ async function upsertSchoolSettings(schoolId, values) {
 }
 
 // NEW: GET /api/settings/users (frontend expects this path)
-router.get("/users", requireRoles("admin"), async (req, res, next) => {
+// Directors can use ?all=true to see users from all schools
+router.get("/users", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
+    const { schoolId, role } = req.user;
+    const { all } = req.query;
     const currentUserId = String(req.user?.user_id || req.user?.userId || "");
     
-    console.log(`[DEBUG] Settings/users: schoolId=${schoolId}, currentUserId=${currentUserId}`);
+    console.log(`[DEBUG] Settings/users: schoolId=${schoolId}, currentUserId=${currentUserId}, role=${role}`);
 
-    // Prefer Supabase fluent API (no raw SQL, no MySQL fallback)
-    const { data, error } = await supabase
+    let query = supabase
       .from("users")
       .select("user_id, full_name, email, phone, role, status, created_at, is_deleted, school_id")
-      .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .order("role")
-      .order("full_name");
+      .eq("is_deleted", false);
+
+    // Directors/superadmins can request all schools
+    if ((role === 'director' || role === 'superadmin') && all === 'true') {
+      // Get all school IDs director can access
+      const { getAccessibleSchoolIds } = await import('../services/branch.service.js');
+      const accessibleIds = await getAccessibleSchoolIds(req.user.user_id, schoolId);
+      query = query.in('school_id', accessibleIds);
+    } else {
+      // Regular school-scoped query
+      query = query.eq("school_id", schoolId);
+    }
+
+    query = query.order("role").order("full_name");
+
+    const { data, error } = await query;
     
     if (error) {
       console.error(`[DEBUG] Supabase error:`, error);

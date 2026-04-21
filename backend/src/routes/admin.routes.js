@@ -159,10 +159,29 @@ router.get("/audit-logs", async (req, res, next) => {
 });
 
 // ── GET /api/admin/users ───────────────────────────────────────────────────────
+// Directors can use ?schoolId=X to query any school, or omit to get all schools
 router.get("/users", async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
-    const userData = await AdminService.getUserManagementData(schoolId);
+    const { schoolId: userSchoolId, role } = req.user;
+    const { schoolId: querySchoolId, all } = req.query;
+    
+    // Directors/superadmins can query any school or all schools
+    let targetSchoolId = userSchoolId;
+    if ((role === 'director' || role === 'superadmin') && querySchoolId) {
+      targetSchoolId = Number(querySchoolId);
+    }
+    
+    // If director requests all schools, fetch from all accessible schools
+    if ((role === 'director' || role === 'superadmin') && all === 'true') {
+      const { getAccessibleSchoolIds } = await import('../services/branch.service.js');
+      const accessibleIds = await getAccessibleSchoolIds(req.user.user_id, userSchoolId);
+      
+      // Get users from all accessible schools
+      const allUsersData = await AdminService.getUserManagementDataMultiSchool(accessibleIds);
+      return res.json(allUsersData);
+    }
+    
+    const userData = await AdminService.getUserManagementData(targetSchoolId);
     res.json(userData);
   } catch (error) {
     next(error);

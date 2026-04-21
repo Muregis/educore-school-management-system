@@ -11,14 +11,26 @@ const router = express.Router();
 // GET /api/subjects - List all subjects for school
 router.get("/", requireAuth, async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
-    const { category, active = "true" } = req.query;
+    const { schoolId, role } = req.user;
+    const { category, active = "true", schoolId: querySchoolId } = req.query;
+
+    // Directors/superadmins can specify a school_id via query param, or see all subjects
+    const effectiveSchoolId = querySchoolId ? Number(querySchoolId) : schoolId;
+
+    // Regular users must have a school context
+    if (!effectiveSchoolId && role !== 'director' && role !== 'superadmin') {
+      return res.status(400).json({ message: "School context required" });
+    }
 
     let query = supabase
       .from("subjects")
-      .select("subject_id, name, code, category, description, class_levels, max_marks, pass_marks, is_active, created_at")
-      .eq("school_id", schoolId)
+      .select("subject_id, name, code, category, description, class_levels, max_marks, pass_marks, is_active, created_at, school_id")
       .eq("is_deleted", false);
+
+    // Filter by school_id if specified or for regular users
+    if (effectiveSchoolId) {
+      query = query.eq("school_id", effectiveSchoolId);
+    }
 
     if (active === "true") {
       query = query.eq("is_active", true);

@@ -77,8 +77,10 @@ export function authRequired(req, res, next) {
     }
 
     const isSuperadminToken = payload.email === SUPERADMIN_EMAIL || payload.role === 'superadmin';
+    const isDirectorToken = payload.role === 'director';
+    const isSystemAdmin = isSuperadminToken || isDirectorToken;
 
-    if (!payload.school_id && !payload.schoolId && !isSuperadminToken) {
+    if (!payload.school_id && !payload.schoolId && !isSystemAdmin) {
       logAuthEvent("ERROR", "JWT_MISSING_SCHOOL_ID", {
         requestId: req.requestId,
         path: req.path,
@@ -91,16 +93,17 @@ export function authRequired(req, res, next) {
       });
     }
 
-    // Allow superadmin to bypass school_id requirement
-    if (isSuperadminToken) {
+    // Allow superadmin/director to bypass school_id requirement (they have access to all schools)
+    if (isSystemAdmin) {
       req.user = {
         ...payload,
         user_id: payload.user_id || payload.userId,
         userId: payload.user_id || payload.userId,
-        role: 'superadmin',
-        school_id: null, // Superadmin has access to all schools
-        schoolId: null,
-        isSuperadmin: true
+        role: payload.role || (isSuperadminToken ? 'superadmin' : 'director'),
+        school_id: payload.school_id || payload.schoolId || null, // Use school_id if available, else null for all-school access
+        schoolId: payload.school_id || payload.schoolId || null,
+        isSuperadmin: isSuperadminToken,
+        isDirector: isDirectorToken
       };
       return next();
     }
