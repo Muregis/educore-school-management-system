@@ -17,6 +17,43 @@ import { supabase } from "../config/supabaseClient.js";
 const router = Router();
 
 /**
+ * GET /api/branches/debug-token
+ * Diagnostic endpoint to check token parsing
+ * NO AUTH REQUIRED - for debugging only
+ */
+router.get("/debug-token", (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.json({ error: "No auth header", headers: req.headers });
+    }
+    
+    const token = authHeader.replace("Bearer ", "");
+    if (!token) {
+      return res.json({ error: "No token in header", authHeader });
+    }
+    
+    // Decode token without verification to see payload
+    const base64Payload = token.split('.')[1];
+    const payload = JSON.parse(Buffer.from(base64Payload, 'base64').toString());
+    
+    res.json({
+      tokenPayload: payload,
+      hasRole: !!payload.role,
+      roleValue: payload.role,
+      hasSchoolId: !!(payload.school_id || payload.schoolId),
+      schoolIdValue: payload.school_id || payload.schoolId,
+      userId: payload.user_id || payload.userId,
+      email: payload.email,
+      iat: payload.iat,
+      exp: payload.exp
+    });
+  } catch (err) {
+    res.json({ error: err.message, stack: err.stack });
+  }
+});
+
+/**
  * Helper: Sanitize branch data to hide branch info from parents
  */
 function sanitizeForParents(data, role) {
