@@ -8,7 +8,7 @@ import { env } from "../config/env.js";
 export function generateSupabaseJWT(user) {
   // OLD:
   // const { userId, schoolId, role, name } = user;
-  const { user_id, school_id, role, name } = user;
+  const { user_id, school_id, role, name, parent_school_id, is_branch, accessible_school_ids } = user;
   
   // OLD:
   // console.log("🔐 Generating Supabase JWT for schoolId:", schoolId);
@@ -31,12 +31,20 @@ export function generateSupabaseJWT(user) {
       name: name,
       // OLD:
     // school_id: schoolId // Custom claim for RLS
-    school_id: school_id // Custom claim for RLS
+    school_id: school_id, // Custom claim for RLS
+    // NEW: Branch support
+    parent_school_id: parent_school_id || null,
+    is_branch: is_branch || false,
+    accessible_school_ids: accessible_school_ids || null
     },
     // Custom claim at root level for easier access in RLS
     // OLD:
     // school_id: schoolId
-    school_id: school_id
+    school_id: school_id,
+    // NEW: Branch claims at root level
+    parent_school_id: parent_school_id || null,
+    is_branch: is_branch || false,
+    accessible_school_ids: accessible_school_ids || null
   };
 
   if (!env.supabaseJwtSecret) {

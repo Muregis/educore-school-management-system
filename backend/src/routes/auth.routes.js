@@ -306,9 +306,10 @@ router.post("/login", authRateLimit, async (req, res, next) => {
       console.error("Failed to generate Supabase JWT:", error.message);
     }
 
+    // NEW: Fetch school with branch info
     const { data: schoolData } = await supabase
       .from("schools")
-      .select("plan, plan_expires_at")
+      .select("plan, plan_expires_at, is_branch, parent_school_id, branch_code")
       .eq("school_id", normalizedSchoolId)
       .single();
 
@@ -330,10 +331,24 @@ router.post("/login", authRateLimit, async (req, res, next) => {
     req.user = userPayload;
     logActivity(req, { action: "auth.login", description: `${role} login: ${name}` });
 
+    // Hide branch info from parents/students - they see unified school
+    const isParentOrStudent = role === "parent" || role === "student";
+    
     res.json({
       token,
       supabaseToken,
-      user: { userId: user.user_id, schoolId: normalizedSchoolId, role, name, email: user.email, plan: schoolPlan },
+      user: { 
+        userId: user.user_id, 
+        schoolId: normalizedSchoolId, 
+        role, 
+        name, 
+        email: user.email, 
+        plan: schoolPlan,
+        // Branch info: HIDDEN from parents, visible to staff
+        isBranch: isParentOrStudent ? false : (schoolData?.is_branch || false),
+        parentSchoolId: isParentOrStudent ? null : (schoolData?.parent_school_id || null),
+        branchCode: isParentOrStudent ? null : (schoolData?.branch_code || null)
+      },
     });
   } catch (err) {
     next(err);

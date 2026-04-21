@@ -40,8 +40,10 @@ import MedicalRecordsPage from "./pages/MedicalRecordsPage";
 import QRVerificationPage from "./pages/QRVerificationPage";
 import UpgradePage from "./pages/UpgradePage";
 import UpdateRequestsPage from "./pages/UpdateRequestsPage";
+import BranchManagementPage from "./pages/BranchManagementPage"; // NEW: Branch management
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import Sidebar from "./components/Sidebar";
+import { BranchSelector } from "./components/BranchSelector"; // NEW: Branch/campus selector
 import { apiFetch } from "./lib/api";
 
 // Mobile portal imports
@@ -406,6 +408,7 @@ export default function App() {
     analysis: ["admin","teacher"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,
     medical: auth.role === "admin" ? <MedicalRecordsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
     "update-requests": ["admin","parent"].includes(auth.role) ? <UpdateRequestsPage auth={auth} students={students} pendingUpdates={pendingUpdates} setPendingUpdates={setPendingUpdates} toast={toast} /> : <Forbidden />,
+    "branch-management": ["admin","director","superadmin"].includes(auth.role) ? <BranchManagementPage auth={auth} toast={toast} /> : <Forbidden />,
     settings: auth.role === "admin"
       ? <AdminSettings auth={auth} onPermissionsSaved={() => loadRolePermissions(auth.token)} />
       : <Forbidden />,
@@ -491,6 +494,10 @@ export default function App() {
           </div>
 
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            {/* NEW: Branch Selector - shows for admin/director only */}
+            {!isMobile && ["admin","director","superadmin"].includes(auth.role) && (
+              <BranchSelector />
+            )}
             {!isMobile && (
               <div style={{ background:`${roleColor}18`, border:`1px solid ${roleColor}44`, borderRadius:20, padding:"4px 12px", fontSize:11, fontWeight:700, color:roleColor, textTransform:"capitalize" }}>{auth.role}</div>
             )}

@@ -276,7 +276,7 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const {
-      firstName, lastName, gender, className, classId,
+      admissionNumber, firstName, lastName, gender, className, classId,
       dateOfBirth, nemisNumber, phone, parentName, parentPhone,
       bloodGroup, allergies, medicalConditions, emergencyContactName, emergencyContactPhone, emergencyContactRelationship,
       email, address, photoUrl, status
@@ -302,9 +302,27 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
       }
     }
 
+    const normalizedAdmissionNumber = admissionNumber ? normalizeAdmissionNumber(admissionNumber) : null;
+
+    // Check for duplicate if admission number is being changed
+    if (normalizedAdmissionNumber) {
+      const { data: existing } = await supabase
+        .from('students')
+        .select('student_id')
+        .eq('school_id', schoolId)
+        .ilike('admission_number', normalizedAdmissionNumber)
+        .neq('student_id', req.params.id)
+        .eq('is_deleted', false)
+        .limit(1);
+      if (existing?.length) {
+        return res.status(409).json({ message: "Admission number already exists" });
+      }
+    }
+
     const { data: updated, error } = await supabase
       .from('students')
       .update({
+        ...(normalizedAdmissionNumber && { admission_number: normalizedAdmissionNumber }),
         first_name: firstName,
         last_name: lastName,
         gender,
@@ -334,6 +352,33 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
 
     if (error) throw error;
     if (!updated) return res.status(404).json({ message: "Student not found" });
+
+    // Update portal account emails if admission number changed
+    if (normalizedAdmissionNumber) {
+      try {
+        await supabase
+          .from('users')
+          .update({ 
+            email: `${normalizedAdmissionNumber.toLowerCase()}.student@portal`,
+            full_name: `${firstName} ${lastName}`
+          })
+          .eq('student_id', req.params.id)
+          .eq('school_id', schoolId)
+          .eq('role', 'student');
+        
+        await supabase
+          .from('users')
+          .update({ 
+            email: `${normalizedAdmissionNumber.toLowerCase()}.parent@portal`
+          })
+          .eq('student_id', req.params.id)
+          .eq('school_id', schoolId)
+          .eq('role', 'parent');
+      } catch (userUpdateErr) {
+        console.log('[WARN] Failed to update portal accounts:', userUpdateErr);
+        // Don't fail the whole request if user update fails
+      }
+    }
 
     logActivity(req, { action: "student.update", entity: "student", entityId: req.params.id, description: `Student updated: ${firstName} ${lastName}` });
     res.json({ updated: true });

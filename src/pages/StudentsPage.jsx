@@ -104,7 +104,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       if (editId) {
         await apiFetch(`/students/${editId}`, {
           method: "PUT",
-          body: { firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
+          body: { admissionNumber: f.admission || null, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
           token: auth?.token,
         });
         setStudents(prev => prev.map(s => (s.id === editId || s.student_id === editId) ? { ...normalise(s), ...f, id: editId } : s));
