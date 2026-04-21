@@ -8,12 +8,22 @@ import { promisify } from 'util';
 
 // Role permissions mapping
 const ROLE_PERMISSIONS = {
-  admin: [
+  director: [
     'dashboard', 'upgrade', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees',
     'mpesa-reconcile', 'admissions', 'invoices', 'reportcards', 'discipline', 'transport',
     'communication', 'messaging', 'timetable', 'reports', 'analytics', 'accounts', 'hr',
     'library', 'lessonplans', 'pendingplans', 'settings', 'announcements', 'bulk-import',
-    'exams', 'medical', 'update-requests'
+    'exams', 'medical', 'update-requests', 'academic.view', 'branch-management', 'admin-permissions'
+  ],
+  superadmin: [
+    'dashboard', 'upgrade', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees',
+    'mpesa-reconcile', 'admissions', 'invoices', 'reportcards', 'discipline', 'transport',
+    'communication', 'messaging', 'timetable', 'reports', 'analytics', 'accounts', 'hr',
+    'library', 'lessonplans', 'pendingplans', 'settings', 'announcements', 'bulk-import',
+    'exams', 'medical', 'update-requests', 'academic.view', 'branch-management'
+  ],
+  admin: [
+    'dashboard', 'students', 'attendance', 'communication', 'announcements'
   ],
   teacher: [
     'dashboard', 'attendance', 'grades', 'reportcards', 'discipline', 'timetable',
@@ -178,13 +188,13 @@ const canEdit = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ message: 'Authentication required' });
   }
-  
-  const editableRoles = ['admin', 'teacher', 'hr', 'finance'];
-  
+
+  const editableRoles = ['director', 'superadmin', 'admin', 'teacher', 'hr', 'finance'];
+
   if (!editableRoles.includes(req.user.role)) {
     return res.status(403).json({ message: 'Read-only access' });
   }
-  
+
   next();
 };
 
