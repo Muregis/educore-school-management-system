@@ -540,4 +540,91 @@ router.get("/payslips/export", requireRoles(...HR_ROLES), async (req, res, next)
   } catch (err) { next(err); }
 });
 
+// ═══════════════════════════════════════════════════════════════════
+// BULK SYNC & TRANSFERS
+// ═══════════════════════════════════════════════════════════════════
+
+// Sync all staff matching teacher titles to the teachers table
+router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { data: staff, error: staffError } = await supabase
+      .from('hr_staff')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .eq('status', 'active');
+    
+    if (staffError) throw staffError;
+
+    const teacherRegex = /teacher|tutor|instructor|lecturer/i;
+    const teachersToSync = staff.filter(s => teacherRegex.test(s.job_title));
+    
+    let synced = 0;
+    for (const s of teachersToSync) {
+      const firstName = s.full_name.split(' ')[0] || s.full_name;
+      const lastName = s.full_name.split(' ').slice(1).join(' ') || '';
+      
+      const { error: upsertError } = await supabase
+        .from('teachers')
+        .upsert({
+          school_id: schoolId,
+          first_name: firstName,
+          last_name: lastName,
+          email: s.email,
+          phone: s.phone,
+          subject: s.department || 'General',
+          qualification: s.job_title,
+          status: s.status,
+          staff_id: s.staff_id
+        }, { onConflict: 'school_id,email' }); 
+      
+      if (!upsertError) synced++;
+      else console.error(`Sync error for ${s.full_name}:`, upsertError.message);
+    }
+    
+    res.json({ synced });
+  } catch (err) { next(err); }
+});
+
+// Transfer staff member to another branch
+router.post("/transfer", requireRoles("director", "superadmin"), async (req, res, next) => {
+  try {
+    const { staffId, toSchoolId } = req.body;
+    if (!staffId || !toSchoolId) return res.status(400).json({ message: "staffId and toSchoolId are required" });
+
+    // 1. Get staff details
+    const { data: s, error: fetchError } = await supabase
+      .from('hr_staff')
+      .select('*')
+      .eq('staff_id', staffId)
+      .single();
+
+    if (fetchError || !s) return res.status(404).json({ message: "Staff not found" });
+
+    // 2. Update hr_staff
+    const { error: staffUpdateError } = await supabase
+      .from('hr_staff')
+      .update({ school_id: toSchoolId, updated_at: new Date().toISOString() })
+      .eq('staff_id', staffId);
+    if (staffUpdateError) throw staffUpdateError;
+
+    // 3. Update teachers
+    await supabase
+      .from('teachers')
+      .update({ school_id: toSchoolId, updated_at: new Date().toISOString() })
+      .eq('staff_id', staffId);
+    
+    // 4. Update users (if email exists)
+    if (s.email) {
+      await supabase
+        .from('users')
+        .update({ school_id: toSchoolId, updated_at: new Date().toISOString() })
+        .eq('email', s.email);
+    }
+
+    res.json({ success: true, message: `Staff transferred to school ${toSchoolId}` });
+  } catch (err) { next(err); }
+});
+
 export default router;

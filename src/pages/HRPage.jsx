@@ -52,8 +52,16 @@ export default function HRPage({ auth, canEdit, toast }) {
   const [payYear, setPayYear]   = useState(new Date().getFullYear());
   const [generating, setGen]    = useState(false);
   const [pPage, setPPage]       = useState(1);
-
   const [err, setErr] = useState("");
+
+  // Transfer state
+  const [branches, setBranches] = useState([]);
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [transferStaff, setTStaff] = useState(null);
+  const [destBranch, setDestBranch] = useState("");
+  const [transferring, setTransferring] = useState(false);
+
+  const isDirector = auth?.role?.toLowerCase() === "director" || auth?.role?.toLowerCase() === "superadmin";
 
   const load = async (signal) => {
     setLoading(true);
@@ -81,6 +89,14 @@ export default function HRPage({ auth, canEdit, toast }) {
     if (!auth?.token) return;
     const ac = new AbortController();
     load(ac.signal);
+    if (isDirector) {
+      apiFetch("/branches/my-branches", { token: auth.token })
+        .then(res => {
+          if (res.allSchools) setBranches(res.allSchools);
+          else if (res.branches) setBranches([res.school, ...res.branches]);
+        })
+        .catch(e => console.error("Failed to load branches", e));
+    }
     return () => ac.abort();
   }, [auth]);
 
@@ -199,6 +215,22 @@ export default function HRPage({ auth, canEdit, toast }) {
     } catch(e) { toast("Export failed", "error"); }
   };
 
+  const handleTransfer = async () => {
+    if (!destBranch || !transferStaff) return;
+    setTransferring(true);
+    try {
+      await apiFetch("/hr/transfer", {
+        method: "POST",
+        body: { staffId: transferStaff.staff_id, toSchoolId: Number(destBranch) },
+        token: auth.token
+      });
+      toast(`Transferred ${transferStaff.full_name} to new branch`, "success");
+      setShowTransfer(false);
+      load();
+    } catch (e) { toast(e.message, "error"); }
+    setTransferring(false);
+  };
+
   // Print single payslip
   const printPayslip = (p) => {
     const w = window.open("","_blank");
@@ -311,6 +343,9 @@ export default function HRPage({ auth, canEdit, toast }) {
                     <Badge key="st" text={s.status} tone={STATUS_TONE[s.status]||"info"} />,
                     canEdit ? (
                       <div key="a" style={{display:"flex",gap:4}}>
+                        {isDirector && (
+                          <Btn size="xs" tone="secondary" onClick={() => { setTStaff(s); setDestBranch(""); setShowTransfer(true); }}>Transfer</Btn>
+                        )}
                         <Btn size="xs" variant="ghost" onClick={()=>{ setEditStaff(s); setStaffForm({ fullName:s.full_name, email:s.email||"", phone:s.phone||"", department:s.department, jobTitle:s.job_title, contractType:s.contract_type, startDate:s.start_date?.slice(0,10)||"", salary:s.salary||"", status:s.status, nationalId:s.national_id||"", notes:s.notes||"" }); setErr(""); setShowStaff(true); }}>Edit</Btn>
                         <Btn size="xs" variant="danger" onClick={()=>deleteStaff(s.staff_id)}>Remove</Btn>
                       </div>
@@ -593,6 +628,31 @@ export default function HRPage({ auth, canEdit, toast }) {
           <div style={{ display:"flex", gap:8, justifyContent:"flex-end", marginTop:20 }}>
             <Btn variant="ghost" onClick={()=>setShowPayModal(false)}>Cancel</Btn>
             <Btn tone="success" onClick={markPaid}>Confirm & Record Payment</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── TRANSFER MODAL ── */}
+      {showTransfer && (
+        <Modal title={`Transfer Staff: ${transferStaff?.full_name}`} onClose={() => setShowTransfer(false)}>
+          <div style={{ display: "grid", gap: 14 }}>
+            <div style={{ padding: 10, background: "#f0f9ff", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, color: "#0369a1" }}>
+              Moving a staff member will transfer their profile, teacher records, and user account to the selected branch. Historical records like attendance and payslips will remain at the current branch.
+            </div>
+            <Field label="Destination Branch">
+              <select style={inputStyle} value={destBranch} onChange={e => setDestBranch(e.target.value)}>
+                <option value="">-- Select Branch --</option>
+                {branches.filter(b => Number(b.school_id) !== Number(auth.schoolId)).map(b => (
+                  <option key={b.school_id} value={b.school_id}>{b.name} ({b.branch_code || b.code})</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>
+            <Btn variant="ghost" onClick={() => setShowTransfer(false)}>Cancel</Btn>
+            <Btn tone="primary" onClick={handleTransfer} disabled={!destBranch || transferring}>
+              {transferring ? "Transferring..." : "Confirm Transfer"}
+            </Btn>
           </div>
         </Modal>
       )}
