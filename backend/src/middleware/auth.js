@@ -85,8 +85,9 @@ export function authRequired(req, res, next) {
       });
     }
 
-    const isSuperadminToken = payload.email === SUPERADMIN_EMAIL || payload.role === 'superadmin';
-    const isDirectorToken = payload.role === 'director';
+    const payloadRole = (payload.role || "").toLowerCase();
+    const isSuperadminToken = (payload.email === SUPERADMIN_EMAIL) || (payloadRole === 'superadmin');
+    const isDirectorToken = payloadRole === 'director';
     const isSystemAdmin = isSuperadminToken || isDirectorToken;
     
     // DEBUG: Log role detection
@@ -113,16 +114,26 @@ export function authRequired(req, res, next) {
 
     // Allow superadmin/director to bypass school_id requirement (they have access to all schools)
     if (isSystemAdmin) {
+      // NEW: Support header-based context switching for directors
+      const headerSchoolId = req.headers["x-school-id"] || req.headers["x-effective-school-id"];
+      const effectiveSchoolId = headerSchoolId ? Number(headerSchoolId) : (payload.school_id || payload.schoolId || null);
+
       req.user = {
         ...payload,
         user_id: payload.user_id || payload.userId,
         userId: payload.user_id || payload.userId,
-        role: payload.role || (isSuperadminToken ? 'superadmin' : 'director'),
-        school_id: payload.school_id || payload.schoolId || null, // Use school_id if available, else null for all-school access
-        schoolId: payload.school_id || payload.schoolId || null,
+        role: (payload.role || (isSuperadminToken ? 'superadmin' : 'director')).toLowerCase(),
+        school_id: effectiveSchoolId, 
+        schoolId: effectiveSchoolId,
         isSuperadmin: isSuperadminToken,
-        isDirector: isDirectorToken
+        isDirector: isDirectorToken,
+        originalSchoolId: payload.school_id || payload.schoolId || null
       };
+
+      if (headerSchoolId) {
+        console.log(`[AUTH DEBUG] Director context override applied: ${effectiveSchoolId}`);
+      }
+
       return next();
     }
 
@@ -143,6 +154,7 @@ export function authRequired(req, res, next) {
         path: req.path,
         userId: req.user.user_id,
         schoolId: req.user.school_id,
+        role: req.user.role,
         payloadKeys: Object.keys(payload)
       });
       return res.status(401).json({ 

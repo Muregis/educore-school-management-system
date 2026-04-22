@@ -1,11 +1,6 @@
-/**
- * Branch/Campus Selector Component
- * Allows users to switch between school branches
- * 100% ADDITIVE - New component, no existing files modified
- */
-
 import { useState, useEffect } from "react";
-import { API_BASE } from "../lib/api.js";
+import { API_BASE, apiFetch } from "../lib/api.js";
+import { C } from "../lib/theme.js";
 
 const API_URL = API_BASE;
 
@@ -19,7 +14,7 @@ export function useBranches() {
   const [canAccessBranches, setCanAccessBranches] = useState(false);
   const [isDirector, setIsDirector] = useState(false);
 
-  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+  const token = sessionStorage.getItem("token");
 
   const fetchBranches = async () => {
     if (!token) {
@@ -29,17 +24,7 @@ export function useBranches() {
     
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/branches/my-branches`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch branches");
-      }
-
-      const data = await response.json();
+      const data = await apiFetch("/branches/my-branches", { token });
       
       // Director sees all schools
       if (data.canManageAll && data.allSchools) {
@@ -71,24 +56,16 @@ export function useBranches() {
     if (!token) return;
     
     try {
-      const response = await fetch(`${API_URL}/branches/switch/${branchId}`, {
+      const data = await apiFetch(`/branches/switch/${branchId}`, {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        token
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to switch branch");
-      }
-
-      const data = await response.json();
       
-      // Update localStorage with new school context
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      user.school_id = data.newSchoolId;
-      user.school = data.newSchool;
-      localStorage.setItem("user", JSON.stringify(user));
+      // Update sessionStorage with new school context
+      const auth = JSON.parse(sessionStorage.getItem("educore.auth") || "{}");
+      auth.schoolId = data.newSchoolId;
+      auth.school = data.newSchool;
+      sessionStorage.setItem("educore.auth", JSON.stringify(auth));
       
       // Reload to apply new context
       window.location.reload();
@@ -103,23 +80,19 @@ export function useBranches() {
 
   return {
     branches,
-    allSchools,      // For director
+    allSchools,
     currentBranch,
     parentSchool,
     loading,
     error,
     canAccessBranches,
-    isDirector,      // Flag for director view
+    isDirector,
     refresh: fetchBranches,
     switchBranch,
   };
 }
 
-/**
- * Branch Selector Dropdown Component
- * PARENTS: Component returns null - they never see branch selector
- */
-export function BranchSelector({ className = "" }) {
+export function BranchSelector({ className = "", style = {} }) {
   const {
     branches,
     allSchools,
@@ -133,28 +106,24 @@ export function BranchSelector({ className = "" }) {
 
   const [isOpen, setIsOpen] = useState(false);
   
-  // Get user role from localStorage
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const userRole = user?.role;
-  const currentSchoolId = user?.schoolId;
+  const auth = JSON.parse(sessionStorage.getItem("educore.auth") || "{}");
+  const userRole = auth?.role;
+  const currentSchoolId = auth?.schoolId;
   
-  // Parents and students NEVER see branch selector
   if (userRole === "parent" || userRole === "student") {
     return null;
   }
 
-  // Director sees all schools, admin sees branches
   if (!canAccessBranches) {
     return null;
   }
   
-  // For regular admin, need at least one branch
   if (!isDirector && branches.length === 0) {
     return null;
   }
 
   const formatBranchName = (school) => {
-    if (!school) return "";
+    if (!school) return "System Admin";
     if (school.is_branch && school.branch_code) {
       return `${school.name} (${school.branch_code})`;
     }
@@ -162,7 +131,7 @@ export function BranchSelector({ className = "" }) {
   };
 
   const handleSwitch = async (branchId) => {
-    if (branchId === currentBranch?.school_id) {
+    if (branchId === currentSchoolId) {
       setIsOpen(false);
       return;
     }
@@ -173,140 +142,138 @@ export function BranchSelector({ className = "" }) {
     setIsOpen(false);
   };
 
+  const currentSchoolName = isDirector 
+    ? (allSchools.find(s => s.school_id === currentSchoolId)?.name || "All Schools")
+    : formatBranchName(currentBranch);
+
   return (
-    <div className={`relative ${className}`}>
+    <div style={{ position: "relative", ...style }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-colors"
         disabled={loading}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "8px 12px",
+          background: C.card,
+          border: `1px solid ${C.border}`,
+          borderRadius: 8,
+          color: C.text,
+          cursor: "pointer",
+          fontSize: 13,
+          fontWeight: 600,
+          transition: "all 0.2s"
+        }}
       >
-        <svg
-          className="w-5 h-5 text-gray-500"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-          />
-        </svg>
-        <span className="text-sm font-medium text-gray-700">
-          {isDirector ? "All Schools" : formatBranchName(currentBranch)}
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ color: C.accent }}>🏢</span>
+          <span>{currentSchoolName}</span>
         </span>
-        {isDirector ? (
-          <span className="text-xs text-gray-500">
-            ({allSchools.length} schools)
-          </span>
-        ) : branches.length > 0 && (
-          <span className="text-xs text-gray-500">
-            ({branches.length + 1} locations)
-          </span>
-        )}
-        <svg
-          className={`w-4 h-4 text-gray-500 transition-transform ${
-            isOpen ? "rotate-180" : ""
-          }`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+        <span style={{ fontSize: 10, color: C.textSub, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</span>
       </button>
 
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 z-40"
+            style={{ position: "fixed", inset: 0, zIndex: 1000 }}
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-            <div className="p-3 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-500 uppercase">
-                {isDirector ? "Select School" : "Select Location"}
+          <div style={{
+            position: "absolute",
+            right: 0,
+            marginTop: 8,
+            width: 280,
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 12,
+            boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+            zIndex: 1001,
+            overflow: "hidden"
+          }}>
+            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, background: C.card }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: C.textSub, margin: 0, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                {isDirector ? "Select School" : "Change Campus"}
               </p>
             </div>
             
-            <div className="max-h-64 overflow-y-auto">
+            <div style={{ maxHeight: 320, overflowY: "auto" }}>
               {isDirector ? (
-                // Director sees ALL schools
-                allSchools.map((school) => (
-                  <button
-                    key={school.school_id}
-                    onClick={() => handleSwitch(school.school_id)}
-                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${
-                      currentSchoolId === school.school_id
-                        ? "bg-blue-50 border-l-4 border-blue-500"
-                        : "border-l-4 border-transparent"
-                    }`}
-                  >
-                    <p className="font-medium text-gray-900">
-                      {school.name}
-                      {school.is_branch && (
-                        <span className="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded">Branch</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      ID: {school.school_id}
-                      {school.branch_code && ` • ${school.branch_code}`}
-                      {school.county && ` • ${school.county}`}
-                    </p>
-                  </button>
-                ))
+                allSchools.map((school) => {
+                  const isActive = currentSchoolId === school.school_id;
+                  return (
+                    <button
+                      key={school.school_id}
+                      onClick={() => handleSwitch(school.school_id)}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "12px 16px",
+                        background: isActive ? C.accentDim : "transparent",
+                        border: "none",
+                        borderLeft: `4px solid ${isActive ? C.accent : "transparent"}`,
+                        color: C.text,
+                        cursor: "pointer",
+                        transition: "background 0.2s"
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>
+                        {school.name}
+                        {school.is_branch && (
+                          <span style={{ marginLeft: 8, fontSize: 10, background: C.border, padding: "2px 6px", borderRadius: 4, color: C.textSub }}>Branch</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>
+                        ID: {school.school_id} {school.branch_code && ` • ${school.branch_code}`}
+                      </div>
+                    </button>
+                  );
+                })
               ) : (
                 <>
-                  {/* Regular Admin - Main School */}
                   {parentSchool && (
                     <button
                       onClick={() => handleSwitch(parentSchool.school_id)}
-                      className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${
-                        currentBranch?.school_id === parentSchool.school_id
-                          ? "bg-blue-50 border-l-4 border-blue-500"
-                          : "border-l-4 border-transparent"
-                      }`}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "12px 16px",
+                        background: currentSchoolId === parentSchool.school_id ? C.accentDim : "transparent",
+                        border: "none",
+                        borderLeft: `4px solid ${currentSchoolId === parentSchool.school_id ? C.accent : "transparent"}`,
+                        color: C.text,
+                        cursor: "pointer"
+                      }}
                     >
-                      <p className="font-medium text-gray-900">{parentSchool.name}</p>
-                      <p className="text-xs text-gray-500">Main Campus</p>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{parentSchool.name}</div>
+                      <div style={{ fontSize: 11, color: C.textSub, marginTop: 2 }}>Main Campus</div>
                     </button>
                   )}
                   
-                  {/* Current school if it's main */}
-                  {currentBranch && !currentBranch.is_branch && (
-                    <button
-                      onClick={() => handleSwitch(currentBranch.school_id)}
-                      className="w-full text-left px-4 py-3 bg-blue-50 border-l-4 border-blue-500"
-                    >
-                      <p className="font-medium text-gray-900">{currentBranch.name}</p>
-                      <p className="text-xs text-gray-500">Main Campus</p>
-                    </button>
-                  )}
-                  
-                  {/* Branches */}
-                  {branches.map((branch) => (
-                    <button
-                      key={branch.school_id}
-                      onClick={() => handleSwitch(branch.school_id)}
-                      className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${
-                        currentBranch?.school_id === branch.school_id
-                          ? "bg-blue-50 border-l-4 border-blue-500"
-                          : "border-l-4 border-transparent"
-                      }`}
-                    >
-                      <p className="font-medium text-gray-900">{branch.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {branch.branch_code}
-                        {branch.branch_address && ` • ${branch.branch_address}`}
-                      </p>
-                    </button>
-                  ))}
+                  {branches.map((branch) => {
+                    const isActive = currentSchoolId === branch.school_id;
+                    return (
+                      <button
+                        key={branch.school_id}
+                        onClick={() => handleSwitch(branch.school_id)}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "12px 16px",
+                          background: isActive ? C.accentDim : "transparent",
+                          border: "none",
+                          borderLeft: `4px solid ${isActive ? C.accent : "transparent"}`,
+                          color: C.text,
+                          cursor: "pointer"
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{branch.name}</div>
+                        <div style={{ fontSize: 11, color: C.textSub, marginTop: 2 }}>
+                          {branch.branch_code} {branch.branch_address && ` • ${branch.branch_address}`}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </>
               )}
             </div>
@@ -316,5 +283,7 @@ export function BranchSelector({ className = "" }) {
     </div>
   );
 }
+
+export default BranchSelector;
 
 export default BranchSelector;

@@ -29,6 +29,20 @@ export async function apiFetch(
   const resolvedToken = token || sessionStorage.getItem("token") || null;
   if (resolvedToken) {
     headers["Authorization"] = `Bearer ${resolvedToken}`;
+    
+    // Support director context switching
+    const authString = sessionStorage.getItem("educore.auth");
+    if (authString) {
+      try {
+        const auth = JSON.parse(authString);
+        const role = (auth.role || "").toLowerCase();
+        if ((role === 'director' || role === 'superadmin') && auth.schoolId) {
+          headers["X-School-Id"] = auth.schoolId;
+        }
+      } catch (e) {
+        // ignore parse error
+      }
+    }
   }
 
   const controller = new AbortController();
