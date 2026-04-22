@@ -845,7 +845,10 @@ const PermissionsTab = ({ auth, onSave, onPermissionsSaved }) => {
   const [message, setMessage] = useState(null);
 
   const allPages = useMemo(() => [...NAV, ...NAV_EXTRAS], []);
-  const roles = useMemo(() => Object.keys(defaultPermissions), [defaultPermissions]);
+  const roles = useMemo(() => 
+    Object.keys(defaultPermissions).filter(r => r !== "superadmin" && r !== "director"), 
+    [defaultPermissions]
+  );
 
   const loadPermissions = async () => {
     setLoading(true);
