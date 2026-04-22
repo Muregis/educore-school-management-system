@@ -36,7 +36,7 @@ router.get("/staff", async (req, res, next) => {
       .from('users')
       .select('user_id, full_name, email, phone, role, status, created_at, is_deleted, school_id')
       .eq('school_id', schoolId)
-      .in('role', ['admin', 'teacher', 'finance'])
+      .in('role', ['admin', 'teacher', 'finance', 'director'])
       .eq('is_deleted', false)
       .order('role')
       .order('full_name');

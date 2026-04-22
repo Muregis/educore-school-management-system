@@ -416,16 +416,19 @@ router.patch("/payslips/approve", requireRoles(...HR_ROLES), async (req, res, ne
   } catch (err) { next(err); }
 });
 
-// Mark payslips as paid for a month
+// Mark payslips as paid for a month (supports professional payment recording)
 router.patch("/payslips/mark-paid", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { month, year } = req.body;
-    const { error } = await supabase
+    const { month, year, staffIds, paymentMethod, paymentReference } = req.body;
+
+    let query = supabase
       .from('hr_payslips')
       .update({
         status: 'paid',
         paid_date: new Date().toISOString().slice(0, 10),
+        payment_method: paymentMethod || 'Cash',
+        payment_reference: paymentReference || null,
         updated_at: new Date().toISOString()
       })
       .eq('school_id', schoolId)
@@ -433,6 +436,12 @@ router.patch("/payslips/mark-paid", requireRoles(...HR_ROLES), async (req, res, 
       .eq('year', year)
       .eq('status', 'approved')
       .eq('is_deleted', false);
+
+    if (staffIds && Array.isArray(staffIds)) {
+      query = query.in('staff_id', staffIds);
+    }
+
+    const { error } = await query;
     if (error) throw error;
     res.json({ paid: true });
   } catch (err) { next(err); }
@@ -471,6 +480,63 @@ router.put("/payslips/:id", requireRoles(...HR_ROLES), async (req, res, next) =>
 
     if (updateError) throw updateError;
     res.json({ updated: true });
+  } catch (err) { next(err); }
+});
+
+// Export payroll as CSV for tax filing
+router.get("/payslips/export", requireRoles(...HR_ROLES), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { month, year } = req.query;
+
+    const { data: payslips, error } = await supabase
+      .from('hr_payslips')
+      .select('*, hr_staff(full_name, national_id, pin_number, krapin)') // Include KRA PIN if available
+      .eq('school_id', schoolId)
+      .eq('month', month)
+      .eq('year', year)
+      .eq('is_deleted', false);
+
+    if (error) throw error;
+
+    // Build CSV
+    const headers = [
+      "Staff Name", "ID Number", "KRA PIN", "Month", "Year", 
+      "Basic Salary", "Allowances", "Gross Pay", 
+      "PAYE", "NHIF", "NSSF", "Total Deductions", "Net Pay", 
+      "Status", "Paid Date", "Payment Method", "Reference"
+    ];
+
+    const rows = (payslips || []).map(p => {
+      const gross = Number(p.basic_salary) + Number(p.allowances);
+      const deductions = Number(p.deductions);
+      return [
+        p.hr_staff?.full_name,
+        p.hr_staff?.national_id || "",
+        p.hr_staff?.krapin || p.hr_staff?.pin_number || "",
+        p.month,
+        p.year,
+        p.basic_salary,
+        p.allowances,
+        gross,
+        p.paye,
+        p.nhif,
+        p.nssf,
+        deductions,
+        p.net_pay,
+        p.status,
+        p.paid_date || "",
+        p.payment_method || "",
+        p.payment_reference || ""
+      ].map(v => `"${v}"`).join(",");
+    });
+
+    const csv = [headers.join(","), ...rows].join("\n");
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=payroll_${year}_${month}.csv`);
+    res.send(csv);
+
   } catch (err) { next(err); }
 });
 

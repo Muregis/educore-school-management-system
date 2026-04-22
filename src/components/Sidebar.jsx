@@ -65,6 +65,7 @@ const ROLE_COLORS = {
   finance: "#10b981",
   hr: "#f59e0b",
   librarian: "#8b5cf6",
+  director: "#8b5cf6", // Restored director color
   parent: "#ec4899",
   student: "#06b6d4"
 };
@@ -429,13 +430,14 @@ const Sidebar = ({
                   flexShrink: 0
                 }}
               >
-                {auth?.role === "admin" ? "A"
-                  : auth?.role === "teacher" ? "T"
-                    : auth?.role === "finance" ? "F"
-                      : auth?.role === "hr" ? "H"
-                        : auth?.role === "librarian" ? "L"
-                          : auth?.role === "parent" ? "P"
-                            : auth?.role === "student" ? "S" : "?"}
+                {auth?.role === "superadmin" ? "A"
+                  : auth?.role === "director" ? "D"
+                    : auth?.role === "teacher" ? "T"
+                      : auth?.role === "finance" ? "F"
+                        : auth?.role === "hr" ? "H"
+                          : auth?.role === "librarian" ? "L"
+                            : auth?.role === "parent" ? "P"
+                              : auth?.role === "student" ? "S" : "?"}
               </div>
               <div style={{ minWidth: 0 }}>
                 <div
@@ -480,13 +482,14 @@ const Sidebar = ({
                 color: roleColor
               }}
             >
-              {auth?.role === "admin" ? "A"
-                : auth?.role === "teacher" ? "T"
-                  : auth?.role === "finance" ? "F"
-                    : auth?.role === "hr" ? "H"
-                      : auth?.role === "librarian" ? "L"
-                        : auth?.role === "parent" ? "P"
-                          : auth?.role === "student" ? "S" : "?"}
+              {auth?.role === "superadmin" ? "A"
+                : auth?.role === "director" ? "D"
+                  : auth?.role === "teacher" ? "T"
+                    : auth?.role === "finance" ? "F"
+                      : auth?.role === "hr" ? "H"
+                        : auth?.role === "librarian" ? "L"
+                          : auth?.role === "parent" ? "P"
+                            : auth?.role === "student" ? "S" : "?"}
             </div>
           </div>
         )}

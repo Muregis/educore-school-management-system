@@ -168,11 +168,35 @@ export default function HRPage({ auth, canEdit, toast }) {
     } catch(e) { toast(e.message, "error"); }
   };
 
+  // Payroll payment state
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [payMethod, setPayMethod]     = useState("Bank Transfer");
+  const [payRef, setPayRef]           = useState("");
+
   const markPaid = async () => {
+    if (!showPayModal) {
+      setShowPayModal(true);
+      return;
+    }
     try {
-      await apiFetch("/hr/payslips/mark-paid", { method:"PATCH", body:{ month:payMonth, year:payYear }, token:auth.token });
-      toast("Payroll marked as paid", "success"); load();
+      await apiFetch("/hr/payslips/mark-paid", { 
+        method: "PATCH", 
+        body: { month: payMonth, year: payYear, paymentMethod: payMethod, paymentReference: payRef }, 
+        token: auth.token 
+      });
+      toast("Payroll marked as paid", "success"); 
+      setShowPayModal(false);
+      setPayRef("");
+      load();
     } catch(e) { toast(e.message, "error"); }
+  };
+
+  const exportPayroll = async () => {
+    try {
+      const url = `${import.meta.env.VITE_API_URL || "/api"}/hr/payslips/export?month=${payMonth}&year=${payYear}&token=${auth.token}`;
+      window.open(url, "_blank");
+      toast("Exporting payroll...", "info");
+    } catch(e) { toast("Export failed", "error"); }
   };
 
   // Print single payslip
@@ -400,7 +424,8 @@ export default function HRPage({ auth, canEdit, toast }) {
               <>
                 <Btn onClick={generatePayslips} disabled={generating}>{generating?"Generating...":"Generate Payslips"}</Btn>
                 {curPayslips.some(p=>p.status==="draft") && <Btn onClick={approvePayroll}>Approve All</Btn>}
-                {curPayslips.some(p=>p.status==="approved") && <Btn onClick={markPaid}>Mark as Paid</Btn>}
+                {curPayslips.some(p=>p.status==="approved") && <Btn tone="success" onClick={markPaid}>Mark as Paid</Btn>}
+                <Btn tone="secondary" onClick={exportPayroll}>📥 Export CSV</Btn>
               </>
             )}
           </div>
@@ -537,6 +562,37 @@ export default function HRPage({ auth, canEdit, toast }) {
           <div style={{ display:"flex", gap:8, justifyContent:"flex-end", marginTop:14 }}>
             <Btn variant="ghost" onClick={()=>setShowLeave(false)}>Cancel</Btn>
             <Btn onClick={saveLeave}>Submit</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── PAYMENT MODAL ── */}
+      {showPayModal && (
+        <Modal title={`Record Salary Payment — ${MONTHS[payMonth-1]} ${payYear}`} onClose={()=>setShowPayModal(false)}>
+          <div style={{ display:"grid", gap:14 }}>
+            <div style={{ padding:10, background:"#f8fafc", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13 }}>
+              You are marking <strong>{curPayslips.filter(p=>p.status==="approved").length}</strong> approved payslips as paid.
+            </div>
+            <Field label="Payment Method">
+              <select style={inputStyle} value={payMethod} onChange={e=>setPayMethod(e.target.value)}>
+                <option>Bank Transfer</option>
+                <option>M-Pesa Business</option>
+                <option>Petty Cash</option>
+                <option>Cheque</option>
+                <option>Equity Online</option>
+                <option>KCB I-Bank</option>
+              </select>
+            </Field>
+            <Field label="Transaction Reference / Cheque No">
+              <input style={inputStyle} placeholder="e.g. QWE123RT45 or Cheque #001" value={payRef} onChange={e=>setPayRef(e.target.value)} />
+            </Field>
+            <div style={{ color:C.textMuted, fontSize:12 }}>
+              This will record the payment method and today's date ({today()}) against all selected staff records for tax compliance.
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:8, justifyContent:"flex-end", marginTop:20 }}>
+            <Btn variant="ghost" onClick={()=>setShowPayModal(false)}>Cancel</Btn>
+            <Btn tone="success" onClick={markPaid}>Confirm & Record Payment</Btn>
           </div>
         </Modal>
       )}

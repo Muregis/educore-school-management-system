@@ -24,7 +24,7 @@ function normaliseUser(u) {
   };
 }
 
-const roleTone = r => ({ admin: "danger", teacher: "info", finance: "warning", parent: "success", student: "success" }[r] || "info");
+const roleTone = r => ({ director: "info", admin: "danger", teacher: "info", finance: "warning", parent: "success", student: "success" }[r] || "info");
 
 export default function AdminAccountsPage({ auth, students, toast }) {
   const [tab, setTab]               = useState("staff");
@@ -336,6 +336,7 @@ export default function AdminAccountsPage({ auth, students, toast }) {
             <Field label="Role">
               <select style={inputStyle} value={staffForm.role}
                 onChange={e => setStaffForm({ ...staffForm, role: e.target.value })}>
+                <option value="director">Director</option>
                 <option value="admin">Admin</option>
                 <option value="teacher">Teacher</option>
                 <option value="finance">Finance</option>
