@@ -209,8 +209,8 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     }, {})
   ).slice(-7);
 
-  // Admin dashboard
-  if (auth?.role === "admin") {
+  // Admin/Director/Superadmin dashboard
+  if (["admin", "director", "superadmin"].includes(auth?.role)) {
     const pendingPlans = lessonPlansLoading ? "…" : lessonPlans.length;
     const cards = [
       ["Boys", boys],

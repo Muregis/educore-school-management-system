@@ -27,22 +27,32 @@ router.get("/", requireAuth, async (req, res, next) => {
       .select("*")
       .eq("is_deleted", false);
 
-    if (effectiveSchoolId) {
-      query = query.eq("school_id", effectiveSchoolId);
+    const { data: rows, error } = await supabase
+      .from("subjects")
+      .select("*")
+      .eq("school_id", effectiveSchoolId)
+      .eq("is_deleted", false);
+
+    if (error) {
+      console.error("[SUBJECTS ERROR]", error);
+      throw error;
     }
 
-    query = query.order("category", { ascending: true });
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    // Normalise data for frontend
-    const normalised = (data || []).map(s => ({
-      ...s,
+    const normalised = (rows || []).map(s => ({
       id: s.subject_id || s.id,
-      name: s.name || s.subject_name || "",
-      is_active: s.is_active !== undefined ? s.is_active : (s.status === 'active' || s.status === true),
+      subject_id: s.subject_id || s.id,
+      name: s.name || s.subject_name || "Untitled",
+      code: s.code || "",
+      category: s.category || "General",
+      description: s.description || "",
+      class_levels: s.class_levels || "",
+      max_marks: s.max_marks || 100,
+      pass_marks: s.pass_marks || 40,
+      is_active: s.is_active ?? (s.status === 'active')
     }));
+
+    // In-memory sort to avoid SQL errors on missing columns
+    normalised.sort((a, b) => a.name.localeCompare(b.name));
 
     const filtered = active === "true" ? normalised.filter(s => s.is_active) : normalised;
     res.json(filtered);

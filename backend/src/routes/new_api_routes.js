@@ -364,15 +364,23 @@ router.get("/classes/promotion-chain", authorize("academic.view"), async (req, r
   try {
     const { schoolId } = req.user;
 
-    const { data: classes, error } = await supabase
+    const { data: rows, error } = await supabase
       .from('classes')
-      .select('class_id, class_name, next_class_name, class_order, status')
+      .select('*')
       .eq('school_id', schoolId)
-      .eq('is_deleted', false)
-      .order('class_order');
+      .neq('is_deleted', true);
 
     if (error) throw error;
-    res.json({ data: classes || [] });
+
+    const classes = (rows || []).map(c => ({
+      class_id: c.class_id || c.id,
+      class_name: c.class_name,
+      next_class_name: c.next_class_name || null,
+      class_order: c.class_order || 0,
+      status: c.status || 'active'
+    })).sort((a, b) => (a.class_order || 0) - (b.class_order || 0));
+
+    res.json({ data: classes });
   } catch (err) {
     console.error('Error fetching promotion chain:', err);
     res.status(500).json({ message: "Failed to fetch promotion chain" });
@@ -384,16 +392,21 @@ router.get("/classes", authorize("academic.view"), async (req, res) => {
   try {
     const { schoolId } = req.user;
 
-    const { data: classes, error } = await supabase
+    const { data: rows, error } = await supabase
       .from('classes')
-      .select('class_id, class_name')
+      .select('*')
       .eq('school_id', schoolId)
-      .eq('is_deleted', false)
-      .eq('status', 'active')
-      .order('class_name');
+      .neq('is_deleted', true)
+      .eq('status', 'active');
 
     if (error) throw error;
-    res.json({ data: classes || [] });
+    
+    const classes = (rows || []).map(c => ({
+      class_id: c.class_id || c.id,
+      class_name: c.class_name
+    })).sort((a, b) => a.class_name.localeCompare(b.class_name));
+
+    res.json({ data: classes });
   } catch (err) {
     console.error('Error fetching classes:', err);
     res.status(500).json({ message: "Failed to fetch classes" });
