@@ -103,7 +103,7 @@ router.get("/:id", async (req, res, next) => {
 });
 
 // ─── POST / — admit new student ───────────────────────────────────────────────
-router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
+router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const {
@@ -272,7 +272,7 @@ router.post("/", requireRoles("admin", "teacher"), async (req, res, next) => {
 });
 
 // ─── PUT /:id — update student ────────────────────────────────────────────────
-router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
+router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const {
@@ -412,7 +412,7 @@ router.delete("/:id", requireRoles("admin", "director", "superadmin"), async (re
 });
 
 // ─── POST /upload-photo — upload student photo ─────────────────────────────
-router.post("/upload-photo", requireRoles("admin", "teacher"), upload.single('file'), async (req, res, next) => {
+router.post("/upload-photo", requireRoles("admin", "teacher", "director", "superadmin"), upload.single('file'), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 

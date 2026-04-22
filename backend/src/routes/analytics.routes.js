@@ -207,7 +207,7 @@ router.get("/", async (req, res, next) => {
 
     // HR summary
     let hrSummary = null;
-    if (["admin", "hr"].includes(role)) {
+    if (["admin", "hr", "director", "superadmin"].includes(role)) {
       const { count: totalStaff, error: staffErr } = await supabase
         .from('hr_staff')
         .select('*', { count: 'exact', head: true })

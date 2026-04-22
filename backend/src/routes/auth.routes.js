@@ -206,7 +206,19 @@ router.get("/school-info/:id", authRateLimit, async (req, res) => {
   }
 });
 
-const SUPERADMIN_EMAIL = "muregivictor@gmail.com";
+// Diagnostic route to check current session context
+router.get("/me", authRequired, (req, res) => {
+  res.json({
+    user: req.user,
+    timestamp: new Date().toISOString(),
+    headers: {
+      'x-school-id': req.headers['x-school-id'],
+      'x-effective-school-id': req.headers['x-effective-school-id']
+    }
+  });
+});
+
+const SUPERADMIN_EMAIL = env.superadminEmail || "muregivictor@gmail.com";
 
 // Helper to verify superadmin password (stored in env or hardcoded for now)
 async function verifySuperadminPassword(password) {

@@ -6,7 +6,7 @@ import { requireRoles } from "../middleware/roles.js";
 const router = Router();
 router.use(authRequired);
 
-const HR_ROLES = ["admin","hr"];
+const HR_ROLES = ["admin", "hr", "director", "superadmin"];
 
 // ═══════════════════════════════════════════════════════════════════
 // STAFF RECORDS

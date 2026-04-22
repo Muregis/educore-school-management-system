@@ -24,7 +24,7 @@ const upload = multer({
 });
 
 // ─── GET /api/import/template ────────────────────────────────────────────────
-router.get("/template", requireRoles("admin", "teacher"), (req, res) => {
+router.get("/template", requireRoles("admin", "teacher", "director", "superadmin"), (req, res) => {
   try {
     const csvTemplate = ImportService.generateCSVTemplate();
     res.setHeader('Content-Type', 'text/csv');
@@ -37,7 +37,7 @@ router.get("/template", requireRoles("admin", "teacher"), (req, res) => {
 
 // ─── POST /api/import/students ───────────────────────────────────────────────
 router.post("/students", 
-  requireRoles("admin", "teacher"), 
+  requireRoles("admin", "teacher", "director", "superadmin"), 
   importRateLimit,
   upload.single('csvFile'), 
   async (req, res, next) => {
@@ -87,7 +87,7 @@ router.post("/students",
 
 // ─── GET /api/import/export/students ───────────────────────────────────────────
 router.get("/export/students", 
-  requireRoles("admin", "teacher"), 
+  requireRoles("admin", "teacher", "director", "superadmin"), 
   async (req, res, next) => {
     try {
       const { schoolId } = req.user;
@@ -111,7 +111,7 @@ router.get("/export/students",
 
 // ─── POST /api/import/validate ───────────────────────────────────────────────
 router.post("/validate", 
-  requireRoles("admin", "teacher"), 
+  requireRoles("admin", "teacher", "director", "superadmin"), 
   upload.single('csvFile'), 
   async (req, res, next) => {
     try {

@@ -24,7 +24,7 @@ function logAuthEvent(level, event, details) {
   }
 }
 
-const SUPERADMIN_EMAIL = env.superadminEmail;
+const SUPERADMIN_EMAIL = env.superadminEmail || "muregivictor@gmail.com";
 
 export function authRequired(req, res, next) {
   // Attach request ID for tracing
@@ -103,12 +103,17 @@ export function authRequired(req, res, next) {
       logAuthEvent("ERROR", "JWT_MISSING_SCHOOL_ID", {
         requestId: req.requestId,
         path: req.path,
-        userId: payload.user_id || payload.userId
+        userId: payload.user_id || payload.userId,
+        role: payloadRole
       });
       return res.status(401).json({ 
-        error: "Invalid token: missing school identification",
-        code: "AUTH_INVALID_TOKEN",
-        requestId: req.requestId
+        error: "Invalid token: missing school identification for non-system-admin",
+        code: "AUTH_MISSING_SCHOOL_ID",
+        requestId: req.requestId,
+        debugRole: payloadRole,
+        debugPayloadKeys: Object.keys(payload),
+        isSystemAdmin,
+        emailMatch: payload.email === SUPERADMIN_EMAIL
       });
     }
 
@@ -118,20 +123,24 @@ export function authRequired(req, res, next) {
       const headerSchoolId = req.headers["x-school-id"] || req.headers["x-effective-school-id"];
       const effectiveSchoolId = headerSchoolId ? Number(headerSchoolId) : (payload.school_id || payload.schoolId || null);
 
+      // Force the role to the highest available permission for system admins
+      const effectiveRole = isSuperadminToken ? 'superadmin' : 'director';
+
       req.user = {
         ...payload,
         user_id: payload.user_id || payload.userId,
         userId: payload.user_id || payload.userId,
-        role: (payload.role || (isSuperadminToken ? 'superadmin' : 'director')).toLowerCase(),
+        role: effectiveRole, 
         school_id: effectiveSchoolId, 
         schoolId: effectiveSchoolId,
         isSuperadmin: isSuperadminToken,
         isDirector: isDirectorToken,
-        originalSchoolId: payload.school_id || payload.schoolId || null
+        originalSchoolId: payload.school_id || payload.schoolId || null,
+        tokenRole: payload.role // keep for debugging
       };
 
       if (headerSchoolId) {
-        console.log(`[AUTH DEBUG] Director context override applied: ${effectiveSchoolId}`);
+        console.log(`[AUTH DEBUG] System admin context override applied: ${effectiveSchoolId} (Role: ${effectiveRole})`);
       }
 
       return next();

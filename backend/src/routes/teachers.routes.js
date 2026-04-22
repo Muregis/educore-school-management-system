@@ -24,7 +24,7 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-router.post("/", requireRoles("admin", "hr"), async (req, res, next) => {
+router.post("/", requireRoles("admin", "hr", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const {
@@ -103,7 +103,7 @@ router.post("/", requireRoles("admin", "hr"), async (req, res, next) => {
   }
 });
 
-router.put("/:id", requireRoles("admin", "hr"), async (req, res, next) => {
+router.put("/:id", requireRoles("admin", "hr", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const {
