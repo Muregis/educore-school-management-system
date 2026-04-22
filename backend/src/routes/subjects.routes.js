@@ -278,9 +278,5 @@ router.post("/seed-defaults", requireAuth, requireRoles("admin", "director", "su
     res.json({ message: `Seeded ${inserted.length} subjects`, count: inserted.length });
   } catch (err) { next(err); }
 });
-  } catch (err) {
-    next(err);
-  }
-});
 
 export default router;
