@@ -11,7 +11,7 @@ export async function authLogin(email, password, schoolId = 1) {
     const { data: users, error } = await supabase
       .from('users')
       .select('user_id, full_name, email, password_hash, role, status')
-      .eq('email', email)
+      .ilike('email', email)
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
       .limit(1);
