@@ -285,5 +285,3 @@ export function BranchSelector({ className = "", style = {} }) {
 }
 
 export default BranchSelector;
-
-export default BranchSelector;
