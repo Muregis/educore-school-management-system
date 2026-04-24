@@ -127,7 +127,9 @@ class OfflineDatabase {
    */
   async getStudent(studentId) {
     const db = await this.init();
-    return await db.get('students', studentId);
+    const tx = db.transaction('students', 'readonly');
+    const store = tx.objectStore('students');
+    return await store.get(studentId);
   }
 
   /**
@@ -225,7 +227,9 @@ class OfflineDatabase {
     const db = await this.init();
     const cacheKey = `${payload.student_id}_${payload.date}`;
 
-    await db.put('cached_attendance', {
+    const tx = db.transaction('cached_attendance', 'readwrite');
+    const store = tx.objectStore('cached_attendance');
+    await store.put({
       cache_key: cacheKey,
       student_id: payload.student_id,
       class_id: payload.class_id,
@@ -244,7 +248,9 @@ class OfflineDatabase {
     const db = await this.init();
     const cacheKey = `${payload.student_id}_${payload.subject}_${payload.term}`;
 
-    await db.put('cached_grades', {
+    const tx = db.transaction('cached_grades', 'readwrite');
+    const store = tx.objectStore('cached_grades');
+    await store.put({
       cache_key: cacheKey,
       student_id: payload.student_id,
       subject: payload.subject,
@@ -312,11 +318,13 @@ class OfflineDatabase {
     const db = await this.init();
     const cacheKey = `${payload.student_id}_${payload.date}`;
 
-    const cached = await db.get('cached_attendance', cacheKey);
+    const tx = db.transaction('cached_attendance', 'readwrite');
+    const store = tx.objectStore('cached_attendance');
+    const cached = await store.get(cacheKey);
     if (cached) {
       cached.is_pending = false;
       cached.synced_at = new Date().toISOString();
-      await db.put('cached_attendance', cached);
+      await store.put(cached);
     }
   }
 
@@ -326,7 +334,9 @@ class OfflineDatabase {
   async getAttendance(studentId, date) {
     const db = await this.init();
     const cacheKey = `${studentId}_${date}`;
-    return await db.get('cached_attendance', cacheKey);
+    const tx = db.transaction('cached_attendance', 'readonly');
+    const store = tx.objectStore('cached_attendance');
+    return await store.get(cacheKey);
   }
 
   /**
@@ -353,7 +363,9 @@ class OfflineDatabase {
   async getGrade(studentId, subject, term) {
     const db = await this.init();
     const cacheKey = `${studentId}_${subject}_${term}`;
-    return await db.get('cached_grades', cacheKey);
+    const tx = db.transaction('cached_grades', 'readonly');
+    const store = tx.objectStore('cached_grades');
+    return await store.get(cacheKey);
   }
 
   /**
@@ -361,7 +373,9 @@ class OfflineDatabase {
    */
   async deleteAction(localId) {
     const db = await this.init();
-    await db.delete('pending_actions', localId);
+    const tx = db.transaction('pending_actions', 'readwrite');
+    const store = tx.objectStore('pending_actions');
+    await store.delete(localId);
   }
 
   /**
@@ -399,7 +413,9 @@ class OfflineDatabase {
    */
   async setSyncMetadata(key, value) {
     const db = await this.init();
-    await db.put('sync_metadata', {
+    const tx = db.transaction('sync_metadata', 'readwrite');
+    const store = tx.objectStore('sync_metadata');
+    await store.put({
       key,
       value,
       updated_at: new Date().toISOString()
@@ -411,7 +427,9 @@ class OfflineDatabase {
    */
   async getSyncMetadata(key) {
     const db = await this.init();
-    const data = await db.get('sync_metadata', key);
+    const tx = db.transaction('sync_metadata', 'readonly');
+    const store = tx.objectStore('sync_metadata');
+    const data = await store.get(key);
     return data?.value;
   }
 
