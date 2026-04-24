@@ -42,6 +42,9 @@ import UpgradePage from "./pages/UpgradePage";
 import UpdateRequestsPage from "./pages/UpdateRequestsPage";
 import BranchManagementPage from "./pages/BranchManagementPage"; // NEW: Branch management
 import AdminPermissionsPage from "./pages/AdminPermissionsPage"; // NEW: Director admin permissions
+import TermManagementPage from "./pages/TermManagementPage"; // NEW: Academic term management
+import PromotionPage from "./pages/PromotionPage"; // NEW: Student promotions
+import OfflineStatusBar from "./components/OfflineStatusBar"; // NEW: Offline/sync status indicator
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import Sidebar from "./components/Sidebar";
 import { BranchSelector } from "./components/BranchSelector"; // NEW: Branch/campus selector
@@ -413,6 +416,12 @@ export default function App() {
     "update-requests": ["admin","parent"].includes(auth.role) ? <UpdateRequestsPage auth={auth} students={students} pendingUpdates={pendingUpdates} setPendingUpdates={setPendingUpdates} toast={toast} /> : <Forbidden />,
     "branch-management": ["admin","director","superadmin"].includes(auth.role) ? <BranchManagementPage auth={auth} toast={toast} /> : <Forbidden />,
     "admin-permissions": ["director","superadmin"].includes(auth.role) ? <AdminPermissionsPage auth={auth} toast={toast} /> : <Forbidden />,
+    "term-management": ["director","admin","superadmin"].includes(auth.role) 
+      ? <TermManagementPage auth={auth} toast={toast} /> 
+      : <Forbidden />,
+    "promotions": ["director","admin","superadmin"].includes(auth.role) 
+      ? <PromotionPage auth={auth} toast={toast} /> 
+      : <Forbidden />,
     settings: ["admin","director","superadmin"].includes(auth.role)
       ? <AdminSettings auth={auth} onPermissionsSaved={() => loadRolePermissions(auth.token)} />
       : <Forbidden />,
@@ -545,6 +554,9 @@ export default function App() {
       )}
         </>
       )}
+
+      {/* Offline/Sync Status Bar */}
+      {auth && <OfflineStatusBar />}
 
       <Toasts items={toasts} remove={id => setToasts(prev => prev.filter(t => t.id !== id))} />
     </div>
