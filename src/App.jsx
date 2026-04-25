@@ -41,6 +41,7 @@ import QRVerificationPage from "./pages/QRVerificationPage";
 import UpgradePage from "./pages/UpgradePage";
 import UpdateRequestsPage from "./pages/UpdateRequestsPage";
 import BranchManagementPage from "./pages/BranchManagementPage"; // NEW: Branch management
+import AdminPermissionsPage from "./pages/AdminPermissionsPage"; // NEW: Admin permissions
 import OfflineStatusBar from "./components/OfflineStatusBar"; // NEW: Offline/sync status indicator
 import ParentGuard from "./components/ParentGuard"; // NEW: Parent-student binding enforcement
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
