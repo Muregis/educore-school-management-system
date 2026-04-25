@@ -474,7 +474,7 @@ if (typeof window !== 'undefined') {
   }, CACHE_TTL);
 }
 
-export default {
+const ledgerBalanceService = {
   getLedgerBalance,
   addOpeningBalance,
   addFeeCharge,
@@ -489,3 +489,6 @@ export default {
   clearStudentCache,
   clearAllLedgerCache
 };
+
+export { ledgerBalanceService };
+export default ledgerBalanceService;
