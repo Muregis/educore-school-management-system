@@ -176,21 +176,23 @@ export function BranchSelector({ className = "", style = {} }) {
       {isOpen && (
         <>
           <div
+            className="mobile-dropdown-overlay"
             style={{ position: "fixed", inset: 0, zIndex: 1000 }}
             onClick={() => setIsOpen(false)}
           />
-          <div style={{
-            position: "absolute",
-            right: 0,
-            marginTop: 8,
-            width: 280,
-            background: C.surface,
-            border: `1px solid ${C.border}`,
-            borderRadius: 12,
-            boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
-            zIndex: 1001,
-            overflow: "hidden"
-          }}>
+          <div className="branch-selector-dropdown"
+            style={{
+              position: "absolute",
+              right: 0,
+              marginTop: 8,
+              width: 280,
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: 12,
+              boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+              zIndex: 1001,
+              overflow: "hidden"
+            }}>
             <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, background: C.card }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: C.textSub, margin: 0, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 {isDirector ? "Select School" : "Change Campus"}
@@ -204,6 +206,7 @@ export function BranchSelector({ className = "", style = {} }) {
                   return (
                     <button
                       key={school.school_id}
+                      className="school-list-item"
                       onClick={() => handleSwitch(school.school_id)}
                       style={{
                         width: "100%",
@@ -233,6 +236,7 @@ export function BranchSelector({ className = "", style = {} }) {
                 <>
                   {parentSchool && (
                     <button
+                      className="branch-list-item"
                       onClick={() => handleSwitch(parentSchool.school_id)}
                       style={{
                         width: "100%",
@@ -255,6 +259,7 @@ export function BranchSelector({ className = "", style = {} }) {
                     return (
                       <button
                         key={branch.school_id}
+                        className="branch-list-item"
                         onClick={() => handleSwitch(branch.school_id)}
                         style={{
                           width: "100%",

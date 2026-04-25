@@ -557,6 +557,59 @@
   .modal-content {
     max-height: calc(100vh - 40px) !important;
     overflow-y: auto !important;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     margin: 0 12px !important;
     width: calc(100% - 24px) !important;
   }
@@ -667,6 +720,74 @@ textarea {
   min-height: 44px;
   padding: 10px 12px;
 }
+
+/* ==========================================
+   MOBILE SCHOOL SWITCHER FIXES
+   For Android touch compatibility
+   ========================================== */
+
+/* School/branch selector dropdown */
+.branch-selector-dropdown,
+.school-switcher-dropdown {
+  position: fixed !important;
+  top: 60px !important;
+  left: 10px !important;
+  right: 10px !important;
+  max-height: calc(100vh - 100px) !important;
+  overflow-y: auto !important;
+  z-index: 9999 !important;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+
+/* Director school list items */
+.school-list-item,
+.branch-list-item {
+  min-height: 48px !important;
+  padding: 12px 16px !important;
+  display: flex;
+  align-items: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.school-list-item:active,
+.branch-list-item:active {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* Ensure dropdown buttons are tappable */
+.branch-selector-dropdown button,
+.school-switcher-dropdown button,
+.branch-selector-dropdown [role="button"],
+.school-switcher-dropdown [role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 12px 16px;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+/* Overlay for mobile dropdowns */
+.mobile-dropdown-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 9998;
+  touch-action: none;
+}
+
+/* Prevent body scroll when dropdown is open */
+body.dropdown-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
+/* ==========================================
+   END MOBILE SCHOOL SWITCHER FIXES
+   ========================================== */
 
 /* Modal scroll container */
 .modal-scroll-container {
