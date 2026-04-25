@@ -74,6 +74,19 @@ export default function OfflineStatusBar() {
     }
   };
 
+  // Close when clicking outside (must be before early return!)
+  useEffect(() => {
+    if (!isMinimized) {
+      const handleClickOutside = (e) => {
+        if (e.target.closest('.sync-status-bar')) return;
+        setIsMinimized(true);
+        setShowDetails(false);
+      };
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [isMinimized]);
+
   // Don't show if everything is normal (online and no pending)
   if (isOnline && pendingCount === 0 && !isSyncing) {
     return null;
@@ -203,19 +216,6 @@ export default function OfflineStatusBar() {
       setIsMinimized(false);
     }
   };
-
-  // Close when clicking outside (handled by effect below)
-  useEffect(() => {
-    if (!isMinimized) {
-      const handleClickOutside = (e) => {
-        if (e.target.closest('.sync-status-bar')) return;
-        setIsMinimized(true);
-        setShowDetails(false);
-      };
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
-    }
-  }, [isMinimized]);
 
   return (
     <div 
