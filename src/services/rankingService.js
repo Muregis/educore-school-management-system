@@ -247,10 +247,13 @@ export function calculateTrend(currentMean, previousMean, threshold = 5) {
   return 'declining';
 }
 
-export default {
+const rankingService = {
   calculateClassRankings,
   calculateSubjectMean,
   getStudentPosition,
   formatRank,
   calculateTrend
 };
+
+export { rankingService };
+export default rankingService;
