@@ -240,6 +240,54 @@ export function getGradePoints(grade) {
   return points[grade] || 0;
 }
 
+/**
+ * Parse a mark value to handle special marks (ABSENT, CHEATING, etc.)
+ * @param {string|number} marks - The mark value
+ * @returns {Object} Parsed result { value, isSpecial, specialType, display }
+ */
+export function parseMark(marks) {
+  if (marks === null || marks === undefined || marks === '') {
+    return { value: null, isSpecial: true, specialType: 'NOT_ASSESSED', display: 'N/A' };
+  }
+  
+  const strMark = String(marks).trim().toUpperCase();
+  
+  // Check for special marks
+  if (strMark === 'X' || strMark === 'ABSENT') {
+    return { value: SPECIAL_MARKS.ABSENT, isSpecial: true, specialType: 'ABSENT', display: 'X' };
+  }
+  if (strMark === 'Y' || strMark === 'CHEAT' || strMark === 'CHEATING') {
+    return { value: SPECIAL_MARKS.CHEATING, isSpecial: true, specialType: 'CHEATING', display: 'Y' };
+  }
+  if (strMark === 'N/A' || strMark === 'NA' || strMark === '-') {
+    return { value: null, isSpecial: true, specialType: 'NOT_ASSESSED', display: 'N/A' };
+  }
+  if (strMark === 'INC' || strMark === 'INCOMPLETE') {
+    return { value: SPECIAL_MARKS.INCOMPLETE, isSpecial: true, specialType: 'INCOMPLETE', display: 'INC' };
+  }
+  
+  // Regular numeric mark
+  const numValue = parseFloat(marks);
+  if (isNaN(numValue)) {
+    return { value: null, isSpecial: true, specialType: 'UNKNOWN', display: '?' };
+  }
+  
+  return { value: numValue, isSpecial: false, specialType: null, display: String(numValue) };
+}
+
+/**
+ * Format a score for display
+ * @param {number} score - The score value
+ * @param {number} decimals - Number of decimal places (default: 2)
+ * @returns {string} Formatted score
+ */
+export function formatScore(score, decimals = 2) {
+  if (score === null || score === undefined || isNaN(score)) {
+    return '-';
+  }
+  return Number(score).toFixed(decimals);
+}
+
 export default {
   calculateGrade,
   calculateGradeFromMarks,
@@ -250,6 +298,8 @@ export default {
   getGradePoints,
   isPassing,
   getPositionLabel,
+  parseMark,
+  formatScore,
   CBC_GRADES,
   KNEC_GRADES,
   SPECIAL_MARKS,
