@@ -46,49 +46,72 @@ export async function apiFetch(
   }
 
   const controller = new AbortController();
-  if (signal) {
-    if (signal.aborted) controller.abort();
-    else signal.addEventListener("abort", () => controller.abort(), { once: true });
-  }
-
   let timedOut = false;
-  const timeoutId = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
-  try {
-    const res = await fetch(`${API_BASE}${path}`, {
-      method,
-      headers,
-      body: body != null ? JSON.stringify(body) : null,
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      let err;
-      try { err = JSON.parse(text); } catch { err = { message: text }; }
-      const e = new Error(err.message || res.statusText);
-      e.status = res.status;
-      throw e;
+  
+  // Retry loop for timeout/network errors
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    if (signal) {
+      if (signal.aborted) controller.abort();
+      else signal.addEventListener("abort", () => controller.abort(), { once: true });
     }
 
-    return res.json();
-  } catch (err) {
-    if (err?.name === "AbortError") {
-      const e = timedOut
-        ? new Error("Request timed out. Please try again.")
-        : new Error("Request cancelled.");
-      e.code = timedOut ? "ETIMEOUT" : "EABORT";
-      throw e;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        method,
+        headers,
+        body: body != null ? JSON.stringify(body) : null,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        const text = await res.text();
+        let err;
+        try { err = JSON.parse(text); } catch { err = { message: text }; }
+        const e = new Error(err.message || res.statusText);
+        e.status = res.status;
+        throw e;
+      }
+
+      return res.json();
+    } catch (err) {
+      clearTimeout(timeoutId);
+      
+      if (err?.name === "AbortError") {
+        if (timedOut && attempt < retries) {
+          // Retry on timeout
+          console.warn(`[apiFetch] Timeout on attempt ${attempt + 1}, retrying...`);
+          await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
+          timedOut = false;
+          continue;
+        }
+        const e = timedOut
+          ? new Error("Request timed out. Please try again.")
+          : new Error("Request cancelled.");
+        e.code = timedOut ? "ETIMEOUT" : "EABORT";
+        throw e;
+      }
+      
+      // Retry on network errors too
+      if (err instanceof TypeError && attempt < retries) {
+        console.warn(`[apiFetch] Network error on attempt ${attempt + 1}, retrying...`);
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      
+      if (err instanceof TypeError) {
+        const e = new Error("Network error. Backend may be down or unreachable.");
+        e.code = "ENETWORK";
+        throw e;
+      }
+      throw err;
     }
-    if (err instanceof TypeError) {
-      const e = new Error("Network error. Backend may be down or unreachable.");
-      e.code = "ENETWORK";
-      throw e;
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
