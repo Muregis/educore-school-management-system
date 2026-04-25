@@ -54,7 +54,7 @@ export function TermManagementPage({ auth }) {
 
     setClosingTerm(true);
     try {
-      await apiFetch(`/api/academic/terms/${currentTerm.term_id}/close`, {
+      await apiFetch(`/academic/terms/${currentTerm.term_id}/close`, {
         method: 'PUT'
       });
 
@@ -157,7 +157,7 @@ function TermClosureChecklist({ term, onClose, show, onHide, loading }) {
 
   const loadChecklist = async () => {
     try {
-      const res = await apiFetch(`/api/academic/terms/${term.term_id}/can-close`);
+      const res = await apiFetch(`/academic/terms/${term.term_id}/can-close`);
       const eligibility = res.data;
 
       setChecklist([
@@ -394,7 +394,7 @@ export function EnhancedFeesPage({ auth, students, feeStructures, setFeeStructur
     if (!useNewSystem) return;
 
     try {
-      const res = await apiFetch(`/api/finance/ledger?studentId=${studentId}&limit=20`);
+      const res = await apiFetch(`/finance/ledger?studentId=${studentId}&limit=20`);
       setLedgerEntries(res.data || []);
     } catch (error) {
       console.error('Error loading ledger:', error);
@@ -404,7 +404,7 @@ export function EnhancedFeesPage({ auth, students, feeStructures, setFeeStructur
   const getStudentBalance = async (studentId) => {
     if (useNewSystem) {
       try {
-        const res = await apiFetch(`/api/finance/balance/${studentId}`);
+        const res = await apiFetch(`/finance/balance/${studentId}`);
         return res.data.balance;
       } catch {
         // Fallback to legacy
@@ -666,7 +666,7 @@ export function PermissionGuard({ permission, children, fallback = null }) {
 
   const checkPermission = async () => {
     try {
-      const res = await apiFetch(`/api/permissions/check/${permission}`);
+      const res = await apiFetch(`/permissions/check/${permission}`);
       setHasPermission(res.data.hasPermission);
     } catch {
       setHasPermission(false);
@@ -816,5 +816,4 @@ export function ClassPromotionChain({ auth }) {
       </div>
     </div>
   );
-}
 }

@@ -117,9 +117,14 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
 
   return (
     <div>
-      {whatsAppStatus?.whatsappConfigured && (
+      {whatsAppStatus?.configured && (
         <div style={{ background: "#052e16", border: "1px solid #16a34a", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#86efac" }}>
-          WhatsApp mode: semi-automated `wa.me` links using the school's WhatsApp Business line.
+          WhatsApp mode: semi-automated wa.me links using the school's WhatsApp Business line.
+        </div>
+      )}
+      {whatsAppStatus?.disabled && (
+        <div style={{ background: "#450a0a", border: "1px solid #dc2626", borderRadius: 10, padding: "10px 14px", marginBottom: 16, fontSize: 12, color: "#fca5a5" }}>
+          WhatsApp not configured. Please set WhatsApp Business number in School Settings.
         </div>
       )}
 

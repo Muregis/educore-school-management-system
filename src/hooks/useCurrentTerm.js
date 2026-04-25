@@ -54,8 +54,8 @@ export function useCurrentTerm(auth, options = {}) {
 
     try {
       // Try to fetch current term from API
-      const response = await apiFetch('/terms/current', { 
-        token: auth.token 
+      const response = await apiFetch('/academic/terms/current', {
+        token: auth.token
       });
 
       // Handle different response formats
@@ -63,7 +63,7 @@ export function useCurrentTerm(auth, options = {}) {
 
       if (!termData || !termData.term) {
         // Fallback: try to get terms list and find active one
-        const termsResponse = await apiFetch('/terms', { token: auth.token });
+        const termsResponse = await apiFetch('/academic/terms', { token: auth.token });
         const terms = termsResponse.data || termsResponse || [];
         
         const now = new Date();
@@ -163,7 +163,7 @@ export function useTerms(auth) {
       return;
     }
 
-    apiFetch('/terms', { token: auth.token })
+    apiFetch('/academic/terms', { token: auth.token })
       .then(data => {
         const termsList = data.data || data || [];
         setTerms(termsList);
