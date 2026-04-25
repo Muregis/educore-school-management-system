@@ -10,8 +10,10 @@ import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { Pager, Msg, csv, pager } from "../components/Helpers";
+import { useCurrentTerm } from "../hooks/useCurrentTerm";
+import { calculateGrade, getGradeColor as getGradeHexColor, parseMark, formatScore } from "../lib/grading";
 
-// Special mark values
+// Use shared grading utilities instead of local definitions
 const SPECIAL_MARKS = {
   "N/A": "na",      // Did not sit this subject
   "X":   "absent",  // Missed exam / absent
@@ -19,13 +21,17 @@ const SPECIAL_MARKS = {
 };
 
 function displayMark(marks, total) {
-  if (marks === "na")     return <span style={{ color:C.textMuted, fontStyle:"italic" }}>N/A</span>;
-  if (marks === "absent") return <Badge tone="warning">X – Absent</Badge>;
-  if (marks === "cheat")  return <Badge tone="danger">Y – Cheating</Badge>;
+  const parsed = parseMark(marks);
+  if (parsed.isSpecial) {
+    if (parsed.specialType === 'ABSENT') return <Badge tone="warning">X – Absent</Badge>;
+    if (parsed.specialType === 'CHEATING') return <Badge tone="danger">Y – Cheating</Badge>;
+    if (parsed.specialType === 'NOT_ASSESSED') return <span style={{ color:C.textMuted, fontStyle:"italic" }}>N/A</span>;
+  }
   return `${marks}/${total}`;
 }
 
 function gradeColor(grade) {
+  // Map grades to Badge tones - uses shared utility logic
   if (!grade) return "info";
   if (grade === "EE") return "success";
   if (grade === "ME") return "info";
@@ -34,11 +40,20 @@ function gradeColor(grade) {
 }
 
 export default function GradesPage({ auth, students, results, setResults, canEdit, toast, feeBlocked = false, onGoFees}) {
-  const [term, setTerm]                   = useState("Term 2");
+  // Use current term from API instead of hardcoded "Term 2"
+  const { term: currentTerm, isLoading: termLoading } = useCurrentTerm(auth);
+  const [term, setTerm]                   = useState(""); // Will be set from currentTerm
   const [filterClass, setFilterClass]     = useState("all");
   const [filterStudent, setFilterStudent] = useState("all");
   const [filterSubject, setFilterSubject] = useState("all");
   const [classOptions, setClassOptions] = useState([]);
+
+  // Set term from currentTerm when loaded
+  useEffect(() => {
+    if (currentTerm && !term) {
+      setTerm(currentTerm);
+    }
+  }, [currentTerm, term]);
 
   useEffect(() => {
     const token = auth?.token || sessionStorage.getItem("token") || localStorage.getItem("token");

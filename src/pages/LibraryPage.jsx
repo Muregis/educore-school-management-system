@@ -76,18 +76,42 @@ export default function LibraryPage({ auth, students = [], teachers = [] }) {
   // ── Save book ──────────────────────────────────────────────────────────────
   const saveBook = async () => {
     setErr("");
-    if (!fb.title || !fb.author) return setErr("Title and author are required.");
-    if (Number(fb.quantityTotal) < 1) return setErr("Quantity must be at least 1.");
+    setLoading(true); // Show loading during save
+    if (!fb.title || !fb.author) {
+      setLoading(false);
+      return setErr("Title and author are required.");
+    }
+    if (Number(fb.quantityTotal) < 1) {
+      setLoading(false);
+      return setErr("Quantity must be at least 1.");
+    }
     try {
+      let result;
       if (editBook) {
-        await apiFetch(`/library/books/${editBook.book_id}`, { method: "PUT", token: auth?.token, body: fb });
+        result = await apiFetch(`/library/books/${editBook.book_id}`, { method: "PUT", token: auth?.token, body: fb });
         toast("Book updated", "success");
       } else {
-        await apiFetch("/library/books", { method: "POST", token: auth?.token, body: fb });
+        result = await apiFetch("/library/books", { method: "POST", token: auth?.token, body: fb });
+        toast("Book added", "success");
       }
+      
+      // Handle different response formats
+      const savedBook = result?.data || result;
+      
+      // Optimistically add to list if new book
+      if (!editBook && savedBook?.book_id) {
+        setBooks(prev => [savedBook, ...prev]);
+      }
+      
       setShowBook(false); setFb(BLANK_BOOK); setEditBook(null);
-      load();
-    } catch (e) { setErr(e.message || "Failed to save"); }
+      
+      // Force refresh to ensure consistency
+      await load();
+    } catch (e) { 
+      setErr(e.message || "Failed to save"); 
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ── Issue book ─────────────────────────────────────────────────────────────

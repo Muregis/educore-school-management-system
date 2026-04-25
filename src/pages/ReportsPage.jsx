@@ -4,6 +4,7 @@ import { C } from "../lib/theme";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { ALL_CLASSES } from "../lib/constants";
+import { calculateGrade, CBC_LEVELS } from "../lib/grading";
 
 // ─── Shared helpers ────────────────────────────────────────────────────────
 const inputStyle = {
@@ -11,11 +12,15 @@ const inputStyle = {
   borderRadius: 8, padding: "6px 10px", fontSize: 13,
 };
 
+// Use shared grading utility instead of local definition
 const gradeInfo = (score) => {
-  if (score >= 80) return { label: "EE", color: "#4ade80", bg: "#052e16", text: "Exceeds Expectations" };
-  if (score >= 60) return { label: "ME", color: "#60a5fa", bg: "#0c1a2e", text: "Meets Expectations" };
-  if (score >= 40) return { label: "AE", color: "#facc15", bg: "#1c1400", text: "Approaching Expectations" };
-  return              { label: "BE", color: "#f87171", bg: "#1c0505", text: "Below Expectations" };
+  const grade = calculateGrade(score, 'CBC');
+  return {
+    label: grade.grade,
+    color: grade.color,
+    bg: grade.bgColor,
+    text: grade.label
+  };
 };
 
 const ScoreBar = ({ score, color }) => (

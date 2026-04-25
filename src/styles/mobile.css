@@ -487,3 +487,208 @@
   font-size: 12px;
   color: #7A92B8;
 }
+
+/* ============================================
+   CRITICAL MOBILE UI FIXES - APRIL 2026
+   ============================================ */
+
+/* Responsive Table Wrapper - Fixes broken tables on mobile */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  -ms-overflow-style: -ms-autohiding-scrollbar;
+  margin-bottom: 16px;
+}
+
+.table-responsive::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+  background: #0E1420;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: #1A2A42;
+  border-radius: 3px;
+}
+
+/* Mobile table optimizations */
+@media screen and (max-width: 767px) {
+  table {
+    font-size: 13px !important;
+  }
+  
+  table th,
+  table td {
+    padding: 8px 10px !important;
+    white-space: nowrap;
+  }
+  
+  /* Prevent iOS zoom on input focus */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important; /* Minimum 16px prevents zoom */
+  }
+  
+  /* 44px minimum touch targets */
+  button,
+  [role="button"],
+  input[type="submit"],
+  input[type="button"],
+  .clickable {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Better spacing for mobile */
+  .ec-page-content {
+    padding: 12px !important;
+  }
+  
+  /* Modal fixes for mobile */
+  .modal-overlay {
+    align-items: flex-start !important;
+    padding-top: 20px !important;
+  }
+  
+  .modal-content {
+    max-height: calc(100vh - 40px) !important;
+    overflow-y: auto !important;
+    margin: 0 12px !important;
+    width: calc(100% - 24px) !important;
+  }
+}
+
+/* ============================================
+   PRINT STYLES - Fixes broken print layout
+   ============================================ */
+
+@media print {
+  /* Hide navigation and UI chrome */
+  .sidebar,
+  .ec-sidebar,
+  .ec-drawer,
+  .ec-bottom-nav,
+  .mobile-nav,
+  .ec-topbar button,
+  .no-print,
+  [class*="nav"],
+  [class*="Nav"] {
+    display: none !important;
+  }
+  
+  /* Expand content area */
+  .ec-page-content,
+  .mobile-page,
+  main,
+  [class*="content"],
+  [class*="Content"] {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Ensure dark backgrounds print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  
+  /* Page breaks */
+  .page-break {
+    page-break-before: always;
+  }
+  
+  .no-break {
+    page-break-inside: avoid;
+  }
+  
+  /* Table optimizations for print */
+  table {
+    font-size: 10pt !important;
+    page-break-inside: auto;
+  }
+  
+  tr {
+    page-break-inside: avoid;
+  }
+  
+  /* Links - show URL after link text */
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 90%;
+    opacity: 0.7;
+  }
+  
+  /* Background colors */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  /* Ensure text is visible */
+  .dark-theme,
+  [data-theme="dark"] {
+    color: black !important;
+  }
+}
+
+/* ============================================
+   ADDITIONAL RESPONSIVE UTILITIES
+   ============================================ */
+
+/* Hide on mobile */
+@media screen and (max-width: 767px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Hide on desktop */
+@media screen and (min-width: 768px) {
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* Touch-friendly form elements */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="number"],
+input[type="password"],
+select,
+textarea {
+  min-height: 44px;
+  padding: 10px 12px;
+}
+
+/* Modal scroll container */
+.modal-scroll-container {
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Fixed bottom safe area spacing */
+.safe-bottom {
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+}
+
+/* Stack layout for mobile */
+.stack-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media screen and (min-width: 768px) {
+  .stack-mobile {
+    flex-direction: row;
+  }
+}

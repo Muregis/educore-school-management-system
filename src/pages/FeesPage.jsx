@@ -10,6 +10,8 @@ import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { Msg } from "../components/Helpers";
+import { calculateStudentBalance, formatBalance, getBalanceStatusColor } from "../services/balanceService";
+import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 // Inline helpers
 function csv(filename, headers, rows) {
