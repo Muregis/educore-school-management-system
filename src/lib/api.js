@@ -17,7 +17,7 @@ export const API_BASE =
 
 export async function apiFetch(
   path,
-  { method = "GET", body = null, token = null, timeoutMs = 20000, signal = null } = {}
+  { method = "GET", body = null, token = null, timeoutMs = 45000, signal = null, retries = 1 } = {}
 ) {
   const headers = {};
   if (body != null) {
