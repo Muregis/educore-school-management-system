@@ -459,7 +459,14 @@ const SchoolInfoTab = ({ onSave, auth }) => {
     term_end:    "2025-08-01",
     admin_name:  "",
     admin_title: "",
+    logo_url:    "",
+    favicon_url: "",
+    primary_color: "#3B82F6",
+    secondary_color: "#1A2A42",
   });
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   
@@ -512,8 +519,12 @@ const SchoolInfoTab = ({ onSave, auth }) => {
     <div>
       {/* School identity */}
       <div style={{ background: C.accentGlow, border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: 20, marginBottom: 24, display: "flex", alignItems: "center", gap: 18 }}>
-        <div style={{ width: 64, height: 64, borderRadius: 16, background: `linear-gradient(135deg, ${C.accent}, #6366F1)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
-          🏫
+        <div style={{ width: 64, height: 64, borderRadius: 16, background: `linear-gradient(135deg, ${C.accent}, #6366F1)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0, overflow: 'hidden' }}>
+          {form.logo_url ? (
+            <img src={form.logo_url} alt="School logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            "🏫"
+          )}
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 17, fontWeight: 800, color: C.text }}>{form.name}</div>
@@ -525,6 +536,85 @@ const SchoolInfoTab = ({ onSave, auth }) => {
         </div>
       </div>
 
+      {/* School Branding / Logo Upload */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>School Branding</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
+          <div>
+            <label style={{ fontSize: 12, color: C.textMuted, marginBottom: 8, display: 'block' }}>School Logo</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 80, height: 80, borderRadius: 12, background: C.surface, display: "flex", alignItems: "center", justifyContent: "center", overflow: 'hidden', border: `2px dashed ${C.border}` }}>
+                {logoPreview || form.logo_url ? (
+                  <img src={logoPreview || form.logo_url} alt="Logo preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ fontSize: 32 }}>🏫</span>
+                )}
+              </div>
+              <div style={{ flex: 1 }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      setLogoFile(file);
+                      const reader = new FileReader();
+                      reader.onloadend = () => setLogoPreview(reader.result);
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  style={{ marginBottom: 8 }}
+                />
+                <div style={{ fontSize: 11, color: C.textMuted }}>Recommended: 200x200px PNG/JPG</div>
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <label style={{ fontSize: 12, color: C.textMuted, marginBottom: 8, display: 'block' }}>Brand Colors</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, color: C.textMuted, marginBottom: 4, display: 'block' }}>Primary</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    type="color"
+                    value={form.primary_color}
+                    onChange={f("primary_color")}
+                    style={{ width: 40, height: 40, border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                  />
+                  <input
+                    type="text"
+                    value={form.primary_color}
+                    onChange={f("primary_color")}
+                    style={{ ...inputStyle, flex: 1, fontFamily: 'monospace' }}
+                    placeholder="#3B82F6"
+                  />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: C.textMuted, marginBottom: 4, display: 'block' }}>Secondary</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    type="color"
+                    value={form.secondary_color}
+                    onChange={f("secondary_color")}
+                    style={{ width: 40, height: 40, border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                  />
+                  <input
+                    type="text"
+                    value={form.secondary_color}
+                    onChange={f("secondary_color")}
+                    style={{ ...inputStyle, flex: 1, fontFamily: 'monospace' }}
+                    placeholder="#1A2A42"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
         <Inp label="School Name" value={form.name} onChange={f("name")} placeholder="e.g. Sunrise Academy" />
         <Inp label="School Motto" value={form.motto} onChange={f("motto")} placeholder="e.g. Excellence in Every Child" />

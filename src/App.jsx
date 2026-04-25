@@ -41,10 +41,8 @@ import QRVerificationPage from "./pages/QRVerificationPage";
 import UpgradePage from "./pages/UpgradePage";
 import UpdateRequestsPage from "./pages/UpdateRequestsPage";
 import BranchManagementPage from "./pages/BranchManagementPage"; // NEW: Branch management
-import AdminPermissionsPage from "./pages/AdminPermissionsPage"; // NEW: Director admin permissions
-import TermManagementPage from "./pages/TermManagementPage"; // NEW: Academic term management
-import PromotionPage from "./pages/PromotionPage"; // NEW: Student promotions
 import OfflineStatusBar from "./components/OfflineStatusBar"; // NEW: Offline/sync status indicator
+import ParentGuard from "./components/ParentGuard"; // NEW: Parent-student binding enforcement
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import Sidebar from "./components/Sidebar";
 import { BranchSelector } from "./components/BranchSelector"; // NEW: Branch/campus selector
@@ -378,11 +376,15 @@ export default function App() {
   const pages = {
     dashboard: isPortal && isMobile
       ? (auth.role === "parent"
-          ? <ParentPortalMobile auth={auth} school={school} students={students} attendance={attendance} results={results} payments={payments} feeStructures={feeStructures} onNavigate={setPage} onLogout={handleLogout} />
+          ? <ParentGuard auth={auth} requiredPermission="view" redirectTo="/login">
+              <ParentPortalMobile auth={auth} school={school} students={students} attendance={attendance} results={results} payments={payments} feeStructures={feeStructures} onNavigate={setPage} onLogout={handleLogout} />
+            </ParentGuard>
           : <StudentPortalMobile auth={auth} school={school} student={activeChild} attendance={myAttendance} results={myResults} library={[]} timetable={timetable} onNavigate={setPage} onLogout={handleLogout} />
         )
       : (isPortal
-          ? <PortalDashboardPage auth={auth} school={school} student={activeChild} attendance={myAttendance} results={myResults} payments={myPayments} feeStructures={feeStructures} toast={toast} onViewGrades={() => setPage("grades")} onViewFees={() => setPage("fees")} onViewAttendance={() => setPage("attendance")} />
+          ? <ParentGuard auth={auth} requiredPermission="view" redirectTo="/login">
+              <PortalDashboardPage auth={auth} school={school} student={activeChild} attendance={myAttendance} results={myResults} payments={myPayments} feeStructures={feeStructures} toast={toast} onViewGrades={() => setPage("grades")} onViewFees={() => setPage("fees")} onViewAttendance={() => setPage("attendance")} />
+            </ParentGuard>
           : <DashboardPage auth={auth} school={school} students={myStudents} teachers={teachers} attendance={myAttendance} payments={myPayments} feeStructures={feeStructures} results={myResults} toast={toast} />
         ),
     students: <StudentsPage auth={auth} students={students} setStudents={setStudents} canEdit={canEdit} results={results} payments={payments} feeStructures={feeStructures} toast={toast} />,
@@ -416,12 +418,6 @@ export default function App() {
     "update-requests": ["admin","parent"].includes(auth.role) ? <UpdateRequestsPage auth={auth} students={students} pendingUpdates={pendingUpdates} setPendingUpdates={setPendingUpdates} toast={toast} /> : <Forbidden />,
     "branch-management": ["admin","director","superadmin"].includes(auth.role) ? <BranchManagementPage auth={auth} toast={toast} /> : <Forbidden />,
     "admin-permissions": ["director","superadmin"].includes(auth.role) ? <AdminPermissionsPage auth={auth} toast={toast} /> : <Forbidden />,
-    "term-management": ["director","admin","superadmin"].includes(auth.role) 
-      ? <TermManagementPage auth={auth} toast={toast} /> 
-      : <Forbidden />,
-    "promotions": ["director","admin","superadmin"].includes(auth.role) 
-      ? <PromotionPage auth={auth} toast={toast} /> 
-      : <Forbidden />,
     settings: ["admin","director","superadmin"].includes(auth.role)
       ? <AdminSettings auth={auth} onPermissionsSaved={() => loadRolePermissions(auth.token)} />
       : <Forbidden />,
@@ -554,9 +550,6 @@ export default function App() {
       )}
         </>
       )}
-
-      {/* Offline/Sync Status Bar */}
-      {auth && <OfflineStatusBar />}
 
       <Toasts items={toasts} remove={id => setToasts(prev => prev.filter(t => t.id !== id))} />
     </div>

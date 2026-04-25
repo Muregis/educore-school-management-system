@@ -286,6 +286,84 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
             <Field label="Emergency Contact"><input style={inputStyle} value={f.emergencyContactName || ""} onChange={e => setF({ ...f, emergencyContactName: e.target.value })} placeholder="Name" /></Field>
             <Field label="Emergency Phone"><input style={inputStyle} value={f.emergencyContactPhone || ""} onChange={e => setF({ ...f, emergencyContactPhone: e.target.value })} placeholder="07xxxxxxxx" /></Field>
             <Field label="Relationship"><input style={inputStyle} value={f.emergencyContactRelationship || ""} onChange={e => setF({ ...f, emergencyContactRelationship: e.target.value })} placeholder="e.g. Parent, Guardian" /></Field>
+            
+            {/* Financial Settings */}
+            <Field label="Transport" style={{ gridColumn: "1 / -1" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <select 
+                  style={inputStyle} 
+                  value={f.transport_direction || "none"} 
+                  onChange={e => setF({ ...f, transport_direction: e.target.value })}
+                >
+                  <option value="none">No Transport</option>
+                  <option value="one_way">One Way (60% fee)</option>
+                  <option value="two_way">Two Way (100% fee)</option>
+                </select>
+                <input 
+                  style={inputStyle} 
+                  type="number"
+                  value={f.transport_base_fee || ""} 
+                  onChange={e => setF({ ...f, transport_base_fee: e.target.value })} 
+                  placeholder="Base transport fee (KES)"
+                  disabled={f.transport_direction === "none"}
+                />
+              </div>
+            </Field>
+            
+            <Field label="Lunch Program" style={{ gridColumn: "1 / -1" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input 
+                    type="checkbox" 
+                    checked={f.lunch_enabled || false}
+                    onChange={e => setF({ ...f, lunch_enabled: e.target.checked })}
+                  />
+                  <span>Enrolled in lunch program</span>
+                </label>
+              </div>
+              {f.lunch_enabled && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <input 
+                    style={inputStyle} 
+                    type="number"
+                    value={f.lunch_daily_rate || ""} 
+                    onChange={e => setF({ ...f, lunch_daily_rate: e.target.value })} 
+                    placeholder="Daily rate (KES)"
+                  />
+                  <input 
+                    style={inputStyle} 
+                    type="number"
+                    value={f.lunch_days || 66} 
+                    onChange={e => setF({ ...f, lunch_days: e.target.value })} 
+                    placeholder="School days (default: 66)"
+                  />
+                </div>
+              )}
+            </Field>
+            
+            <Field label="Opening Balance (KES)" style={{ gridColumn: "1 / -1" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+                <input 
+                  style={inputStyle} 
+                  type="number"
+                  value={f.opening_balance || ""} 
+                  onChange={e => setF({ ...f, opening_balance: e.target.value })} 
+                  placeholder="Amount carried forward from previous term"
+                />
+                <select 
+                  style={{ ...inputStyle, width: "120px" }}
+                  value={f.opening_balance_type || "owing"} 
+                  onChange={e => setF({ ...f, opening_balance_type: e.target.value })}
+                >
+                  <option value="owing">Student Owes</option>
+                  <option value="credit">Credit (Prepaid)</option>
+                </select>
+              </div>
+              <small style={{ color: C.textMuted, fontSize: 11 }}>
+                Opening balance is added to the student's total expected fees
+              </small>
+            </Field>
+            
             <Field label="Photo" style={{ gridColumn: "1 / -1" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <input

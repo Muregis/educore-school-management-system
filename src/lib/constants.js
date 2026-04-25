@@ -14,9 +14,9 @@ export const DEFAULTS = {
 
 export const ROLE = {
   // Director - HIGHEST ROLE - Full control over all schools, can delegate permissions
-  director:  { pages:["dashboard","upgrade","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical","update-requests","branch-management","admin-permissions","term-management","promotions"], edit:true, canDelegate:true },
+  director:  { pages:["dashboard","upgrade","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical","update-requests","branch-management","admin-permissions"], edit:true, canDelegate:true },
   // Superadmin - System-level full access
-  superadmin:{ pages:["dashboard","upgrade","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical","update-requests","branch-management","term-management","promotions"], edit:true },
+  superadmin:{ pages:["dashboard","upgrade","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical","update-requests","branch-management"], edit:true },
   // Admin - LIMITED (secretary-level) - Basic operations, needs director delegation for advanced features
   admin:     { pages:["dashboard","students","attendance","communication","announcements"], edit:false, needsDelegation:true },
   // Teacher - Classroom operations
@@ -64,8 +64,6 @@ export const NAV = [
   { id:"update-requests", label:"Update Requests",icon:"\u{1F4DD}" },
   { id:"branch-management", label:"Branches",   icon:"\u{1F3DB}" },
   { id:"admin-permissions", label:"Admin Permissions",icon:"\u{1F510}" },
-  { id:"term-management", label:"Academic Terms", icon:"\u{1F4C5}" },
-  { id:"promotions",      label:"Promotions",     icon:"\u{1F3C6}" },
   { id:"settings",        label:"Settings",       icon:"\u2699" },
 ];
 

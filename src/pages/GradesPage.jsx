@@ -12,6 +12,7 @@ import { apiFetch } from "../lib/api";
 import { Pager, Msg, csv, pager } from "../components/Helpers";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
 import { calculateGrade, getGradeColor as getGradeHexColor, parseMark, formatScore } from "../lib/grading";
+import { rankingService } from "../services/rankingService";
 
 // Use shared grading utilities instead of local definitions
 const SPECIAL_MARKS = {
@@ -72,6 +73,23 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const [subjects, setSubjects]           = useState([]);
   const [bulkMarks, setBulkMarks]         = useState({});
   const [editing, setEditing] = useState(null);
+  const [rankings, setRankings] = useState(null);
+  const [showRankings, setShowRankings] = useState(false);
+
+  // Calculate rankings when results change
+  useEffect(() => {
+    if (results.length > 0 && filterClass !== "all") {
+      const classResults = results.filter(r => r.className === filterClass && (term === "all" || r.term === term));
+      if (classResults.length > 0) {
+        const calculatedRankings = rankingService.calculateClassRankings(classResults);
+        setRankings(calculatedRankings);
+      } else {
+        setRankings(null);
+      }
+    } else {
+      setRankings(null);
+    }
+  }, [results, filterClass, term]);
 
   // Load subjects from API
   useEffect(() => {
@@ -258,6 +276,53 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           </div>
           <Pager page={page} pages={pages} setPage={setPage} />
         </>
+      )}
+
+      {/* Class Rankings */}
+      {rankings && filterClass !== "all" && (
+        <div style={{ marginTop: 24, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, background: C.card }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h3 style={{ margin: 0, color: C.text, fontSize: 16 }}>
+              🏆 Class Rankings: {filterClass}
+            </h3>
+            <Btn variant="ghost" onClick={() => setShowRankings(!showRankings)}>
+              {showRankings ? "Hide" : "Show"} Details
+            </Btn>
+          </div>
+          
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 12 }}>
+            <div style={{ textAlign: "center", padding: "8px 12px", background: "#1A2A42", borderRadius: 6 }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#3B82F6" }}>{rankings.classStats.meanScore.toFixed(1)}</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>Class Mean</div>
+            </div>
+            <div style={{ textAlign: "center", padding: "8px 12px", background: "#1A2A42", borderRadius: 6 }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#22c55e" }}>{rankings.classStats.passRate.toFixed(0)}%</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>Pass Rate</div>
+            </div>
+            <div style={{ textAlign: "center", padding: "8px 12px", background: "#1A2A42", borderRadius: 6 }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#f59e0b" }}>{rankings.students.length}</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>Students</div>
+            </div>
+          </div>
+
+          {showRankings && (
+            <div style={{ overflowX: "auto" }}>
+              <Table
+                headers={["Rank", "Student", "Mean Score", "Total Marks", "Grade", "Position"]} 
+                rows={rankings.students.slice(0, 20).map((s, idx) => [
+                  <span key="rank" style={{ fontWeight: 700, fontSize: 16, color: idx < 3 ? '#f59e0b' : C.text }}>
+                    {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${s.rank}`}
+                  </span>,
+                  <span key="name" style={{ color: C.text, fontWeight: 600 }}>{s.studentName}</span>,
+                  <span key="mean" style={{ fontWeight: 600, color: '#3B82F6' }}>{s.meanScore.toFixed(1)}%</span>,
+                  <span key="total">{s.totalMarks}/{s.maxPossible}</span>,
+                  <Badge key="grade" tone={getGradeHexColor(s.overallGrade)}>{s.overallGrade}</Badge>,
+                  <span key="pos" style={{ fontSize: 12, color: C.textMuted }}>Position {s.rank} of {rankings.students.length}</span>
+                ])}
+              />
+            </div>
+          )}
+        </div>
       )}
 
       {/* Bulk Modal */}

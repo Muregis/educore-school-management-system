@@ -11,6 +11,7 @@ import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { Msg } from "../components/Helpers";
 import { calculateStudentBalance, formatBalance, getBalanceStatusColor } from "../services/balanceService";
+import { ledgerBalanceService } from "../services/ledgerBalanceService";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 // Inline helpers
@@ -172,16 +173,61 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     return fs ? Number(fs.tuition) + Number(fs.activity) + Number(fs.misc) : 0;
   };
 
-  const balances = students.map(s => {
-    const sid  = s.id ?? s.student_id;
-    const cls  = s.className ?? s.class_name ?? "";
-    const exp  = expectedByClass(cls);
-    const paid = normalisedPayments.filter(p => String(p.studentId) === String(sid) && p.status === "paid").reduce((sum, p) => sum + Number(p.amount), 0);
-    const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
-    const adm  = s.admission ?? s.admission_number ?? "";
-    const email = s.email ?? s.parentEmail ?? "";
-    return { studentId: sid, name, className: cls, expected: exp, paid, balance: Math.max(0, exp - paid), admissionNumber: adm, email };
-  }).filter(b => filterClass === "all" || b.className === filterClass);
+  // Ledger-first balance calculation with transport and lunch support
+  const calculateLedgerBalance = (student) => {
+    const sid = student.id ?? student.student_id;
+    const cls = student.className ?? student.class_name ?? "";
+    
+    // Base expected amount from fee structure
+    const baseExpected = expectedByClass(cls);
+    
+    // Get student-specific settings (these would come from student record or API)
+    const transportDirection = student.transport_direction || 'none'; // 'none', 'one_way', 'two_way'
+    const lunchEnabled = student.lunch_enabled || false;
+    const openingBalance = Number(student.opening_balance) || 0;
+    
+    // Calculate additional fees
+    const transportFee = ledgerBalanceService.calculateTransportFee(
+      student.transport_base_fee || 0, 
+      transportDirection
+    );
+    const lunchFee = lunchEnabled ? ledgerBalanceService.calculateLunchFee(
+      student.lunch_daily_rate || 100,
+      student.lunch_days || 66
+    ) : 0;
+    
+    const totalExpected = baseExpected + transportFee + lunchFee;
+    
+    // Calculate paid amount from payments
+    const paid = normalisedPayments
+      .filter(p => String(p.studentId) === String(sid) && p.status === "paid")
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+    
+    // Ledger formula: (Opening + Expected + Additions) - (Payments + Waivers + Refunds)
+    const totalCredits = openingBalance + totalExpected;
+    const totalDebits = paid; // + waivers + refunds would be added here
+    const balance = Math.max(0, totalCredits - totalDebits);
+    
+    return {
+      studentId: sid,
+      name: student.firstName ? `${student.firstName} ${student.lastName}` : `${student.first_name} ${student.last_name}`,
+      className: cls,
+      expected: totalExpected,
+      paid,
+      balance,
+      openingBalance,
+      transportFee,
+      lunchFee,
+      baseFee: baseExpected,
+      admissionNumber: student.admission ?? student.admission_number ?? "",
+      email: student.email ?? student.parentEmail ?? "",
+      transportDirection,
+      lunchEnabled
+    };
+  };
+
+  const balances = students.map(calculateLedgerBalance)
+    .filter(b => filterClass === "all" || b.className === filterClass);
 
   const filteredPayments = normalisedPayments.filter(p => filterClass === "all" || p.className === filterClass);
   const { pages, rows }  = pager(filteredPayments, page);
@@ -614,13 +660,37 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           {balances.length===0 ? <Msg text="No balances available." /> : (
         <div style={{ overflowX: "auto" }}>
           <Table
-            headers={["Student","Class","Expected","Paid","Balance","Status","Pay"]}
+            headers={["Student","Class","Base Fee","+Transport","+Lunch","+Opening","=Total","Paid","Balance","Status","Pay"]}
             rows={balances.map(b=>[
               <span key={b.studentId} style={{color:C.text,fontWeight:600}}>{b.name}</span>,
-              b.className, money(b.expected), money(b.paid), money(b.balance),
+              b.className,
+              // Base fee (tuition + activity + misc)
+              <span key="base" style={{fontSize:12}}>{money(b.baseFee)}</span>,
+              // Transport fee with indicator
+              <span key="transport" style={{fontSize:12,color:b.transportFee>0?C.text:"#64748b"}}>
+                {b.transportFee>0 ? money(b.transportFee) : "—"}
+                {b.transportDirection!=='none' && <small style={{display:'block',fontSize:10,color:'#64748b'}}>{b.transportDirection.replace('_',' ')}</small>}
+              </span>,
+              // Lunch fee with indicator
+              <span key="lunch" style={{fontSize:12,color:b.lunchFee>0?C.text:"#64748b"}}>
+                {b.lunchFee>0 ? money(b.lunchFee) : "—"}
+              </span>,
+              // Opening balance
+              <span key="opening" style={{fontSize:12,color:b.openingBalance>0?'#f59e0b':b.openingBalance<0?'#22c55e':'#64748b'}}>
+                {b.openingBalance!==0 ? money(Math.abs(b.openingBalance)) : "—"}
+                {b.openingBalance!==0 && <small style={{display:'block',fontSize:10}}>{b.openingBalance>0?'(owing)':'(credit)'}</small>}
+              </span>,
+              // Total expected
+              <span key="expected" style={{fontWeight:600}}>{money(b.expected)}</span>,
+              // Paid
+              <span key="paid" style={{color:'#22c55e'}}>{money(b.paid)}</span>,
+              // Balance
+              <span key="balance" style={{fontWeight:700,color:b.balance>0?'#ef4444':'#22c55e'}}>{money(b.balance)}</span>,
+              // Status
               b.expected === 0
                 ? <Badge key="bdg" text="no structure" tone="info" />
                 : <Badge key="bdg" text={b.balance>0?"pending":"cleared"} tone={b.balance>0?"warning":"success"} />,
+              // Pay buttons
               b.expected > 0 && b.balance > 0 ? (
                 <div key="pay" style={{display:"flex",flexDirection:"column",gap:6}}>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -630,21 +700,17 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                       <Btn variant="primary" size="small" onClick={() => openBankDeposit(b)}>🏦 Bank Deposit</Btn>
                     )}
                   </div>
-                  {/* OLD: Removed 'Pay Custom Amount' for parents per requirements */}
-                  {/* <Btn variant="ghost" size="small" onClick={() => {
-                    setPaymentForm({
-                      ...paymentForm,
-                      studentId: b.studentId,
-                      amount: String(b.balance),
-                    });
-                    setShowPayment(true);
-                  }}>
-                    Pay Custom Amount
-                  </Btn> */}
                 </div>
               ) : "—"
             ])}
           />
+          {/* Legend */}
+          <div style={{marginTop:12,fontSize:11,color:'#64748b',display:'flex',gap:16,flexWrap:'wrap'}}>
+            <span>💡 <strong>Base Fee:</strong> Tuition + Activity + Misc</span>
+            <span>🚌 <strong>Transport:</strong> 1-way (60%) or 2-way (100%)</span>
+            <span>🍽️ <strong>Lunch:</strong> Daily rate × school days</span>
+            <span>📖 <strong>Opening:</strong> Balance carried forward</span>
+          </div>
         </div>
       )}
         </>
