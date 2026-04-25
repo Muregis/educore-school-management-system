@@ -226,6 +226,20 @@ function getOrdinalSuffix(n) {
   return s[(v - 20) % 10] || s[v] || s[0];
 }
 
+/**
+ * Get grade points for GPA calculation (KNEC scale)
+ * @param {string} grade - Grade letter
+ * @returns {number} Grade points (A=12, A-=11, B+=10, B=9, B-=8, C+=7, C=6, C-=5, D+=4, D=3, D-=2, E=1)
+ */
+export function getGradePoints(grade) {
+  const points = {
+    'A': 12, 'A-': 11, 'B+': 10, 'B': 9, 'B-': 8,
+    'C+': 7, 'C': 6, 'C-': 5, 'D+': 4, 'D': 3, 'D-': 2, 'E': 1,
+    'EE': 4, 'ME': 3, 'AE': 2, 'BE': 1
+  };
+  return points[grade] || 0;
+}
+
 export default {
   calculateGrade,
   calculateGradeFromMarks,
@@ -233,6 +247,7 @@ export default {
   calculateClassMean,
   calculatePassRate,
   getGradeColor,
+  getGradePoints,
   isPassing,
   getPositionLabel,
   CBC_GRADES,
