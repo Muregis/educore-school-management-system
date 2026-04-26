@@ -11,6 +11,15 @@ const requireAuth = authRequired;
 
 const router = express.Router();
 
+function isMissingColumnError(error) {
+  const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
+  return Boolean(error) && (
+    error.code === "PGRST204" ||
+    message.includes("column") ||
+    message.includes("schema cache")
+  );
+}
+
 // GET /api/subjects - List all subjects for school
 router.get("/", requireAuth, async (req, res, next) => {
   try {
@@ -80,12 +89,7 @@ router.get("/:id", requireAuth, async (req, res, next) => {
       .select("*")
       .eq("is_deleted", false);
 
-    // Try both possible ID columns
-    if (id.includes("-")) { // UUID
-       query = query.eq("subject_id", id);
-    } else {
-       query = query.or(`subject_id.eq.${id},id.eq.${id}`);
-    }
+    query = query.or(`subject_id.eq.${id},id.eq.${id}`);
 
     if (role !== 'director' && role !== 'superadmin') {
       query = query.eq("school_id", schoolId);
@@ -141,7 +145,18 @@ router.post("/", requireAuth, requireRoles("admin", "teacher", "director"), asyn
       is_deleted: false,
     };
 
-    const { data, error } = await supabase.from("subjects").insert(insertData).select().single();
+    let { data, error } = await supabase.from("subjects").insert(insertData).select().single();
+
+    if (error && isMissingColumnError(error)) {
+      const fallbackInsertData = {
+        school_id: effectiveSchoolId,
+        name: name.trim(),
+        code: code ? code.trim().toUpperCase() : null,
+        description: description ? description.trim() : null,
+        is_active: true,
+      };
+      ({ data, error } = await supabase.from("subjects").insert(fallbackInsertData).select().single());
+    }
 
     if (error) {
       if (error.code === "23505") return res.status(409).json({ message: "Duplicate subject" });
@@ -178,14 +193,29 @@ router.put("/:id", requireAuth, requireRoles("admin", "teacher", "director"), as
     }
 
     let query = supabase.from("subjects").update(updates).eq("is_deleted", false);
-    if (id.includes("-")) query = query.eq("subject_id", id);
-    else query = query.or(`subject_id.eq.${id},id.eq.${id}`);
+    query = query.or(`subject_id.eq.${id},id.eq.${id}`);
 
     if (role !== 'director' && role !== 'superadmin') {
       query = query.eq("school_id", schoolId);
     }
 
-    const { data, error } = await query.select().maybeSingle();
+    let { data, error } = await query.select().maybeSingle();
+    if (error && isMissingColumnError(error)) {
+      const fallbackUpdates = { updated_at: new Date().toISOString() };
+      if (name !== undefined) fallbackUpdates.name = name;
+      if (code !== undefined) fallbackUpdates.code = code;
+      if (description !== undefined) fallbackUpdates.description = description;
+      if (isActive !== undefined) fallbackUpdates.is_active = Boolean(isActive);
+
+      let fallbackQuery = supabase.from("subjects").update(fallbackUpdates);
+      fallbackQuery = fallbackQuery.or(`subject_id.eq.${id},id.eq.${id}`);
+
+      if (role !== 'director' && role !== 'superadmin') {
+        fallbackQuery = fallbackQuery.eq("school_id", schoolId);
+      }
+
+      ({ data, error } = await fallbackQuery.select().maybeSingle());
+    }
     if (error) throw error;
     if (!data) return res.status(404).json({ message: "Subject not found" });
 
@@ -210,8 +240,7 @@ router.delete("/:id", requireAuth, requireRoles("admin", "director", "superadmin
       .update({ is_deleted: true, updated_at: new Date().toISOString() })
       .eq("is_deleted", false);
 
-    if (id.includes("-")) query = query.eq("subject_id", id);
-    else query = query.or(`subject_id.eq.${id},id.eq.${id}`);
+    query = query.or(`subject_id.eq.${id},id.eq.${id}`);
 
     if (role !== 'director' && role !== 'superadmin') {
       query = query.eq("school_id", schoolId);

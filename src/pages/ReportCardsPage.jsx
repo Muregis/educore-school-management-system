@@ -82,6 +82,10 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
     const { student, results, attendance, reportCard, average } = fullData;
     const gradeColor = g => g === "A" ? "#22c55e" : g === "B" ? "#3b82f6" : g === "C" ? "#f59e0b" : "#ef4444";
     const w = window.open("", "_blank");
+    if (!w) {
+      toast("Allow pop-ups to print report cards", "error");
+      return;
+    }
     w.document.write(`
       <html><head><title>Report Card - ${student.full_name}</title>
       <style>

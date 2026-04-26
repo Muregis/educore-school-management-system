@@ -376,9 +376,9 @@ router.get("/classes/promotion-chain", authorize("academic.view"), async (req, r
       class_id: c.class_id || c.id,
       class_name: c.class_name,
       next_class_name: c.next_class_name || null,
-      class_order: c.class_order || 0,
+      class_order: c.sort_order ?? c.class_order ?? 0,
       status: c.status || 'active'
-    })).sort((a, b) => (a.class_order || 0) - (b.class_order || 0));
+    })).sort((a, b) => (a.class_order || 0) - (b.class_order || 0) || a.class_name.localeCompare(b.class_name));
 
     res.json({ data: classes });
   } catch (err) {
@@ -425,13 +425,15 @@ router.put("/classes/:id/promotion", authorize("academic.manage"), async (req, r
     if (classOrder !== undefined) updateData.class_order = classOrder;
     updateData.updated_at = new Date();
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('classes')
       .update(updateData)
-      .eq('class_id', classId)
       .eq('school_id', schoolId)
-      .select()
-      .single();
+      .select();
+
+    query = query.or(`class_id.eq.${classId},id.eq.${classId}`);
+
+    const { data, error } = await query.single();
 
     if (error) throw error;
     res.json(data);

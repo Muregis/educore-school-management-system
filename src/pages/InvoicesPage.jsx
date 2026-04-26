@@ -53,6 +53,10 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
 
   const printInvoice = (inv) => {
     const w = window.open("", "_blank");
+    if (!w) {
+      toast("Allow pop-ups to print invoices", "error");
+      return;
+    }
     w.document.write(`
       <html><head><title>Invoice ${inv.invoice_number}</title>
       <style>body{font-family:sans-serif;padding:40px;max-width:500px;margin:auto}h1{font-size:20px;margin-bottom:4px}.school{color:#888;margin-bottom:24px}.row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee}.total{font-weight:bold;font-size:16px;border-top:2px solid #000;margin-top:8px}@media print{button{display:none}}</style>

@@ -564,6 +564,7 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
     for (const s of teachersToSync) {
       const firstName = s.full_name.split(' ')[0] || s.full_name;
       const lastName = s.full_name.split(' ').slice(1).join(' ') || '';
+      const teacherEmail = s.email || `hr-teacher-${s.staff_id}@local.invalid`;
       
       const { error: upsertError } = await supabase
         .from('teachers')
@@ -571,12 +572,14 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
           school_id: schoolId,
           first_name: firstName,
           last_name: lastName,
-          email: s.email,
-          phone: s.phone,
-          subject: s.department || 'General',
+          email: teacherEmail,
+          phone: s.phone || null,
+          staff_number: s.staff_number || `HR-${s.staff_id}`,
+          national_id: s.national_id || null,
           qualification: s.job_title,
           status: s.status,
-          staff_id: s.staff_id
+          hire_date: s.start_date || null,
+          department: s.department || null,
         }, { onConflict: 'school_id,email' }); 
       
       if (!upsertError) synced++;

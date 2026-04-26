@@ -6,6 +6,11 @@ import { requireRoles } from "../middleware/roles.js";
 const router = Router();
 router.use(authRequired);
 
+function applyBookIdentityFilter(query, rawId) {
+  const id = String(rawId);
+  return query.or(`book_id.eq.${id},id.eq.${id}`);
+}
+
 // ── GET all books ─────────────────────────────────────────────────────────────
 router.get("/books", async (req, res, next) => {
   try {
@@ -43,17 +48,22 @@ router.post("/books", requireRoles("admin","librarian"), async (req, res, next) 
         quantity_available: qty,
         status: 'active'
       })
-      .select('book_id')
+      .select('book_id, id')
       .single();
 
     if (insertError) throw insertError;
 
-    const { data: row, error: selectError } = await supabase
+    const insertedBookId = inserted?.book_id ?? inserted?.id;
+    if (!insertedBookId) {
+      return res.status(201).json({ created: true });
+    }
+
+    let selectQuery = supabase
       .from('books')
       .select('*')
-      .eq('book_id', inserted.book_id)
-      .eq('school_id', schoolId)
-      .single();
+      .eq('school_id', schoolId);
+    selectQuery = applyBookIdentityFilter(selectQuery, insertedBookId);
+    const { data: row, error: selectError } = await selectQuery.single();
 
     if (selectError) throw selectError;
     res.status(201).json(row);
@@ -65,12 +75,12 @@ router.put("/books/:id", requireRoles("admin","librarian"), async (req, res, nex
   try {
     const { schoolId } = req.user;
     const { title, author, category, isbn, quantityTotal } = req.body;
-    const { data: book, error: fetchError } = await supabase
+    let fetchQuery = supabase
       .from('books')
       .select('*')
-      .eq('book_id', req.params.id)
-      .eq('school_id', schoolId)
-      .single();
+      .eq('school_id', schoolId);
+    fetchQuery = applyBookIdentityFilter(fetchQuery, req.params.id);
+    const { data: book, error: fetchError } = await fetchQuery.single();
 
     if (fetchError || !book) return res.status(404).json({ message: "Book not found" });
 
@@ -78,20 +88,22 @@ router.put("/books/:id", requireRoles("admin","librarian"), async (req, res, nex
     const checkedOut = book.quantity_total - book.quantity_available;
     const newAvailable = Math.max(0, newTotal - checkedOut);
 
-    const { error: updateError } = await supabase
-      .from('books')
-      .update({
-        title: title || book.title,
-        author: author || book.author,
-        category: category || book.category,
-        isbn: isbn ?? book.isbn,
-        quantity_total: newTotal,
-        quantity_available: newAvailable,
-        updated_at: new Date().toISOString()
-      })
-      .eq('book_id', req.params.id)
-      .eq('school_id', schoolId);
-
+    const updateQuery = applyBookIdentityFilter(
+      supabase
+        .from('books')
+        .update({
+          title: title || book.title,
+          author: author || book.author,
+          category: category || book.category,
+          isbn: isbn ?? book.isbn,
+          quantity_total: newTotal,
+          quantity_available: newAvailable,
+          updated_at: new Date().toISOString()
+        })
+        .eq('school_id', schoolId),
+      req.params.id
+    );
+    const { error: updateError } = await updateQuery;
     if (updateError) throw updateError;
     res.json({ updated: true });
   } catch (err) { next(err); }
@@ -102,11 +114,14 @@ router.delete("/books/:id", requireRoles("admin", "director", "superadmin"), asy
   try {
     const { schoolId } = req.user;
 
-    const { error: updateError } = await supabase
-      .from('books')
-      .update({ is_deleted: true, updated_at: new Date().toISOString() })
-      .eq('book_id', req.params.id)
-      .eq('school_id', schoolId);
+    const deleteQuery = applyBookIdentityFilter(
+      supabase
+        .from('books')
+        .update({ is_deleted: true, updated_at: new Date().toISOString() })
+        .eq('school_id', schoolId),
+      req.params.id
+    );
+    const { error: updateError } = await deleteQuery;
 
     if (updateError) throw updateError;
     res.json({ deleted: true });

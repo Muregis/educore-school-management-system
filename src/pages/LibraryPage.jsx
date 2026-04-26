@@ -111,7 +111,9 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
       // Force refresh to ensure consistency
       await load();
     } catch (e) { 
-      setErr(e.message || "Failed to save"); 
+      const message = e.message || "Failed to save";
+      setErr(message);
+      toast?.(message, "error");
     } finally {
       setLoading(false);
     }

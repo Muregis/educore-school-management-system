@@ -11,23 +11,34 @@ const router = Router();
 router.use(authRequired);
 
 async function sendViaWhatsApp(recipients, message, schoolId, sentByUserId = null) {
-  const logs = [];
   const uniqueRecipients = [...new Set(recipients.filter(Boolean))];
+  const preparedResults = await Promise.allSettled(
+    uniqueRecipients.map(async (phone) => {
+      const prepared = await prepareWhatsAppMessage({
+        schoolId,
+        recipientPhone: phone,
+        message,
+        sentByUserId,
+      });
 
-  for (const phone of uniqueRecipients) {
-    const prepared = await prepareWhatsAppMessage({
-      schoolId,
-      recipientPhone: phone,
-      message,
-      sentByUserId,
-    });
+      return {
+        phone,
+        status: prepared.status,
+        waLink: prepared.waLink,
+      };
+    })
+  );
 
-    logs.push({
-      phone,
-      status: prepared.status,
-      waLink: prepared.waLink,
-    });
-  }
+  const logs = preparedResults.map((result, index) => {
+    if (result.status === "fulfilled") {
+      return result.value;
+    }
+    return {
+      phone: uniqueRecipients[index],
+      status: "failed",
+      waLink: null,
+    };
+  });
 
   return {
     sent: 0,
