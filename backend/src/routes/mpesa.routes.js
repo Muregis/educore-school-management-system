@@ -221,6 +221,7 @@ router.post("/c2b/confirm", authRateLimit, async (req, res, next) => {
       .maybeSingle();
 
       // Try to resolve school_id from MPesa shortcode configs — so the right admin can see & reconcile this
+    if (studentError || !student) {
       let resolvedSchoolId = null;
       try {
         const { data: configs } = await supabase
