@@ -538,7 +538,10 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   const printReceipt = () => {
     const w = window.open("", "_blank");
-    if (!w) return;
+    if (!w) {
+      toast("Allow pop-ups to print receipts", "error");
+      return;
+    }
     w.document.write(`
       <html><head><title>Receipt</title>
       <style>

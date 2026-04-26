@@ -33,6 +33,9 @@ export default function StudentIDCard({ student, school, onClose }) {
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      return;
+    }
     printWindow.document.write(`
       <html>
         <head>

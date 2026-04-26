@@ -234,7 +234,10 @@ export default function HRPage({ auth, canEdit, toast }) {
   // Print single payslip
   const printPayslip = (p) => {
     const w = window.open("","_blank");
-    if (!w) return;
+    if (!w) {
+      toast("Allow pop-ups to print payslips", "error");
+      return;
+    }
     w.document.write(`
       <html><head><title>Payslip - ${p.staff_name}</title>
       <style>body{font-family:Arial;padding:32px;max-width:600px;margin:auto}

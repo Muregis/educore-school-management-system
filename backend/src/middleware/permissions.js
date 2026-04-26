@@ -13,17 +13,20 @@ const ROLE_PERMISSIONS = {
     'mpesa-reconcile', 'admissions', 'invoices', 'reportcards', 'discipline', 'transport',
     'communication', 'messaging', 'timetable', 'reports', 'analytics', 'accounts', 'hr',
     'library', 'lessonplans', 'pendingplans', 'settings', 'announcements', 'bulk-import',
-    'exams', 'medical', 'update-requests', 'academic.view', 'branch-management', 'admin-permissions'
+    'exams', 'medical', 'update-requests', 'academic.view', 'academic.manage',
+    'promotion.view', 'promotion.approve', 'branch-management', 'admin-permissions'
   ],
   superadmin: [
     'dashboard', 'upgrade', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees',
     'mpesa-reconcile', 'admissions', 'invoices', 'reportcards', 'discipline', 'transport',
     'communication', 'messaging', 'timetable', 'reports', 'analytics', 'accounts', 'hr',
     'library', 'lessonplans', 'pendingplans', 'settings', 'announcements', 'bulk-import',
-    'exams', 'medical', 'update-requests', 'academic.view', 'branch-management'
+    'exams', 'medical', 'update-requests', 'academic.view', 'academic.manage',
+    'promotion.view', 'promotion.approve', 'branch-management'
   ],
   admin: [
-    'dashboard', 'students', 'attendance', 'communication', 'announcements'
+    'dashboard', 'students', 'attendance', 'communication', 'announcements',
+    'academic.view', 'academic.manage', 'promotion.view', 'promotion.approve'
   ],
   teacher: [
     'dashboard', 'attendance', 'grades', 'reportcards', 'discipline', 'timetable',
