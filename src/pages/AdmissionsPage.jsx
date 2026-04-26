@@ -117,6 +117,22 @@ export default function AdmissionsPage({ auth, canEdit, toast }) {
     }
   };
 
+  const [enrollAdmNo, setEnrollAdmNo] = useState("");
+
+  const enrollAdmission = async (id) => {
+    try {
+      const res = await apiFetch(`/admissions/${id}/enroll`, {
+        method: "POST",
+        body: { admissionNumber: enrollAdmNo || undefined },
+        token: auth.token,
+      });
+      toast(`Student enrolled — Adm# ${res.admission_number}`, "success");
+      setShowDetail(null);
+      setEnrollAdmNo("");
+      await load();
+    } catch (e) { toast(e.message, "error"); }
+  };
+
   const updateStatus = async (id, status) => {
     try {
       await apiFetch(`/admissions/${id}`, { method: "PATCH", body: { status }, token: auth.token });
@@ -125,6 +141,7 @@ export default function AdmissionsPage({ auth, canEdit, toast }) {
       setShowDetail(null);
     } catch (e) { toast(e.message, "error"); }
   };
+
 
   const filtered = applications.filter(a => filterStatus === "all" || a.status === filterStatus);
   const counts   = { pending: 0, reviewed: 0, accepted: 0, rejected: 0 };
@@ -297,17 +314,30 @@ export default function AdmissionsPage({ auth, canEdit, toast }) {
               <div style={{ color: C.textSub }}>{showDetail.notes}</div>
             </div>
           )}
+          {canEdit && (showDetail.status === "pending" || showDetail.status === "reviewed") && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Admission No. (leave blank to auto-generate)</div>
+              <input
+                style={{ ...inputStyle, width: "100%" }}
+                value={enrollAdmNo}
+                onChange={e => setEnrollAdmNo(e.target.value)}
+                placeholder="e.g. 2026-0051 (optional)"
+              />
+            </div>
+          )}
           {canEdit && showDetail.status === "pending" && (
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <Btn variant="ghost" onClick={() => updateStatus(showDetail.admission_id, "reviewed")}>Mark Reviewed</Btn>
               <Btn variant="ghost" onClick={() => updateStatus(showDetail.admission_id, "rejected")} style={{ color: "#ef4444" }}>Reject</Btn>
-              <Btn onClick={() => updateStatus(showDetail.admission_id, "accepted")}>✓ Accept</Btn>
+              <Btn onClick={() => updateStatus(showDetail.admission_id, "accepted")}>✓ Accept Only</Btn>
+              <Btn onClick={() => enrollAdmission(showDetail.admission_id)}>🎓 Accept & Enroll</Btn>
             </div>
           )}
           {canEdit && showDetail.status === "reviewed" && (
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <Btn variant="ghost" onClick={() => updateStatus(showDetail.admission_id, "rejected")} style={{ color: "#ef4444" }}>Reject</Btn>
-              <Btn onClick={() => updateStatus(showDetail.admission_id, "accepted")}>✓ Accept</Btn>
+              <Btn onClick={() => updateStatus(showDetail.admission_id, "accepted")}>✓ Accept Only</Btn>
+              <Btn onClick={() => enrollAdmission(showDetail.admission_id)}>🎓 Accept & Enroll</Btn>
             </div>
           )}
         </Modal>

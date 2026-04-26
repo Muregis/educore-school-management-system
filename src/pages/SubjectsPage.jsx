@@ -59,7 +59,8 @@ export default function SubjectsPage({ auth, toast }) {
       const data = await apiFetch("/subjects", { token: auth.token });
       setSubjects((data || []).map(normaliseSubject));
     } catch (e) {
-      toast("Failed to load subjects", "error");
+      console.error("Subjects load error:", e);
+      toast(e.message || "Failed to load subjects", "error");
     }
     setLoading(false);
   };

@@ -220,12 +220,22 @@ router.post("/c2b/confirm", authRateLimit, async (req, res, next) => {
       .eq('is_deleted', false)
       .maybeSingle();
 
-    // If no student found, store in unmatched table for later reconciliation
-    if (studentError || !student) {
-      console.warn(`[C2B Confirm] No student for billRef: ${billRef}. TransID: ${transId}. Storing for reconciliation.`);
-      
+      // Try to resolve school_id from MPesa shortcode configs — so the right admin can see & reconcile this
+      let resolvedSchoolId = null;
+      try {
+        const { data: configs } = await supabase
+          .from('payment_configs')
+          .select('school_id')
+          .eq('is_deleted', false)
+          .limit(10);
+        // If only one school uses this callback endpoint, that's our tenant
+        if (configs && configs.length === 1) {
+          resolvedSchoolId = configs[0].school_id;
+        }
+      } catch (_) { /* non-fatal — fall back to null */ }
+
       await supabase.from('mpesa_unmatched').upsert({
-        school_id: null, // Will be matched later during reconciliation
+        school_id: resolvedSchoolId,
         transaction_id: transId,
         amount,
         phone_number: msisdn || null,
@@ -233,7 +243,7 @@ router.post("/c2b/confirm", authRateLimit, async (req, res, next) => {
         raw_payload: b,
         status: 'unmatched'
       }, { onConflict: 'transaction_id' });
-      
+
       return res.json({ ok: true, warning: "Student not found, payment stored for reconciliation" });
     }
 
@@ -454,4 +464,21 @@ router.get("/reconciliation-logs", authRequired, requireRoles("admin", "finance"
   } catch (err) { next(err); }
 });
 
+// GET /api/mpesa/unmatched-orphaned — superadmin/director only
+// Shows unmatched payments with no school_id (pre-fix legacy records)
+router.get("/unmatched-orphaned", authRequired, requireRoles("director", "superadmin"), async (req, res, next) => {
+  try {
+    const { data, error } = await supabase
+      .from('mpesa_unmatched')
+      .select('*')
+      .is('school_id', null)
+      .eq('status', 'unmatched')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err) { next(err); }
+});
+
 export default router;
+

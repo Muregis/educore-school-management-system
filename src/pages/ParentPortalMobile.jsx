@@ -61,8 +61,14 @@ export default function ParentPortalMobile({
     .filter(p => p.status === 'paid')
     .reduce((sum, p) => sum + Number(p.amount), 0);
 
-  const classFee = feeStructures.find(f => f.className === activeChild?.className)?.amount || 0;
-  const balance = classFee - totalPaid;
+  // Read tuition+activity+misc — .amount does not exist on feeStructures
+  const feeStruct = feeStructures.find(
+    f => (f.className ?? f.class_name) === (activeChild?.className ?? activeChild?.class_name)
+  );
+  const classFee = feeStruct
+    ? (Number(feeStruct.tuition || 0) + Number(feeStruct.activity || 0) + Number(feeStruct.misc || 0))
+    : 0;
+  const balance = Math.max(0, classFee - totalPaid);
 
   // Navigation items
   const navItems = [

@@ -89,6 +89,13 @@ router.get("/streams", authRequired, async (req, res, next) => {
       a.sum += p;
       a.count += 1;
     }
+// Official CBC class order: Playgroup → Grade 9 (not alphabetical)
+const CLASS_ORDER = ["Playgroup","PP1","PP2","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"];
+const classOrderIndex = (name) => {
+  const i = CLASS_ORDER.indexOf(name);
+  return i === -1 ? 99 : i; // unknown classes sort last
+};
+
     const streamAvgs = [...streamAgg.values()]
       .map(a => ({
         class_name: a.class_name,
@@ -98,7 +105,8 @@ router.get("/streams", authRequired, async (req, res, next) => {
         student_count: a.studentIds.size,
         avg_score: a.count ? Number((a.sum / a.count).toFixed(1)) : 0,
       }))
-      .sort((a, b) => String(a.class_name).localeCompare(String(b.class_name)) || String(a.stream).localeCompare(String(b.stream)));
+      .sort((a, b) => classOrderIndex(a.class_name) - classOrderIndex(b.class_name) || String(a.stream).localeCompare(String(b.stream)));
+
 
     // Subject rankings
     const subjAgg = new Map(); // subject -> { sum,count,highest,lowest,entries }

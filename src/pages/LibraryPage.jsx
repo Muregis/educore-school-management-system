@@ -20,7 +20,7 @@ const BLANK_BORROW = { borrowerId: "", borrowerType: "student", bookId: "", dueD
 
 const CATEGORIES = ["General","Mathematics","Sciences","Languages","History","Religion","Arts","Reference","Stationery"];
 
-export default function LibraryPage({ auth, students = [], teachers = [] }) {
+export default function LibraryPage({ auth, students = [], teachers = [], toast }) {
   const [tab, setTab]           = useState("books");
   const [books, setBooks]       = useState([]);
   const [borrows, setBorrows]   = useState([]);
@@ -46,7 +46,10 @@ export default function LibraryPage({ auth, students = [], teachers = [] }) {
       ]);
       setBooks(Array.isArray(booksData) ? booksData : []);
       setBorrows(Array.isArray(borrowsData) ? borrowsData : []);
-    } catch { /* offline */ }
+    } catch (e) {
+      console.error("Library load error:", e);
+      toast?.(e.message || "Failed to load library data", "error");
+    }
     setLoading(false);
   };
 
@@ -143,14 +146,7 @@ export default function LibraryPage({ auth, students = [], teachers = [] }) {
     } catch { /* ignore */ }
   };
 
-  const toast = (msg, tone) => {
-    // Toast should be passed from parent, but fallback to console if not available
-    if (typeof window !== 'undefined' && window.toast) {
-      window.toast(msg, tone);
-    } else {
-      // Silent fallback - production code shouldn't use console.log
-    }
-  };
+  // toast prop is provided by App.jsx — no internal stub needed
 
   // Export functions
   const exportBooks = () => {
@@ -417,4 +413,5 @@ LibraryPage.propTypes = {
   auth:     PropTypes.object.isRequired,
   students: PropTypes.array,
   teachers: PropTypes.array,
+  toast:    PropTypes.func,
 };

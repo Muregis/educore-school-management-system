@@ -3,8 +3,11 @@
 
 import express from "express";
 import { supabase } from "../config/supabaseClient.js";
-import { requireAuth } from "../middleware/auth.js";
+import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
+
+// Backward-compat alias — this file uses requireAuth but middleware exports authRequired
+const requireAuth = authRequired;
 
 const router = express.Router();
 
@@ -21,17 +24,14 @@ router.get("/", requireAuth, async (req, res, next) => {
       return res.status(400).json({ message: "School context required" });
     }
 
-    // Use * to be safe against schema variations
+    // Single clean query — no dead variable
     let query = supabase
-      .from("subjects")
-      .select("*")
-      .eq("is_deleted", false);
-
-    const { data: rows, error } = await supabase
       .from("subjects")
       .select("*")
       .eq("school_id", effectiveSchoolId)
       .eq("is_deleted", false);
+
+    const { data: rows, error } = await query;
 
     if (error) {
       console.error("[SUBJECTS ERROR]", error);
@@ -51,10 +51,19 @@ router.get("/", requireAuth, async (req, res, next) => {
       is_active: s.is_active ?? (s.status === 'active')
     }));
 
-    // In-memory sort to avoid SQL errors on missing columns
+    // Sort alphabetically by name
     normalised.sort((a, b) => a.name.localeCompare(b.name));
 
-    const filtered = active === "true" ? normalised.filter(s => s.is_active) : normalised;
+    // Apply category filter in memory (safe for live data)
+    let filtered = normalised;
+    if (category) {
+      filtered = filtered.filter(s => s.category?.toLowerCase() === category.toLowerCase());
+    }
+    // Apply active filter — default true
+    if (active !== "false") {
+      filtered = filtered.filter(s => s.is_active);
+    }
+
     res.json(filtered);
   } catch (err) { next(err); }
 });

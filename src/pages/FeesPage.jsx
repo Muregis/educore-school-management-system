@@ -97,7 +97,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [page, setPage]               = useState(1);
   const [paymentForm, setPaymentForm] = useState({ studentId: "", amount: "", feeType: "tuition", method: "cash", date: new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
   const [paymentClass, setPaymentClass] = useState("");
-  const [structForm, setStructForm]   = useState({ className: "Grade 7", tuition: "", activity: "", misc: "" });
+  const [structForm, setStructForm]   = useState({ className: "Grade 7", term: "Term 1", tuition: "", activity: "", misc: "" });
   const [bankDetails, setBankDetails] = useState(null);
   const [schoolWhatsApp, setSchoolWhatsApp] = useState("");
   const [bankDepositTarget, setBankDepositTarget] = useState(null);
@@ -371,7 +371,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     try {
       await apiFetch("/payments/fee-structures", {
         method: "POST",
-        body: { className: structForm.className, term: "Term 2", tuition: Number(structForm.tuition)||0, activity: Number(structForm.activity)||0, misc: Number(structForm.misc)||0 },
+        body: { className: structForm.className, term: structForm.term || "Term 1", tuition: Number(structForm.tuition)||0, activity: Number(structForm.activity)||0, misc: Number(structForm.misc)||0 },
         token: auth?.token,
       });
       const data = await apiFetch("/payments/fee-structures", { token: auth?.token });
@@ -434,7 +434,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       formData.append('studentId', sid);
       formData.append('amount', amt);
       
-      const uploadResponse = await fetch('/payments/upload-proof', {
+      // Upload proof — use apiFetch base URL to work in both dev and production
+      const API_BASE = import.meta.env.VITE_API_URL || '';
+      const uploadResponse = await fetch(`${API_BASE}/api/payments/upload-proof`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${auth.token}`,
@@ -600,7 +602,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           toast("CSV exported","success");
         }}>Export CSV</Btn>
         {canEdit && tab==="payments" && <Btn onClick={()=>setShowPayment(true)}>+ Record Payment</Btn>}
-        {canEdit && tab==="structure" && <Btn onClick={()=>{setEditStruct(null);setStructForm({className:"Grade 7",tuition:"",activity:"",misc:""});setShowStruct(true);}}>Set Fee Structure</Btn>}
+        {canEdit && tab==="structure" && <Btn onClick={()=>{setEditStruct(null);setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""});setShowStruct(true);}}>Set Fee Structure</Btn>}
       </div>
 
       {/* Payments Tab */}
@@ -720,12 +722,13 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       {tab==="structure" && (normalisedStructures.length===0 ? <Msg text="No fee structures set." /> : (
         <div style={{ overflowX: "auto" }}>
           <Table
-            headers={["Class","Tuition","Activity","Misc","Total","Actions"]}
+            headers={["Class","Term","Tuition","Activity","Misc","Total","Actions"]}
             rows={normalisedStructures.map(f=>[
               <span key={f.id} style={{color:C.text,fontWeight:600}}>{f.className}</span>,
+              <span key="term" style={{color:C.textSub,fontSize:12}}>{f.term||"—"}</span>,
               money(f.tuition), money(f.activity), money(f.misc),
               money(Number(f.tuition)+Number(f.activity)+Number(f.misc)),
-              canEdit && <Btn key="ed" variant="ghost" onClick={()=>{setEditStruct(f);setStructForm({className:f.className,tuition:String(f.tuition),activity:String(f.activity),misc:String(f.misc)});setShowStruct(true);}}>Edit</Btn>
+              canEdit && <Btn key="ed" variant="ghost" onClick={()=>{setEditStruct(f);setStructForm({className:f.className,term:f.term||"Term 1",tuition:String(f.tuition),activity:String(f.activity),misc:String(f.misc)});setShowStruct(true);}}>Edit</Btn>
             ])}
           />
         </div>
@@ -914,6 +917,13 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             <Field label="Class">
               <select style={inputStyle} value={structForm.className} onChange={e=>setStructForm({...structForm,className:e.target.value})}>
                 {ALL_CLASSES.map(c=><option key={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Term">
+              <select style={inputStyle} value={structForm.term||"Term 1"} onChange={e=>setStructForm({...structForm,term:e.target.value})}>
+                <option value="Term 1">Term 1</option>
+                <option value="Term 2">Term 2</option>
+                <option value="Term 3">Term 3</option>
               </select>
             </Field>
             <Field label="Tuition">

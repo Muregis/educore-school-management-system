@@ -46,6 +46,9 @@ import updateRequestsRoutes from "./routes/update_requests.js";
 import enhancedExportsRoutes from "./routes/enhanced_exports.js";
 import branchRoutes          from "./routes/branch.routes.js"; // NEW: Branch support
 import adminPermissionsRoutes from "./routes/admin-permissions.routes.js"; // NEW: Director admin permissions
+import performanceRoutes    from "./routes/performance.routes.js"; // NEW: KNEC performance sheets
+import promotionRoutes      from "./routes/promotion.routes.js";  // NEW: Student promotion chain
+import feereRemindersRoutes from "./routes/feereminders.routes.js"; // NEW: Fee reminder automation
 // import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }    from "./middleware/error.js";
 import { authRequired } from "./middleware/auth.js";
@@ -146,6 +149,9 @@ app.use("/api/students",        updateRequestsRoutes);
 app.use("/api",                 enhancedExportsRoutes);
 app.use("/api/branches",        branchRoutes); // NEW: Branch/campus support
 app.use("/api/admin-permissions", adminPermissionsRoutes); // NEW: Director admin permissions
+app.use("/api/performance",     performanceRoutes);  // NEW: KNEC performance sheet
+app.use("/api/students/promote", promotionRoutes);   // NEW: Promotion chain
+app.use("/api/fees",             feereRemindersRoutes); // NEW: Fee reminders (additive, does not override /api/payments)
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
 

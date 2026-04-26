@@ -95,4 +95,92 @@ router.delete("/:id", requireRoles("admin", "director", "superadmin"), async (re
   } catch (err) { next(err); }
 });
 
+// POST /api/admissions/:id/enroll — Accept application AND create student
+// Safe: never deletes admission record; creates student additively
+router.post("/:id/enroll", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { admissionNumber } = req.body; // optional — auto-generated if blank
+
+    // 1. Fetch the admission (read-only)
+    const { data: adm, error: fetchErr } = await supabase
+      .from("admissions")
+      .select("*")
+      .eq("admission_id", req.params.id)
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .single();
+    if (fetchErr || !adm) return res.status(404).json({ message: "Application not found" });
+    if (adm.status === "rejected")  return res.status(400).json({ message: "Cannot enroll a rejected application" });
+
+    // 2. Generate admission number if not provided
+    //    Format: YYYY-NNNN (e.g. 2026-0047)
+    let admNo = admissionNumber?.trim();
+    if (!admNo) {
+      const year = new Date().getFullYear();
+      const { count } = await supabase
+        .from("students")
+        .select("*", { count: "exact", head: true })
+        .eq("school_id", schoolId);
+      admNo = `${year}-${String((count || 0) + 1).padStart(4, "0")}`;
+    }
+
+    // 3. Check for duplicate admission number
+    const { data: existing } = await supabase
+      .from("students")
+      .select("student_id")
+      .eq("school_id", schoolId)
+      .eq("admission_number", admNo)
+      .eq("is_deleted", false)
+      .maybeSingle();
+    if (existing) return res.status(409).json({ message: `Admission number ${admNo} already exists` });
+
+    // 4. Create student record from admission data
+    const nameParts = (adm.full_name || "").trim().split(" ");
+    const firstName = nameParts[0] || adm.full_name;
+    const lastName  = nameParts.slice(1).join(" ") || "";
+
+    const { data: student, error: createErr } = await supabase
+      .from("students")
+      .insert({
+        school_id:        schoolId,
+        admission_number: admNo,
+        first_name:       firstName,
+        last_name:        lastName,
+        date_of_birth:    adm.date_of_birth || null,
+        gender:           adm.gender || "unknown",
+        parent_name:      adm.parent_name || null,
+        parent_phone:     adm.parent_phone || null,
+        parent_email:     adm.parent_email || null,
+        address:          adm.address || null,
+        previous_school:  adm.previous_school || null,
+        class_name:       adm.applying_class,
+        status:           "active",
+        is_deleted:       false,
+      })
+      .select("student_id")
+      .single();
+    if (createErr) throw createErr;
+
+    // 5. Mark admission accepted and link to student (additive — does not delete admission)
+    await supabase
+      .from("admissions")
+      .update({
+        status:           "accepted",
+        admission_number: admNo,
+        updated_at:       new Date().toISOString(),
+      })
+      .eq("admission_id", req.params.id)
+      .eq("school_id", schoolId);
+
+    res.status(201).json({
+      enrolled:   true,
+      student_id: student.student_id,
+      admission_number: admNo,
+      message: `Student created with admission number ${admNo}`,
+    });
+  } catch (err) { next(err); }
+});
+
 export default router;
+
