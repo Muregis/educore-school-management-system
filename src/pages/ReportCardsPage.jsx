@@ -166,7 +166,11 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
               acc[cls].push(s);
               return acc;
             }, {});
-            const sortedClasses = Object.keys(grouped).sort();
+            const classOrderIndex = (className) => {
+              const idx = ALL_CLASSES.indexOf(className);
+              return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+            };
+            const sortedClasses = Object.keys(grouped).sort((a, b) => classOrderIndex(a) - classOrderIndex(b) || a.localeCompare(b));
             return sortedClasses.map(cls => (
               <div key={cls} style={{ marginBottom: 16 }}>
                 <div style={{ fontWeight: 700, color: C.accent, fontSize: 13, marginBottom: 6, padding: "4px 8px", background: C.accent + "15", borderRadius: 6 }}>{cls} ({grouped[cls].length})</div>

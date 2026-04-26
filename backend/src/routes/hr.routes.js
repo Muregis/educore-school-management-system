@@ -8,6 +8,15 @@ router.use(authRequired);
 
 const HR_ROLES = ["admin", "hr", "director", "superadmin"];
 
+function isMissingColumnError(error) {
+  const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
+  return Boolean(error) && (
+    error.code === "PGRST204" ||
+    message.includes("column") ||
+    message.includes("schema cache")
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // STAFF RECORDS
 // ═══════════════════════════════════════════════════════════════════
@@ -558,7 +567,7 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
     if (staffError) throw staffError;
 
     const teacherRegex = /teacher|tutor|instructor|lecturer/i;
-    const teachersToSync = staff.filter(s => teacherRegex.test(s.job_title));
+    const teachersToSync = staff.filter(s => teacherRegex.test(s.job_title || s.department || ""));
     
     let synced = 0;
     for (const s of teachersToSync) {
@@ -566,7 +575,7 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
       const lastName = s.full_name.split(' ').slice(1).join(' ') || '';
       const teacherEmail = s.email || `hr-teacher-${s.staff_id}@local.invalid`;
       
-      const { error: upsertError } = await supabase
+      let { error: upsertError } = await supabase
         .from('teachers')
         .upsert({
           school_id: schoolId,
@@ -581,6 +590,20 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
           hire_date: s.start_date || null,
           department: s.department || null,
         }, { onConflict: 'school_id,email' }); 
+
+      if (upsertError && isMissingColumnError(upsertError)) {
+        ({ error: upsertError } = await supabase
+          .from('teachers')
+          .upsert({
+            school_id: schoolId,
+            first_name: firstName,
+            last_name: lastName,
+            email: teacherEmail,
+            phone: s.phone || null,
+            qualification: s.job_title || s.department || 'Teacher',
+            status: s.status || 'active',
+          }, { onConflict: 'school_id,email' }));
+      }
       
       if (!upsertError) synced++;
       else console.error(`Sync error for ${s.full_name}:`, upsertError.message);

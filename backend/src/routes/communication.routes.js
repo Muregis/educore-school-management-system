@@ -6,6 +6,7 @@ import { sendEmail, sendBulkEmail, isEmailConfigured, templates } from "../servi
 import { supabase } from "../config/supabaseClient.js";
 // OLD: import { sendWhatsAppMessage, sendBulkWhatsAppMessages, getWhatsAppConfigStatus } from "../services/whatsappService.js";
 import { prepareWhatsAppMessage } from "../utils/whatsappLinks.js";
+import { buildWaMeLink } from "../utils/whatsappLinks.js";
 
 const router = Router();
 router.use(authRequired);
@@ -145,7 +146,22 @@ router.post("/whatsapp/bulk", requireRoles("admin", "teacher"), async (req, res,
       return res.status(404).json({ message: "No parent phone numbers found for this class" });
     }
 
-    const result = await sendViaWhatsApp(phones, enhancedMessage, schoolId, userId);
+    // Fast path for bulk mode: build wa.me links without per-recipient logging to avoid timeouts on large classes.
+    const links = phones
+      .map(phone => ({ phone, waLink: buildWaMeLink(phone, enhancedMessage) }))
+      .filter(item => item.waLink);
+
+    const result = {
+      sent: 0,
+      failed: phones.length - links.length,
+      queued: links.length,
+      logs: links.map(item => ({
+        phone: item.phone,
+        status: "queued",
+        waLink: item.waLink,
+      })),
+      links,
+    };
 
     res.json({
       ...result,

@@ -11,6 +11,28 @@ function applyBookIdentityFilter(query, rawId) {
   return query.or(`book_id.eq.${id},id.eq.${id}`);
 }
 
+function isMissingColumnError(error) {
+  const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
+  return Boolean(error) && (
+    error.code === "PGRST204" ||
+    message.includes("column") ||
+    message.includes("schema cache")
+  );
+}
+
+function normalizeBookRow(row = {}) {
+  const total = Number(row.quantity_total ?? row.quantity ?? 1) || 1;
+  const available = Number(row.quantity_available ?? total) || total;
+  return {
+    ...row,
+    book_id: row.book_id ?? row.id,
+    quantity_total: total,
+    quantity_available: available,
+    category: row.category || "General",
+    isbn: row.isbn || null,
+  };
+}
+
 // ── GET all books ─────────────────────────────────────────────────────────────
 router.get("/books", async (req, res, next) => {
   try {
@@ -23,7 +45,7 @@ router.get("/books", async (req, res, next) => {
       .eq("is_deleted", false)
       .order("title");
     if (error) throw error;
-    res.json(rows || []);
+    res.json((rows || []).map(normalizeBookRow));
   } catch (err) { next(err); }
 });
 
@@ -36,7 +58,7 @@ router.post("/books", requireRoles("admin","librarian"), async (req, res, next) 
 
     const qty = Number(quantityTotal) || 1;
 
-    const { data: inserted, error: insertError } = await supabase
+    let { data: inserted, error: insertError } = await supabase
       .from('books')
       .insert({
         school_id: schoolId,
@@ -50,6 +72,20 @@ router.post("/books", requireRoles("admin","librarian"), async (req, res, next) 
       })
       .select('book_id, id')
       .single();
+
+    if (insertError && isMissingColumnError(insertError)) {
+      ({ data: inserted, error: insertError } = await supabase
+        .from('books')
+        .insert({
+          school_id: schoolId,
+          title,
+          author,
+          category,
+          status: 'active'
+        })
+        .select('book_id, id')
+        .single());
+    }
 
     if (insertError) throw insertError;
 
@@ -66,7 +102,7 @@ router.post("/books", requireRoles("admin","librarian"), async (req, res, next) 
     const { data: row, error: selectError } = await selectQuery.single();
 
     if (selectError) throw selectError;
-    res.status(201).json(row);
+    res.status(201).json(normalizeBookRow(row));
   } catch (err) { next(err); }
 });
 

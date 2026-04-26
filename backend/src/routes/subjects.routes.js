@@ -311,7 +311,7 @@ router.post("/seed-defaults", requireAuth, requireRoles("admin", "director", "su
 
     const inserted = [];
     for (const subj of defaultSubjects) {
-      const { data } = await supabase.from("subjects").insert({
+      let { data, error } = await supabase.from("subjects").insert({
         school_id: effectiveSchoolId,
         name: subj.name,
         subject_name: subj.name,
@@ -320,6 +320,14 @@ router.post("/seed-defaults", requireAuth, requireRoles("admin", "director", "su
         is_active: true,
         status: 'active'
       }).select("subject_id, id, name, subject_name").maybeSingle();
+      if (error && isMissingColumnError(error)) {
+        ({ data } = await supabase.from("subjects").insert({
+          school_id: effectiveSchoolId,
+          name: subj.name,
+          code: subj.code,
+          is_active: true,
+        }).select("subject_id, id, name, subject_name").maybeSingle());
+      }
       if (data) inserted.push(data);
     }
 
