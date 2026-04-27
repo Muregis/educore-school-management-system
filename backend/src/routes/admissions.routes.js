@@ -127,9 +127,6 @@ router.post("/", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-  } catch (err) { next(err); }
-});
-
 // PATCH update status
 router.patch("/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
