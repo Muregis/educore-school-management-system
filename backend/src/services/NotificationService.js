@@ -48,7 +48,8 @@ export class NotificationService {
       
       if (!student || student.length === 0) {
         return { success: false, error: 'Student not found' };
-      }\n
+      }
+
       const parentPhone = student[0].parent_phone;
       const parentEmail = student[0].parent_email;
       const studentName = `${student[0].first_name} ${student[0].last_name}`;
