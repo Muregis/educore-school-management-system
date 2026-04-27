@@ -8,6 +8,7 @@ import NotificationPanel from "./components/NotificationPanel";
 import LoginView from "./pages/LoginView";
 import DashboardPage from "./pages/DashboardPage";
 import StudentsPage from "./pages/StudentsPage";
+import TeachersPage from "./pages/TeachersPage";
 import AttendancePage from "./pages/AttendancePage";
 import GradesPage from "./pages/GradesPage";
 import FeesPage from "./pages/FeesPage";
