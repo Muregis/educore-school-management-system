@@ -127,9 +127,9 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
     const totalCollected = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
     const pendingFees = students.reduce((sum, s) => {
       const struct = feeStructures.find(f => f.className === s.className);
-      const tuition = struct?.tuition || 0;
+      const expected = struct ? (Number(struct.tuition || 0) + Number(struct.activity || 0) + Number(struct.misc || 0)) : 0;
       const studentPayments = payments.filter(p => p.studentId === (s.id ?? s.student_id)).reduce((t, p) => t + Number(p.amount), 0);
-      return sum + Math.max(0, tuition - studentPayments);
+      return sum + Math.max(0, expected - studentPayments);
     }, 0);
 
     // Grade stats

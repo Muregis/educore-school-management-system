@@ -117,14 +117,14 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
     
     console.log('[DEBUG] POST /students req.body:', req.body);
 
-    const normalizedAdmissionNumber = normalizeAdmissionNumber(admissionNumber);
+    const normalizedAdmissionNumber = admissionNumber ? normalizeAdmissionNumber(admissionNumber) : null;
     const normalizedDateOfBirth = normalizeDateInput(dateOfBirth);
     const normalizedAdmissionDate = normalizeDateInput(admissionDate) || new Date().toISOString().slice(0, 10);
     const normalizedPhone = normalizePhoneNumber(phone);
     const normalizedParentPhone = normalizePhoneNumber(parentPhone);
 
-    if (!normalizedAdmissionNumber || !firstName || !lastName || !gender)
-      return res.status(400).json({ message: "admissionNumber, firstName, lastName, gender are required" });
+    if (!firstName || !lastName || !gender)
+      return res.status(400).json({ message: "firstName, lastName, gender are required" });
 
     // Kenyan phone number validation (supports: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, +2541xxxxxxxx)
     const phoneRegex = /^(\+?254|0)[17][0-9]{8}$/;
@@ -158,15 +158,28 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
       }
     }
 
-    const { data: existing } = await supabase
-      .from('students')
-      .select('student_id')
-      .eq('school_id', schoolId)
-      .ilike('admission_number', normalizedAdmissionNumber)
-      .eq('is_deleted', false)
-      .limit(1);
-    if (existing?.length) {
-      return res.status(409).json({ message: "Admission number already exists" });
+    // Generate admission number if not provided
+    let finalAdmissionNumber = normalizedAdmissionNumber;
+    if (!finalAdmissionNumber) {
+      const year = new Date().getFullYear();
+      const { count } = await supabase
+        .from('students')
+        .select('*', { count: 'exact', head: true })
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false);
+      finalAdmissionNumber = `${year}-${String((count || 0) + 1).padStart(4, '0')}`;
+    } else {
+      // Check for duplicate only if admission number was provided
+      const { data: existing } = await supabase
+        .from('students')
+        .select('student_id')
+        .eq('school_id', schoolId)
+        .ilike('admission_number', finalAdmissionNumber)
+        .eq('is_deleted', false)
+        .limit(1);
+      if (existing?.length) {
+        return res.status(409).json({ message: "Admission number already exists" });
+      }
     }
 
     console.log('[DEBUG] Inserting student with class_name:', resolvedClassName, 'parent_name:', parentName, 'parent_phone:', parentPhone);
@@ -177,7 +190,7 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
         school_id: schoolId,
         class_id: resolvedClassId,
         class_name: resolvedClassName,
-        admission_number: normalizedAdmissionNumber,
+        admission_number: finalAdmissionNumber,
         first_name: firstName,
         last_name: lastName,
         gender,
@@ -205,13 +218,13 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
     console.log('[DEBUG] Insert result:', result);
     const studentId = result.student_id;
 
-    // Auto-create portal accounts (login: admissionNumber, pass: admissionNumber)
-    try {
-      const hash = await bcrypt.hash(normalizedAdmissionNumber, 10);
-      const parentDisplayName = parentName?.trim() || `Parent of ${firstName} ${lastName}`;
-      // OLD: await supabase
-      // OLD:   .from('users')
-      // OLD:   .upsert(
+      // Auto-create portal accounts (login: admissionNumber, pass: admissionNumber)
+      try {
+        const hash = await bcrypt.hash(finalAdmissionNumber, 10);
+        const parentDisplayName = parentName?.trim() || `Parent of ${firstName} ${lastName}`;
+        // OLD: await supabase
+        // OLD:   .from('users')
+        // OLD:   .upsert({
       // OLD:     {
       // OLD:       school_id: schoolId,
       // OLD:       student_id: studentId,
@@ -230,7 +243,7 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
             school_id: schoolId,
             student_id: studentId,
             full_name: `${firstName} ${lastName}`,
-            email: `${normalizedAdmissionNumber.toLowerCase()}.student@portal`,
+            email: `${finalAdmissionNumber.toLowerCase()}.student@portal`,
             password_hash: hash,
             role: 'student',
             status: 'active',
@@ -239,7 +252,7 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
             school_id: schoolId,
             student_id: studentId,
             full_name: parentDisplayName,
-            email: `${normalizedAdmissionNumber.toLowerCase()}.parent@portal`,
+            email: `${finalAdmissionNumber.toLowerCase()}.parent@portal`,
             password_hash: hash,
             role: 'parent',
             status: 'active',

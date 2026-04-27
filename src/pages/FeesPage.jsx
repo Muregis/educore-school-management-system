@@ -105,6 +105,28 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [bankDepositForm, setBankDepositForm] = useState({ studentId: "", amount: "", proofFile: null });
   const [bankDepositLoading, setBankDepositLoading] = useState(false);
 
+  // New system & term management
+  const [useNewSystem, setUseNewSystem] = useState(false);
+  const [ledgerView, setLedgerView] = useState(false);
+  const { term: currentTerm, isReady: isTermReady } = useCurrentTerm(auth);
+
+  // Check if new system is available
+  useEffect(() => {
+    checkNewSystemAvailability();
+  }, []);
+
+  const checkNewSystemAvailability = async () => {
+    try {
+      await apiFetch(`/api/finance/ledger/_check`);
+      setUseNewSystem(true);
+    } catch {
+      // New system not available, use legacy
+    }
+  };
+
+  // Display term (current or selected)
+  const displayTerm = currentTerm || "Term 2";
+
   const reloadPayments = useCallback(async () => {
     if (!auth?.token) return;
     const data = await apiFetch("/payments", { token: auth.token });
@@ -171,6 +193,16 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const expectedByClass = c => {
     const fs = normalisedStructures.find(f => f.className === c);
     return fs ? Number(fs.tuition) + Number(fs.activity) + Number(fs.misc) : 0;
+  };
+
+  // Get current term from fee structures or default to Term 2
+  const getCurrentTerm = () => {
+    const terms = [...new Set(normalisedStructures.map(f => f.term).filter(Boolean))];
+    // Return most common term or default to Term 2
+    if (terms.length > 0) {
+      return terms[0]; // First term found
+    }
+    return "Term 2"; // Legacy default
   };
 
   // Ledger-first balance calculation with transport and lunch support

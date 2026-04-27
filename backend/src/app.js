@@ -41,6 +41,7 @@ import examsRoutes         from "./routes/exams.routes.js";
 import medicalRoutes       from "./routes/medical.routes.js";
 import subscriptionRoutes from "./routes/subscription.routes.js";
 import publicRoutes        from "./routes/public.routes.js";
+import parentRoutes        from "./routes/parent.routes.js";
 import newApiRoutes       from "./routes/new_api_routes.js";
 import updateRequestsRoutes from "./routes/update_requests.js";
 import enhancedExportsRoutes from "./routes/enhanced_exports.js";
@@ -48,12 +49,15 @@ import branchRoutes          from "./routes/branch.routes.js"; // NEW: Branch su
 import adminPermissionsRoutes from "./routes/admin-permissions.routes.js"; // NEW: Director admin permissions
 import performanceRoutes    from "./routes/performance.routes.js"; // NEW: KNEC performance sheets
 import promotionRoutes      from "./routes/promotion.routes.js";  // NEW: Student promotion chain
-import feereRemindersRoutes from "./routes/feereminders.routes.js"; // NEW: Fee reminder automation
+import feereRemindersRoutes   from "./routes/feereminders.routes.js";  // NEW: Fee reminder automation
+import academicTermsRoutes      from "./routes/academic-terms.routes.js";  // NEW: Academic term lifecycle
+import promotionAdvancedRoutes  from "./routes/promotion-advanced.routes.js";  // NEW: Advanced promotion
+import notificationQueueRoutes  from "./routes/notification-queue.routes.js";  // NEW: Notification queue
 // import { startBackupScheduler } from "./services/backup.service.js";
-import { errorHandler }    from "./middleware/error.js";
-import { authRequired } from "./middleware/auth.js";
+import { errorHandler }         from "./middleware/error.js";
+import { authRequired }         from "./middleware/auth.js";
 import { tenantContext, tenantSecurityCheck } from "./middleware/tenantContext.js";
-import { logTenantContext } from "./helpers/tenant-debug.logger.js";
+import { logTenantContext }     from "./helpers/tenant-debug.logger.js";
 
 const app = express();
 
@@ -101,6 +105,7 @@ app.use(apiRateLimit); // Apply rate limiting to all API routes
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/public", publicRoutes);
+app.use("/api/parent", parentRoutes);
 app.use("/api", authRequired);
 app.use("/api", tenantContext);
 app.use("/api", tenantSecurityCheck);
@@ -151,7 +156,10 @@ app.use("/api/branches",        branchRoutes); // NEW: Branch/campus support
 app.use("/api/admin-permissions", adminPermissionsRoutes); // NEW: Director admin permissions
 app.use("/api/performance",     performanceRoutes);  // NEW: KNEC performance sheet
 app.use("/api/students/promote", promotionRoutes);   // NEW: Promotion chain
-app.use("/api/fees",             feereRemindersRoutes); // NEW: Fee reminders (additive, does not override /api/payments)
+app.use("/api/fees",             feereRemindersRoutes);      // NEW: Fee reminders (additive, does not override /api/payments)
+app.use("/api/academic/terms",    academicTermsRoutes);       // NEW: Academic term lifecycle
+app.use("/api/promotion",         promotionAdvancedRoutes);   // NEW: Advanced promotion
+app.use("/api/notifications",     notificationQueueRoutes);   // NEW: Notification queue
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
 

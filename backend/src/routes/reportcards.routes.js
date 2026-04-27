@@ -29,7 +29,7 @@ router.get("/", async (req, res, next) => {
 
     const { data: cards, error } = await query;
     if (error) {
-      if (error.code === "PGRST205") {
+      if (error.code === "PGRST205" || error.message?.includes("does not exist")) {
         return res.json([]);
       }
       throw error;
@@ -44,7 +44,12 @@ router.get("/", async (req, res, next) => {
       .select("student_id, first_name, last_name, class_name, admission_number")
       .eq("school_id", schoolId)
       .in("student_id", studentIds);
-    if (stuErr) throw stuErr;
+    if (stuErr) {
+      if (stuErr.code === "PGRST205" || stuErr.message?.includes("does not exist")) {
+        return res.json(rows);
+      }
+      throw stuErr;
+    }
 
     const byId = new Map((students || []).map(s => [String(s.student_id), s]));
     const enriched = rows.map(rc => {
@@ -163,7 +168,7 @@ router.get("/:studentId/full", async (req, res, next) => {
       .limit(1)
       .maybeSingle();
     if (rcErr) {
-      if (rcErr.code !== "PGRST205") throw rcErr;
+      if (rcErr.code !== "PGRST205" && !rcErr.message?.includes("does not exist")) throw rcErr;
       reportCard = null;
     } else {
       reportCard = rcRow || null;

@@ -30,7 +30,8 @@ const ROLE_PERMISSIONS = {
   ],
   teacher: [
     'dashboard', 'attendance', 'grades', 'reportcards', 'discipline', 'timetable',
-    'communication', 'messaging', 'library', 'analysis', 'lessonplans', 'announcements', 'exams'
+    'communication', 'messaging', 'library', 'analysis', 'lessonplans', 'announcements', 'exams',
+    'academic.view', 'students.view'
   ],
   finance: [
     'dashboard', 'fees', 'mpesa-reconcile', 'invoices', 'announcements', 'upgrade'
@@ -43,7 +44,7 @@ const ROLE_PERMISSIONS = {
   ],
   parent: [
     'dashboard', 'grades', 'fees', 'reportcards', 'attendance', 'communication',
-    'announcements', 'update-requests'
+    'announcements', 'update-requests', 'students.view'
   ],
   student: [
     'dashboard', 'grades', 'attendance', 'reportcards', 'library', 'announcements'

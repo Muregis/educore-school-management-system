@@ -29,8 +29,10 @@ router.get("/", async (req, res, next) => {
 router.post("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const { fullName, dateOfBirth, gender, parentName, parentPhone, parentEmail, address, previousSchool, applyingClass, academicYear = "2026", notes } = req.body;
+    const { fullName, dateOfBirth, gender, parentName, parentPhone, parentEmail, address, previousSchool, applyingClass, academicYear = "2026", notes, autoAccept = false } = req.body;
     if (!fullName || !applyingClass) return res.status(400).json({ message: "fullName and applyingClass are required" });
+    
+    // Insert admission record
     const { data: inserted, error } = await supabase
       .from('admissions')
       .insert({
@@ -45,12 +47,86 @@ router.post("/", async (req, res, next) => {
         previous_school: previousSchool || null,
         applying_class: applyingClass,
         academic_year: academicYear,
+        status: autoAccept ? "accepted" : "pending",
         notes: notes || null
       })
-      .select('admission_id')
+      .select('admission_id, status')
       .single();
     if (error) throw error;
-    res.status(201).json({ admissionId: inserted.admission_id });
+    
+    let admissionNumber = null;
+    let studentId = null;
+    
+    // If autoAccept is true, create student record immediately
+    if (autoAccept) {
+      // Generate admission number
+      const year = new Date().getFullYear();
+      const { count } = await supabase
+        .from("students")
+        .select("*", { count: "exact", head: true })
+        .eq("school_id", schoolId);
+      
+      admissionNumber = `${year}-${String((count || 0) + 1).padStart(4, "0")}`;
+      
+      // Check for duplicate
+      const { data: existing } = await supabase
+        .from("students")
+        .select("student_id")
+        .eq("school_id", schoolId)
+        .eq("admission_number", admissionNumber);
+      
+      if (existing && existing.length > 0) {
+        return res.status(409).json({ message: "Admission number generation conflict" });
+      }
+      
+      // Create student
+      const nameParts = (fullName || "").trim().split(" ");
+      const firstName = nameParts[0] || fullName;
+      const lastName = nameParts.slice(1).join(" ") || "";
+      
+      const { data: student, error: createErr } = await supabase
+        .from("students")
+        .insert({
+          school_id: schoolId,
+          admission_number: admissionNumber,
+          first_name: firstName,
+          last_name: lastName,
+          date_of_birth: dateOfBirth || null,
+          gender: gender || "unknown",
+          parent_name: parentName || null,
+          parent_phone: parentPhone || null,
+          parent_email: parentEmail || null,
+          address: address || null,
+          previous_school: previousSchool || null,
+          class_name: applyingClass,
+          status: "active",
+          is_deleted: false
+        })
+        .select("student_id")
+        .single();
+      
+      if (createErr) throw createErr;
+      studentId = student.student_id;
+      
+      // Update admission with admission number and link
+      await supabase
+        .from("admissions")
+        .update({
+          admission_number: admissionNumber,
+          updated_at: new Date().toISOString()
+        })
+        .eq("admission_id", inserted.admission_id);
+    }
+    
+    res.status(201).json({ 
+      admissionId: inserted.admission_id,
+      admissionNumber: admissionNumber,
+      studentId: studentId,
+      status: inserted.status
+    });
+  } catch (err) { next(err); }
+});
+
   } catch (err) { next(err); }
 });
 
