@@ -8,6 +8,7 @@ import Table from "../components/Table";
 import { Pager, Msg } from "../components/Helpers";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
+import { printHTML } from "../lib/print";
 
 const DEPARTMENTS    = ["Administration","Academic","Finance","Support Staff","Security","Catering","Transport","Library","HR"];
 const CONTRACT_TYPES = ["Permanent","Contract","Part-time","Volunteer"];
@@ -233,19 +234,7 @@ export default function HRPage({ auth, canEdit, toast }) {
 
   // Print single payslip
   const printPayslip = (p) => {
-    const w = window.open("","_blank");
-    if (!w) {
-      toast("Allow pop-ups to print payslips", "error");
-      return;
-    }
-    w.document.write(`
-      <html><head><title>Payslip - ${p.staff_name}</title>
-      <style>body{font-family:Arial;padding:32px;max-width:600px;margin:auto}
-      h2{color:#1e293b}table{width:100%;border-collapse:collapse;margin:16px 0}
-      td,th{padding:8px 12px;border:1px solid #e2e8f0;font-size:13px}
-      th{background:#f8fafc;font-weight:600}.total{font-weight:bold;font-size:15px}
-      .net{color:#16a34a;font-size:18px;font-weight:800}.header{display:flex;justify-content:space-between}</style>
-      </head><body>
+    const html = `
       <div class="header"><div><h2>PAYSLIP</h2><p>${MONTHS[p.month-1]} ${p.year}</p></div>
       <div style="text-align:right"><strong>${p.staff_name}</strong><br>${p.job_title}<br>${p.department}<br>ID: ${p.national_id||"—"}</div></div>
       <hr>
@@ -262,9 +251,16 @@ export default function HRPage({ auth, canEdit, toast }) {
         <tr><td><strong>NET PAY</strong></td><td class="net">${Number(p.net_pay).toLocaleString()}</td></tr>
       </table>
       <p style="color:#64748b;font-size:12px">Status: ${p.status.toUpperCase()} ${p.paid_date ? "· Paid: "+p.paid_date : ""}</p>
-      <script>window.print();</script></body></html>
-    `);
-    w.document.close();
+      <style>
+        body{font-family:Arial;padding:32px;max-width:600px;margin:auto}
+        h2{color:#1e293b}table{width:100%;border-collapse:collapse;margin:16px 0}
+        td,th{padding:8px 12px;border:1px solid #e2e8f0;font-size:13px}
+        th{background:#f8fafc;font-weight:600}.total{font-weight:bold;font-size:15px}
+        .net{color:#16a34a;font-size:18px;font-weight:800}.header{display:flex;justify-content:space-between}
+      </style>
+    `;
+    
+    printHTML(html, { title: `Payslip - ${p.staff_name}` });
   };
 
   // ── Derived ────────────────────────────────────────────────────────────────

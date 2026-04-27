@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import qrcode from "qrcode-generator";
 import { C } from "../lib/theme";
 import { buildStudentVerificationUrl } from "../lib/qr";
+import { printHTML } from "../lib/print";
 import Btn from "./Btn";
 
 export default function StudentIDCard({ student, school, onClose }) {
@@ -32,138 +33,125 @@ export default function StudentIDCard({ student, school, onClose }) {
   };
 
   const handlePrint = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      return;
-    }
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Student ID - ${student.firstName || student.first_name}</title>
-          <style>
-            @page { size: 85.6mm 54mm; margin: 0; }
-            body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
-            .id-card {
-              width: 85.6mm;
-              height: 54mm;
-              background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
-              color: white;
-              position: relative;
-              overflow: hidden;
-              box-sizing: border-box;
-            }
-            .id-card-front {
-              padding: 8px 12px;
-              display: flex;
-              gap: 10px;
-            }
-            .photo-area {
-              width: 50px;
-              height: 60px;
-              background: #e2e8f0;
-              border-radius: 4px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              color: #4a5568;
-              font-size: 10px;
-              flex-shrink: 0;
-              overflow: hidden;
-            }
-            .photo-area img {
-              width: 100%;
-              height: 100%;
-              object-fit: cover;
-            }
-            .info-area {
-              flex: 1;
-            }
-            .school-name {
-              font-size: 9px;
-              font-weight: bold;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              margin-bottom: 6px;
-              opacity: 0.9;
-            }
-            .student-name {
-              font-size: 14px;
-              font-weight: bold;
-              margin-bottom: 2px;
-            }
-            .student-class {
-              font-size: 10px;
-              opacity: 0.85;
-              margin-bottom: 4px;
-            }
-            .admission-no {
-              font-size: 11px;
-              font-weight: 600;
-              background: rgba(255,255,255,0.2);
-              padding: 2px 6px;
-              border-radius: 3px;
-              display: inline-block;
-            }
-            .qr-area {
-              position: absolute;
-              right: 10px;
-              bottom: 8px;
-              background: white;
-              padding: 4px;
-              border-radius: 4px;
-            }
-            .qr-area img {
-              width: 50px;
-              height: 50px;
-            }
-            .validity {
-              position: absolute;
-              bottom: 8px;
-              left: 12px;
-              font-size: 7px;
-              opacity: 0.7;
-            }
-            .id-type {
-              position: absolute;
-              top: 8px;
-              right: 10px;
-              font-size: 8px;
-              background: #f6ad55;
-              color: #1a202c;
-              padding: 2px 6px;
-              border-radius: 3px;
-              font-weight: bold;
-            }
-            @media print {
-              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="id-card id-card-front">
-            <div class="id-type">STUDENT</div>
-            <div class="photo-area">${student.photoUrl ? `<img src="${student.photoUrl}" alt="Photo" />` : 'Photo'}</div>
-            <div class="info-area">
-              <div class="school-name">
-                ${school.logo_url ? `<img src="${school.logo_url}" style="width:16px;height:16px;border-radius:2px;margin-right:4px;vertical-align:middle" />` : ''}
-                ${school.name}
-              </div>
-              <div class="student-name">${student.firstName || student.first_name} ${student.lastName || student.last_name}</div>
-              <div class="student-class">${student.className || student.class_name || "Grade 1"}</div>
-              <div class="admission-no">${student.admission || student.admission_number}</div>
-            </div>
-            <div class="qr-area">
-              <img src="${qrDataUrl}" alt="QR Code" />
-            </div>
-            <div class="validity">Valid: ${school.year || new Date().getFullYear()}</div>
+    const html = `
+      <div class="id-card id-card-front">
+        <div class="id-type">STUDENT</div>
+        <div class="photo-area">${student.photoUrl ? `<img src="${student.photoUrl}" alt="Photo" />` : 'Photo'}</div>
+        <div class="info-area">
+          <div class="school-name">
+            ${school.logo_url ? `<img src="${school.logo_url}" style="width:16px;height:16px;border-radius:2px;margin-right:4px;vertical-align:middle" />` : ''}
+            ${school.name}
           </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
+          <div class="student-name">${student.firstName || student.first_name} ${student.lastName || student.last_name}</div>
+          <div class="student-class">${student.className || student.class_name || "Grade 1"}</div>
+          <div class="admission-no">${student.admission || student.admission_number}</div>
+        </div>
+        <div class="qr-area">
+          <img src="${qrDataUrl}" alt="QR Code" />
+        </div>
+        <div class="validity">Valid: ${school.year || new Date().getFullYear()}</div>
+      </div>
+      <style>
+        @page { size: 85.6mm 54mm; margin: 0; }
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        .id-card {
+          width: 85.6mm;
+          height: 54mm;
+          background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+          color: white;
+          position: relative;
+          overflow: hidden;
+          box-sizing: border-box;
+        }
+        .id-card-front {
+          padding: 8px 12px;
+          display: flex;
+          gap: 10px;
+        }
+        .photo-area {
+          width: 50px;
+          height: 60px;
+          background: #e2e8f0;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #4a5568;
+          font-size: 10px;
+          flex-shrink: 0;
+          overflow: hidden;
+        }
+        .photo-area img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .info-area {
+          flex: 1;
+        }
+        .school-name {
+          font-size: 9px;
+          font-weight: bold;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 6px;
+          opacity: 0.9;
+        }
+        .student-name {
+          font-size: 14px;
+          font-weight: bold;
+          margin-bottom: 2px;
+        }
+        .student-class {
+          font-size: 10px;
+          opacity: 0.85;
+          margin-bottom: 4px;
+        }
+        .admission-no {
+          font-size: 11px;
+          font-weight: 600;
+          background: rgba(255,255,255,0.2);
+          padding: 2px 6px;
+          border-radius: 3px;
+          display: inline-block;
+        }
+        .qr-area {
+          position: absolute;
+          right: 10px;
+          bottom: 8px;
+          background: white;
+          padding: 4px;
+          border-radius: 4px;
+        }
+        .qr-area img {
+          width: 50px;
+          height: 50px;
+        }
+        .validity {
+          position: absolute;
+          bottom: 8px;
+          left: 12px;
+          font-size: 7px;
+          opacity: 0.7;
+        }
+        .id-type {
+          position: absolute;
+          top: 8px;
+          right: 10px;
+          font-size: 8px;
+          background: #f6ad55;
+          color: #1a202c;
+          padding: 2px 6px;
+          border-radius: 3px;
+          font-weight: bold;
+        }
+        @media print {
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+      </style>
+    `;
+    
+    printHTML(html, { title: `Student ID - ${student.firstName || student.first_name}`, timeout: 250 });
   };
 
   const handleDownload = () => {

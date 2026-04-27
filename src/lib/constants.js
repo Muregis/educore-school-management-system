@@ -20,7 +20,7 @@ export const ROLE = {
   // Admin - School administrator with full school-level access
   admin:     { pages:["dashboard","students","teachers","subjects","attendance","grades","fees","invoices","reportcards","discipline","transport","communication","messaging","timetable","library","lessonplans","announcements","exams","admissions"], edit:true },
   // Teacher - Classroom operations
-  teacher:   { pages:["dashboard","attendance","grades","reportcards","discipline","timetable","communication","messaging","library","analysis","lessonplans","announcements","exams"], edit:true },
+  teacher:   { pages:["dashboard","subjects","attendance","grades","reportcards","discipline","timetable","communication","messaging","library","analysis","lessonplans","announcements","exams"], edit:true },
   // Finance - Fee operations
   finance:   { pages:["dashboard","fees","mpesa-reconcile","invoices","announcements","upgrade"], edit:true },
   // HR - Staff management

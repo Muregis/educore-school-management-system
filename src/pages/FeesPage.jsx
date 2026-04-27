@@ -9,6 +9,7 @@ import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
+import { printHTML } from "../lib/print";
 import { Msg } from "../components/Helpers";
 import { calculateStudentBalance, formatBalance, getBalanceStatusColor } from "../services/balanceService";
 import { ledgerBalanceService } from "../services/ledgerBalanceService";
@@ -569,47 +570,22 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   };
 
   const printReceipt = () => {
-    const w = window.open("", "_blank");
-    if (!w) {
-      toast("Allow pop-ups to print receipts", "error");
-      return;
-    }
-    w.document.write(`
-      <html><head><title>Receipt</title>
+    const html = `
+      <h2>Payment Receipt</h2><p style="color: #888">EduCore School Management</p>
+      <div class="row"><span>Student</span><strong>${receipt?.studentName}</strong></div>
+      <div class="row"><span>Amount</span><strong>KES ${Number(receipt?.amount).toLocaleString()}</strong></div>
+      <div class="row"><span>Method</span><strong>${receipt?.method}</strong></div>
+      <div class="row"><span>Reference</span><strong>${receipt?.reference}</strong></div>
+      <div class="row"><span>Date</span><strong>${receipt?.date}</strong></div>
+      <p style="margin-top: 24px; color: #888; font-size: 12px">Thank you for your payment.</p>
       <style>
-        body {
-          font-family: sans-serif;
-          padding: 32px;
-          max-width: 400px;
-          margin: auto
-        }
-        h2 {
-          margin-bottom: 4px
-        }
-        .row {
-          display: flex;
-          justify-content: space-between;
-          padding: 8px 0;
-          border-bottom: 1px solid #eee
-        }
-        @media print {
-          button {
-            display: none
-          }
-        }
+        body { font-family: sans-serif; padding: 32px; max-width: 400px; margin: auto }
+        h2 { margin-bottom: 4px }
+        .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee }
       </style>
-      </head><body>
-        <h2>Payment Receipt</h2><p style="color: #888">EduCore School Management</p>
-        <div class="row"><span>Student</span><strong>${receipt?.studentName}</strong></div>
-        <div class="row"><span>Amount</span><strong>KES ${Number(receipt?.amount).toLocaleString()}</strong></div>
-        <div class="row"><span>Method</span><strong>${receipt?.method}</strong></div>
-        <div class="row"><span>Reference</span><strong>${receipt?.reference}</strong></div>
-        <div class="row"><span>Date</span><strong>${receipt?.date}</strong></div>
-        <p style="margin-top: 24px; color: #888; font-size: 12px">Thank you for your payment.</p>
-        <button onclick="window.print()" style="margin-top: 16px; padding: 8px 16px; cursor: pointer">Print</button>
-      </body></html>
-    `);
-    w.document.close();
+    `;
+    
+    printHTML(html, { title: "Receipt" });
   };
 
   return (

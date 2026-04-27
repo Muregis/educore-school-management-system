@@ -8,6 +8,7 @@ import Modal from "../components/Modal";
 import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
+import { printHTML } from "../lib/print";
 
 export default function ReportCardsPage({ auth, school, students, canEdit, toast, feeBlocked = false, onGoFees}) {
   const [reportCards, setReportCards] = useState([]);
@@ -81,13 +82,36 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
     if (!fullData) return;
     const { student, results, attendance, reportCard, average } = fullData;
     const gradeColor = g => g === "A" ? "#22c55e" : g === "B" ? "#3b82f6" : g === "C" ? "#f59e0b" : "#ef4444";
-    const w = window.open("", "_blank");
-    if (!w) {
-      toast("Allow pop-ups to print report cards", "error");
-      return;
-    }
-    w.document.write(`
-      <html><head><title>Report Card - ${student.full_name}</title>
+    
+    const html = `
+      <h1>${school?.name || "School Report Card"}</h1>
+      <div class="sub">Academic Report Card — ${term} ${year}</div>
+      <div class="info">
+        <div class="info-box"><div class="info-label">Student Name</div><strong>${student.full_name}</strong></div>
+        <div class="info-box"><div class="info-label">Admission No.</div><strong>${student.admission_number}</strong></div>
+        <div class="info-box"><div class="info-label">Class</div><strong>${student.class_name}</strong></div>
+        <div class="info-box"><div class="info-label">Average Score</div><strong>${average}%</strong></div>
+        ${reportCard?.class_position ? `<div class="info-box"><div class="info-label">Position</div><strong>${reportCard.class_position} / ${reportCard.out_of||'—'}</strong></div>` : ''}
+        <div class="info-box"><div class="info-label">Attendance</div><strong>${attendance?.present||0} / ${attendance?.total||0} days</strong></div>
+      </div>
+      <table>
+        <thead><tr><th>Subject</th><th>Score</th><th>Grade</th><th>Remarks</th></tr></thead>
+        <tbody>${results.map(r => `
+          <tr>
+            <td>${r.subject}</td>
+            <td>${r.marks}</td>
+            <td><span class="grade" style="background:${gradeColor(r.grade)}">${r.grade}</span></td>
+            <td style="color:#666;font-size:12px">${r.teacher_comment||'—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      ${reportCard?.class_teacher_comment ? `<div class="comment"><strong>Class Teacher:</strong> ${reportCard.class_teacher_comment}</div>` : ''}
+      ${reportCard?.principal_comment ? `<div class="comment"><strong>Principal:</strong> ${reportCard.principal_comment}</div>` : ''}
+      <div class="signature">
+        <div>Class Teacher: ___________________</div>
+        <div>Principal: ___________________</div>
+        <div>Parent/Guardian: ___________________</div>
+      </div>
       <style>
         body{font-family:sans-serif;padding:40px;max-width:600px;margin:auto;color:#111}
         h1{font-size:22px;margin-bottom:2px}.sub{color:#666;font-size:13px;margin-bottom:20px}
@@ -100,40 +124,10 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
         .grade{font-weight:bold;padding:2px 8px;border-radius:4px;color:#fff;display:inline-block}
         .comment{background:#f8f8f8;padding:12px;border-radius:6px;margin-bottom:12px;font-size:13px}
         .signature{display:flex;justify-content:space-between;margin-top:40px;font-size:12px}
-        @media print{button{display:none}}
-      </style></head><body>
-        <h1>${school?.name || "School Report Card"}</h1>
-        <div class="sub">Academic Report Card — ${term} ${year}</div>
-        <div class="info">
-          <div class="info-box"><div class="info-label">Student Name</div><strong>${student.full_name}</strong></div>
-          <div class="info-box"><div class="info-label">Admission No.</div><strong>${student.admission_number}</strong></div>
-          <div class="info-box"><div class="info-label">Class</div><strong>${student.class_name}</strong></div>
-          <div class="info-box"><div class="info-label">Average Score</div><strong>${average}%</strong></div>
-          ${reportCard?.class_position ? `<div class="info-box"><div class="info-label">Position</div><strong>${reportCard.class_position} / ${reportCard.out_of||'—'}</strong></div>` : ''}
-          <div class="info-box"><div class="info-label">Attendance</div><strong>${attendance?.present||0} / ${attendance?.total||0} days</strong></div>
-        </div>
-        <table>
-          <thead><tr><th>Subject</th><th>Score</th><th>Grade</th><th>Remarks</th></tr></thead>
-          <tbody>${results.map(r => `
-            <tr>
-              <td>${r.subject}</td>
-              <td>${r.marks}</td>
-              <td><span class="grade" style="background:${gradeColor(r.grade)}">${r.grade}</span></td>
-              <td style="color:#666;font-size:12px">${r.teacher_comment||'—'}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-        ${reportCard?.class_teacher_comment ? `<div class="comment"><strong>Class Teacher:</strong> ${reportCard.class_teacher_comment}</div>` : ''}
-        ${reportCard?.principal_comment ? `<div class="comment"><strong>Principal:</strong> ${reportCard.principal_comment}</div>` : ''}
-        <div class="signature">
-          <div>Class Teacher: ___________________</div>
-          <div>Principal: ___________________</div>
-          <div>Parent/Guardian: ___________________</div>
-        </div>
-        <button onclick="window.print()" style="margin-top:24px;padding:8px 20px;cursor:pointer">Print Report Card</button>
-      </body></html>
-    `);
-    w.document.close();
+      </style>
+    `;
+    
+    printHTML(html, { title: `Report Card - ${student.full_name}` });
   };
 
 

@@ -12,6 +12,7 @@ import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
 import { API_BASE, apiFetch } from "../lib/api";
 import { parseStudentQrContent } from "../lib/qr";
+import { printHTML } from "../lib/print";
 import { Pager, Msg } from "../components/Helpers";
 import { csv, pager } from "../lib/utils";
 
@@ -417,7 +418,11 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <div style={{ color: C.textSub, marginBottom: 14 }}>Results: {results.filter(r => (r.studentId ?? r.student_id) === profile.id).length}</div>
           <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
             <Btn onClick={() => { setProfile(null); setIdCardStudent(profile); }}>🪪 View ID Card</Btn>
-            <Btn onClick={() => { const rowsHtml = results.filter(r => (r.studentId ?? r.student_id) === profile.id).map(r => `<li>${r.subject}: ${r.marks}/${r.total || r.total_marks} (${r.grade})</li>`).join(""); const w = window.open("","_blank"); if (!w) return; w.document.write(`<h2>${profile.firstName} ${profile.lastName}</h2><p>${profile.admission}</p><ul>${rowsHtml||"<li>No results</li>"}</ul>`); w.document.close(); w.print(); }}>Export Report (Print/PDF)</Btn>
+            <Btn onClick={() => { 
+              const rowsHtml = results.filter(r => (r.studentId ?? r.student_id) === profile.id).map(r => `<li>${r.subject}: ${r.marks}/${r.total || r.total_marks} (${r.grade})</li>`).join(""); 
+              const html = `<h2>${profile.firstName} ${profile.lastName}</h2><p>${profile.admission}</p><ul>${rowsHtml||"<li>No results</li>"}</ul>`;
+              printHTML(html, { title: `Report - ${profile.firstName} ${profile.lastName}` });
+            }}>Export Report (Print/PDF)</Btn>
           </div>
         </Modal>
       )}
