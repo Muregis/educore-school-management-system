@@ -147,6 +147,8 @@ export default function SubjectsPage({ auth, toast }) {
         });
         setSubjects(prev => prev.map(s => s.id === editingId ? { ...s, ...form, id: editingId } : s));
         toast("Subject updated", "success");
+        // Refetch to ensure consistency
+        await loadSubjects();
       } else {
         const res = await apiFetch("/subjects", {
           method: "POST",
@@ -161,8 +163,18 @@ export default function SubjectsPage({ auth, toast }) {
           },
           token: auth?.token,
         });
-        setSubjects(prev => [...prev, normaliseSubject(res)]);
+        // Ensure ID is properly set from various possible response formats
+        const newSubject = normaliseSubject({
+          ...res,
+          subject_id: res.subject_id || res.id,
+          name: res.name || form.name,
+          code: res.code || form.code,
+          category: res.category || form.category,
+        });
+        setSubjects(prev => [...prev, newSubject]);
         toast("Subject created", "success");
+        // Force refetch to ensure consistency
+        await loadSubjects();
       }
       setShowModal(false);
       resetForm();
@@ -179,6 +191,8 @@ export default function SubjectsPage({ auth, toast }) {
       await apiFetch(`/subjects/${id}`, { method: "DELETE", token: auth?.token });
       setSubjects(prev => prev.filter(s => s.id !== id));
       toast("Subject deleted", "success");
+      // Refetch to ensure consistency
+      await loadSubjects();
     } catch (err) {
       toast(err.message || "Delete failed", "error");
     }

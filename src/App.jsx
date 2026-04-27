@@ -256,10 +256,21 @@ export default function App() {
     [myChildren, linkedStudentId]
   );
 
-  const myStudents   = isPortal ? students.filter(s => (s.id ?? s.student_id) === linkedStudentId) : students;
-  const myAttendance = isPortal ? attendance.filter(a => (a.studentId ?? a.student_id) === linkedStudentId) : attendance;
-  const myResults    = isPortal ? results.filter(r => (r.studentId ?? r.student_id) === linkedStudentId) : results;
-  const myPayments   = isPortal ? payments.filter(p => (p.studentId ?? p.student_id) === linkedStudentId) : payments;
+  // STRICT: For portal users, only show data if linkedStudentId is valid
+  const validLinkedId = linkedStudentId && Number(linkedStudentId) > 0 ? Number(linkedStudentId) : null;
+  
+  const myStudents   = isPortal 
+    ? (validLinkedId ? students.filter(s => Number(s.id ?? s.student_id) === validLinkedId) : []) 
+    : students;
+  const myAttendance = isPortal 
+    ? (validLinkedId ? attendance.filter(a => Number(a.studentId ?? a.student_id) === validLinkedId) : []) 
+    : attendance;
+  const myResults    = isPortal 
+    ? (validLinkedId ? results.filter(r => Number(r.studentId ?? r.student_id) === validLinkedId) : []) 
+    : results;
+  const myPayments   = isPortal 
+    ? (validLinkedId ? payments.filter(p => Number(p.studentId ?? p.student_id) === validLinkedId) : []) 
+    : payments;
 
   const fullNav = useMemo(() => {
     const existing = new Set(NAV.map(n => n.id));
@@ -390,9 +401,10 @@ export default function App() {
         ),
     students: <StudentsPage auth={auth} students={students} setStudents={setStudents} canEdit={canEdit} results={results} payments={payments} feeStructures={feeStructures} toast={toast} />,
     staff: ["admin","hr","director","superadmin"].includes(auth.role) ? <StaffPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
+    teachers: ["admin","teacher","director","superadmin"].includes(auth.role) ? <TeachersPage auth={auth} teachers={teachers} setTeachers={setTeachers} canEdit={canEdit} toast={toast} /> : <Forbidden />,
     attendance: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     grades: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
-    subjects: <SubjectsPage auth={auth} toast={toast} />,
+    subjects: ["admin","teacher","director","superadmin"].includes(auth.role) ? <SubjectsPage auth={auth} toast={toast} /> : <Forbidden />,
     fees: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <FeesPage auth={auth} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     "mpesa-reconcile": <MpesaReconciliationPage auth={auth} students={students} toast={toast} />,
     "bulk-import": ["admin","director","superadmin"].includes(auth.role) ? <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} payments={payments} feeStructures={feeStructures} results={results} /> : <Forbidden />,

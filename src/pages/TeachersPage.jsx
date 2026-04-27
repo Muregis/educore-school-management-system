@@ -92,8 +92,12 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
           },
           token: auth?.token,
         });
-        setTeachers(prev => [...prev, normalise({ ...res, ...f, id: res.teacherId })]);
+        const newId = res.teacher_id || res.id || res.teacherId;
+        setTeachers(prev => [...prev, normalise({ ...res, ...f, id: newId })]);
       }
+      // Refetch to ensure consistency with backend
+      const refreshed = await apiFetch("/teachers", { token: auth.token });
+      setTeachers(refreshed.map(normalise));
       setShow(false);
       toast("Teacher saved", "success");
     } catch (err) { toast(err.message || "Failed to save", "error"); }
@@ -105,6 +109,9 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
       await apiFetch(`/teachers/${id}`, { method: "DELETE", token: auth?.token });
       setTeachers(prev => prev.filter(t => (t.id ?? t.teacher_id) !== id));
       toast("Teacher deleted", "success");
+      // Refetch to ensure consistency
+      const refreshed = await apiFetch("/teachers", { token: auth.token });
+      setTeachers(refreshed.map(normalise));
     } catch (err) { toast(err.message || "Delete failed", "error"); }
   };
 

@@ -92,9 +92,30 @@ function SchoolTab({ school, setSchool, toast, auth }) {
         token: auth?.token,
         body: schoolInfo,
       });
-      setSchool(response?.school || schoolInfo);
+      
+      // Validate response has expected data
+      if (!response) {
+        throw new Error("No response from server");
+      }
+      
+      if (!response.updated && !response.school) {
+        throw new Error("Save failed: unexpected response format");
+      }
+      
+      // Update school state with response data or fallback to sent data
+      const updatedSchool = response?.school || schoolInfo;
+      setSchool(updatedSchool);
+      
+      // Update form with saved data to ensure consistency
+      setForm(prev => ({
+        ...prev,
+        ...updatedSchool,
+        logo_url: updatedSchool.logo_url || prev.logo_url,
+      }));
+      
       toast("School info saved", "success");
     } catch (e) {
+      console.error("Settings save error:", e);
       toast(e.message || "Save failed", "error");
     }
     setSaving(false);

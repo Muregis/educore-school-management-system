@@ -17,8 +17,8 @@ export const ROLE = {
   director:  { pages:["dashboard","upgrade","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical","update-requests","branch-management","admin-permissions"], edit:true, canDelegate:true },
   // Superadmin - System-level full access
   superadmin:{ pages:["dashboard","upgrade","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical","update-requests","branch-management"], edit:true },
-  // Admin - LIMITED (secretary-level) - Basic operations, needs director delegation for advanced features
-  admin:     { pages:["dashboard","students","attendance","communication","announcements"], edit:false, needsDelegation:true },
+  // Admin - School administrator with full school-level access
+  admin:     { pages:["dashboard","students","teachers","subjects","attendance","grades","fees","invoices","reportcards","discipline","transport","communication","messaging","timetable","library","lessonplans","announcements","exams","admissions"], edit:true },
   // Teacher - Classroom operations
   teacher:   { pages:["dashboard","attendance","grades","reportcards","discipline","timetable","communication","messaging","library","analysis","lessonplans","announcements","exams"], edit:true },
   // Finance - Fee operations
@@ -37,6 +37,7 @@ export const NAV = [
   { id:"dashboard",       label:"Dashboard",      icon:"\u{1F4CA}" },
   { id:"upgrade",         label:"Upgrade Plan",   icon:"\u2B50" },
   { id:"students",        label:"Students",       icon:"\u{1F465}" },
+  { id:"teachers",        label:"Teachers",       icon:"\u{1F9D1}\u200D\u{1F3EB}" },
   { id:"staff",           label:"Staff",          icon:"\u{1F3EB}" },
   { id:"attendance",      label:"Attendance",     icon:"\u2714" },
   { id:"grades",          label:"Grades",         icon:"\u{1F4CA}" },

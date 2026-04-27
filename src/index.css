@@ -53,3 +53,62 @@ img {
   max-width: 100%;
   display: block;
 }
+
+/* Print styles - ensure proper printing across all pages */
+@media print {
+  /* Hide navigation and interactive elements */
+  .ec-bottom-nav,
+  .ec-drawer,
+  .ec-drawer-overlay,
+  nav, 
+  aside,
+  .ec-topbar,
+  button:not(.print-only),
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset main content area for printing */
+  main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Ensure proper background colors and contrast */
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Make sure cards/sections are visible */
+  .ec-page-content {
+    padding: 0 !important;
+  }
+
+  /* Ensure tables print properly */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 12px !important;
+  }
+
+  th, td {
+    border: 1px solid #ccc !important;
+    padding: 8px !important;
+  }
+
+  /* Page breaks */
+  .page-break {
+    page-break-before: always !important;
+  }
+
+  .page-break-after {
+    page-break-after: always !important;
+  }
+
+  .no-page-break {
+    page-break-inside: avoid !important;
+  }
+}

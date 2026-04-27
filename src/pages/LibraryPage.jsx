@@ -35,7 +35,7 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
   const [fb, setFb]             = useState(BLANK_BOOK);
   const [fw, setFw]             = useState(BLANK_BORROW);
   const [err, setErr]           = useState("");
-  const isLibrarian = ["admin","librarian"].includes(auth?.role);
+  const isLibrarian = ["admin","librarian","director","superadmin","teacher"].includes(auth?.role);
 
   const load = async () => {
     setLoading(true);
@@ -98,12 +98,25 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
         toast("Book added", "success");
       }
       
-      // Handle different response formats
+      // Handle different response formats - backend may return { data: book } or book directly
       const savedBook = result?.data || result;
       
-      // Optimistically add to list if new book
-      if (!editBook && savedBook?.book_id) {
-        setBooks(prev => [savedBook, ...prev]);
+      // Extract book_id from various possible response structures
+      const bookId = savedBook?.book_id || savedBook?.id;
+      
+      // Optimistically add to list if new book with properly normalized data
+      if (!editBook && bookId) {
+        const normalizedBook = {
+          book_id: bookId,
+          title: fb.title,
+          author: fb.author,
+          category: fb.category,
+          isbn: fb.isbn || null,
+          quantity_total: Number(fb.quantityTotal) || 1,
+          quantity_available: Number(fb.quantityTotal) || 1,
+          ...savedBook
+        };
+        setBooks(prev => [normalizedBook, ...prev]);
       }
       
       setShowBook(false); setFb(BLANK_BOOK); setEditBook(null);
