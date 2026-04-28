@@ -109,10 +109,16 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
       await apiFetch(`/teachers/${id}`, { method: "DELETE", token: auth?.token });
       setTeachers(prev => prev.filter(t => (t.id ?? t.teacher_id) !== id));
       toast("Teacher deleted", "success");
-      // Refetch to ensure consistency
-      const refreshed = await apiFetch("/teachers", { token: auth.token });
-      setTeachers(refreshed.map(normalise));
     } catch (err) { toast(err.message || "Delete failed", "error"); }
+  };
+
+  const syncToHR = async () => {
+    if (!window.confirm("Sync all teachers to HR staff table?\n\nThis will create HR records for any teachers that don't have them yet.")) return;
+    try {
+      const res = await apiFetch("/teachers/sync-hr", { method: "POST", token: auth?.token });
+      toast(`Synced ${res.synced} of ${res.total} teachers to HR`, res.errors ? "warning" : "success");
+      if (res.errors) console.warn("Sync errors:", res.errors);
+    } catch (err) { toast(err.message || "Sync failed", "error"); }
   };
 
   return (
@@ -132,6 +138,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
           toast("Teachers CSV exported", "success");
         }}>Export CSV</Btn>
         {canEdit && <Btn onClick={openAdd}>Add Teacher</Btn>}
+        {["admin","director","superadmin"].includes(auth?.role) && <Btn variant="ghost" onClick={syncToHR}>Sync to HR</Btn>}
       </div>
       {filtered.length === 0 ? <Msg text="No teachers found." /> : (
         <>

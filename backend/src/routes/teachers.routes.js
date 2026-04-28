@@ -201,6 +201,71 @@ router.put("/:id", requireRoles("admin", "hr", "director", "superadmin"), async 
   }
 });
 
+// POST /api/teachers/sync-hr - Sync all existing teachers to HR staff table
+router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    
+    // Get all teachers that don't have staff_id linked
+    const { data: teachers, error: teachersError } = await supabase
+      .from("teachers")
+      .select("teacher_id, first_name, last_name, email, phone, department, qualification, hire_date, status")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .is("staff_id", null);
+    
+    if (teachersError) throw teachersError;
+    
+    let synced = 0;
+    let errors = [];
+    
+    for (const teacher of (teachers || [])) {
+      try {
+        // Sync to HR staff
+        const { data: hrStaff, error: hrError } = await supabase
+          .from("hr_staff")
+          .upsert({
+            school_id: schoolId,
+            full_name: `${teacher.first_name} ${teacher.last_name}`,
+            email: teacher.email,
+            phone: teacher.phone || null,
+            department: teacher.department || 'Academic',
+            job_title: teacher.qualification || 'Teacher',
+            contract_type: 'Permanent',
+            start_date: teacher.hire_date || null,
+            status: teacher.status || 'active',
+          }, { onConflict: "school_id,email" })
+          .select("staff_id")
+          .single();
+        
+        if (hrError) {
+          errors.push({ teacher: teacher.email, error: hrError.message });
+          continue;
+        }
+        
+        // Link teacher to hr_staff
+        if (hrStaff?.staff_id) {
+          await supabase
+            .from("teachers")
+            .update({ staff_id: hrStaff.staff_id })
+            .eq("teacher_id", teacher.teacher_id);
+          synced++;
+        }
+      } catch (e) {
+        errors.push({ teacher: teacher.email, error: e.message });
+      }
+    }
+    
+    res.json({ 
+      synced, 
+      total: teachers?.length || 0,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.delete("/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;

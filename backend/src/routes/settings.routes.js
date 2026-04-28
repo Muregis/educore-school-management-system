@@ -37,20 +37,29 @@ async function upsertSchoolSettings(schoolId, values) {
   if (check.missing) return { skipped: true };
 
   const rows = Object.entries(values)
-    .filter(([, value]) => value !== undefined)
+    .filter(([, value]) => value !== undefined && value !== null)
     .map(([setting_key, setting_value]) => ({
       school_id: schoolId,
       setting_key,
-      setting_value: setting_value === null ? "" : String(setting_value),
+      setting_value: String(setting_value),
     }));
 
-  if (!rows.length) return { skipped: false };
+  console.log('[DEBUG] upsertSchoolSettings - schoolId:', schoolId, 'rows:', rows.map(r => r.setting_key));
+
+  if (!rows.length) {
+    console.log('[DEBUG] upsertSchoolSettings - no rows to save');
+    return { skipped: false };
+  }
 
   const { error } = await supabase
     .from("school_settings")
     .upsert(rows, { onConflict: "school_id,setting_key" });
-  if (error) throw error;
+  if (error) {
+    console.error('[DEBUG] upsertSchoolSettings error:', error);
+    throw error;
+  }
 
+  console.log('[DEBUG] upsertSchoolSettings - saved successfully');
   return { skipped: false };
 }
 
@@ -153,6 +162,7 @@ router.get("/school", async (req, res, next) => {
       admin_name: settings.get("admin_name") || "",
       admin_title: settings.get("admin_title") || "",
       school_type: settings.get("school_type") || "",
+      type: settings.get("school_type") || "",  // alias for frontend compatibility
       curriculum: settings.get("curriculum") || "",
     });
   } catch (err) {
@@ -164,6 +174,7 @@ router.get("/school", async (req, res, next) => {
 router.put("/school", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    console.log('[DEBUG] PUT /settings/school - schoolId:', schoolId, 'body:', req.body);
     const {
       name,
       email,
