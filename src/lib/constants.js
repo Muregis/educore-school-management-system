@@ -27,8 +27,8 @@ export const ROLE = {
   hr:        { pages:["dashboard","hr","staff","announcements","upgrade"], edit:true },
   // Librarian - Library management
   librarian: { pages:["dashboard","library","announcements"], edit:true },
-  // Parent - View child data
-  parent:    { pages:["dashboard","grades","fees","reportcards","attendance","timetable","communication","announcements","update-requests"], edit:false },
+  // Parent - View child data (minimal essential pages only)
+  parent:    { pages:["dashboard","grades","fees","attendance","communication","announcements"], edit:false },
   // Student - View own data
   student:   { pages:["dashboard","grades","attendance","reportcards","library","announcements"], edit:false },
 };

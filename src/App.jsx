@@ -458,6 +458,7 @@ export default function App() {
       linkedStudentId={linkedStudentId}
       setActiveChildId={setActiveChildId}
       handleLogout={handleLogout}
+      allowedPages={perms?.pages || []}
     />
   );
 

@@ -1,5 +1,5 @@
 import PropTypes from "prop-types";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { C } from "../lib/theme";
 
 const NAVIGATION_GROUPS = [
@@ -90,11 +90,21 @@ const Sidebar = ({
   activeChild,
   linkedStudentId,
   setActiveChildId,
-  handleLogout
+  handleLogout,
+  allowedPages = []
 }) => {
   const [openGroup, setOpenGroup] = useState(() => findGroupForPage(page));
   const roleColor = auth?.role ? ROLE_COLORS[auth.role] || C.accent : C.accent;
   const isParent = auth?.role === "parent";
+  
+  // Filter navigation groups based on allowed pages
+  const filteredGroups = useMemo(() => {
+    if (!allowedPages.length) return NAVIGATION_GROUPS;
+    return NAVIGATION_GROUPS.map(group => ({
+      ...group,
+      items: group.items.filter(item => allowedPages.includes(item.id))
+    })).filter(group => group.id === "dashboard" || group.items.length > 0);
+  }, [allowedPages]);
 
   useEffect(() => {
     setOpenGroup(findGroupForPage(page));
@@ -393,7 +403,7 @@ const Sidebar = ({
           minHeight: 0
         }}
       >
-        {NAVIGATION_GROUPS.map(renderGroup)}
+        {filteredGroups.map(renderGroup)}
       </nav>
 
       <div
@@ -533,6 +543,7 @@ Sidebar.propTypes = {
   linkedStudentId: PropTypes.number,
   setActiveChildId: PropTypes.func,
   handleLogout: PropTypes.func,
+  allowedPages: PropTypes.arrayOf(PropTypes.string),
 };
 
 export default Sidebar;

@@ -62,40 +62,36 @@ export default function StudentPortalMobile({
   ];
 
   const renderDashboard = () => (
-    <div className="mobile-page">
-      {/* Welcome Card */}
-      <div className="mobile-card-large" style={{
-        background: `linear-gradient(135deg, ${C.accent}, #6366f1)`,
-        color: '#fff'
-      }}>
-        <div style={{ fontSize: '14px', opacity: 0.9 }}>Good morning,</div>
-        <div style={{ fontSize: '24px', fontWeight: '800', margin: '4px 0' }}>
+    <div className="mobile-page mobile-animate-fade-in">
+      {/* Welcome Card - Modern Gradient */}
+      <div className="mobile-card-gradient">
+        <div className="mobile-label" style={{ color: 'rgba(255,255,255,0.8)', textTransform: 'none', fontWeight: 500 }}>
+          Good morning,
+        </div>
+        <div className="mobile-title" style={{ color: 'white', fontSize: '28px', margin: '4px 0 8px' }}>
           {student?.firstName}!
         </div>
-        <div style={{ fontSize: '14px', opacity: 0.8 }}>
-          {school?.term} {school?.year} • {student?.className}
+        <div style={{ fontSize: '14px', opacity: 0.9, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>{school?.term} {school?.year}</span>
+          <span style={{ opacity: 0.6 }}>•</span>
+          <span>{student?.className}</span>
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-        <div className="mobile-card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: '800', color: '#3B82F6', marginBottom: '4px' }}>
+      {/* Quick Stats - Modern Cards */}
+      <div className="mobile-stats-grid">
+        <div className="mobile-stat-card">
+          <div className={`mobile-stat-value ${attendanceStreak >= 5 ? 'success' : ''}`}>
             {attendanceStreak}
           </div>
-          <div style={{ fontSize: '12px', color: '#7A92B8' }}>Day Streak</div>
+          <div className="mobile-stat-label">Day Streak</div>
         </div>
 
-        <div className="mobile-card" style={{ textAlign: 'center' }}>
-          <div style={{
-            fontSize: '24px',
-            fontWeight: '800',
-            color: avgGrade >= 75 ? '#22C55E' : avgGrade >= 50 ? '#F59E0B' : '#F43F5E',
-            marginBottom: '4px'
-          }}>
+        <div className="mobile-stat-card">
+          <div className={`mobile-stat-value ${avgGrade >= 75 ? 'success' : avgGrade >= 50 ? 'warning' : avgGrade > 0 ? 'danger' : ''}`}>
             {avgGrade > 0 ? `${avgGrade}%` : '-'}
           </div>
-          <div style={{ fontSize: '12px', color: '#7A92B8' }}>Avg Grade</div>
+          <div className="mobile-stat-label">Average Grade</div>
         </div>
       </div>
 

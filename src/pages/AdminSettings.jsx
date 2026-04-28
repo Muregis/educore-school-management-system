@@ -470,37 +470,42 @@ const SchoolInfoTab = ({ onSave, auth }) => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   
-  // Load existing school data
-  useEffect(() => {
-    if (auth?.token) {
-      apiFetch("/settings/school", { token: auth.token })
-        .then(data => {
-          setForm(prev => ({
-            ...prev,
-            name: data.name || prev.name,
-            email: data.email || prev.email,
-            phone: data.phone || prev.phone,
-            whatsapp_business_number: data.whatsapp_business_number || "",
-            address: data.address || prev.address,
-            county: data.county || prev.county,
-            motto: data.motto || data.tagline || prev.motto,
-            logo_url: data.logo_url || prev.logo_url,
-            primary_color: data.primary_color || prev.primary_color,
-            secondary_color: data.secondary_color || prev.secondary_color,
-            term: data.term || prev.term,
-            year: data.year || prev.year,
-            term_start: data.term_start || data.term_start_date || prev.term_start,
-            term_end: data.term_end || data.term_end_date || prev.term_end,
-            type: data.school_type || prev.type,
-            curriculum: data.curriculum || prev.curriculum,
-            admin_name: data.admin_name || prev.admin_name,
-            admin_title: data.admin_title || prev.admin_title,
-          }));
-        })
-        .catch(() => {
-          // School data not found, keep defaults
-        });
+  // Load school data from backend
+  const loadSchoolData = async () => {
+    if (!auth?.token) return;
+    try {
+      const data = await apiFetch("/settings/school", { token: auth.token });
+      setForm(prev => ({
+        ...prev,
+        name: data.name || prev.name,
+        email: data.email || prev.email,
+        phone: data.phone || prev.phone,
+        whatsapp_business_number: data.whatsapp_business_number || "",
+        address: data.address || prev.address,
+        county: data.county || prev.county,
+        motto: data.motto || data.tagline || prev.motto,
+        logo_url: data.logo_url || prev.logo_url,
+        primary_color: data.primary_color || prev.primary_color,
+        secondary_color: data.secondary_color || prev.secondary_color,
+        term: data.term || prev.term,
+        year: data.year || prev.year,
+        term_start: data.term_start || data.term_start_date || prev.term_start,
+        term_end: data.term_end || data.term_end_date || prev.term_end,
+        type: data.school_type || data.type || prev.type,
+        curriculum: data.curriculum || prev.curriculum,
+        admin_name: data.admin_name || prev.admin_name,
+        admin_title: data.admin_title || prev.admin_title,
+      }));
+    } catch (err) {
+      // School data not found, keep defaults
+      console.log('[DEBUG] Load school data failed:', err);
     }
+  };
+
+  // Load existing school data on mount
+  useEffect(() => {
+    loadSchoolData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth]);
 
   const f = k => e => setForm({ ...form, [k]: e.target.value });
@@ -537,6 +542,10 @@ const SchoolInfoTab = ({ onSave, auth }) => {
       console.log('[DEBUG] School settings save response:', saveRes);
       
       setMessage({ type: "success", text: "School settings saved successfully!" });
+      
+      // Reload data to ensure form has latest values from backend
+      await loadSchoolData();
+      
       onSave();
     } catch (err) {
       console.error('[DEBUG] Save failed:', err);

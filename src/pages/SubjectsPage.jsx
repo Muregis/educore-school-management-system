@@ -248,8 +248,8 @@ export default function SubjectsPage({ auth, toast, canEdit = true }) {
         </div>
       </div>
 
-      {/* Actions & Filters */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12 }}>
+      {/* Actions & Filters - matching Library layout */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
         <input 
           type="text" 
           placeholder="Search subjects..." 
@@ -261,8 +261,9 @@ export default function SubjectsPage({ auth, toast, canEdit = true }) {
           <option value="all">All Categories</option>
           {categories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        {canEdit && <Btn onClick={openAdd}>+ Add Subject</Btn>}
+        <div style={{ flex: 1 }} />
         {canEdit && <Btn variant="ghost" onClick={seedDefaults}>⚡ Load Defaults</Btn>}
+        {canEdit && <Btn onClick={() => { resetForm(); setShowModal(true); }}>+ Add Subject</Btn>}
       </div>
 
       {/* Table */}

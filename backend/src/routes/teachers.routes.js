@@ -206,20 +206,41 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
   try {
     const { schoolId } = req.user;
     
-    // Get all teachers that don't have staff_id linked
-    const { data: teachers, error: teachersError } = await supabase
-      .from("teachers")
-      .select("teacher_id, first_name, last_name, email, phone, department, qualification, hire_date, status")
-      .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .is("staff_id", null);
+    console.log('[DEBUG] sync-hr - Starting sync for school:', schoolId);
     
-    if (teachersError) throw teachersError;
+    // First check if staff_id column exists
+    let hasStaffIdColumn = true;
+    try {
+      await supabase.from("teachers").select("staff_id").limit(1);
+    } catch (e) {
+      console.log('[DEBUG] sync-hr - staff_id column not found:', e.message);
+      hasStaffIdColumn = false;
+    }
+    
+    // Get all teachers (with or without staff_id filter)
+    let query = supabase
+      .from("teachers")
+      .select("teacher_id, first_name, last_name, email, phone, department, qualification, hire_date, status" + (hasStaffIdColumn ? ", staff_id" : ""))
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false);
+    
+    if (hasStaffIdColumn) {
+      query = query.is("staff_id", null);
+    }
+    
+    const { data: teachers, error: teachersError } = await query;
+    
+    console.log('[DEBUG] sync-hr - Found', teachers?.length || 0, 'teachers to sync');
+    if (teachersError) {
+      console.error('[DEBUG] sync-hr - Error fetching teachers:', teachersError);
+      throw teachersError;
+    }
     
     let synced = 0;
     let errors = [];
     
     for (const teacher of (teachers || [])) {
+      console.log('[DEBUG] sync-hr - Processing teacher:', teacher.email);
       try {
         // Sync to HR staff
         const { data: hrStaff, error: hrError } = await supabase
@@ -239,26 +260,39 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
           .single();
         
         if (hrError) {
+          console.error('[DEBUG] sync-hr - HR upsert error for', teacher.email, ':', hrError);
           errors.push({ teacher: teacher.email, error: hrError.message });
           continue;
         }
         
+        console.log('[DEBUG] sync-hr - HR upsert result for', teacher.email, ':', hrStaff);
+        
         // Link teacher to hr_staff
-        if (hrStaff?.staff_id) {
-          await supabase
+        if (hrStaff?.staff_id && hasStaffIdColumn) {
+          const { error: updateError } = await supabase
             .from("teachers")
             .update({ staff_id: hrStaff.staff_id })
             .eq("teacher_id", teacher.teacher_id);
+          if (updateError) {
+            console.error('[DEBUG] sync-hr - Failed to update staff_id for', teacher.email, ':', updateError);
+          }
+          synced++;
+        } else if (hrStaff?.staff_id) {
+          // Column doesn't exist but HR record was created
           synced++;
         }
       } catch (e) {
+        console.error('[DEBUG] sync-hr - Exception for', teacher.email, ':', e.message);
         errors.push({ teacher: teacher.email, error: e.message });
       }
     }
     
+    console.log('[DEBUG] sync-hr - Sync complete. Synced:', synced, 'Errors:', errors.length);
+    
     res.json({ 
       synced, 
       total: teachers?.length || 0,
+      hasStaffIdColumn,
       errors: errors.length > 0 ? errors : undefined
     });
   } catch (err) {
