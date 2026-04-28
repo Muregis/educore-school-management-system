@@ -199,6 +199,7 @@ try {
             .upsert({
               school_id: schoolId,
               subject_name: subject,
+              name: subject,  // also populate name for compatibility
               code
             }, { onConflict: 'school_id,subject_name' })
             .select('subject_id')

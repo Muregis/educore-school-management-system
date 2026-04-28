@@ -78,7 +78,7 @@ function loadPaystackScript() {
   });
 }
 
-export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, toast, linkedStudentId }) {
+export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, toast, linkedStudentId, school }) {
   const [tab, setTab]                 = useState("payments");
   const [showPayment, setShowPayment] = useState(false);
   const [showStruct, setShowStruct]   = useState(false);
@@ -101,6 +101,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [structForm, setStructForm]   = useState({ className: "Grade 7", term: "Term 1", tuition: "", activity: "", misc: "" });
   const [bankDetails, setBankDetails] = useState(null);
   const [schoolWhatsApp, setSchoolWhatsApp] = useState("");
+  const [schoolData, setSchoolData] = useState(null);
   const [bankDepositTarget, setBankDepositTarget] = useState(null);
   const [showBankDeposit, setShowBankDeposit] = useState(false);
   const [bankDepositForm, setBankDepositForm] = useState({ studentId: "", amount: "", proofFile: null });
@@ -183,7 +184,10 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       }
         
       apiFetch("/settings/school", { token: auth.token })
-        .then(data => setSchoolWhatsApp(data?.whatsapp_business_number || ""))
+        .then(data => {
+          setSchoolWhatsApp(data?.whatsapp_business_number || "");
+          setSchoolData(data);
+        })
         .catch(e => console.warn("School settings:", e));
     }
   }, [auth, setFeeStructures, reloadPayments, canEdit]);
@@ -570,22 +574,84 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   };
 
   const printReceipt = () => {
+    // Use school data from state (fetched from /settings/school) or fall back to school prop
+    const schoolInfo = schoolData || school || {};
+    const schoolName = schoolInfo.name || schoolInfo.school_name || "School";
+    const logoUrl = schoolInfo.logo_url || "";
+    const motto = schoolInfo.motto || schoolInfo.tagline || "";
+    const address = schoolInfo.address || "";
+    const phone = schoolInfo.phone || "";
+    const email = schoolInfo.email || "";
+    const hasContact = address || phone || email;
+
     const html = `
-      <h2>Payment Receipt</h2><p style="color: #888">EduCore School Management</p>
-      <div class="row"><span>Student</span><strong>${receipt?.studentName}</strong></div>
-      <div class="row"><span>Amount</span><strong>KES ${Number(receipt?.amount).toLocaleString()}</strong></div>
-      <div class="row"><span>Method</span><strong>${receipt?.method}</strong></div>
-      <div class="row"><span>Reference</span><strong>${receipt?.reference}</strong></div>
-      <div class="row"><span>Date</span><strong>${receipt?.date}</strong></div>
-      <p style="margin-top: 24px; color: #888; font-size: 12px">Thank you for your payment.</p>
-      <style>
-        body { font-family: sans-serif; padding: 32px; max-width: 400px; margin: auto }
-        h2 { margin-bottom: 4px }
-        .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee }
-      </style>
+      <div class="print-document">
+        <!-- School Header with Branding -->
+        <div class="print-header">
+          <div class="print-header-content">
+            ${logoUrl ? `<div class="print-header-logo"><img src="${logoUrl}" alt="${schoolName} logo" style="max-width:60px;max-height:60px;object-fit:contain;"></div>` : ""}
+            <div class="print-header-info ${!logoUrl ? "print-header-info-full" : ""}">
+              <h1 class="print-header-school-name">${schoolName}</h1>
+              ${motto ? `<p class="print-header-motto">${motto}</p>` : ""}
+              ${hasContact ? `
+                <div class="print-header-contact">
+                  ${address ? `<span>${address}</span>` : ""}
+                  ${phone ? `<span>${phone}</span>` : ""}
+                  ${email ? `<span>${email}</span>` : ""}
+                </div>
+              ` : ""}
+            </div>
+          </div>
+          <div class="print-header-title">Payment Receipt</div>
+          <div class="print-header-divider"></div>
+        </div>
+
+        <!-- Receipt Content -->
+        <div class="receipt-content">
+          <div class="row"><span>Student</span><strong>${receipt?.studentName}</strong></div>
+          <div class="row"><span>Amount</span><strong>KES ${Number(receipt?.amount).toLocaleString()}</strong></div>
+          <div class="row"><span>Method</span><strong>${receipt?.method}</strong></div>
+          <div class="row"><span>Reference</span><strong>${receipt?.reference}</strong></div>
+          <div class="row"><span>Date</span><strong>${receipt?.date}</strong></div>
+        </div>
+
+        <div class="receipt-footer">
+          <p>Thank you for your payment.</p>
+          <p class="receipt-stamp">Official Receipt</p>
+        </div>
+
+        <style>
+          .print-document{font-family:'Segoe UI',Arial,sans-serif;padding:20px;max-width:210mm;margin:auto;color:#1f2937;background:white}
+          .print-header{margin-bottom:20px;width:100%}
+          .print-header-content{display:flex;align-items:center;gap:20px;padding-bottom:16px}
+          .print-header-logo{flex-shrink:0}
+          .print-header-logo img{max-width:60px;max-height:60px;object-fit:contain;border-radius:4px}
+          .print-header-info{flex:1;text-align:center}
+          .print-header-info-full{text-align:left}
+          .print-header-school-name{font-size:20px;font-weight:800;margin:0 0 4px 0;color:#1f2937;line-height:1.2}
+          .print-header-motto{font-size:13px;font-style:italic;color:#6b7280;margin:0 0 8px 0}
+          .print-header-contact{font-size:10px;color:#6b7280;display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+          .print-header-info-full .print-header-contact{justify-content:flex-start}
+          .print-header-title{text-align:center;font-size:14px;font-weight:600;color:#374151;margin:12px 0;text-transform:uppercase;letter-spacing:1px}
+          .print-header-divider{height:2px;background:linear-gradient(90deg,transparent,#c9a84c,transparent);margin:12px 0}
+          .receipt-content{margin:24px 0}
+          .row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #e5e7eb;font-size:14px}
+          .row span{color:#6b7280}
+          .row strong{color:#111827;font-weight:600}
+          .receipt-footer{margin-top:40px;text-align:center}
+          .receipt-footer p{color:#6b7280;font-size:12px;margin:4px 0}
+          .receipt-stamp{margin-top:24px;padding:8px 16px;border:2px solid #c9a84c;border-radius:4px;display:inline-block;color:#c9a84c;font-weight:600;font-size:12px;text-transform:uppercase}
+          @media print{
+            .print-document{padding:0}
+            .print-header-divider{background:#999!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            .receipt-stamp{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            body{background:white!important;color:black!important}
+          }
+        </style>
+      </div>
     `;
-    
-    printHTML(html, { title: "Receipt" });
+
+    printHTML(html, { title: `Receipt - ${receipt?.studentName || "Payment"}` });
   };
 
   return (
@@ -1050,4 +1116,14 @@ FeesPage.propTypes = {
   canEdit: PropTypes.bool.isRequired,
   toast: PropTypes.func.isRequired,
   linkedStudentId: PropTypes.number,
+  school: PropTypes.shape({
+    name: PropTypes.string,
+    school_name: PropTypes.string,
+    logo_url: PropTypes.string,
+    motto: PropTypes.string,
+    tagline: PropTypes.string,
+    address: PropTypes.string,
+    phone: PropTypes.string,
+    email: PropTypes.string,
+  }),
 };

@@ -232,7 +232,8 @@ export default function App() {
     }
   }, [auth?.token, loadRolePermissions]);
 
-  const perms = auth ? (rolePermissions?.[auth.role] ?? ROLE[auth.role] ?? null) : null;
+  // Defensive: fallback to ROLE defaults if backend permissions are missing or empty
+  const perms = auth ? (rolePermissions?.[auth.role]?.pages?.length ? rolePermissions[auth.role] : ROLE[auth.role]) : null;
   const isPortal = auth?.role === "parent" || auth?.role === "student";
   const isParent = auth?.role === "parent";
   const canEdit  = Boolean(perms?.edit);
@@ -406,7 +407,7 @@ export default function App() {
     attendance: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     grades: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     subjects: ["admin","teacher","director","superadmin"].includes(auth.role) ? <SubjectsPage auth={auth} toast={toast} /> : <Forbidden />,
-    fees: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <FeesPage auth={auth} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
+    fees: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <FeesPage auth={auth} school={school} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     "mpesa-reconcile": <MpesaReconciliationPage auth={auth} students={students} toast={toast} />,
     "bulk-import": ["admin","director","superadmin"].includes(auth.role) ? <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} payments={payments} feeStructures={feeStructures} results={results} /> : <Forbidden />,
     upgrade: ["admin","director","superadmin","finance"].includes(auth.role) ? <UpgradePage auth={auth} toast={toast} /> : <Forbidden />,
@@ -414,7 +415,7 @@ export default function App() {
     admissions: <AdmissionsPage auth={auth} canEdit={canEdit} toast={toast} />,
     invoices: <InvoicesPage auth={auth} school={school} students={students} canEdit={canEdit} toast={toast} />,
     reportcards: <ReportCardsPage auth={auth} school={school} students={myStudents} canEdit={canEdit} toast={toast} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
-    hr: ["admin","hr","director","superadmin"].includes(auth.role) ? <HRPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
+    hr: ["admin","hr","director","superadmin"].includes(auth.role) ? <HRPage auth={auth} school={school} canEdit={canEdit} toast={toast} /> : <Forbidden />,
     library: isPortal && isMobile && auth.role === "student" ? (() => { setPage("dashboard"); return null; })() : <LibraryPage auth={auth} students={myStudents} teachers={teachers} toast={toast} />,
     discipline: <DisciplinePage auth={auth} students={myStudents} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
     transport: <TransportPage auth={auth} canEdit={canEdit} toast={toast} students={students} />,

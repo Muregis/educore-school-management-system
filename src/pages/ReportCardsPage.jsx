@@ -80,53 +80,109 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
 
   const printCard = () => {
     if (!fullData) return;
-    const { student, results, attendance, reportCard, average } = fullData;
+    const { student, results, attendance, reportCard, average, branding } = fullData;
     const gradeColor = g => g === "A" ? "#22c55e" : g === "B" ? "#3b82f6" : g === "C" ? "#f59e0b" : "#ef4444";
-    
+
+    // Use branding from backend, or fall back to school prop
+    const schoolName = branding?.schoolName || school?.name || school?.school_name || "School";
+    const logoUrl = branding?.logoUrl || school?.logo_url || "";
+    const motto = branding?.schoolMotto || school?.motto || school?.tagline || "";
+    const address = branding?.schoolAddress || school?.address || "";
+    const phone = branding?.schoolPhone || school?.phone || "";
+    const email = branding?.schoolEmail || school?.email || "";
+
+    const hasContact = address || phone || email;
+
     const html = `
-      <h1>${school?.name || "School Report Card"}</h1>
-      <div class="sub">Academic Report Card — ${term} ${year}</div>
-      <div class="info">
-        <div class="info-box"><div class="info-label">Student Name</div><strong>${student.full_name}</strong></div>
-        <div class="info-box"><div class="info-label">Admission No.</div><strong>${student.admission_number}</strong></div>
-        <div class="info-box"><div class="info-label">Class</div><strong>${student.class_name}</strong></div>
-        <div class="info-box"><div class="info-label">Average Score</div><strong>${average}%</strong></div>
-        ${reportCard?.class_position ? `<div class="info-box"><div class="info-label">Position</div><strong>${reportCard.class_position} / ${reportCard.out_of||'—'}</strong></div>` : ''}
-        <div class="info-box"><div class="info-label">Attendance</div><strong>${attendance?.present||0} / ${attendance?.total||0} days</strong></div>
+      <div class="print-document">
+        <!-- School Header with Branding -->
+        <div class="print-header">
+          <div class="print-header-content">
+            ${logoUrl ? `<div class="print-header-logo"><img src="${logoUrl}" alt="${schoolName} logo" style="max-width:60px;max-height:60px;object-fit:contain;"></div>` : ""}
+            <div class="print-header-info ${!logoUrl ? "print-header-info-full" : ""}">
+              <h1 class="print-header-school-name">${schoolName}</h1>
+              ${motto ? `<p class="print-header-motto">${motto}</p>` : ""}
+              ${hasContact ? `
+                <div class="print-header-contact">
+                  ${address ? `<span>${address}</span>` : ""}
+                  ${phone ? `<span>${phone}</span>` : ""}
+                  ${email ? `<span>${email}</span>` : ""}
+                </div>
+              ` : ""}
+            </div>
+          </div>
+          <div class="print-header-title">Academic Report Card — ${term} ${year}</div>
+          <div class="print-header-divider"></div>
+        </div>
+
+        <!-- Student Info -->
+        <div class="info">
+          <div class="info-box"><div class="info-label">Student Name</div><strong>${student.full_name}</strong></div>
+          <div class="info-box"><div class="info-label">Admission No.</div><strong>${student.admission_number}</strong></div>
+          <div class="info-box"><div class="info-label">Class</div><strong>${student.class_name}</strong></div>
+          <div class="info-box"><div class="info-label">Average Score</div><strong>${average}%</strong></div>
+          ${reportCard?.class_position ? `<div class="info-box"><div class="info-label">Position</div><strong>${reportCard.class_position} / ${reportCard.out_of||'—'}</strong></div>` : ''}
+          <div class="info-box"><div class="info-label">Attendance</div><strong>${attendance?.present||0} / ${attendance?.total||0} days</strong></div>
+        </div>
+
+        <!-- Results Table -->
+        <table>
+          <thead><tr><th>Subject</th><th>Score</th><th>Grade</th><th>Remarks</th></tr></thead>
+          <tbody>${results.map(r => `
+            <tr>
+              <td>${r.subject}</td>
+              <td>${r.marks}</td>
+              <td><span class="grade" style="background:${gradeColor(r.grade)}">${r.grade}</span></td>
+              <td style="color:#666;font-size:12px">${r.teacher_comment||'—'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+
+        <!-- Comments -->
+        ${reportCard?.class_teacher_comment ? `<div class="comment"><strong>Class Teacher Comment:</strong> ${reportCard.class_teacher_comment}</div>` : ''}
+        ${reportCard?.principal_comment ? `<div class="comment"><strong>Principal Comment:</strong> ${reportCard.principal_comment}</div>` : ''}
+
+        <!-- Signature Section -->
+        <div class="signature">
+          <div>Class Teacher: ___________________</div>
+          <div>Principal: ___________________</div>
+          <div>Parent/Guardian: ___________________</div>
+        </div>
+
+        <style>
+          .print-document{font-family:'Segoe UI',Arial,sans-serif;padding:20px;max-width:210mm;margin:auto;color:#1f2937;background:white}
+          .print-header{margin-bottom:20px;width:100%}
+          .print-header-content{display:flex;align-items:center;gap:20px;padding-bottom:16px}
+          .print-header-logo{flex-shrink:0}
+          .print-header-logo img{max-width:60px;max-height:60px;object-fit:contain;border-radius:4px}
+          .print-header-info{flex:1;text-align:center}
+          .print-header-info-full{text-align:left}
+          .print-header-school-name{font-size:20px;font-weight:800;margin:0 0 4px 0;color:#1f2937;line-height:1.2}
+          .print-header-motto{font-size:13px;font-style:italic;color:#6b7280;margin:0 0 8px 0}
+          .print-header-contact{font-size:10px;color:#6b7280;display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+          .print-header-info-full .print-header-contact{justify-content:flex-start}
+          .print-header-title{text-align:center;font-size:14px;font-weight:600;color:#374151;margin:12px 0;text-transform:uppercase;letter-spacing:1px}
+          .print-header-divider{height:2px;background:linear-gradient(90deg,transparent,#c9a84c,transparent);margin:12px 0}
+          .sub{color:#666;font-size:13px;margin-bottom:20px;text-align:center}
+          .info{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
+          .info-box{background:#f8f8f8;padding:8px 12px;border-radius:6px}
+          .info-label{font-size:10px;color:#888;margin-bottom:2px}
+          table{width:100%;border-collapse:collapse;margin-bottom:20px}
+          th{background:#f0f0f0;text-align:left;padding:8px 10px;font-size:12px}
+          td{padding:8px 10px;border-bottom:1px solid #eee;font-size:13px}
+          .grade{font-weight:bold;padding:2px 8px;border-radius:4px;color:#fff;display:inline-block}
+          .comment{background:#f8f8f8;padding:12px;border-radius:6px;margin-bottom:12px;font-size:13px}
+          .signature{display:flex;justify-content:space-between;margin-top:40px;font-size:12px;page-break-inside:avoid}
+          @media print{
+            .print-document{padding:0}
+            .print-header-divider{background:#999!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            .grade{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            body{background:white!important;color:black!important}
+          }
+        </style>
       </div>
-      <table>
-        <thead><tr><th>Subject</th><th>Score</th><th>Grade</th><th>Remarks</th></tr></thead>
-        <tbody>${results.map(r => `
-          <tr>
-            <td>${r.subject}</td>
-            <td>${r.marks}</td>
-            <td><span class="grade" style="background:${gradeColor(r.grade)}">${r.grade}</span></td>
-            <td style="color:#666;font-size:12px">${r.teacher_comment||'—'}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-      ${reportCard?.class_teacher_comment ? `<div class="comment"><strong>Class Teacher:</strong> ${reportCard.class_teacher_comment}</div>` : ''}
-      ${reportCard?.principal_comment ? `<div class="comment"><strong>Principal:</strong> ${reportCard.principal_comment}</div>` : ''}
-      <div class="signature">
-        <div>Class Teacher: ___________________</div>
-        <div>Principal: ___________________</div>
-        <div>Parent/Guardian: ___________________</div>
-      </div>
-      <style>
-        body{font-family:sans-serif;padding:40px;max-width:600px;margin:auto;color:#111}
-        h1{font-size:22px;margin-bottom:2px}.sub{color:#666;font-size:13px;margin-bottom:20px}
-        .info{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
-        .info-box{background:#f8f8f8;padding:8px 12px;border-radius:6px}
-        .info-label{font-size:10px;color:#888;margin-bottom:2px}
-        table{width:100%;border-collapse:collapse;margin-bottom:20px}
-        th{background:#f0f0f0;text-align:left;padding:8px 10px;font-size:12px}
-        td{padding:8px 10px;border-bottom:1px solid #eee;font-size:13px}
-        .grade{font-weight:bold;padding:2px 8px;border-radius:4px;color:#fff;display:inline-block}
-        .comment{background:#f8f8f8;padding:12px;border-radius:6px;margin-bottom:12px;font-size:13px}
-        .signature{display:flex;justify-content:space-between;margin-top:40px;font-size:12px}
-      </style>
     `;
-    
+
     printHTML(html, { title: `Report Card - ${student.full_name}` });
   };
 
@@ -285,7 +341,16 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
 
 ReportCardsPage.propTypes = {
   auth: PropTypes.object,
-  school: PropTypes.object,
+  school: PropTypes.shape({
+    name: PropTypes.string,
+    school_name: PropTypes.string,
+    logo_url: PropTypes.string,
+    motto: PropTypes.string,
+    tagline: PropTypes.string,
+    address: PropTypes.string,
+    phone: PropTypes.string,
+    email: PropTypes.string,
+  }),
   students: PropTypes.array.isRequired,
   canEdit: PropTypes.bool.isRequired,
   toast: PropTypes.func.isRequired,

@@ -26,8 +26,9 @@ import { logActivity } from "../helpers/activity.logger.js";
 const router = Router();
 router.use(authRequired);
 
-// Official next-class map (CBC Kenya)
-const NEXT_CLASS = {
+// Default next-class map (CBC Kenya) - used as fallback when toClass not specified
+// null = final class, requires explicit toClass to promote from
+const DEFAULT_NEXT_CLASS = {
   "Playgroup": "PP1",
   "PP1":       "PP2",
   "PP2":       "Grade 1",
@@ -39,7 +40,11 @@ const NEXT_CLASS = {
   "Grade 6":   "Grade 7",
   "Grade 7":   "Grade 8",
   "Grade 8":   "Grade 9",
-  "Grade 9":   null, // graduates — handle separately
+  "Grade 9":   null,        // Final class - requires explicit toClass to promote
+  "Form 1":    "Form 2",
+  "Form 2":    "Form 3",
+  "Form 3":    "Form 4",
+  "Form 4":    null,        // Final class - requires explicit toClass
 };
 
 // POST /api/students/promote
@@ -56,14 +61,30 @@ router.post("/", requireRoles("admin", "director", "superadmin"), async (req, re
     // Validate inputs
     if (!fromClass) return res.status(400).json({ message: "fromClass is required" });
 
-    // Determine target class
-    const targetClass = toClass || NEXT_CLASS[fromClass];
-    if (targetClass === undefined) {
-      return res.status(400).json({ message: `No known next class for: ${fromClass}` });
+    // Determine target class: explicit toClass takes precedence, then try default progression
+    let targetClass = toClass;
+    let isFinalClass = false;
+    
+    if (!targetClass) {
+      targetClass = DEFAULT_NEXT_CLASS[fromClass];
+      if (targetClass === null) {
+        isFinalClass = true;
+      }
     }
-    if (targetClass === null) {
-      return res.status(400).json({
-        message: "Grade 9 graduates — use the alumni/exit flow instead of promotion.",
+    
+    // If this is a final class (Grade 9, Form 4) and no explicit toClass provided
+    if (isFinalClass) {
+      return res.status(400).json({ 
+        message: `${fromClass} is configured as a final class. To promote from ${fromClass}, you must explicitly specify the destination class (toClass).`,
+        isFinalClass: true,
+        fromClass
+      });
+    }
+    
+    // If no default progression found for this class
+    if (!targetClass) {
+      return res.status(400).json({ 
+        message: `Please specify the destination class (toClass). No default progression found for: ${fromClass}` 
       });
     }
 
@@ -140,6 +161,126 @@ router.post("/", requireRoles("admin", "director", "superadmin"), async (req, re
       academicYear,
       errors: errors.length > 0 ? errors : undefined,
       message: `${promoted} student(s) promoted from ${fromClass} to ${targetClass}.`,
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /api/students/promotion/classes - Get available classes for promotion dropdowns
+router.get("/classes", requireRoles("admin", "director", "superadmin", "teacher"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    
+    // Get unique class names from students table
+    const { data: classes, error } = await supabase
+      .from("students")
+      .select("class_name")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .not("class_name", "is", null);
+    
+    if (error) throw error;
+    
+    // Get unique, sorted class names
+    const uniqueClasses = [...new Set((classes || []).map(c => c.class_name))].filter(Boolean).sort();
+    
+    // Identify final classes (those with null progression)
+    const finalClasses = Object.entries(DEFAULT_NEXT_CLASS)
+      .filter(([_, next]) => next === null)
+      .map(([cls, _]) => cls);
+    
+    res.json({
+      classes: uniqueClasses,
+      finalClasses,
+      defaultProgression: DEFAULT_NEXT_CLASS,
+      canPromoteFrom: uniqueClasses.filter(c => !finalClasses.includes(c) || DEFAULT_NEXT_CLASS[c] !== undefined),
+      count: uniqueClasses.length,
+    });
+  } catch (err) { next(err); }
+});
+
+// POST /api/students/promotion/individual - Promote specific students (with selection)
+router.post("/individual", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
+  try {
+    const { schoolId, userId } = req.user;
+    const {
+      studentIds,      // Array of student IDs to promote
+      toClass,         // Target class (required)
+      academicYear = new Date().getFullYear().toString(),
+      fromClass,       // Optional: for verification
+    } = req.body;
+
+    if (!Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({ message: "studentIds array is required" });
+    }
+    if (!toClass) {
+      return res.status(400).json({ message: "toClass (destination class) is required" });
+    }
+
+    // Fetch the specific students
+    let query = supabase
+      .from("students")
+      .select("student_id, first_name, last_name, class_name, admission_number")
+      .eq("school_id", schoolId)
+      .eq("status", "active")
+      .eq("is_deleted", false)
+      .in("student_id", studentIds);
+    
+    // Optionally verify they're all in the same source class
+    if (fromClass) {
+      query = query.eq("class_name", fromClass);
+    }
+
+    const { data: students, error: fetchErr } = await query;
+    if (fetchErr) throw fetchErr;
+
+    if (!students || students.length === 0) {
+      return res.status(404).json({ message: "No eligible students found" });
+    }
+
+    // Promote each student
+    const promoted = [];
+    const errors = [];
+    
+    for (const s of students) {
+      const fromClassName = s.class_name;
+      
+      const { error: upErr } = await supabase
+        .from("students")
+        .update({
+          class_name: toClass,
+          previous_class: fromClassName,
+          promotion_year: academicYear,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("student_id", s.student_id)
+        .eq("school_id", schoolId);
+
+      if (upErr) {
+        errors.push({ student_id: s.student_id, name: `${s.first_name} ${s.last_name}`, error: upErr.message });
+      } else {
+        promoted.push({
+          student_id: s.student_id,
+          name: `${s.first_name} ${s.last_name}`,
+          fromClass: fromClassName,
+          toClass,
+        });
+      }
+    }
+
+    // Log activity
+    logActivity({ user: { userId, schoolId } }, {
+      action: "students.promote.individual",
+      entity: "students",
+      description: `Promoted ${promoted.length} individual students to ${toClass}`,
+    });
+
+    res.json({
+      promoted: promoted.length,
+      promotedStudents: promoted,
+      errors: errors.length > 0 ? errors : undefined,
+      toClass,
+      academicYear,
+      message: `${promoted.length} student(s) promoted to ${toClass}.`,
     });
   } catch (err) { next(err); }
 });

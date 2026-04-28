@@ -78,6 +78,36 @@ router.post("/", requireRoles("admin", "hr", "director", "superadmin"), async (r
 
     if (insertTeacherError) throw insertTeacherError;
 
+    // Sync to HR staff table
+    try {
+      const { data: hrStaff } = await supabase
+        .from("hr_staff")
+        .upsert({
+          school_id: schoolId,
+          full_name: `${firstName} ${lastName}`,
+          email: email || null,
+          phone: phone || null,
+          department: department || 'Academic',
+          job_title: qualification || 'Teacher',
+          contract_type: 'Permanent',
+          start_date: hireDate || null,
+          status: status || 'active',
+        }, { onConflict: "school_id,email" })
+        .select("staff_id")
+        .single();
+      
+      if (hrStaff?.staff_id) {
+        // Link teacher record to hr_staff
+        await supabase
+          .from("teachers")
+          .update({ staff_id: hrStaff.staff_id })
+          .eq("teacher_id", insertedTeacher.teacher_id);
+        insertedTeacher.staff_id = hrStaff.staff_id;
+      }
+    } catch (e) {
+      console.warn("Could not sync teacher to HR staff:", e.message);
+    }
+
     try {
       const defaultPass = email.split("@")[0];
       const hash = await bcrypt.hash(defaultPass, 10);
@@ -143,6 +173,28 @@ router.put("/:id", requireRoles("admin", "hr", "director", "superadmin"), async 
 
     if (error) throw error;
     if (!updatedTeacher) return res.status(404).json({ message: "Teacher not found" });
+
+    // Sync updates to HR staff table
+    if (email) {
+      try {
+        await supabase
+          .from("hr_staff")
+          .upsert({
+            school_id: schoolId,
+            full_name: `${firstName || ''} ${lastName || ''}`.trim(),
+            email: email,
+            phone: phone || null,
+            department: department || 'Academic',
+            job_title: qualification || 'Teacher',
+            start_date: hireDate || null,
+            status: status || 'active',
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "school_id,email" });
+      } catch (e) {
+        console.warn("Could not sync teacher update to HR staff:", e.message);
+      }
+    }
+
     res.json({ updated: true });
   } catch (err) {
     next(err);
@@ -162,6 +214,32 @@ router.delete("/:id", requireRoles("admin", "director", "superadmin"), async (re
 
     if (error) throw error;
     if (!deletedTeacher) return res.status(404).json({ message: "Teacher not found" });
+
+    // Soft-delete linked HR staff record
+    try {
+      const { data: teacher } = await supabase
+        .from("teachers")
+        .select("email, staff_id")
+        .eq("teacher_id", req.params.id)
+        .single();
+      
+      if (teacher?.staff_id) {
+        await supabase
+          .from("hr_staff")
+          .update({ is_deleted: true, updated_at: new Date().toISOString() })
+          .eq("staff_id", teacher.staff_id)
+          .eq("school_id", schoolId);
+      } else if (teacher?.email) {
+        await supabase
+          .from("hr_staff")
+          .update({ is_deleted: true, updated_at: new Date().toISOString() })
+          .eq("email", teacher.email)
+          .eq("school_id", schoolId);
+      }
+    } catch (e) {
+      console.warn("Could not sync teacher deletion to HR staff:", e.message);
+    }
+
     res.json({ deleted: true });
   } catch (err) {
     next(err);

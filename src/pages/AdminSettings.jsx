@@ -483,6 +483,16 @@ const SchoolInfoTab = ({ onSave, auth }) => {
             whatsapp_business_number: data.whatsapp_business_number || "",
             address: data.address || prev.address,
             county: data.county || prev.county,
+            motto: data.motto || data.tagline || prev.motto,
+            logo_url: data.logo_url || prev.logo_url,
+            primary_color: data.primary_color || prev.primary_color,
+            secondary_color: data.secondary_color || prev.secondary_color,
+            term: data.term || prev.term,
+            year: data.year || prev.year,
+            type: data.school_type || prev.type,
+            curriculum: data.curriculum || prev.curriculum,
+            admin_name: data.admin_name || prev.admin_name,
+            admin_title: data.admin_title || prev.admin_title,
           }));
         })
         .catch(() => {
@@ -496,21 +506,37 @@ const SchoolInfoTab = ({ onSave, auth }) => {
   const saveSchoolInfo = async () => {
     setLoading(true); setMessage(null);
     try {
-      console.log('[DEBUG] Saving WhatsApp number:', form.whatsapp_business_number);
-      
-      // Save WhatsApp number
-      const whatsappRes = await apiFetch("/settings/school/whatsapp", {
-        method: "PATCH",
-        body: { whatsapp_business_number: form.whatsapp_business_number },
+      // Save all school settings via PUT /settings/school
+      const saveRes = await apiFetch("/settings/school", {
+        method: "PUT",
+        body: {
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          address: form.address,
+          county: form.county,
+          whatsapp_business_number: form.whatsapp_business_number,
+          term: form.term,
+          year: form.year,
+          motto: form.motto,
+          tagline: form.motto, // Use motto as tagline if not separately set
+          logo_url: form.logo_url,
+          primary_color: form.primary_color,
+          secondary_color: form.secondary_color,
+          school_type: form.type,
+          curriculum: form.curriculum,
+          admin_name: form.admin_name,
+          admin_title: form.admin_title,
+        },
         token: auth?.token,
       });
-      console.log('[DEBUG] WhatsApp save response:', whatsappRes);
+      console.log('[DEBUG] School settings save response:', saveRes);
       
-      setMessage({ type: "success", text: "School WhatsApp number saved successfully!" });
+      setMessage({ type: "success", text: "School settings saved successfully!" });
       onSave();
     } catch (err) {
       console.error('[DEBUG] Save failed:', err);
-      setMessage({ type: "error", text: err.message || "Failed to save WhatsApp number" });
+      setMessage({ type: "error", text: err.message || "Failed to save school settings" });
     }
     setLoading(false);
   };

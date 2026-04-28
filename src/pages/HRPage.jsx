@@ -23,7 +23,7 @@ const pager  = (arr, p) => ({ pages: Math.max(1,Math.ceil(arr.length/PAGE)), row
 const BLANK_STAFF = { fullName:"", email:"", phone:"", department:"Academic", jobTitle:"", contractType:"Permanent", startDate:"", salary:"", status:"active", nationalId:"", notes:"" };
 const BLANK_LEAVE = { staffId:"", leaveType:"Annual", fromDate:"", toDate:"", reason:"" };
 
-export default function HRPage({ auth, canEdit, toast }) {
+export default function HRPage({ auth, canEdit, toast, school }) {
   const [tab, setTab]           = useState("staff");
   const [staff, setStaff]       = useState([]);
   const [leave, setLeave]       = useState([]);
@@ -232,34 +232,97 @@ export default function HRPage({ auth, canEdit, toast }) {
     setTransferring(false);
   };
 
-  // Print single payslip
+  // Print single payslip with school branding
   const printPayslip = (p) => {
+    // Extract school branding data
+    const schoolName = school?.name || school?.school_name || "School";
+    const logoUrl = school?.logo_url || "";
+    const motto = school?.motto || school?.tagline || "";
+    const address = school?.address || "";
+    const phone = school?.phone || "";
+    const email = school?.email || "";
+    const hasContact = address || phone || email;
+
     const html = `
-      <div class="header"><div><h2>PAYSLIP</h2><p>${MONTHS[p.month-1]} ${p.year}</p></div>
-      <div style="text-align:right"><strong>${p.staff_name}</strong><br>${p.job_title}<br>${p.department}<br>ID: ${p.national_id||"—"}</div></div>
-      <hr>
-      <table>
-        <tr><th>Description</th><th>Amount (KES)</th></tr>
-        <tr><td>Basic Salary</td><td>${Number(p.basic_salary).toLocaleString()}</td></tr>
-        <tr><td>Allowances</td><td>${Number(p.allowances).toLocaleString()}</td></tr>
-        <tr><td>Gross Pay</td><td class="total">${(Number(p.basic_salary)+Number(p.allowances)).toLocaleString()}</td></tr>
-        <tr><td colspan="2" style="background:#fff8f8;font-weight:600">Deductions</td></tr>
-        <tr><td>PAYE</td><td>- ${Number(p.paye).toLocaleString()}</td></tr>
-        <tr><td>NHIF</td><td>- ${Number(p.nhif).toLocaleString()}</td></tr>
-        <tr><td>NSSF</td><td>- ${Number(p.nssf).toLocaleString()}</td></tr>
-        <tr><td>Total Deductions</td><td class="total">- ${Number(p.deductions).toLocaleString()}</td></tr>
-        <tr><td><strong>NET PAY</strong></td><td class="net">${Number(p.net_pay).toLocaleString()}</td></tr>
-      </table>
-      <p style="color:#64748b;font-size:12px">Status: ${p.status.toUpperCase()} ${p.paid_date ? "· Paid: "+p.paid_date : ""}</p>
-      <style>
-        body{font-family:Arial;padding:32px;max-width:600px;margin:auto}
-        h2{color:#1e293b}table{width:100%;border-collapse:collapse;margin:16px 0}
-        td,th{padding:8px 12px;border:1px solid #e2e8f0;font-size:13px}
-        th{background:#f8fafc;font-weight:600}.total{font-weight:bold;font-size:15px}
-        .net{color:#16a34a;font-size:18px;font-weight:800}.header{display:flex;justify-content:space-between}
-      </style>
+      <div class="print-document">
+        <!-- School Header with Branding -->
+        <div class="print-header">
+          <div class="print-header-content">
+            ${logoUrl ? `<div class="print-header-logo"><img src="${logoUrl}" alt="${schoolName} logo" style="max-width:60px;max-height:60px;object-fit:contain;"></div>` : ""}
+            <div class="print-header-info ${!logoUrl ? "print-header-info-full" : ""}">
+              <h1 class="print-header-school-name">${schoolName}</h1>
+              ${motto ? `<p class="print-header-motto">${motto}</p>` : ""}
+              ${hasContact ? `
+                <div class="print-header-contact">
+                  ${address ? `<span>${address}</span>` : ""}
+                  ${phone ? `<span>${phone}</span>` : ""}
+                  ${email ? `<span>${email}</span>` : ""}
+                </div>
+              ` : ""}
+            </div>
+          </div>
+          <div class="print-header-title">Official Payslip — ${MONTHS[p.month-1]} ${p.year}</div>
+          <div class="print-header-divider"></div>
+        </div>
+
+        <!-- Employee Info -->
+        <div class="employee-info">
+          <div><strong>${p.staff_name}</strong><br>${p.job_title}<br>${p.department}<br>ID: ${p.national_id||"—"}</div>
+        </div>
+
+        <!-- Payslip Table -->
+        <table class="payslip-table">
+          <tr><th>Description</th><th>Amount (KES)</th></tr>
+          <tr><td>Basic Salary</td><td>${Number(p.basic_salary).toLocaleString()}</td></tr>
+          <tr><td>Allowances</td><td>${Number(p.allowances).toLocaleString()}</td></tr>
+          <tr><td>Gross Pay</td><td class="total">${(Number(p.basic_salary)+Number(p.allowances)).toLocaleString()}</td></tr>
+          <tr><td colspan="2" style="background:#fef2f2;font-weight:600;color:#991b1b">Deductions</td></tr>
+          <tr><td>PAYE</td><td>- ${Number(p.paye).toLocaleString()}</td></tr>
+          <tr><td>NHIF</td><td>- ${Number(p.nhif).toLocaleString()}</td></tr>
+          <tr><td>NSSF</td><td>- ${Number(p.nssf).toLocaleString()}</td></tr>
+          <tr><td>Total Deductions</td><td class="total">- ${Number(p.deductions).toLocaleString()}</td></tr>
+          <tr><td><strong>NET PAY</strong></td><td class="net">${Number(p.net_pay).toLocaleString()}</td></tr>
+        </table>
+
+        <div class="payslip-footer">
+          <p>Status: <strong>${p.status.toUpperCase()}</strong> ${p.paid_date ? "· Paid: "+p.paid_date : ""}</p>
+          <p class="payslip-stamp">Official Document</p>
+        </div>
+
+        <style>
+          .print-document{font-family:'Segoe UI',Arial,sans-serif;padding:20px;max-width:210mm;margin:auto;color:#1f2937;background:white}
+          .print-header{margin-bottom:20px;width:100%}
+          .print-header-content{display:flex;align-items:center;gap:20px;padding-bottom:16px}
+          .print-header-logo{flex-shrink:0}
+          .print-header-logo img{max-width:60px;max-height:60px;object-fit:contain;border-radius:4px}
+          .print-header-info{flex:1;text-align:center}
+          .print-header-info-full{text-align:left}
+          .print-header-school-name{font-size:20px;font-weight:800;margin:0 0 4px 0;color:#1f2937;line-height:1.2}
+          .print-header-motto{font-size:13px;font-style:italic;color:#6b7280;margin:0 0 8px 0}
+          .print-header-contact{font-size:10px;color:#6b7280;display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+          .print-header-info-full .print-header-contact{justify-content:flex-start}
+          .print-header-title{text-align:center;font-size:14px;font-weight:600;color:#374151;margin:12px 0;text-transform:uppercase;letter-spacing:1px}
+          .print-header-divider{height:2px;background:linear-gradient(90deg,transparent,#c9a84c,transparent);margin:12px 0}
+          .employee-info{margin:24px 0;padding:16px;background:#f8fafc;border-radius:8px;text-align:right}
+          .payslip-table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+          .payslip-table td,.payslip-table th{padding:10px 12px;border:1px solid #e2e8f0}
+          .payslip-table th{background:#f1f5f9;font-weight:600;text-align:left}
+          .payslip-table td:last-child{text-align:right}
+          .total{font-weight:bold;font-size:15px}
+          .net{color:#16a34a;font-size:18px;font-weight:800}
+          .payslip-footer{margin-top:32px;text-align:center}
+          .payslip-footer p{color:#64748b;font-size:12px;margin:4px 0}
+          .payslip-stamp{margin-top:24px;padding:8px 16px;border:2px solid #c9a84c;border-radius:4px;display:inline-block;color:#c9a84c;font-weight:600;font-size:12px;text-transform:uppercase}
+          @media print{
+            .print-document{padding:0}
+            .print-header-divider{background:#999!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            .net,.payslip-stamp{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+            body{background:white!important;color:black!important}
+          }
+        </style>
+      </div>
     `;
-    
+
     printHTML(html, { title: `Payslip - ${p.staff_name}` });
   };
 
@@ -664,4 +727,14 @@ HRPage.propTypes = {
   auth:    PropTypes.object.isRequired,
   canEdit: PropTypes.bool,
   toast:   PropTypes.func.isRequired,
+  school:  PropTypes.shape({
+    name: PropTypes.string,
+    school_name: PropTypes.string,
+    logo_url: PropTypes.string,
+    motto: PropTypes.string,
+    tagline: PropTypes.string,
+    address: PropTypes.string,
+    phone: PropTypes.string,
+    email: PropTypes.string,
+  }),
 };

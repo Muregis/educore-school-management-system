@@ -292,7 +292,7 @@ async function ensurePermissionsTable() {
   return { missing: false };
 }
 
-router.get("/permissions", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
+router.get("/permissions", requireRoles("admin", "director", "superadmin", "parent", "student"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const check = await ensurePermissionsTable();
