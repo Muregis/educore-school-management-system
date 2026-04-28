@@ -113,7 +113,7 @@ router.get("/:id", requireAuth, async (req, res, next) => {
 router.post("/", requireAuth, requireRoles("admin", "teacher", "director"), async (req, res, next) => {
   try {
     if (!supabase) return res.status(503).json({ message: "Database service unavailable" });
-    const { schoolId } = req.user;
+    const { schoolId, role } = req.user;
     const { 
       name, 
       code = null, 
@@ -125,8 +125,12 @@ router.post("/", requireAuth, requireRoles("admin", "teacher", "director"), asyn
       schoolId: bodySchoolId 
     } = req.body;
 
+    console.log('[DEBUG] Subjects POST - req.user:', { schoolId, role });
+    console.log('[DEBUG] Subjects POST - req.body:', req.body);
+
     const effectiveSchoolId = bodySchoolId || schoolId;
     if (!name || !effectiveSchoolId) {
+      console.log('[DEBUG] Subjects POST - Missing required fields:', { name: !!name, effectiveSchoolId: !!effectiveSchoolId });
       return res.status(400).json({ message: "Name and School ID are required" });
     }
 
@@ -159,9 +163,12 @@ router.post("/", requireAuth, requireRoles("admin", "teacher", "director"), asyn
     }
 
     if (error) {
+      console.log('[DEBUG] Subjects POST - Insert error:', { code: error.code, message: error.message, details: error.details });
       if (error.code === "23505") return res.status(409).json({ message: "Duplicate subject" });
       throw error;
     }
+    
+    console.log('[DEBUG] Subjects POST - Insert success:', data);
 
     res.status(201).json({
       ...data,

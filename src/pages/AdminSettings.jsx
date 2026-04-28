@@ -489,6 +489,8 @@ const SchoolInfoTab = ({ onSave, auth }) => {
             secondary_color: data.secondary_color || prev.secondary_color,
             term: data.term || prev.term,
             year: data.year || prev.year,
+            term_start: data.term_start || data.term_start_date || prev.term_start,
+            term_end: data.term_end || data.term_end_date || prev.term_end,
             type: data.school_type || prev.type,
             curriculum: data.curriculum || prev.curriculum,
             admin_name: data.admin_name || prev.admin_name,
@@ -518,6 +520,8 @@ const SchoolInfoTab = ({ onSave, auth }) => {
           whatsapp_business_number: form.whatsapp_business_number,
           term: form.term,
           year: form.year,
+          term_start: form.term_start,
+          term_end: form.term_end,
           motto: form.motto,
           tagline: form.motto, // Use motto as tagline if not separately set
           logo_url: form.logo_url,

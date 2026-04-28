@@ -27,7 +27,7 @@ function normaliseSubject(s) {
   };
 }
 
-export default function SubjectsPage({ auth, toast }) {
+export default function SubjectsPage({ auth, toast, canEdit = true }) {
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -261,8 +261,8 @@ export default function SubjectsPage({ auth, toast }) {
           <option value="all">All Categories</option>
           {categories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <Btn onClick={openAdd}>+ Add Subject</Btn>
-        <Btn variant="ghost" onClick={seedDefaults}>⚡ Load Defaults</Btn>
+        {canEdit && <Btn onClick={openAdd}>+ Add Subject</Btn>}
+        {canEdit && <Btn variant="ghost" onClick={seedDefaults}>⚡ Load Defaults</Btn>}
       </div>
 
       {/* Table */}
@@ -282,8 +282,8 @@ export default function SubjectsPage({ auth, toast }) {
                 `${s.passMarks}/${s.maxMarks}`,
                 <Badge key="s" text={s.isActive ? "Active" : "Inactive"} tone={s.isActive ? "success" : "danger"} />,
                 <div key="a" style={{ display: "flex", gap: 6 }}>
-                  <Btn variant="ghost" onClick={() => openEdit(s)}>Edit</Btn>
-                  <Btn variant="danger" onClick={() => del(s.id)}>Delete</Btn>
+                  {canEdit && <Btn variant="ghost" onClick={() => openEdit(s)}>Edit</Btn>}
+                  {canEdit && <Btn variant="danger" onClick={() => del(s.id)}>Delete</Btn>}
                 </div>,
               ])}
             />
@@ -339,4 +339,5 @@ export default function SubjectsPage({ auth, toast }) {
 SubjectsPage.propTypes = {
   auth: PropTypes.object,
   toast: PropTypes.func.isRequired,
+  canEdit: PropTypes.bool,
 };

@@ -141,6 +141,8 @@ router.get("/school", async (req, res, next) => {
       ...data,
       term: settings.get("current_term") || "",
       year: settings.get("academic_year") || "",
+      term_start: settings.get("term_start") || settings.get("term_start_date") || "",
+      term_end: settings.get("term_end") || settings.get("term_end_date") || "",
       motto: settings.get("school_motto") || "",
       tagline: settings.get("school_tagline") || "",
       hero_message: settings.get("hero_message") || "",
@@ -170,6 +172,8 @@ router.put("/school", requireRoles("admin"), async (req, res, next) => {
       county,
       term,
       year,
+      term_start,
+      term_end,
       motto,
       tagline,
       hero_message,
@@ -205,6 +209,10 @@ router.put("/school", requireRoles("admin"), async (req, res, next) => {
     await upsertSchoolSettings(schoolId, {
       current_term: term,
       academic_year: year,
+      term_start: term_start,
+      term_end: term_end,
+      term_start_date: term_start,  // alias for compatibility
+      term_end_date: term_end,      // alias for compatibility
       school_motto: motto,
       school_tagline: tagline,
       hero_message,
@@ -226,6 +234,8 @@ router.put("/school", requireRoles("admin"), async (req, res, next) => {
         ...data,
         term: settings.get("current_term") || "",
         year: settings.get("academic_year") || "",
+        term_start: settings.get("term_start") || settings.get("term_start_date") || "",
+        term_end: settings.get("term_end") || settings.get("term_end_date") || "",
         motto: settings.get("school_motto") || "",
         tagline: settings.get("school_tagline") || "",
         hero_message: settings.get("hero_message") || "",

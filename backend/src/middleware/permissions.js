@@ -44,10 +44,10 @@ const ROLE_PERMISSIONS = {
   ],
   parent: [
     'dashboard', 'grades', 'fees', 'reportcards', 'attendance', 'communication',
-    'announcements', 'update-requests', 'students.view'
+    'announcements', 'update-requests', 'students.view', 'academic.view'
   ],
   student: [
-    'dashboard', 'grades', 'attendance', 'reportcards', 'library', 'announcements'
+    'dashboard', 'grades', 'attendance', 'reportcards', 'library', 'announcements', 'academic.view'
   ]
 };
 

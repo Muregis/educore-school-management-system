@@ -119,7 +119,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   const checkNewSystemAvailability = async () => {
     try {
-      await apiFetch(`/api/finance/ledger/_check`);
+      await apiFetch(`/finance/ledger/_check`);
       setUseNewSystem(true);
     } catch {
       // New system not available, use legacy
