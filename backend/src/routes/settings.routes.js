@@ -134,10 +134,11 @@ router.get("/school", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 
-    // Prefer Supabase fluent API (no raw SQL, no MySQL fallback)
+    // Only select columns that definitely exist in schools table
+    // Everything else comes from school_settings
     const { data, error } = await supabase
       .from("schools")
-      .select("school_id, name, email, phone, whatsapp_business_number, address, county, logo_url, primary_color, motto")
+      .select("*")
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
       .single();
@@ -148,22 +149,22 @@ router.get("/school", async (req, res, next) => {
 
     res.json({
       ...data,
-      term: settings.get("current_term") || "",
-      year: settings.get("academic_year") || "",
-      term_start: settings.get("term_start") || settings.get("term_start_date") || "",
-      term_end: settings.get("term_end") || settings.get("term_end_date") || "",
+      term: data.term || settings.get("current_term") || "",
+      year: data.year || settings.get("academic_year") || "",
+      term_start: data.term_start || settings.get("term_start") || settings.get("term_start_date") || "",
+      term_end: data.term_end || settings.get("term_end") || settings.get("term_end_date") || "",
       motto: data.motto || settings.get("school_motto") || "",
-      tagline: settings.get("school_tagline") || "",
+      tagline: data.tagline || settings.get("school_tagline") || "",
       hero_message: settings.get("hero_message") || "",
       logo_url: data.logo_url || settings.get("logo_url") || settings.get("school_logo") || "",
       primary_color: data.primary_color || settings.get("primary_color") || "",
-      secondary_color: settings.get("secondary_color") || "",
+      secondary_color: data.secondary_color || settings.get("secondary_color") || "",
       established_year: settings.get("established_year") || "",
-      admin_name: settings.get("admin_name") || "",
-      admin_title: settings.get("admin_title") || "",
-      school_type: settings.get("school_type") || "",
-      type: settings.get("school_type") || "",  // alias for frontend compatibility
-      curriculum: settings.get("curriculum") || "",
+      admin_name: data.admin_name || settings.get("admin_name") || "",
+      admin_title: data.admin_title || settings.get("admin_title") || "",
+      school_type: data.school_type || settings.get("school_type") || "",
+      type: data.school_type || settings.get("school_type") || "",  // alias for frontend compatibility
+      curriculum: data.curriculum || settings.get("curriculum") || "",
     });
   } catch (err) {
     next(err);
@@ -203,20 +204,20 @@ router.put("/school", requireRoles("admin"), async (req, res, next) => {
       updated_at: new Date().toISOString(),
     };
 
+    // Only update columns that exist in the schools table
+    // Other fields go to school_settings via upsertSchoolSettings below
     if (name !== undefined) updatePayload.name = name;
     if (email !== undefined) updatePayload.email = email;
     if (phone !== undefined) updatePayload.phone = phone;
     if (address !== undefined) updatePayload.address = address;
     if (county !== undefined) updatePayload.county = county;
     if (logo_url !== undefined) updatePayload.logo_url = logo_url;
-    if (primary_color !== undefined) updatePayload.primary_color = primary_color;
-    if (motto !== undefined) updatePayload.motto = motto;
     const { data, error } = await supabase
       .from("schools")
       .update(updatePayload)
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
-      .select("school_id, name, email, phone, whatsapp_business_number, address, county, logo_url, primary_color, motto")
+      .select("*")
       .single();
     if (error) throw error;
 
