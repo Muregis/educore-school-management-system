@@ -137,7 +137,7 @@ router.get("/school", async (req, res, next) => {
     // Prefer Supabase fluent API (no raw SQL, no MySQL fallback)
     const { data, error } = await supabase
       .from("schools")
-      .select("school_id, name, email, phone, whatsapp_business_number, address, county")
+      .select("school_id, name, email, phone, whatsapp_business_number, address, county, logo_url, primary_color, motto")
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
       .single();
@@ -152,11 +152,11 @@ router.get("/school", async (req, res, next) => {
       year: settings.get("academic_year") || "",
       term_start: settings.get("term_start") || settings.get("term_start_date") || "",
       term_end: settings.get("term_end") || settings.get("term_end_date") || "",
-      motto: settings.get("school_motto") || "",
+      motto: data.motto || settings.get("school_motto") || "",
       tagline: settings.get("school_tagline") || "",
       hero_message: settings.get("hero_message") || "",
-      logo_url: settings.get("logo_url") || settings.get("school_logo") || "",
-      primary_color: settings.get("primary_color") || "",
+      logo_url: data.logo_url || settings.get("logo_url") || settings.get("school_logo") || "",
+      primary_color: data.primary_color || settings.get("primary_color") || "",
       secondary_color: settings.get("secondary_color") || "",
       established_year: settings.get("established_year") || "",
       admin_name: settings.get("admin_name") || "",
@@ -208,12 +208,15 @@ router.put("/school", requireRoles("admin"), async (req, res, next) => {
     if (phone !== undefined) updatePayload.phone = phone;
     if (address !== undefined) updatePayload.address = address;
     if (county !== undefined) updatePayload.county = county;
+    if (logo_url !== undefined) updatePayload.logo_url = logo_url;
+    if (primary_color !== undefined) updatePayload.primary_color = primary_color;
+    if (motto !== undefined) updatePayload.motto = motto;
     const { data, error } = await supabase
       .from("schools")
       .update(updatePayload)
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
-      .select("school_id, name, email, phone, whatsapp_business_number, address, county")
+      .select("school_id, name, email, phone, whatsapp_business_number, address, county, logo_url, primary_color, motto")
       .single();
     if (error) throw error;
 

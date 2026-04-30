@@ -72,23 +72,17 @@ router.post("/", requireRoles("admin", "director", "superadmin"), async (req, re
       }
     }
     
-    // If this is a final class (Grade 9, Form 4) and no explicit toClass provided
-    if (isFinalClass) {
-      return res.status(400).json({ 
-        message: `${fromClass} is configured as a final class. To promote from ${fromClass}, you must explicitly specify the destination class (toClass).`,
-        isFinalClass: true,
-        fromClass
-      });
-    }
-    
-    // If no default progression found for this class
-    if (!targetClass) {
+    // If no explicit toClass and no default progression found for this class
+    if (!targetClass && !toClass) {
       return res.status(400).json({ 
         message: `Please specify the destination class (toClass). No default progression found for: ${fromClass}` 
       });
     }
 
-    // 1. Fetch students to promote (READ-ONLY step)
+    // Determine if this is a graduation (final class with no explicit toClass)
+    const isGraduation = isFinalClass && !toClass;
+
+    // 1. Fetch students to promote/graduate (READ-ONLY step)
     const { data: students, error: fetchErr } = await supabase
       .from("students")
       .select("student_id, first_name, last_name, class_name, admission_number")
@@ -102,6 +96,23 @@ router.post("/", requireRoles("admin", "director", "superadmin"), async (req, re
 
     // Dry run: return preview without writing
     if (dryRun || String(dryRun) === "true") {
+      if (isGraduation) {
+        return res.json({
+          dryRun: true,
+          fromClass,
+          isGraduation: true,
+          academicYear,
+          students: (students || []).map(s => ({
+            student_id:       s.student_id,
+            name:             `${s.first_name} ${s.last_name}`.trim(),
+            admission_number: s.admission_number,
+            currentClass:     s.class_name,
+            wouldGraduate:    true,
+          })),
+          count,
+          message: `${count} student(s) in ${fromClass} will be marked as graduated.`,
+        });
+      }
       return res.json({
         dryRun: true,
         fromClass,
@@ -120,47 +131,91 @@ router.post("/", requireRoles("admin", "director", "superadmin"), async (req, re
     }
 
     if (count === 0) {
-      return res.json({ promoted: 0, fromClass, toClass: targetClass, message: "No active students found in this class." });
+      return res.json({ 
+        promoted: 0, 
+        graduated: 0,
+        fromClass, 
+        toClass: targetClass, 
+        message: "No active students found in this class." 
+      });
     }
 
-    // 2. Update each student — additive fields only, never removes data
+    // 2. Update each student — graduation for final class, promotion for others
     let promoted = 0;
+    let graduated = 0;
     const errors = [];
+    const currentYear = new Date().getFullYear();
+    
     for (const s of students) {
-      const { error: upErr } = await supabase
-        .from("students")
-        .update({
-          class_name:      targetClass,       // move to next class
-          previous_class:  fromClass,         // record where they came from
-          promotion_year:  academicYear,      // record when
-          // Note: all other columns (status, payments, results) are untouched
-        })
-        .eq("student_id", s.student_id)
-        .eq("school_id", schoolId)
-        .eq("is_deleted", false);             // extra guard
+      if (isGraduation) {
+        // Graduate students from final class (Grade 9, Form 4)
+        const { error: upErr } = await supabase
+          .from("students")
+          .update({
+            status:          'graduated',
+            previous_class:  fromClass,
+            promotion_year:  academicYear,
+            graduation_year: currentYear,
+            updated_at:      new Date().toISOString(),
+          })
+          .eq("student_id", s.student_id)
+          .eq("school_id", schoolId)
+          .eq("is_deleted", false);
 
-      if (upErr) {
-        errors.push({ student_id: s.student_id, error: upErr.message });
+        if (upErr) {
+          errors.push({ student_id: s.student_id, error: upErr.message });
+        } else {
+          graduated++;
+        }
       } else {
-        promoted++;
+        // Promote students to next class
+        const { error: upErr } = await supabase
+          .from("students")
+          .update({
+            class_name:      targetClass,
+            previous_class:  fromClass,
+            promotion_year:  academicYear,
+            updated_at:      new Date().toISOString(),
+          })
+          .eq("student_id", s.student_id)
+          .eq("school_id", schoolId)
+          .eq("is_deleted", false);
+
+        if (upErr) {
+          errors.push({ student_id: s.student_id, error: upErr.message });
+        } else {
+          promoted++;
+        }
       }
     }
 
     // 3. Log activity
-    logActivity({ user: { userId, schoolId } }, {
-      action:      "students.promote",
-      entity:      "students",
-      description: `Promoted ${promoted}/${count} students from ${fromClass} to ${targetClass} (year ${academicYear})`,
-    });
+    if (isGraduation) {
+      logActivity({ user: { userId, schoolId } }, {
+        action:      "students.graduate",
+        entity:      "students",
+        description: `Graduated ${graduated}/${count} students from ${fromClass} (year ${academicYear})`,
+      });
+    } else {
+      logActivity({ user: { userId, schoolId } }, {
+        action:      "students.promote",
+        entity:      "students",
+        description: `Promoted ${promoted}/${count} students from ${fromClass} to ${targetClass} (year ${academicYear})`,
+      });
+    }
 
     res.json({
       promoted,
+      graduated,
+      isGraduation,
       skipped: errors.length,
       fromClass,
-      toClass: targetClass,
+      toClass: isGraduation ? null : targetClass,
       academicYear,
       errors: errors.length > 0 ? errors : undefined,
-      message: `${promoted} student(s) promoted from ${fromClass} to ${targetClass}.`,
+      message: isGraduation 
+        ? `${graduated} student(s) marked as graduated from ${fromClass}.`
+        : `${promoted} student(s) promoted from ${fromClass} to ${targetClass}.`,
     });
   } catch (err) { next(err); }
 });

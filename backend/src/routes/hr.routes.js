@@ -60,20 +60,23 @@ router.post("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
       .single();
     if (insertError) throw insertError;
 
-    // Sync to teachers table if job title indicates teacher
-    if (jobTitle && /teacher|tutor|instructor|lecturer/i.test(jobTitle)) {
+    // Sync to teachers table if job title indicates teacher OR department is Academic
+    const isTeacherRole = jobTitle && /teacher|tutor|instructor|lecturer/i.test(jobTitle);
+    const isAcademicDept = department && /academic/i.test(department);
+    if (isTeacherRole || isAcademicDept) {
       try {
-        await supabase.from('teachers').insert({
+        await supabase.from('teachers').upsert({
           school_id: schoolId,
           first_name: fullName.split(' ')[0] || fullName,
           last_name: fullName.split(' ').slice(1).join(' ') || '',
           email: email || null,
           phone: phone || null,
-          subject: department || 'General',
+          department: department || 'Academic',
           qualification: jobTitle,
           status: status || 'active',
+          hire_date: startDate || null,
           staff_id: inserted.staff_id
-        });
+        }, { onConflict: 'school_id,email' });
       } catch (e) {
         // Teacher sync failed, but staff was created successfully
         console.log('Teacher sync failed:', e.message);
@@ -113,10 +116,33 @@ router.put("/staff/:id", requireRoles(...HR_ROLES), async (req, res, next) => {
       .eq('staff_id', req.params.id)
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
-      .select('staff_id')
+      .select('staff_id, email')
       .single();
     if (error) throw error;
     if (!updated) return res.status(404).json({ message: "Staff not found" });
+
+    // Sync updates to teachers table if academic department or teacher role
+    const isTeacherRole = jobTitle && /teacher|tutor|instructor|lecturer/i.test(jobTitle);
+    const isAcademicDept = department && /academic/i.test(department);
+    if ((isTeacherRole || isAcademicDept) && email) {
+      try {
+        await supabase.from('teachers').upsert({
+          school_id: schoolId,
+          first_name: fullName?.split(' ')[0] || fullName,
+          last_name: fullName?.split(' ').slice(1).join(' ') || '',
+          email: email,
+          phone: phone || null,
+          department: department || 'Academic',
+          qualification: jobTitle,
+          status: status || 'active',
+          hire_date: startDate || null,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'school_id,email' });
+      } catch (e) {
+        console.log('Teacher sync on update failed:', e.message);
+      }
+    }
+
     res.json({ updated: true });
   } catch (err) { next(err); }
 });

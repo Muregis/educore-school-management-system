@@ -52,6 +52,7 @@ const Icon = ({ name, size = 16, color = "currentColor" }) => {
     key:      <><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></>,
     toggle:   <><rect x="1" y="5" width="22" height="14" rx="7"/><circle cx="16" cy="12" r="3"/></>,
     "arrow-up": <><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></>,
+    book:     <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -429,6 +430,217 @@ const PromotionChainTab = ({ auth }) => {
 };
 PromotionChainTab.propTypes = { auth: PropTypes.object };
 
+// ─── SUBJECTS TAB ─────────────────────────────────────────────────────────────
+const SubjectsTab = ({ auth }) => {
+  const [subjects, setSubjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState("");
+  const [newSubjectCode, setNewSubjectCode] = useState("");
+  const [message, setMessage] = useState(null);
+
+  useEffect(() => {
+    loadSubjects();
+  }, [auth]);
+
+  const loadSubjects = async () => {
+    setLoading(true);
+    try {
+      const data = await apiFetch("/subjects", { token: auth?.token });
+      setSubjects(data || []);
+    } catch (e) {
+      setMessage({ type: "error", text: "Failed to load subjects" });
+    }
+    setLoading(false);
+  };
+
+  const generateCode = (name) => {
+    return name.substring(0, 6).toUpperCase().replace(/[^A-Z]/g, "");
+  };
+
+  const handleNameChange = (e) => {
+    const name = e.target.value;
+    setNewSubjectName(name);
+    if (!newSubjectCode || newSubjectCode === generateCode(newSubjectName)) {
+      setNewSubjectCode(generateCode(name));
+    }
+  };
+
+  const addSubject = async () => {
+    if (!newSubjectName.trim()) {
+      setMessage({ type: "error", text: "Subject name is required" });
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiFetch("/subjects", {
+        method: "POST",
+        token: auth?.token,
+        body: {
+          name: newSubjectName.trim(),
+          code: newSubjectCode.trim() || generateCode(newSubjectName),
+          category: "General",
+          isActive: true
+        }
+      });
+      setNewSubjectName("");
+      setNewSubjectCode("");
+      setMessage({ type: "success", text: "Subject added successfully" });
+      await loadSubjects();
+    } catch (e) {
+      setMessage({ type: "error", text: e.message || "Failed to add subject" });
+    }
+    setSaving(false);
+  };
+
+  const deleteSubject = async (id) => {
+    if (!window.confirm("Delete this subject? Existing grades will not be affected.")) return;
+    try {
+      await apiFetch(`/subjects/${id}`, { method: "DELETE", token: auth?.token });
+      setMessage({ type: "success", text: "Subject deleted" });
+      await loadSubjects();
+    } catch (e) {
+      setMessage({ type: "error", text: e.message || "Delete failed" });
+    }
+  };
+
+  const loadDefaultSubjects = async () => {
+    if (!window.confirm("Load default Kenyan CBC subjects?\n\nThis will add English, Kiswahili, Mathematics, Science, etc. Duplicates will be skipped.")) return;
+    setSaving(true);
+    try {
+      const res = await apiFetch("/subjects/seed-defaults", { method: "POST", token: auth?.token });
+      setMessage({ type: "success", text: res.message || "Default subjects loaded" });
+      await loadSubjects();
+    } catch (e) {
+      setMessage({ type: "error", text: e.message || "Failed to load defaults" });
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div>
+      {message && (
+        <div style={{
+          marginBottom: 16,
+          padding: "10px 14px",
+          borderRadius: 8,
+          fontSize: 13,
+          background: message.type === "success" ? C.greenDim : C.roseDim,
+          border: `1px solid ${message.type === "success" ? C.green : C.rose}44`,
+          color: message.type === "success" ? C.green : C.rose,
+        }}>
+          {message.text}
+        </div>
+      )}
+
+      {/* Add New Subject */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 12 }}>Add New Subject</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "end" }}>
+          <div>
+            <label style={{ fontSize: 11, color: C.textMuted, marginBottom: 4, display: "block" }}>Subject Name *</label>
+            <input
+              type="text"
+              value={newSubjectName}
+              onChange={handleNameChange}
+              placeholder="e.g. Mathematics"
+              style={{ ...inputStyle, width: "100%" }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, color: C.textMuted, marginBottom: 4, display: "block" }}>Code (auto-generated)</label>
+            <input
+              type="text"
+              value={newSubjectCode}
+              onChange={(e) => setNewSubjectCode(e.target.value.toUpperCase())}
+              placeholder="e.g. MATH"
+              style={{ ...inputStyle, width: "100%", fontFamily: "monospace" }}
+            />
+          </div>
+          <Btn onClick={addSubject} disabled={saving || !newSubjectName.trim()} icon="plus">
+            {saving ? "Adding..." : "Add"}
+          </Btn>
+        </div>
+      </div>
+
+      {/* Load Defaults Button */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Current Subjects ({subjects.length})</div>
+        <Btn variant="ghost" onClick={loadDefaultSubjects} disabled={saving}>
+          ⚡ Load Default CBC Subjects
+        </Btn>
+      </div>
+
+      {/* Subjects List */}
+      {loading ? (
+        <div style={{ color: C.textSub }}>Loading subjects...</div>
+      ) : subjects.length === 0 ? (
+        <div style={{ color: C.textMuted, fontSize: 13, textAlign: "center", padding: "40px 20px" }}>
+          No subjects yet. Add your first subject above or load default CBC subjects.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {subjects.map((subject) => (
+            <div
+              key={subject.id || subject.subject_id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background: C.surface,
+                border: `1px solid ${C.border}`,
+                borderRadius: 10,
+                padding: "12px 16px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{
+                    background: C.accentGlow,
+                    color: C.accent,
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    fontFamily: "monospace",
+                    minWidth: 50,
+                    textAlign: "center",
+                  }}
+                >
+                  {subject.code || "—"}
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
+                    {subject.name || subject.subject_name}
+                  </div>
+                  <div style={{ fontSize: 11, color: C.textMuted }}>
+                    {subject.category || "General"} • {subject.is_active || subject.isActive ? "Active" : "Inactive"}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => deleteSubject(subject.id || subject.subject_id)}
+                style={{
+                  background: C.roseDim,
+                  border: `1px solid ${C.rose}33`,
+                  borderRadius: 6,
+                  padding: "6px 10px",
+                  cursor: "pointer",
+                  color: C.rose,
+                  fontSize: 12,
+                }}
+              >
+                <Icon name="trash" size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+SubjectsTab.propTypes = { auth: PropTypes.object };
+
 const TABS = [
   { id: "school",        label: "School Info",    icon: "school" },
   { id: "users",         label: "User Accounts",  icon: "users" },
@@ -439,6 +651,7 @@ const TABS = [
   { id: "backups",       label: "DB Backups",     icon: "database" },
   { id: "integrations",  label: "Integrations",   icon: "key" },
   { id: "promotion",    label: "Promotion Chain", icon: "arrow-up" },
+  { id: "subjects",     label: "Subjects",       icon: "book" },
 ];
 
 // ─── SCHOOL INFO TAB ──────────────────────────────────────────────────────────
@@ -1436,6 +1649,7 @@ export default function AdminSettings({ auth, initialTab, onPermissionsSaved }) 
       case "backups":       return <BackupsTab auth={auth} />;
       case "integrations":  return <IntegrationsTab auth={auth} />;
       case "promotion":    return <PromotionChainTab auth={auth} />;
+      case "subjects":     return <SubjectsTab auth={auth} />;
       default:              return null;
     }
   };
@@ -1473,6 +1687,7 @@ export default function AdminSettings({ auth, initialTab, onPermissionsSaved }) 
           activity:      "View a history of actions performed in the system",
           backups:       "Download or create database backups for safety",
           integrations:  "Connect M-Pesa, Paystack, and SMS gateways",
+          subjects:      "Manage subjects for grade entry and report cards",
         }[activeTab]}
         icon={TABS.find(t => t.id === activeTab)?.icon}
       >

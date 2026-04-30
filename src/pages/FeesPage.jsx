@@ -657,8 +657,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        <Badge text={`Collected: ${money(normalisedPayments.filter(p=>p.status==="paid").reduce((s,p)=>s+Number(p.amount),0))}`} tone="success" />
-        <Badge text={`Outstanding: ${money(balances.reduce((s,b)=>s+b.balance,0))}`} tone="warning" />
+        <Badge text={`Daily Collection: ${money(normalisedPayments.filter(p=>p.status==="paid").reduce((s,p)=>s+Number(p.amount),0))}`} tone="success" />
         <Badge text={`Students: ${students.length}`} tone="info" />
       </div>
 
@@ -675,7 +674,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         </select>
         <Btn variant="ghost" onClick={()=>{
           if (tab==="payments") csv("payments.csv",["Date","Student","Class","Amount","Type","Method","Status","Ref"],filteredPayments.map(p=>[p.date,p.studentName,p.className,p.amount,p.feeType,p.method,p.status,p.reference]));
-          if (tab==="balances") csv("balances.csv",["Student","Class","Expected","Paid","Balance"],balances.map(b=>[b.name,b.className,b.expected,b.paid,b.balance]));
+          if (tab==="balances") csv("balances.csv",["Student","Class","Paid","Balance"],balances.map(b=>[b.name,b.className,b.paid,b.balance]));
           toast("CSV exported","success");
         }}>Export CSV</Btn>
         {canEdit && tab==="payments" && <Btn onClick={()=>setShowPayment(true)}>+ Record Payment</Btn>}
@@ -739,7 +738,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           {balances.length===0 ? <Msg text="No balances available." /> : (
         <div style={{ overflowX: "auto" }}>
           <Table
-            headers={["Student","Class","Base Fee","+Transport","+Lunch","+Opening","=Total","Paid","Balance","Status","Pay"]}
+            headers={["Student","Class","Base Fee","+Transport","+Lunch","+Opening","Paid","Balance","Status","Pay"]}
             rows={balances.map(b=>[
               <span key={b.studentId} style={{color:C.text,fontWeight:600}}>{b.name}</span>,
               b.className,
@@ -759,9 +758,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 {b.openingBalance!==0 ? money(Math.abs(b.openingBalance)) : "—"}
                 {b.openingBalance!==0 && <small style={{display:'block',fontSize:10}}>{b.openingBalance>0?'(owing)':'(credit)'}</small>}
               </span>,
-              // Total expected
-              <span key="expected" style={{fontWeight:600}}>{money(b.expected)}</span>,
-              // Paid
+              // Paid (hidden total expected)
               <span key="paid" style={{color:'#22c55e'}}>{money(b.paid)}</span>,
               // Balance
               <span key="balance" style={{fontWeight:700,color:b.balance>0?'#ef4444':'#22c55e'}}>{money(b.balance)}</span>,
