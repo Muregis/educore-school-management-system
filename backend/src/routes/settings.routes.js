@@ -1,7 +1,13 @@
 import { Router } from "express";
+import multer from "multer";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+});
 
 const router = Router();
 router.use(authRequired);
@@ -432,6 +438,65 @@ router.patch("/school/whatsapp", requireRoles("admin"), async (req, res, next) =
   } catch (err) { 
     console.log('[DEBUG] Error caught:', err.message);
     next(err); 
+  }
+});
+
+// POST /api/settings/upload-logo - Upload school logo to Supabase storage
+router.post("/upload-logo", requireRoles("admin", "director", "superadmin"), upload.single("file"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const file = req.file;
+    const fileExt = file.originalname.split(".").pop();
+    const timestamp = Date.now();
+    const filename = `school-logo-${schoolId}-${timestamp}.${fileExt}`;
+
+    // Upload to Supabase storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("school-logos")
+      .upload(filename, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      // If bucket doesn't exist, try creating it
+      if (uploadError.message?.includes("not found") || uploadError.statusCode === 404) {
+        await supabase.storage.createBucket("school-logos", { public: true });
+        const retry = await supabase.storage
+          .from("school-logos")
+          .upload(filename, file.buffer, { contentType: file.mimetype, upsert: false });
+        if (retry.error) throw retry.error;
+      } else {
+        throw uploadError;
+      }
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from("school-logos")
+      .getPublicUrl(filename);
+
+    // Save logo_url to schools table
+    const { error: updateError } = await supabase
+      .from("schools")
+      .update({ logo_url: publicUrl, updated_at: new Date().toISOString() })
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false);
+
+    if (updateError) throw updateError;
+
+    // Also save to school_settings for redundancy
+    await upsertSchoolSettings(schoolId, { logo_url: publicUrl });
+
+    res.json({ logo_url: publicUrl, message: "Logo uploaded successfully" });
+  } catch (err) {
+    console.error("[DEBUG] Logo upload error:", err);
+    next(err);
   }
 });
 

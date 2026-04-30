@@ -6,6 +6,7 @@
 import express from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
+import { requireRoles } from "../middleware/roles.js";
 import { authorize } from "../middleware/permissions.js";
 import {
   AcademicYearService,
@@ -414,33 +415,51 @@ router.get("/classes", authorize("academic.view"), async (req, res) => {
 });
 
 // PUT /api/classes/:id/promotion - Set next class for promotion
-router.put("/classes/:id/promotion", authorize("academic.manage"), async (req, res) => {
-  try {
-    const { schoolId } = req.user;
-    const classId = req.params.id;
-    const { nextClassName, classOrder } = req.body;
+router.put("/classes/:id/promotion", requireRoles("admin", "director", "superadmin"), async (req, res) => {
+try {
+const { schoolId } = req.user;
+const classId = req.params.id;
+const { nextClassName, classOrder } = req.body;
 
-    const updateData = {};
-    if (nextClassName !== undefined) updateData.next_class_name = nextClassName;
-    if (classOrder !== undefined) updateData.class_order = classOrder;
-    updateData.updated_at = new Date();
+// Build update payload with only columns that exist
+const updateData = { updated_at: new Date().toISOString() };
+if (nextClassName !== undefined) updateData.next_class_name = nextClassName;
+if (classOrder !== undefined) updateData.class_order = classOrder;
 
-    let query = supabase
-      .from('classes')
-      .update(updateData)
-      .eq('school_id', schoolId)
-      .select();
+// First check if the class exists
+const { data: existing, error: findErr } = await supabase
+.from('classes')
+.select('class_id, id')
+.eq('school_id', schoolId)
+.or(`class_id.eq.${classId},id.eq.${classId}`)
+.maybeSingle();
 
-    query = query.or(`class_id.eq.${classId},id.eq.${classId}`);
+if (findErr || !existing) {
+return res.status(404).json({ message: "Class not found" });
+}
 
-    const { data, error } = await query.single();
+const pk = existing.class_id || existing.id;
 
-    if (error) throw error;
-    res.json(data);
-  } catch (err) {
-    console.error('Error updating class promotion:', err);
-    res.status(500).json({ message: "Failed to update class promotion" });
-  }
+const { data, error } = await supabase
+.from('classes')
+.update(updateData)
+.eq('school_id', schoolId)
+.eq(existing.class_id ? 'class_id' : 'id', pk)
+.select()
+.single();
+
+if (error) {
+// If column doesn't exist, return what we tried to save
+if (error.message?.includes('does not exist') || error.code === '42703') {
+return res.json({ class_id: classId, next_class_name: nextClassName, class_order: classOrder, warning: 'Columns not in table, update skipped' });
+}
+throw error;
+}
+res.json(data);
+} catch (err) {
+console.error('Error updating class promotion:', err);
+res.status(500).json({ message: "Failed to update class promotion", detail: err.message });
+}
 });
 
 // =====================================================

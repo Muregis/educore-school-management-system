@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
 import { NAV, NAV_EXTRAS, ROLE } from "../lib/constants";
 import PropTypes from "prop-types";
 
@@ -726,6 +726,38 @@ const SchoolInfoTab = ({ onSave, auth }) => {
   const saveSchoolInfo = async () => {
     setLoading(true); setMessage(null);
     try {
+      // Upload logo file first if one was selected
+      if (logoFile) {
+        setUploadingLogo(true);
+        try {
+          const formData = new FormData();
+          formData.append("file", logoFile);
+          const uploadRes = await fetch(`${API_BASE}/settings/upload-logo`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${auth?.token}`,
+            },
+            body: formData,
+          });
+          if (!uploadRes.ok) {
+            const errData = await uploadRes.json().catch(() => ({}));
+            throw new Error(errData.message || "Logo upload failed");
+          }
+          const { logo_url } = await uploadRes.json();
+          if (logo_url) {
+            setForm(prev => ({ ...prev, logo_url }));
+            setLogoPreview(null);
+            setLogoFile(null);
+          }
+        } catch (uploadErr) {
+          setMessage({ type: "error", text: `Logo upload failed: ${uploadErr.message}` });
+          setUploadingLogo(false);
+          setLoading(false);
+          return;
+        }
+        setUploadingLogo(false);
+      }
+
       // Save all school settings via PUT /settings/school
       const saveRes = await apiFetch("/settings/school", {
         method: "PUT",
