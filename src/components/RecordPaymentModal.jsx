@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import Modal from "./Modal";
-import Field from "./Field";
 import Btn from "./Btn";
 import { apiFetch } from "../lib/api";
 import { C, inputStyle } from "../lib/theme";
@@ -198,20 +197,30 @@ export default function RecordPaymentModal({
           </div>
         )}
 
-        <Field
-          label="Amount (KES) *"
-          type="number"
-          value={formData.amount}
-          onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-          placeholder="Enter amount"
-        />
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: "block", color: "#94a3b8", fontSize: 12, marginBottom: 4 }}>
+            Amount (KES) *
+          </label>
+          <input
+            type="number"
+            value={formData.amount}
+            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+            placeholder="Enter amount"
+            style={inputStyle}
+          />
+        </div>
 
-        <Field
-          label="Date Received *"
-          type="date"
-          value={formData.paymentDate}
-          onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
-        />
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: "block", color: "#94a3b8", fontSize: 12, marginBottom: 4 }}>
+            Date Received *
+          </label>
+          <input
+            type="date"
+            value={formData.paymentDate}
+            onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
+            style={inputStyle}
+          />
+        </div>
 
         {/* Tab-specific Fields */}
         {activeTab === "bank_transfer" && (
@@ -232,25 +241,40 @@ export default function RecordPaymentModal({
               </select>
             </div>
 
-            <Field
-              label="Transaction/Slip Reference Number *"
-              value={bankForm.referenceNumber}
-              onChange={(e) => setBankForm({ ...bankForm, referenceNumber: e.target.value })}
-              placeholder="Enter reference number"
-              required
-            />
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", color: "#94a3b8", fontSize: 12, marginBottom: 4 }}>
+                Transaction/Slip Reference Number *
+              </label>
+              <input
+                type="text"
+                value={bankForm.referenceNumber}
+                onChange={(e) => setBankForm({ ...bankForm, referenceNumber: e.target.value })}
+                placeholder="Enter reference number"
+                style={inputStyle}
+              />
+            </div>
           </>
         )}
 
         {activeTab === "mpesa_manual" && (
-          <Field
-            label="M-Pesa Transaction Code *"
-            value={mpesaForm.mpesaCode}
-            onChange={(e) => setMpesaForm({ ...mpesaForm, mpesaCode: e.target.value })}
-            placeholder="e.g. QHX7Y8Z9AB"
-            required
-          />
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: "block", color: "#94a3b8", fontSize: 12, marginBottom: 4 }}>
+              M-Pesa Transaction Code *
+            </label>
+            <input
+              type="text"
+              value={mpesaForm.mpesaCode}
+              onChange={(e) => setMpesaForm({ ...mpesaForm, mpesaCode: e.target.value })}
+              placeholder="e.g. QHX7Y8Z9AB"
+              style={inputStyle}
+            />
+          </div>
         )}
+
+        {/* Received By - Read-only */}
+        <div style={{ marginBottom: 12, color: "#94a3b8", fontSize: 12 }}>
+          Received by: <strong style={{ color: "#e2e8f0" }}>{auth?.user?.full_name || auth?.user?.name || "Current User"}</strong>
+        </div>
 
         {/* Actions */}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
