@@ -21,8 +21,8 @@ function normalise(s) {
   return {
     id:          s.student_id  ?? s.id,
     admission:   s.admission_number ?? s.admission,
-    firstName:   s.first_name  ?? s.firstName,
-    lastName:    s.last_name   ?? s.lastName,
+    firstName:   s.first_name  ?? s.firstName ?? "",
+    lastName:    s.last_name   ?? s.lastName ?? "",
     className:   s.class_name  ?? s.className  ?? "",
     gender:      s.gender      ?? "female",
     parentName:  s.parent_name ?? s.parentName ?? "",
@@ -101,14 +101,22 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     return result;
   }, [students]);
 
-  const filtered = normalised.filter(s =>
-    `${s.firstName} ${s.lastName} ${s.className} ${s.admission} ${s.parentPhone || ""} ${s.nemisNumber || ""}`
-      .toLowerCase().includes(q.toLowerCase()) &&
-    (cls === "all" || s.className === cls) &&
-    (status === "all" || s.status === status)
-  );
+  const filtered = normalised.filter(s => {
+    const searchMatch = `${s.firstName} ${s.lastName} ${s.className} ${s.admission} ${s.parentPhone || ""} ${s.nemisNumber || ""}`
+      .toLowerCase().includes(q.toLowerCase());
+    const classMatch = cls === "all" || s.className === cls;
+    const statusMatch = status === "all" || s.status === status;
+    return searchMatch && classMatch && statusMatch;
+  });
+
+  console.log('[DEBUG] filtered count:', filtered.length, 'q:', q, 'cls:', cls, 'status:', status);
+  if (filtered.length > 0) {
+    console.log('[DEBUG] first filtered student:', filtered[0]);
+    console.log('[DEBUG] first filtered keys:', Object.keys(filtered[0]));
+  }
 
   const { pages, rows } = pager(filtered, page);
+  console.log('[DEBUG] pager result - pages:', pages, 'rows count:', rows?.length);
   useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
 
   const openAdd = () => {
@@ -245,15 +253,18 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   };
 
   // Debug render
-  console.log('[DEBUG] StudentsPage render:', {
-    studentsCount: students?.length,
-    normalisedCount: normalised?.length,
-    filteredCount: filtered?.length,
-    rowsCount: rows?.length,
-    pages,
-    page,
-    q, cls, status
-  });
+  const debugInfo = {
+    studentsCount: students?.length || 0,
+    normalisedCount: normalised?.length || 0,
+    filteredCount: filtered?.length || 0,
+    rowsCount: rows?.length || 0,
+    pages: pages || 0,
+    page: page || 0,
+    q: q || '',
+    cls: cls || '',
+    status: status || ''
+  };
+  console.log('[DEBUG] StudentsPage render:', JSON.stringify(debugInfo));
 
   return (
     <div>
