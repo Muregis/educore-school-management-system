@@ -3,6 +3,10 @@
 -- Description: Add columns for cash, bank transfer, and M-Pesa manual payments
 -- Also adds breakfast columns to students table
 
+-- Add lunch billing type column (for lunch program support)
+ALTER TABLE students
+ADD COLUMN IF NOT EXISTS lunch_billing_type VARCHAR(20) DEFAULT 'daily';
+
 -- Add breakfast columns to students table (for breakfast program support)
 ALTER TABLE students
 ADD COLUMN IF NOT EXISTS breakfast_enabled BOOLEAN DEFAULT false,
@@ -55,6 +59,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ROLLBACK:
+-- ALTER TABLE students DROP COLUMN IF EXISTS lunch_billing_type;
 -- ALTER TABLE students DROP COLUMN IF EXISTS breakfast_enabled;
 -- ALTER TABLE students DROP COLUMN IF EXISTS breakfast_daily_rate;
 -- ALTER TABLE students DROP COLUMN IF EXISTS breakfast_days;

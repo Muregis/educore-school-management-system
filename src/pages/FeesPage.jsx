@@ -111,23 +111,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
 
   // New system & term management
-  const [useNewSystem, setUseNewSystem] = useState(false);
+  const [useNewSystem, setUseNewSystem] = useState(true);
   const [ledgerView, setLedgerView] = useState(false);
   const { term: currentTerm, isReady: isTermReady } = useCurrentTerm(auth);
-
-  // Check if new system is available
-  useEffect(() => {
-    checkNewSystemAvailability();
-  }, []);
-
-  const checkNewSystemAvailability = async () => {
-    try {
-      await apiFetch(`/finance/ledger/_check`);
-      setUseNewSystem(true);
-    } catch {
-      // New system not available, use legacy
-    }
-  };
 
   // Display term (current or selected)
   const displayTerm = currentTerm || "Term 2";
@@ -234,7 +220,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     );
     const lunchFee = lunchEnabled ? ledgerBalanceService.calculateLunchFee(
       student.lunch_daily_rate || 100,
-      student.lunch_days || 66
+      student.lunch_days || 66,
+      student.lunch_billing_type || 'daily'
     ) : 0;
     const breakfastFee = breakfastEnabled ? ledgerBalanceService.calculateBreakfastFee(
       student.breakfast_daily_rate || 100,
@@ -800,7 +787,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           <div style={{marginTop:12,fontSize:11,color:'#64748b',display:'flex',gap:16,flexWrap:'wrap'}}>
             <span>💡 <strong>Base Fee:</strong> Tuition + Activity + Misc</span>
             <span>🚌 <strong>Transport:</strong> 1-way (60%) or 2-way (100%)</span>
-            <span>🍽️ <strong>Lunch:</strong> Daily rate × school days</span>
+            <span>🍽️ <strong>Lunch:</strong> Daily or termly rate</span>
             <span>🥐 <strong>Breakfast:</strong> Daily or termly rate</span>
             <span>📖 <strong>Opening:</strong> Balance carried forward</span>
           </div>

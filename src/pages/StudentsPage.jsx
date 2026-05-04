@@ -323,21 +323,31 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
                 </label>
               </div>
               {f.lunch_enabled && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                  <select
+                    style={inputStyle}
+                    value={f.lunch_billing_type || 'daily'}
+                    onChange={e => setF({ ...f, lunch_billing_type: e.target.value })}
+                  >
+                    <option value="daily">Daily Rate</option>
+                    <option value="termly">Termly Rate</option>
+                  </select>
                   <input 
                     style={inputStyle} 
                     type="number"
                     value={f.lunch_daily_rate || ""} 
                     onChange={e => setF({ ...f, lunch_daily_rate: e.target.value })} 
-                    placeholder="Daily rate (KES)"
+                    placeholder={f.lunch_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"}
                   />
-                  <input 
-                    style={inputStyle} 
-                    type="number"
-                    value={f.lunch_days || 66} 
-                    onChange={e => setF({ ...f, lunch_days: e.target.value })} 
-                    placeholder="School days (default: 66)"
-                  />
+                  {f.lunch_billing_type !== 'termly' && (
+                    <input 
+                      style={inputStyle} 
+                      type="number"
+                      value={f.lunch_days || 66} 
+                      onChange={e => setF({ ...f, lunch_days: e.target.value })} 
+                      placeholder="School days"
+                    />
+                  )}
                 </div>
               )}
             </Field>

@@ -318,11 +318,15 @@ export function calculateTransportFee(baseFee, direction = 'two_way') {
 /**
  * Lunch fee calculation
  * 
- * @param {number} dailyRate - Daily lunch rate
+ * @param {number} dailyRate - Daily lunch rate (or termly rate if billingType is termly)
  * @param {number} days - Number of days (default: term days)
+ * @param {string} billingType - 'daily' or 'termly'
  * @returns {number} Calculated fee
  */
-export function calculateLunchFee(dailyRate, days = 66) { // ~66 school days per term
+export function calculateLunchFee(dailyRate, days = 66, billingType = 'daily') {
+  if (billingType === 'termly') {
+    return Math.round((parseFloat(dailyRate) || 0) * 100) / 100;
+  }
   return Math.round((parseFloat(dailyRate) || 0) * days * 100) / 100;
 }
 
