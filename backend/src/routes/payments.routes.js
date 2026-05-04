@@ -331,7 +331,7 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance'), as
         proof_url: proofUrl || null,
         payment_date: paymentDate || new Date().toISOString(),
         status: 'completed',
-        recorded_by: userId,
+        received_by_user_id: userId,
         notes: notes || null,
         created_at: new Date().toISOString()
       })

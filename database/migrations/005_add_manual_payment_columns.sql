@@ -29,9 +29,7 @@ ALTER TABLE payments
 ADD COLUMN IF NOT EXISTS proof_url TEXT,
 ADD COLUMN IF NOT EXISTS notes TEXT;
 
--- Add column to track who recorded the payment
-ALTER TABLE payments
-ADD COLUMN IF NOT EXISTS recorded_by BIGINT REFERENCES users(user_id);
+-- Note: Using existing received_by_user_id column to track who recorded the payment
 
 -- Create fee balance update function
 CREATE OR REPLACE FUNCTION update_fee_balance(
@@ -70,5 +68,4 @@ $$ LANGUAGE plpgsql;
 -- ALTER TABLE payments DROP COLUMN IF EXISTS mpesa_phone;
 -- ALTER TABLE payments DROP COLUMN IF EXISTS proof_url;
 -- ALTER TABLE payments DROP COLUMN IF EXISTS notes;
--- ALTER TABLE payments DROP COLUMN IF EXISTS recorded_by;
 -- DROP FUNCTION IF EXISTS update_fee_balance;
