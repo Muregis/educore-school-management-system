@@ -341,6 +341,47 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
                 </div>
               )}
             </Field>
+
+            <Field label="Breakfast Program" style={{ gridColumn: "1 / -1" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input 
+                    type="checkbox" 
+                    checked={f.breakfast_enabled || false}
+                    onChange={e => setF({ ...f, breakfast_enabled: e.target.checked })}
+                  />
+                  <span>Enrolled in breakfast program</span>
+                </label>
+              </div>
+              {f.breakfast_enabled && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                  <select
+                    style={inputStyle}
+                    value={f.breakfast_billing_type || 'daily'}
+                    onChange={e => setF({ ...f, breakfast_billing_type: e.target.value })}
+                  >
+                    <option value="daily">Daily Rate</option>
+                    <option value="termly">Termly Rate</option>
+                  </select>
+                  <input 
+                    style={inputStyle} 
+                    type="number"
+                    value={f.breakfast_daily_rate || ""} 
+                    onChange={e => setF({ ...f, breakfast_daily_rate: e.target.value })} 
+                    placeholder={f.breakfast_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"}
+                  />
+                  {f.breakfast_billing_type !== 'termly' && (
+                    <input 
+                      style={inputStyle} 
+                      type="number"
+                      value={f.breakfast_days || 66} 
+                      onChange={e => setF({ ...f, breakfast_days: e.target.value })} 
+                      placeholder="School days"
+                    />
+                  )}
+                </div>
+              )}
+            </Field>
             
             <Field label="Opening Balance (KES)" style={{ gridColumn: "1 / -1" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>

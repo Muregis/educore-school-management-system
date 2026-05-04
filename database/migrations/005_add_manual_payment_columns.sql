@@ -1,6 +1,14 @@
 -- Add missing columns to payments table for manual payment methods
 -- Migration: 005_add_manual_payment_columns
 -- Description: Add columns for cash, bank transfer, and M-Pesa manual payments
+-- Also adds breakfast columns to students table
+
+-- Add breakfast columns to students table (for breakfast program support)
+ALTER TABLE students
+ADD COLUMN IF NOT EXISTS breakfast_enabled BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS breakfast_daily_rate DECIMAL(10,2),
+ADD COLUMN IF NOT EXISTS breakfast_days INTEGER DEFAULT 66,
+ADD COLUMN IF NOT EXISTS breakfast_billing_type VARCHAR(20) DEFAULT 'daily';
 
 -- Add columns for bank transfer
 ALTER TABLE payments
@@ -47,6 +55,10 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ROLLBACK:
+-- ALTER TABLE students DROP COLUMN IF EXISTS breakfast_enabled;
+-- ALTER TABLE students DROP COLUMN IF EXISTS breakfast_daily_rate;
+-- ALTER TABLE students DROP COLUMN IF EXISTS breakfast_days;
+-- ALTER TABLE students DROP COLUMN IF EXISTS breakfast_billing_type;
 -- ALTER TABLE payments DROP COLUMN IF EXISTS bank_name;
 -- ALTER TABLE payments DROP COLUMN IF EXISTS account_number;
 -- ALTER TABLE payments DROP COLUMN IF EXISTS mpesa_code;

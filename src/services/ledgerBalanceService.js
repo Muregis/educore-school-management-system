@@ -20,6 +20,7 @@ export const TRANSACTION_TYPES = {
   FEE_CHARGE: 'fee_charge',            // Tuition, activity, misc fees
   TRANSPORT_CHARGE: 'transport_charge', // Transport enrollment
   LUNCH_CHARGE: 'lunch_charge',       // Lunch enrollment
+  BREAKFAST_CHARGE: 'breakfast_charge', // Breakfast enrollment
   PAYMENT: 'payment',                  // Money received
   WAIVER: 'waiver',                   // Fee forgiveness
   ADJUSTMENT: 'adjustment',            // Manual corrections
@@ -96,7 +97,8 @@ export async function getLedgerBalance({
       opening_balance: sumType(byType, TRANSACTION_TYPES.OPENING_BALANCE),
       total_charges: sumType(byType, TRANSACTION_TYPES.FEE_CHARGE) + 
                      sumType(byType, TRANSACTION_TYPES.TRANSPORT_CHARGE) +
-                     sumType(byType, TRANSACTION_TYPES.LUNCH_CHARGE),
+                     sumType(byType, TRANSACTION_TYPES.LUNCH_CHARGE) +
+                     sumType(byType, TRANSACTION_TYPES.BREAKFAST_CHARGE),
       total_payments: sumType(byType, TRANSACTION_TYPES.PAYMENT),
       total_waivers: sumType(byType, TRANSACTION_TYPES.WAIVER),
       total_adjustments: sumType(byType, TRANSACTION_TYPES.ADJUSTMENT),
@@ -175,6 +177,7 @@ export async function addFeeCharge({
     tuition: TRANSACTION_TYPES.FEE_CHARGE,
     transport: TRANSACTION_TYPES.TRANSPORT_CHARGE,
     lunch: TRANSACTION_TYPES.LUNCH_CHARGE,
+    breakfast: TRANSACTION_TYPES.BREAKFAST_CHARGE,
     activity: TRANSACTION_TYPES.FEE_CHARGE,
     misc: TRANSACTION_TYPES.FEE_CHARGE
   };
@@ -324,6 +327,21 @@ export function calculateLunchFee(dailyRate, days = 66) { // ~66 school days per
 }
 
 /**
+ * Breakfast fee calculation
+ * 
+ * @param {number} dailyRate - Daily breakfast rate
+ * @param {number} days - Number of days (default: term days)
+ * @param {string} billingType - 'daily' or 'termly'
+ * @returns {number} Calculated fee
+ */
+export function calculateBreakfastFee(dailyRate, days = 66, billingType = 'daily') {
+  if (billingType === 'termly') {
+    return Math.round((parseFloat(dailyRate) || 0) * 100) / 100;
+  }
+  return Math.round((parseFloat(dailyRate) || 0) * days * 100) / 100;
+}
+
+/**
  * Format balance for display
  */
 export function formatLedgerBalance(balance, currency = 'KES') {
@@ -376,6 +394,7 @@ function sumByType(byType, category) {
       TRANSACTION_TYPES.FEE_CHARGE,
       TRANSACTION_TYPES.TRANSPORT_CHARGE,
       TRANSACTION_TYPES.LUNCH_CHARGE,
+    TRANSACTION_TYPES.BREAKFAST_CHARGE,
       TRANSACTION_TYPES.CARRY_FORWARD,
       TRANSACTION_TYPES.ADJUSTMENT
     ];
@@ -405,6 +424,7 @@ function isDebitType(transactionType) {
     TRANSACTION_TYPES.FEE_CHARGE,
     TRANSACTION_TYPES.TRANSPORT_CHARGE,
     TRANSACTION_TYPES.LUNCH_CHARGE,
+    TRANSACTION_TYPES.BREAKFAST_CHARGE,
     TRANSACTION_TYPES.CARRY_FORWARD
   ];
   return debitTypes.includes(transactionType);
@@ -483,6 +503,7 @@ const ledgerBalanceService = {
   carryForwardBalance,
   calculateTransportFee,
   calculateLunchFee,
+  calculateBreakfastFee,
   formatLedgerBalance,
   getBalanceStatus,
   TRANSACTION_TYPES,

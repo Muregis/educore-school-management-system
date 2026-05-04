@@ -224,6 +224,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     // Get student-specific settings (these would come from student record or API)
     const transportDirection = student.transport_direction || 'none'; // 'none', 'one_way', 'two_way'
     const lunchEnabled = student.lunch_enabled || false;
+    const breakfastEnabled = student.breakfast_enabled || false;
     const openingBalance = Number(student.opening_balance) || 0;
     
     // Calculate additional fees
@@ -235,8 +236,13 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       student.lunch_daily_rate || 100,
       student.lunch_days || 66
     ) : 0;
+    const breakfastFee = breakfastEnabled ? ledgerBalanceService.calculateBreakfastFee(
+      student.breakfast_daily_rate || 100,
+      student.breakfast_days || 66,
+      student.breakfast_billing_type || 'daily'
+    ) : 0;
     
-    const totalExpected = baseExpected + transportFee + lunchFee;
+    const totalExpected = baseExpected + transportFee + lunchFee + breakfastFee;
     
     // Calculate paid amount from payments
     const paid = normalisedPayments
@@ -258,11 +264,13 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       openingBalance,
       transportFee,
       lunchFee,
+      breakfastFee,
       baseFee: baseExpected,
       admissionNumber: student.admission ?? student.admission_number ?? "",
       email: student.email ?? student.parentEmail ?? "",
       transportDirection,
-      lunchEnabled
+      lunchEnabled,
+      breakfastEnabled
     };
   };
 
@@ -742,7 +750,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           {balances.length===0 ? <Msg text="No balances available." /> : (
         <div style={{ overflowX: "auto" }}>
           <Table
-            headers={["Student","Class","Base Fee","+Transport","+Lunch","+Opening","Paid","Balance","Status","Pay"]}
+            headers={["Student","Class","Base Fee","+Transport","+Lunch","+Breakfast","+Opening","Paid","Balance","Status","Pay"]}
             rows={balances.map(b=>[
               <span key={b.studentId} style={{color:C.text,fontWeight:600}}>{b.name}</span>,
               b.className,
@@ -756,6 +764,10 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
               // Lunch fee with indicator
               <span key="lunch" style={{fontSize:12,color:b.lunchFee>0?C.text:"#64748b"}}>
                 {b.lunchFee>0 ? money(b.lunchFee) : "—"}
+              </span>,
+              // Breakfast fee with indicator
+              <span key="breakfast" style={{fontSize:12,color:b.breakfastFee>0?C.text:"#64748b"}}>
+                {b.breakfastFee>0 ? money(b.breakfastFee) : "—"}
               </span>,
               // Opening balance
               <span key="opening" style={{fontSize:12,color:b.openingBalance>0?'#f59e0b':b.openingBalance<0?'#22c55e':'#64748b'}}>
@@ -789,6 +801,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             <span>💡 <strong>Base Fee:</strong> Tuition + Activity + Misc</span>
             <span>🚌 <strong>Transport:</strong> 1-way (60%) or 2-way (100%)</span>
             <span>🍽️ <strong>Lunch:</strong> Daily rate × school days</span>
+            <span>🥐 <strong>Breakfast:</strong> Daily or termly rate</span>
             <span>📖 <strong>Opening:</strong> Balance carried forward</span>
           </div>
         </div>

@@ -188,11 +188,17 @@ export default function RecordPaymentModal({
               style={inputStyle}
             >
               <option value="">Select student</option>
-              {filteredStudents.map(s => (
-                <option key={s.id || s.student_id} value={s.id || s.student_id}>
-                  {s.first_name} {s.last_name} ({s.admission_number || s.admission})
-                </option>
-              ))}
+              {filteredStudents.map(s => {
+                const firstName = s.first_name || s.firstName || "";
+                const lastName = s.last_name || s.lastName || "";
+                const name = `${firstName} ${lastName}`.trim();
+                const admission = s.admission_number || s.admission || s.admissionNumber || "";
+                return (
+                  <option key={s.id || s.student_id} value={s.id || s.student_id}>
+                    {name || "Student"} {admission ? `(${admission})` : ""}
+                  </option>
+                );
+              })}
             </select>
           </div>
         )}
