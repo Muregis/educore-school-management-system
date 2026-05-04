@@ -80,7 +80,7 @@ function loadPaystackScript() {
   });
 }
 
-export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, toast, linkedStudentId, school }) {
+export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, canViewTotals, toast, linkedStudentId, school }) {
   const [tab, setTab]                 = useState("payments");
   const [showPayment, setShowPayment] = useState(false);
   const [showStruct, setShowStruct]   = useState(false);
@@ -737,7 +737,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           {balances.length===0 ? <Msg text="No balances available." /> : (
         <div style={{ overflowX: "auto" }}>
           <Table
-            headers={["Student","Class","Base Fee","+Transport","+Lunch","+Breakfast","+Opening","Paid","Balance","Status","Pay"]}
+            headers={["Student","Class","Base Fee","+Transport","+Lunch","+Breakfast","+Opening",...(canViewTotals ? ["Paid"] : []),"Balance","Status","Pay"]}
             rows={balances.map(b=>[
               <span key={b.studentId} style={{color:C.text,fontWeight:600}}>{b.name}</span>,
               b.className,
@@ -761,8 +761,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 {b.openingBalance!==0 ? money(Math.abs(b.openingBalance)) : "—"}
                 {b.openingBalance!==0 && <small style={{display:'block',fontSize:10}}>{b.openingBalance>0?'(owing)':'(credit)'}</small>}
               </span>,
-              // Paid (hidden total expected)
-              <span key="paid" style={{color:'#22c55e'}}>{money(b.paid)}</span>,
+              // Paid (hidden total expected) - only visible to finance/director/superadmin
+              ...(canViewTotals ? [<span key="paid" style={{color:'#22c55e'}}>{money(b.paid)}</span>] : []),
               // Balance
               <span key="balance" style={{fontWeight:700,color:b.balance>0?'#ef4444':'#22c55e'}}>{money(b.balance)}</span>,
               // Status
@@ -1118,6 +1118,7 @@ FeesPage.propTypes = {
   payments: PropTypes.array.isRequired,
   setPayments: PropTypes.func.isRequired,
   canEdit: PropTypes.bool.isRequired,
+  canViewTotals: PropTypes.bool,
   toast: PropTypes.func.isRequired,
   linkedStudentId: PropTypes.number,
   school: PropTypes.shape({

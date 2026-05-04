@@ -37,6 +37,16 @@ function normalise(s) {
     emergencyContactRelationship: s.emergency_contact_relationship ?? s.emergencyContactRelationship ?? "",
     photoUrl:    s.photo_url ?? s.photoUrl ?? "",
     status:      s.status      ?? "active",
+    opening_balance: s.opening_balance ?? 0,
+    opening_balance_type: s.opening_balance_type ?? "owing",
+    lunch_enabled: s.lunch_enabled ?? false,
+    lunch_daily_rate: s.lunch_daily_rate ?? 0,
+    lunch_days: s.lunch_days ?? 66,
+    lunch_billing_type: s.lunch_billing_type ?? "daily",
+    breakfast_enabled: s.breakfast_enabled ?? false,
+    breakfast_daily_rate: s.breakfast_daily_rate ?? 0,
+    breakfast_days: s.breakfast_days ?? 66,
+    breakfast_billing_type: s.breakfast_billing_type ?? "daily",
   };
 }
 
@@ -53,7 +63,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "" });
+  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", lunch_enabled: false, lunch_daily_rate: "", lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: 66, breakfast_billing_type: "daily" });
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -105,7 +115,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       if (editId) {
         await apiFetch(`/students/${editId}`, {
           method: "PUT",
-          body: { admissionNumber: f.admission || null, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
+          body: { admissionNumber: f.admission || null, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null, openingBalance: f.opening_balance, openingBalanceType: f.opening_balance_type, lunchEnabled: f.lunch_enabled, lunchDailyRate: f.lunch_daily_rate, lunchDays: f.lunch_days, lunchBillingType: f.lunch_billing_type, breakfastEnabled: f.breakfast_enabled, breakfastDailyRate: f.breakfast_daily_rate, breakfastDays: f.breakfast_days, breakfastBillingType: f.breakfast_billing_type },
           token: auth?.token,
         });
         setStudents(prev => prev.map(s => (s.id === editId || s.student_id === editId) ? { ...normalise(s), ...f, id: editId } : s));
@@ -117,6 +127,10 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         });
         setStudents(prev => [...prev, normalise(res)]);
       }
+      // Refetch students to get updated data including opening balance
+      apiFetch("/students", { token: auth.token })
+        .then(data => setStudents(data.map(normalise)))
+        .catch(() => {});
       setShow(false);
       toast("Student saved", "success");
     } catch (err) {

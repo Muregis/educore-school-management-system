@@ -237,6 +237,7 @@ export default function App() {
   const isPortal = auth?.role === "parent" || auth?.role === "student";
   const isParent = auth?.role === "parent";
   const canEdit  = Boolean(perms?.edit);
+  const canViewTotals = ["finance", "director", "superadmin"].includes(auth?.role);
 
   const myChildren = useMemo(() => {
     if (!isParent) return [];
@@ -407,7 +408,7 @@ export default function App() {
     attendance: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     grades: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     subjects: ["admin","teacher","director","superadmin"].includes(auth.role) ? <SubjectsPage auth={auth} toast={toast} canEdit={canEdit} /> : <Forbidden />,
-    fees: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <FeesPage auth={auth} school={school} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
+    fees: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <FeesPage auth={auth} school={school} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} canViewTotals={canViewTotals} toast={toast} linkedStudentId={linkedStudentId} />,
     "mpesa-reconcile": <MpesaReconciliationPage auth={auth} students={students} toast={toast} />,
     "bulk-import": ["admin","director","superadmin"].includes(auth.role) ? <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} payments={payments} feeStructures={feeStructures} results={results} /> : <Forbidden />,
     upgrade: ["admin","director","superadmin","finance"].includes(auth.role) ? <UpgradePage auth={auth} toast={toast} /> : <Forbidden />,

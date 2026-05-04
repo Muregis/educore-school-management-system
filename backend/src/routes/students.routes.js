@@ -70,7 +70,7 @@ router.get("/", async (req, res, next) => {
     const { data: rows, error } = await supabase
       .from('students')
       .select(
-        'student_id, admission_number, first_name, last_name, gender, class_id, class_name, status, date_of_birth, nemis_number, phone, email, address, parent_name, parent_phone, blood_group, allergies, medical_conditions, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, admission_date, photo_url, created_at'
+        'student_id, admission_number, first_name, last_name, gender, class_id, class_name, status, date_of_birth, nemis_number, phone, email, address, parent_name, parent_phone, blood_group, allergies, medical_conditions, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, admission_date, photo_url, created_at, opening_balance, opening_balance_type, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type'
       )
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
@@ -292,7 +292,10 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
       admissionNumber, firstName, lastName, gender, className, classId,
       dateOfBirth, nemisNumber, phone, parentName, parentPhone,
       bloodGroup, allergies, medicalConditions, emergencyContactName, emergencyContactPhone, emergencyContactRelationship,
-      email, address, photoUrl, status
+      email, address, photoUrl, status,
+      openingBalance, openingBalanceType,
+      lunchEnabled, lunchDailyRate, lunchDays, lunchBillingType,
+      breakfastEnabled, breakfastDailyRate, breakfastDays, breakfastBillingType
     } = req.body;
 
     const normalizedDateOfBirth = normalizeDateInput(dateOfBirth);
@@ -356,6 +359,16 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
         emergency_contact_relationship: emergencyContactRelationship || null,
         photo_url: photoUrl || null,
         status: status || 'active',
+        opening_balance: openingBalance !== undefined ? parseFloat(openingBalance) || 0 : undefined,
+        opening_balance_type: openingBalanceType || 'owing',
+        lunch_enabled: lunchEnabled || false,
+        lunch_daily_rate: lunchDailyRate !== undefined ? parseFloat(lunchDailyRate) || 0 : undefined,
+        lunch_days: lunchDays !== undefined ? parseInt(lunchDays) || 66 : undefined,
+        lunch_billing_type: lunchBillingType || 'daily',
+        breakfast_enabled: breakfastEnabled || false,
+        breakfast_daily_rate: breakfastDailyRate !== undefined ? parseFloat(breakfastDailyRate) || 0 : undefined,
+        breakfast_days: breakfastDays !== undefined ? parseInt(breakfastDays) || 66 : undefined,
+        breakfast_billing_type: breakfastBillingType || 'daily',
       })
       .eq('student_id', req.params.id)
       .eq('school_id', schoolId)
