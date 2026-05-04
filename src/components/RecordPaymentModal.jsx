@@ -24,34 +24,20 @@ export default function RecordPaymentModal({
   const [formData, setFormData] = useState({
     studentId: "",
     amount: "",
-    paymentDate: new Date().toISOString().slice(0, 10),
-    notes: ""
+    paymentDate: new Date().toISOString().slice(0, 10)
   });
   const [bankForm, setBankForm] = useState({
     bankName: "",
-    accountNumber: "",
-    referenceNumber: "",
-    proofUrl: ""
+    referenceNumber: ""
   });
   const [mpesaForm, setMpesaForm] = useState({
-    mpesaCode: "",
-    mpesaPhone: ""
+    mpesaCode: ""
   });
-  const [studentSearch, setStudentSearch] = useState("");
+  const [selectedClass, setSelectedClass] = useState("");
   const [filteredStudents, setFilteredStudents] = useState([]);
 
-  useEffect(() => {
-    if (studentSearch) {
-      const filtered = students.filter(s => {
-        const name = `${s.first_name} ${s.last_name}`.toLowerCase();
-        const admission = (s.admission_number || s.admission || "").toLowerCase();
-        return name.includes(studentSearch.toLowerCase()) || admission.includes(studentSearch.toLowerCase());
-      });
-      setFilteredStudents(filtered);
-    } else {
-      setFilteredStudents(students.slice(0, 20));
-    }
-  }, [studentSearch, students]);
+  // Get unique classes from students
+  const classes = [...new Set(students.map(s => s.class_name || s.className).filter(Boolean))].sort();
 
   useEffect(() => {
     if (isOpen) {
@@ -63,25 +49,36 @@ export default function RecordPaymentModal({
     setFormData({
       studentId: "",
       amount: "",
-      paymentDate: new Date().toISOString().slice(0, 10),
-      notes: ""
+      paymentDate: new Date().toISOString().slice(0, 10)
     });
     setBankForm({
       bankName: "",
-      accountNumber: "",
-      referenceNumber: "",
-      proofUrl: ""
+      referenceNumber: ""
     });
     setMpesaForm({
-      mpesaCode: "",
-      mpesaPhone: ""
+      mpesaCode: ""
     });
-    setStudentSearch("");
+    setSelectedClass("");
+    setFilteredStudents([]);
     setActiveTab("cash");
   };
 
+  // Filter students when class is selected
+  useEffect(() => {
+    if (selectedClass) {
+      const filtered = students.filter(s => 
+        (s.class_name || s.className) === selectedClass
+      );
+      setFilteredStudents(filtered);
+      // Reset student selection when class changes
+      setFormData(prev => ({ ...prev, studentId: "" }));
+    } else {
+      setFilteredStudents([]);
+    }
+  }, [selectedClass, students]);
+
   const handleSubmit = async () => {
-    const { studentId, amount, paymentDate, notes } = formData;
+    const { studentId, amount, paymentDate } = formData;
 
     if (!studentId) {
       return toast("Please select a student", "error");
@@ -104,18 +101,14 @@ export default function RecordPaymentModal({
         studentId: parseInt(studentId),
         amount: parseFloat(amount),
         paymentMethod: activeTab,
-        paymentDate,
-        notes
+        paymentDate
       };
 
       if (activeTab === "bank_transfer") {
         payload.referenceNumber = bankForm.referenceNumber;
         payload.bankName = bankForm.bankName;
-        payload.accountNumber = bankForm.accountNumber;
-        payload.proofUrl = bankForm.proofUrl;
       } else if (activeTab === "mpesa_manual") {
         payload.mpesaCode = mpesaForm.mpesaCode;
-        payload.mpesaPhone = mpesaForm.mpesaPhone;
       }
 
       const response = await apiFetch("/payments/record-manual", {
@@ -138,10 +131,7 @@ export default function RecordPaymentModal({
     }
   };
 
-  const selectedStudent = students.find(s => 
-    (s.id || s.student_id) === parseInt(formData.studentId)
-  );
-
+  
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Record Manual Payment">
       <div style={{ minWidth: "500px" }}>
@@ -172,52 +162,41 @@ export default function RecordPaymentModal({
         </div>
 
         {/* Common Fields */}
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 12 }}>
           <label style={{ display: "block", color: "#94a3b8", fontSize: 12, marginBottom: 4 }}>
-            Student *
+            Class *
           </label>
-          <input
-            type="text"
-            placeholder="Search by name or admission number..."
-            value={studentSearch}
-            onChange={(e) => setStudentSearch(e.target.value)}
+          <select
+            value={selectedClass}
+            onChange={(e) => setSelectedClass(e.target.value)}
             style={inputStyle}
-          />
-          {studentSearch && filteredStudents.length > 0 && (
-            <div style={{
-              maxHeight: 150,
-              overflowY: "auto",
-              border: "1px solid #334155",
-              borderRadius: 6,
-              marginTop: 4,
-              background: "#1e293b"
-            }}>
-              {filteredStudents.map(s => (
-                <div
-                  key={s.id || s.student_id}
-                  onClick={() => {
-                    setFormData({ ...formData, studentId: s.id || s.student_id });
-                    setStudentSearch(`${s.first_name} ${s.last_name} (${s.admission_number || s.admission})`);
-                  }}
-                  style={{
-                    padding: "8px 12px",
-                    cursor: "pointer",
-                    borderBottom: "1px solid #334155",
-                    fontSize: 13,
-                    color: "#e2e8f0"
-                  }}
-                >
-                  {s.first_name} {s.last_name} ({s.admission_number || s.admission})
-                </div>
-              ))}
-            </div>
-          )}
-          {selectedStudent && (
-            <div style={{ marginTop: 4, color: "#10b981", fontSize: 12 }}>
-              Selected: {selectedStudent.first_name} {selectedStudent.last_name}
-            </div>
-          )}
+          >
+            <option value="">Select class</option>
+            {classes.map(cls => (
+              <option key={cls} value={cls}>{cls}</option>
+            ))}
+          </select>
         </div>
+
+        {selectedClass && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: "block", color: "#94a3b8", fontSize: 12, marginBottom: 4 }}>
+              Student *
+            </label>
+            <select
+              value={formData.studentId}
+              onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
+              style={inputStyle}
+            >
+              <option value="">Select student</option>
+              {filteredStudents.map(s => (
+                <option key={s.id || s.student_id} value={s.id || s.student_id}>
+                  {s.first_name} {s.last_name} ({s.admission_number || s.admission})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <Field
           label="Amount (KES) *"
@@ -254,64 +233,27 @@ export default function RecordPaymentModal({
             </div>
 
             <Field
-              label="Account Number"
-              value={bankForm.accountNumber}
-              onChange={(e) => setBankForm({ ...bankForm, accountNumber: e.target.value })}
-              placeholder="Enter account number"
-            />
-
-            <Field
               label="Transaction/Slip Reference Number *"
               value={bankForm.referenceNumber}
               onChange={(e) => setBankForm({ ...bankForm, referenceNumber: e.target.value })}
               placeholder="Enter reference number"
               required
             />
-
-            <Field
-              label="Proof Image URL"
-              value={bankForm.proofUrl}
-              onChange={(e) => setBankForm({ ...bankForm, proofUrl: e.target.value })}
-              placeholder="Enter proof URL"
-            />
           </>
         )}
 
         {activeTab === "mpesa_manual" && (
-          <>
-            <Field
-              label="M-Pesa Transaction Code *"
-              value={mpesaForm.mpesaCode}
-              onChange={(e) => setMpesaForm({ ...mpesaForm, mpesaCode: e.target.value })}
-              placeholder="e.g. QHX7Y8Z9AB"
-              required
-            />
-
-            <Field
-              label="Phone Number"
-              value={mpesaForm.mpesaPhone}
-              onChange={(e) => setMpesaForm({ ...mpesaForm, mpesaPhone: e.target.value })}
-              placeholder="Enter phone number"
-            />
-          </>
+          <Field
+            label="M-Pesa Transaction Code *"
+            value={mpesaForm.mpesaCode}
+            onChange={(e) => setMpesaForm({ ...mpesaForm, mpesaCode: e.target.value })}
+            placeholder="e.g. QHX7Y8Z9AB"
+            required
+          />
         )}
 
-        <Field
-          label="Notes (Optional)"
-          type="textarea"
-          value={formData.notes}
-          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-          placeholder="Any additional notes..."
-          rows={2}
-        />
-
-        {/* Received By - Auto-filled */}
-        <div style={{ marginBottom: 16, color: "#94a3b8", fontSize: 12 }}>
-          Received by: {auth?.user?.full_name || auth?.user?.name || "Current User"}
-        </div>
-
         {/* Actions */}
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
           <Btn variant="ghost" onClick={onClose} disabled={loading}>
             Cancel
           </Btn>
