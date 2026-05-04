@@ -5,6 +5,8 @@ import Field from "../components/Field";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
 import Table from "../components/Table";
+import RecordPaymentModal from "../components/RecordPaymentModal";
+import PaymentReceipt from "../components/PaymentReceipt";
 import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
@@ -106,6 +108,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [showBankDeposit, setShowBankDeposit] = useState(false);
   const [bankDepositForm, setBankDepositForm] = useState({ studentId: "", amount: "", proofFile: null });
   const [bankDepositLoading, setBankDepositLoading] = useState(false);
+  const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
 
   // New system & term management
   const [useNewSystem, setUseNewSystem] = useState(false);
@@ -678,6 +681,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           toast("CSV exported","success");
         }}>Export CSV</Btn>
         {canEdit && tab==="payments" && <Btn onClick={()=>setShowPayment(true)}>+ Record Payment</Btn>}
+        {canEdit && tab==="payments" && <Btn onClick={()=>setShowRecordPaymentModal(true)}>📝 Manual Payment</Btn>}
         {canEdit && tab==="structure" && <Btn onClick={()=>{setEditStruct(null);setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""});setShowStruct(true);}}>Set Fee Structure</Btn>}
       </div>
 
@@ -1018,30 +1022,12 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       )}
 
       {/* Receipt Modal */}
-      {showReceipt && receipt && (
-        <Modal title="Payment Receipt" onClose={()=>setShowReceipt(false)}>
-          <div style={{background:C.card,borderRadius:12,padding:16}}>
-            <div style={{textAlign:"center",marginBottom:16}}>
-              <div style={{fontSize:32}}>✅</div>
-              <div style={{fontWeight:800,fontSize:18,color:C.text}}>Payment Confirmed</div>
-            </div>
-            <div className="row"><span>Student</span><strong>{receipt?.studentName}</strong></div>
-            <div className="row"><span>Amount</span><strong>KES {Number(receipt?.amount).toLocaleString()}</strong></div>
-            <div className="row"><span>Method</span><strong>{receipt?.method}</strong></div>
-            <div className="row"><span>Reference</span><strong>{receipt?.reference}</strong></div>
-            <div className="row"><span>Date</span><strong>{receipt?.date}</strong></div>
-            <p style={{marginTop: 24, color: "rgb(136, 136, 136)", fontSize: 12}}>Thank you for your payment.</p>
-          </div>
-          <div style={{display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12}}>
-            <Btn variant="ghost" onClick={()=>setShowReceipt(false)}>Close</Btn>
-            <Btn onClick={printReceipt}>🖨 Print</Btn>
-            <Btn variant="ghost" onClick={() => sendWhatsAppReceipt(receipt)}>📱 Send Receipt via WhatsApp</Btn>
-            {receipt?.proofUrl && (
-              <Btn variant="ghost" onClick={() => sendWhatsAppProof(receipt)}>📱 Send Proof via WhatsApp</Btn>
-            )}
-          </div>
-        </Modal>
-      )}
+      <PaymentReceipt
+        isOpen={showReceipt}
+        onClose={() => setShowReceipt(false)}
+        receipt={receipt}
+        school={schoolData || school}
+      />
 
       {/* Bank Deposit Modal */}
       {showBankDeposit && (
@@ -1099,6 +1085,27 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           </div>
         </Modal>
       )}
+
+      {/* Manual Payment Modal */}
+      <RecordPaymentModal
+        isOpen={showRecordPaymentModal}
+        onClose={() => setShowRecordPaymentModal(false)}
+        students={students}
+        auth={auth}
+        school={school}
+        toast={toast}
+        onSuccess={(response) => {
+          reloadPayments();
+          setReceipt({
+            studentName: students.find(s => (s.id || s.student_id) === parseInt(response.studentId))?.first_name + " " + students.find(s => (s.id || s.student_id) === parseInt(response.studentId))?.last_name || "Student",
+            amount: response.amount,
+            reference: response.receiptNumber,
+            method: response.paymentMethod,
+            date: new Date().toLocaleDateString(),
+          });
+          setShowReceipt(true);
+        }}
+      />
     </div>
   );
 }

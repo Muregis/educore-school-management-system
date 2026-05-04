@@ -272,6 +272,91 @@ router.delete("/:id", requireRoles("admin", "finance"), async (req, res, next) =
   } catch (err) { next(err); }
 });
 
+// ─── POST record manual payment (Cash, Bank Transfer, M-Pesa Manual) ───────
+router.post("/record-manual", authRequired, requireRoles('admin', 'finance'), async (req, res, next) => {
+  try {
+    const { schoolId, userId } = req.user;
+    const {
+      studentId,
+      amount,
+      paymentMethod, // 'cash' | 'bank_transfer' | 'mpesa_manual'
+      referenceNumber,
+      bankName,
+      accountNumber,
+      mpesaCode,
+      mpesaPhone,
+      proofUrl,
+      paymentDate,
+      notes
+    } = req.body;
+
+    // Validation
+    if (!studentId || !amount || !paymentMethod) {
+      return res.status(400).json({
+        message: 'studentId, amount and paymentMethod are required'
+      });
+    }
+
+    if (paymentMethod === 'mpesa_manual' && !mpesaCode) {
+      return res.status(400).json({
+        message: 'M-Pesa transaction code is required'
+      });
+    }
+
+    if (paymentMethod === 'bank_transfer' && !referenceNumber) {
+      return res.status(400).json({
+        message: 'Bank reference number is required'
+      });
+    }
+
+    // Generate receipt number
+    const receiptNumber = paymentMethod === 'cash'
+      ? `CASH-${Date.now()}`
+      : paymentMethod === 'bank_transfer'
+      ? `BANK-${referenceNumber}`
+      : `MPESA-${mpesaCode}`;
+
+    const { data, error } = await supabase
+      .from('payments')
+      .insert({
+        school_id: schoolId,
+        student_id: studentId,
+        amount: parseFloat(amount),
+        payment_method: paymentMethod,
+        reference_number: receiptNumber,
+        bank_name: bankName || null,
+        account_number: accountNumber || null,
+        mpesa_code: mpesaCode || null,
+        mpesa_phone: mpesaPhone || null,
+        proof_url: proofUrl || null,
+        payment_date: paymentDate || new Date().toISOString(),
+        status: 'completed',
+        recorded_by: userId,
+        notes: notes || null,
+        created_at: new Date().toISOString()
+      })
+      .select('payment_id, reference_number')
+      .single();
+
+    if (error) throw error;
+
+    // Update student fee balance
+    await supabase.rpc('update_fee_balance', {
+      p_student_id: studentId,
+      p_school_id: schoolId,
+      p_amount: parseFloat(amount)
+    });
+
+    res.status(201).json({
+      success: true,
+      paymentId: data.payment_id,
+      receiptNumber: data.reference_number,
+      message: `${paymentMethod} payment of KES ${amount} recorded successfully`
+    });
+
+  } catch (err) { next(err); }
+});
+
 // ─── POST upload proof of payment ────────────────────────────────────────────
 router.post("/upload-proof", requireRoles("admin", "finance", "teacher"), upload.single('file'), async (req, res, next) => {
   try {

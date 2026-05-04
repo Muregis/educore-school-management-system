@@ -388,6 +388,36 @@ router.get("/classes/promotion-chain", authorize("academic.view"), async (req, r
   }
 });
 
+// GET /api/classes/:id/promotion - Get promotion settings for a specific class
+router.get("/classes/:id/promotion", authorize("academic.view"), async (req, res) => {
+  try {
+    const { schoolId } = req.user;
+    const classId = req.params.id;
+
+    // First check if the class exists
+    const { data: existing, error: findErr } = await supabase
+      .from('classes')
+      .select('class_id, id, class_name, next_class_name, class_order')
+      .eq('school_id', schoolId)
+      .or(`class_id.eq.${classId},id.eq.${classId}`)
+      .maybeSingle();
+
+    if (findErr || !existing) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+
+    res.json({
+      class_id: existing.class_id || existing.id,
+      class_name: existing.class_name,
+      next_class_name: existing.next_class_name || null,
+      class_order: existing.class_order ?? 0
+    });
+  } catch (err) {
+    console.error('Error fetching class promotion settings:', err);
+    res.status(500).json({ message: "Failed to fetch class promotion settings", detail: err.message });
+  }
+});
+
 // GET /api/classes - Get all class names for dropdowns
 router.get("/classes", authorize("academic.view"), async (req, res) => {
   try {
