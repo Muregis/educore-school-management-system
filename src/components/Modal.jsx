@@ -1,7 +1,9 @@
 import PropTypes from "prop-types";
 import { C } from "../lib/theme";
 
-export default function Modal({ title, onClose, children }) {
+export default function Modal({ title, onClose, children, isOpen = true }) {
+  if (!isOpen) return null;
+  
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
       <div style={{ width: 760, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto", background: C.card, border: `1px solid ${C.border}`, borderRadius: 16 }}>
@@ -19,4 +21,5 @@ Modal.propTypes = {
   title: PropTypes.string.isRequired,
   onClose: PropTypes.func.isRequired,
   children: PropTypes.node.isRequired,
+  isOpen: PropTypes.bool,
 };
