@@ -67,10 +67,20 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
   useEffect(() => {
     if (!auth?.token) return;
+    console.log('[DEBUG] StudentsPage: Fetching students...');
     const ac = new AbortController();
     apiFetch("/students", { token: auth.token, signal: ac.signal })
-      .then(data => setStudents(data.map(normalise)))
-      .catch(e => { if (e?.code !== "EABORT") toast("Failed to fetch students", "error"); });
+      .then(data => {
+        console.log('[DEBUG] StudentsPage: Fetched', data?.length || 0, 'students');
+        console.log('[DEBUG] StudentsPage: First student:', data?.[0]);
+        const normalisedData = data.map(normalise);
+        console.log('[DEBUG] StudentsPage: Normalised first:', normalisedData?.[0]);
+        setStudents(normalisedData);
+      })
+      .catch(e => { 
+        console.error('[DEBUG] StudentsPage: Fetch error:', e);
+        if (e?.code !== "EABORT") toast("Failed to fetch students: " + (e.message || ""), "error"); 
+      });
     return () => ac.abort();
   }, [auth, setStudents]);
 
@@ -79,7 +89,17 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     return x ? Number(x.tuition) + Number(x.activity) + Number(x.misc) : 0;
   };
 
-  const normalised = useMemo(() => students.map(s => s.first_name ? normalise(s) : s), [students]);
+  const normalised = useMemo(() => {
+    console.log('[DEBUG] normalised useMemo: students count =', students?.length || 0);
+    const result = students.map(s => {
+      // Check if already has camelCase firstName (already normalised)
+      if (s.firstName) return s;
+      // Otherwise normalise from snake_case
+      return normalise(s);
+    });
+    console.log('[DEBUG] normalised result count:', result.length);
+    return result;
+  }, [students]);
 
   const filtered = normalised.filter(s =>
     `${s.firstName} ${s.lastName} ${s.className} ${s.admission} ${s.parentPhone || ""} ${s.nemisNumber || ""}`
@@ -223,6 +243,17 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     }
     setShowQRScanner(false);
   };
+
+  // Debug render
+  console.log('[DEBUG] StudentsPage render:', {
+    studentsCount: students?.length,
+    normalisedCount: normalised?.length,
+    filteredCount: filtered?.length,
+    rowsCount: rows?.length,
+    pages,
+    page,
+    q, cls, status
+  });
 
   return (
     <div>

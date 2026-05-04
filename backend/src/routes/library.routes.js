@@ -34,75 +34,127 @@ function normalizeBookRow(row = {}) {
 }
 
 // ── GET all books ─────────────────────────────────────────────────────────────
+// Now uses library_books table with book codes
 router.get("/books", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 
-    const { data: rows, error } = await supabase
-      .from("books")
-      .select("*")
+    const { data: books, error } = await supabase
+      .from("library_books")
+      .select(`
+        book_id, book_code, title, author, isbn,
+        category, publisher, publication_year,
+        shelf_location, total_copies, available_copies,
+        copies:library_book_copies(
+          copy_id, copy_code, copy_number,
+          status, condition, is_lost
+        )
+      `)
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
-      .order("title");
+      .order("book_code");
+
     if (error) throw error;
-    res.json((rows || []).map(normalizeBookRow));
+
+    // Transform to legacy format for frontend compatibility
+    const transformed = (books || []).map(b => ({
+      book_id: b.book_id,
+      id: b.book_id,
+      book_code: b.book_code,
+      title: b.title,
+      author: b.author,
+      isbn: b.isbn,
+      category: b.category,
+      quantity_total: b.total_copies,
+      quantity_available: b.available_copies,
+      copies: b.copies,
+      status: b.available_copies > 0 ? 'active' : 'unavailable'
+    }));
+
+    res.json(transformed);
   } catch (err) { next(err); }
 });
 
 // ── POST add book ─────────────────────────────────────────────────────────────
+// This now uses the library_books table with auto-generated book codes
 router.post("/books", requireRoles("admin","librarian"), async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
+    const { schoolId, userId } = req.user;
     const { title, author, category = "General", isbn = null, quantityTotal = 1 } = req.body;
     if (!title || !author) return res.status(400).json({ message: "title and author are required" });
 
     const qty = Number(quantityTotal) || 1;
 
-    let { data: inserted, error: insertError } = await supabase
-      .from('books')
+    // Generate book code automatically
+    const year = new Date().getFullYear();
+    const { data: school } = await supabase
+      .from('schools')
+      .select('library_shortcode, code')
+      .eq('school_id', schoolId)
+      .single();
+    const shortcode = school?.library_shortcode || school?.code?.substring(0, 6) || 'LIB';
+
+    // Get next sequence
+    const { data: seqNum, error: seqError } = await supabase
+      .rpc('get_next_book_sequence', { p_school_id: schoolId, p_year: year });
+    if (seqError) throw seqError;
+
+    const bookCode = `${shortcode}/${String(seqNum).padStart(3, '0')}/${year}`;
+
+    // Insert book into library_books
+    const { data: book, error: bookError } = await supabase
+      .from('library_books')
       .insert({
         school_id: schoolId,
         title,
         author,
         category,
         isbn,
-        quantity_total: qty,
-        quantity_available: qty,
-        status: 'active'
+        total_copies: qty,
+        available_copies: qty,
+        book_code: bookCode,
+        sequence_number: seqNum,
+        year_added: year,
+        added_by: userId
       })
-      .select('book_id, id')
+      .select('book_id, book_code, title, author, isbn, category, total_copies, available_copies')
       .single();
 
-    if (insertError && isMissingColumnError(insertError)) {
-      ({ data: inserted, error: insertError } = await supabase
-        .from('books')
-        .insert({
-          school_id: schoolId,
-          title,
-          author,
-          category,
-          status: 'active'
-        })
-        .select('book_id, id')
-        .single());
+    if (bookError) throw bookError;
+
+    // Generate copy codes
+    const copies = [];
+    for (let i = 1; i <= qty; i++) {
+      copies.push({
+        school_id: schoolId,
+        book_id: book.book_id,
+        copy_number: i,
+        copy_code: `${bookCode}-C${i}`,
+        qr_data: `${bookCode}-C${i}`,
+        status: 'available',
+        condition: 'good'
+      });
     }
 
-    if (insertError) throw insertError;
+    const { data: bookCopies, error: copyError } = await supabase
+      .from('library_book_copies')
+      .insert(copies)
+      .select('copy_id, copy_code, copy_number, status');
 
-    const insertedBookId = inserted?.book_id ?? inserted?.id;
-    if (!insertedBookId) {
-      return res.status(201).json({ created: true });
-    }
+    if (copyError) throw copyError;
 
-    let selectQuery = supabase
-      .from('books')
-      .select('*')
-      .eq('school_id', schoolId);
-    selectQuery = applyBookIdentityFilter(selectQuery, insertedBookId);
-    const { data: row, error: selectError } = await selectQuery.single();
-
-    if (selectError) throw selectError;
-    res.status(201).json(normalizeBookRow(row));
+    res.status(201).json({
+      book_id: book.book_id,
+      book_code: book.book_code,
+      title: book.title,
+      author: book.author,
+      isbn: book.isbn,
+      category: book.category,
+      quantity_total: book.total_copies,
+      quantity_available: book.available_copies,
+      copies: bookCopies,
+      message: `Book added — Code: ${bookCode} — ${qty} copies created`
+    });
   } catch (err) { next(err); }
 });
 
@@ -387,6 +439,417 @@ router.put("/borrows/:id/return", requireRoles("admin","librarian"), async (req,
     if (bookUpdateError) throw bookUpdateError;
 
     res.json({ returned: true });
+  } catch (err) { next(err); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW LIBRARY BOOK CODE SYSTEM ENDPOINTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Helper: Generate book code
+async function generateBookCode(schoolId, supabase) {
+  const year = new Date().getFullYear();
+  
+  // Get school shortcode
+  const { data: school } = await supabase
+    .from('schools')
+    .select('library_shortcode, code')
+    .eq('school_id', schoolId)
+    .single();
+
+  const shortcode = school?.library_shortcode || 
+                    school?.code?.substring(0, 6) || 
+                    'LIB';
+
+  // Get next sequence atomically
+  const { data: seqNum, error: seqError } = await supabase
+    .rpc('get_next_book_sequence', {
+      p_school_id: schoolId,
+      p_year: year
+    });
+
+  if (seqError) throw seqError;
+
+  const sequence = String(seqNum).padStart(3, '0');
+  const bookCode = `${shortcode}/${sequence}/${year}`;
+
+  return { bookCode, sequenceNumber: seqNum, year };
+}
+
+// Helper: Generate copy code
+function generateCopyCode(bookCode, copyNumber, isReplacement = false) {
+  return isReplacement 
+    ? `${bookCode}-C${copyNumber}R` 
+    : `${bookCode}-C${copyNumber}`;
+}
+
+// GET /api/library/next-code — Preview next auto-generated code
+router.get('/next-code', authRequired, async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const generated = await generateBookCode(schoolId, supabase);
+    res.json({
+      preview: generated.bookCode,
+      shortcode: generated.bookCode.split('/')[0],
+      sequence: generated.sequenceNumber,
+      year: generated.year
+    });
+  } catch (err) { next(err); }
+});
+
+// POST /api/library/books-coded — Add book with auto or manual code
+router.post('/books-coded', authRequired,
+  requireRoles('admin', 'librarian'),
+  async (req, res, next) => {
+  try {
+    const { schoolId, userId } = req.user;
+    const {
+      title,
+      author,
+      isbn,
+      category,
+      publisher,
+      publicationYear,
+      numberOfCopies = 1,
+      shelfLocation,
+      description,
+      existingCode,
+      useExistingCode = false
+    } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ 
+        message: 'Book title is required' 
+      });
+    }
+
+    let bookCode, sequenceNumber, year;
+
+    if (useExistingCode && existingCode) {
+      // Use the school's existing code exactly as provided
+      const parts = existingCode.toUpperCase().split('/');
+      if (parts.length !== 3) {
+        return res.status(400).json({
+          message: 'Invalid code format. Use: SHORTCODE/NUMBER/YEAR (e.g. DIC/020/2026)'
+        });
+      }
+      bookCode = existingCode.toUpperCase();
+      sequenceNumber = parseInt(parts[1]);
+      year = parseInt(parts[2]);
+
+      // Check not already used
+      const { data: existing } = await supabase
+        .from('library_books')
+        .select('book_id')
+        .eq('book_code', bookCode)
+        .eq('school_id', schoolId)
+        .single();
+
+      if (existing) {
+        return res.status(400).json({
+          message: `Code ${bookCode} already exists in your library` 
+        });
+      }
+    } else {
+      // Auto generate next code
+      const generated = await generateBookCode(schoolId, supabase);
+      bookCode = generated.bookCode;
+      sequenceNumber = generated.sequenceNumber;
+      year = generated.year;
+    }
+
+    // Insert book
+    const { data: book, error: bookError } = await supabase
+      .from('library_books')
+      .insert({
+        school_id: schoolId,
+        title,
+        author: author || null,
+        isbn: isbn || null,
+        category: category || null,
+        publisher: publisher || null,
+        publication_year: publicationYear || null,
+        total_copies: parseInt(numberOfCopies),
+        available_copies: parseInt(numberOfCopies),
+        shelf_location: shelfLocation || null,
+        book_code: bookCode,
+        sequence_number: sequenceNumber,
+        year_added: year,
+        added_by: userId
+      })
+      .select('book_id, book_code, title, isbn, author, category, total_copies')
+      .single();
+
+    if (bookError) throw bookError;
+
+    // Generate copy codes for each physical book
+    const copies = [];
+    for (let i = 1; i <= parseInt(numberOfCopies); i++) {
+      copies.push({
+        school_id: schoolId,
+        book_id: book.book_id,
+        copy_number: i,
+        copy_code: generateCopyCode(bookCode, i),
+        qr_data: generateCopyCode(bookCode, i),
+        status: 'available',
+        condition: 'good'
+      });
+    }
+
+    const { data: bookCopies, error: copyError } = await supabase
+      .from('library_book_copies')
+      .insert(copies)
+      .select('copy_id, copy_code, copy_number, status');
+
+    if (copyError) throw copyError;
+
+    res.status(201).json({
+      success: true,
+      book: { ...book, copies: bookCopies },
+      message: `${useExistingCode ? 'Existing' : 'New'} book added — Code: ${bookCode} — ${numberOfCopies} copies created` 
+    });
+
+  } catch (err) { next(err); }
+});
+
+// GET /api/library/copies/lookup/:code — Look up by any code format
+router.get('/copies/lookup/:code', authRequired,
+  async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const code = req.params.code.toUpperCase();
+
+    // Try exact copy code first
+    let { data: copy } = await supabase
+      .from('library_book_copies')
+      .select(`
+        copy_id, copy_code, copy_number,
+        status, condition, is_lost,
+        replacement_status,
+        book:library_books!inner(
+          book_id, title, author, 
+          isbn, book_code, category
+        )
+      `)
+      .eq('copy_code', code)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (copy) return res.json({ type: 'copy', data: copy });
+
+    // Try book code — return all copies
+    let { data: book } = await supabase
+      .from('library_books')
+      .select(`
+        book_id, title, author, isbn,
+        book_code, total_copies, available_copies,
+        copies:library_book_copies(
+          copy_id, copy_code, copy_number,
+          status, condition, is_lost
+        )
+      `)
+      .eq('book_code', code)
+      .eq('school_id', schoolId)
+      .single();
+
+    if (book) return res.json({ type: 'book', data: book });
+
+    return res.status(404).json({
+      message: `No book found with code: ${code}`,
+      hint: 'Format should be: DIC/020/2026 or DIC/020/2026-C1'
+    });
+
+  } catch (err) { next(err); }
+});
+
+// GET /api/library/books-coded — List all books with codes
+router.get('/books-coded', authRequired, async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    
+    const { data: books, error } = await supabase
+      .from('library_books')
+      .select(`
+        book_id, book_code, title, author, isbn,
+        category, publisher, publication_year,
+        shelf_location, total_copies, available_copies,
+        copies:library_book_copies(
+          copy_id, copy_code, copy_number,
+          status, condition, is_lost
+        )
+      `)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .order('book_code');
+
+    if (error) throw error;
+    res.json(books || []);
+  } catch (err) { next(err); }
+});
+
+// POST /api/library/copies/verify-replacement — Verify replacement book ISBN
+router.post('/copies/verify-replacement', authRequired,
+  requireRoles('admin', 'librarian'),
+  async (req, res, next) => {
+  try {
+    const { schoolId, userId } = req.user;
+    const { lostCopyId, replacementIsbn, studentId } = req.body;
+
+    // Get lost copy details
+    const { data: lost, error: lostError } = await supabase
+      .from('library_book_copies')
+      .select(`
+        copy_id, copy_code, copy_number,
+        book:library_books!inner(
+          book_id, title, isbn, book_code
+        )
+      `)
+      .eq('copy_id', lostCopyId)
+      .eq('school_id', schoolId)
+      .single();
+
+    if (lostError || !lost) {
+      return res.status(404).json({ 
+        message: 'Lost book record not found' 
+      });
+    }
+
+    const requiredIsbn = lost.book?.isbn;
+
+    // Strict ISBN check if book has one
+    if (requiredIsbn) {
+      const isbnMatch = replacementIsbn?.trim() === requiredIsbn?.trim();
+      
+      if (!isbnMatch) {
+        return res.status(400).json({
+          verified: false,
+          message: 'This is NOT the correct book.',
+          required: {
+            title: lost.book.title,
+            isbn: requiredIsbn,
+            bookCode: lost.book.book_code,
+            copyCode: lost.copy_code
+          },
+          provided: { isbn: replacementIsbn },
+          instruction: `Student must bring: "${lost.book.title}" with ISBN ${requiredIsbn}` 
+        });
+      }
+    }
+
+    // ISBN matches or no ISBN — accept replacement
+    const replacementCopyCode = generateCopyCode(
+      lost.book.book_code,
+      lost.copy_number,
+      true // isReplacement = true → adds R suffix
+    );
+
+    // Add replacement as new copy
+    const { data: newCopy, error: newCopyError } = await supabase
+      .from('library_book_copies')
+      .insert({
+        school_id: schoolId,
+        book_id: lost.book.book_id,
+        copy_number: lost.copy_number,
+        copy_code: replacementCopyCode,
+        qr_data: replacementCopyCode,
+        status: 'available',
+        condition: 'good'
+      })
+      .select('copy_id, copy_code')
+      .single();
+
+    if (newCopyError) throw newCopyError;
+
+    // Close the borrowing
+    await supabase
+      .from('library_borrowings')
+      .update({
+        status: 'returned',
+        returned_date: new Date().toISOString().split('T')[0],
+        replacement_status: 'accepted',
+        return_condition: 'replaced',
+        updated_at: new Date().toISOString()
+      })
+      .eq('copy_id', lostCopyId)
+      .eq('student_id', studentId);
+
+    // Mark lost copy as replaced
+    await supabase
+      .from('library_book_copies')
+      .update({
+        replacement_status: 'accepted',
+        replacement_accepted_at: new Date().toISOString(),
+        replacement_accepted_by: userId
+      })
+      .eq('copy_id', lostCopyId);
+
+    res.json({
+      verified: true,
+      success: true,
+      oldCopyCode: lost.copy_code,
+      newCopyCode: newCopy.copy_code,
+      message: `Replacement accepted. Old: ${lost.copy_code} → New: ${replacementCopyCode}. Print new QR label.` 
+    });
+
+  } catch (err) { next(err); }
+});
+
+// GET /api/library/settings — Get library shortcode settings
+router.get('/settings', authRequired, async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    
+    const { data: school, error } = await supabase
+      .from('schools')
+      .select('library_shortcode, library_year_sequence, code')
+      .eq('school_id', schoolId)
+      .single();
+
+    if (error) throw error;
+
+    const year = new Date().getFullYear();
+    const yearSeq = school?.library_year_sequence?.[year] || 0;
+    const shortcode = school?.library_shortcode || school?.code?.substring(0, 6) || 'LIB';
+
+    res.json({
+      shortcode: shortcode,
+      year: year,
+      booksAddedThisYear: yearSeq,
+      nextAutoCode: `${shortcode}/${String(yearSeq + 1).padStart(3, '0')}/${year}`,
+      library_year_sequence: school?.library_year_sequence || {}
+    });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/library/settings — Update library shortcode
+router.put('/settings', authRequired,
+  requireRoles('admin', 'director', 'superadmin'),
+  async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { libraryShortcode } = req.body;
+
+    if (!libraryShortcode || libraryShortcode.length < 2 || libraryShortcode.length > 20) {
+      return res.status(400).json({
+        message: 'Shortcode must be 2-20 characters'
+      });
+    }
+
+    const { data, error } = await supabase
+      .from('schools')
+      .update({ library_shortcode: libraryShortcode.toUpperCase() })
+      .eq('school_id', schoolId)
+      .select('library_shortcode')
+      .single();
+
+    if (error) throw error;
+
+    res.json({
+      success: true,
+      shortcode: data.library_shortcode,
+      message: `Library shortcode updated to: ${data.library_shortcode}`
+    });
   } catch (err) { next(err); }
 });
 

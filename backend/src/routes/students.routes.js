@@ -69,9 +69,7 @@ router.get("/", async (req, res, next) => {
 
     const { data: rows, error } = await supabase
       .from('students')
-      .select(
-        'student_id, admission_number, first_name, last_name, gender, class_id, class_name, status, date_of_birth, nemis_number, phone, email, address, parent_name, parent_phone, blood_group, allergies, medical_conditions, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, admission_date, photo_url, created_at, opening_balance, opening_balance_type, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type'
-      )
+      .select('*')
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
       .order('class_name')
