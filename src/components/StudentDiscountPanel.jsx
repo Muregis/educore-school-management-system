@@ -12,16 +12,17 @@ const DISCOUNT_LABELS = {
   staff_child: "Staff Child",
   scholarship: "Scholarship",
   bursary: "Bursary",
+  hardship: "Hardship",
+  merit: "Academic Merit",
+  sports: "Sports Excellence",
   custom: "Custom Discount"
 };
 
 export default function StudentDiscountPanel({ studentId, student, auth, toast, onDiscountChange }) {
-  const [detected, setDetected] = useState([]);
   const [activeDiscounts, setActiveDiscounts] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [detecting, setDetecting] = useState(false);
-  const [showManualForm, setShowManualForm] = useState(false);
-  const [manualForm, setManualForm] = useState({
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [form, setForm] = useState({
     discountType: "custom",
     discountValue: "",
     reason: "",
@@ -40,48 +41,6 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
       setActiveDiscounts(data || []);
     } catch (err) {
       // Silent fail - student may have no discounts
-    }
-  };
-
-  const handleDetect = async () => {
-    setDetecting(true);
-    try {
-      const data = await apiFetch(`/discounts/detect/${studentId}`, { token: auth?.token });
-      setDetected(data.qualifies || []);
-
-      if (data.qualifies.length === 0 && data.existingDiscounts.length === 0) {
-        toast("No discounts detected for this student", "info");
-      }
-    } catch (err) {
-      toast(err.message || "Failed to detect discounts", "error");
-    } finally {
-      setDetecting(false);
-    }
-  };
-
-  const handleApply = async (discount) => {
-    setLoading(true);
-    try {
-      await apiFetch("/discounts/apply", {
-        method: "POST",
-        token: auth?.token,
-        body: {
-          studentId: parseInt(studentId),
-          discountType: discount.type,
-          discountValue: discount.discountPercent,
-          reason: discount.reason
-        }
-      });
-
-      toast(`${discount.discountPercent}% ${DISCOUNT_LABELS[discount.type]} applied`, "success");
-      await loadActiveDiscounts();
-      setDetected(prev => prev.filter(d => d.type !== discount.type));
-
-      if (onDiscountChange) onDiscountChange();
-    } catch (err) {
-      toast(err.message || "Failed to apply discount", "error");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -110,12 +69,9 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
     }
   };
 
-  const handleApplyManual = async () => {
-    if (!manualForm.discountValue || parseFloat(manualForm.discountValue) <= 0) {
+  const handleAddDiscount = async () => {
+    if (!form.discountValue || parseFloat(form.discountValue) <= 0) {
       return toast("Please enter a valid discount percentage", "error");
-    }
-    if (!manualForm.reason.trim()) {
-      return toast("Please provide a reason for the discount", "error");
     }
 
     setLoading(true);
@@ -125,17 +81,17 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
         token: auth?.token,
         body: {
           studentId: parseInt(studentId),
-          discountType: manualForm.discountType,
-          discountValue: parseFloat(manualForm.discountValue),
-          reason: manualForm.reason,
-          expiresAt: manualForm.expiresAt || null
+          discountType: form.discountType,
+          discountValue: parseFloat(form.discountValue),
+          reason: form.reason || DISCOUNT_LABELS[form.discountType] || "Manual discount",
+          expiresAt: form.expiresAt || null
         }
       });
 
-      toast(`${manualForm.discountValue}% discount applied`, "success");
+      toast(`${form.discountValue}% discount applied`, "success");
       await loadActiveDiscounts();
-      setShowManualForm(false);
-      setManualForm({ discountType: "custom", discountValue: "", reason: "", expiresAt: "" });
+      setShowAddForm(false);
+      setForm({ discountType: "custom", discountValue: "", reason: "", expiresAt: "" });
 
       if (onDiscountChange) onDiscountChange();
     } catch (err) {
@@ -145,10 +101,9 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
     }
   };
 
-  // Find the highest discount from detected and active
-  const allDiscounts = [...detected, ...activeDiscounts.map(d => ({ ...d, type: d.discount_type, discountPercent: d.discount_value, isActive: true }))];
-  const highestDiscount = allDiscounts.length > 0
-    ? allDiscounts.reduce((best, d) => (d.discountPercent > best.discountPercent ? d : best))
+  // Find the highest active discount
+  const highestDiscount = activeDiscounts.length > 0
+    ? activeDiscounts.reduce((best, d) => (d.discount_value > best.discount_value ? d : best))
     : null;
 
   return (
@@ -157,14 +112,9 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
         <h4 style={{ margin: 0, color: C.text, fontSize: 16, fontWeight: 600 }}>
           Fee Discounts
         </h4>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Btn size="small" variant="ghost" onClick={handleDetect} disabled={detecting}>
-            {detecting ? "Checking..." : "Check Eligibility"}
-          </Btn>
-          <Btn size="small" onClick={() => setShowManualForm(true)}>
-            + Manual
-          </Btn>
-        </div>
+        <Btn size="small" onClick={() => setShowAddForm(true)}>
+          + Add Discount
+        </Btn>
       </div>
 
       {/* Highest Discount Banner */}
@@ -184,54 +134,14 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
                 HIGHEST DISCOUNT APPLIES
               </div>
               <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>
-                {highestDiscount.discountPercent}% {DISCOUNT_LABELS[highestDiscount.type] || highestDiscount.label}
+                {highestDiscount.discount_value}% {DISCOUNT_LABELS[highestDiscount.discount_type] || highestDiscount.discount_type}
               </div>
               <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
                 {highestDiscount.reason}
               </div>
             </div>
-            {highestDiscount.isActive && (
-              <Badge text="Active" tone="success" />
-            )}
+            <Badge text="Active" tone="success" />
           </div>
-        </div>
-      )}
-
-      {/* Auto-detected Discounts */}
-      {detected.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <h5 style={{ margin: "0 0 12px 0", color: C.textSub, fontSize: 13, fontWeight: 500 }}>
-            Auto-detected (Not yet applied)
-          </h5>
-          {detected.map((discount, idx) => (
-            <div
-              key={idx}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: 12,
-                background: C.surface,
-                borderRadius: 8,
-                marginBottom: 8
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
-                  {discount.discountPercent}% {discount.label}
-                </div>
-                <div style={{ fontSize: 12, color: C.textMuted }}>{discount.reason}</div>
-                {discount.siblings && discount.siblings.length > 0 && (
-                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
-                    Siblings: {discount.siblings.join(", ")}
-                  </div>
-                )}
-              </div>
-              <Btn size="small" onClick={() => handleApply(discount)} disabled={loading}>
-                Apply
-              </Btn>
-            </div>
-          ))}
         </div>
       )}
 
@@ -280,16 +190,16 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
       )}
 
       {/* No Discounts Message */}
-      {detected.length === 0 && activeDiscounts.length === 0 && !detecting && (
+      {activeDiscounts.length === 0 && (
         <div style={{ textAlign: "center", padding: 24, color: C.textMuted, fontSize: 13 }}>
-          No discounts configured for this student.
+          No discounts applied.
           <br />
-          Click "Check Eligibility" to auto-detect sibling or staff discounts.
+          Click "Add Discount" to apply a fee reduction.
         </div>
       )}
 
-      {/* Manual Discount Form Modal */}
-      {showManualForm && (
+      {/* Add Discount Form Modal */}
+      {showAddForm && (
         <div
           style={{
             position: "fixed",
@@ -316,15 +226,15 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h4 style={{ margin: "0 0 20px 0", color: C.text }}>Apply Manual Discount</h4>
+            <h4 style={{ margin: "0 0 20px 0", color: C.text }}>Add Discount</h4>
 
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: "block", color: C.textMuted, fontSize: 12, marginBottom: 6 }}>
                 Type
               </label>
               <select
-                value={manualForm.discountType}
-                onChange={(e) => setManualForm({ ...manualForm, discountType: e.target.value })}
+                value={form.discountType}
+                onChange={(e) => setForm({ ...form, discountType: e.target.value })}
                 style={{
                   width: "100%",
                   padding: "8px 12px",
@@ -335,8 +245,15 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
                 }}
               >
                 <option value="custom">Custom Discount</option>
+                <option value="sibling_2nd">Sibling (2nd child)</option>
+                <option value="sibling_3rd">Sibling (3rd child)</option>
+                <option value="sibling_4th_plus">Sibling (4th+ child)</option>
+                <option value="staff_child">Staff Child</option>
                 <option value="scholarship">Scholarship</option>
                 <option value="bursary">Bursary</option>
+                <option value="hardship">Hardship</option>
+                <option value="merit">Academic Merit</option>
+                <option value="sports">Sports Excellence</option>
               </select>
             </div>
 
@@ -348,8 +265,8 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
                 type="number"
                 min="1"
                 max="100"
-                value={manualForm.discountValue}
-                onChange={(e) => setManualForm({ ...manualForm, discountValue: e.target.value })}
+                value={form.discountValue}
+                onChange={(e) => setForm({ ...form, discountValue: e.target.value })}
                 placeholder="e.g. 25"
                 style={{
                   width: "100%",
@@ -364,12 +281,12 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
 
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: "block", color: C.textMuted, fontSize: 12, marginBottom: 6 }}>
-                Reason *
+                Reason (optional)
               </label>
               <input
                 type="text"
-                value={manualForm.reason}
-                onChange={(e) => setManualForm({ ...manualForm, reason: e.target.value })}
+                value={form.reason}
+                onChange={(e) => setForm({ ...form, reason: e.target.value })}
                 placeholder="e.g. Financial hardship, academic excellence"
                 style={{
                   width: "100%",
@@ -388,8 +305,8 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
               </label>
               <input
                 type="date"
-                value={manualForm.expiresAt}
-                onChange={(e) => setManualForm({ ...manualForm, expiresAt: e.target.value })}
+                value={form.expiresAt}
+                onChange={(e) => setForm({ ...form, expiresAt: e.target.value })}
                 style={{
                   width: "100%",
                   padding: "8px 12px",
@@ -402,10 +319,10 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
             </div>
 
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <Btn variant="ghost" onClick={() => setShowManualForm(false)}>
+              <Btn variant="ghost" onClick={() => setShowAddForm(false)}>
                 Cancel
               </Btn>
-              <Btn onClick={handleApplyManual} disabled={loading}>
+              <Btn onClick={handleAddDiscount} disabled={loading}>
                 {loading ? "Applying..." : "Apply Discount"}
               </Btn>
             </div>

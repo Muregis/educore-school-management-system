@@ -257,10 +257,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       .filter(p => String(p.studentId) === String(sid) && p.status === "paid")
       .reduce((sum, p) => sum + Number(p.amount), 0);
 
-    // Ledger formula: (Opening + Expected + Additions) - (Payments + Waivers + Refunds)
-    const totalCredits = openingBalance + totalExpected;
-    const totalDebits = paid;
-    const balance = Math.max(0, totalCredits - totalDebits);
+    // Ledger formula: totalExpected already includes openingBalance minus discount
+    // So just subtract paid from totalExpected to get remaining balance
+    const balance = Math.max(0, totalExpected - paid);
 
     return {
       studentId: sid,
@@ -288,7 +287,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     };
   };
 
-  const balances = students.map(s => calculateLedgerBalance(s))
+  const balances = students.map(s => calculateLedgerBalance(s, []))
     .filter(b => filterClass === "all" || b.className === filterClass);
 
   const filteredPayments = normalisedPayments.filter(p => filterClass === "all" || p.className === filterClass);
@@ -719,11 +718,11 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           <Btn variant={filterDate==="all"?"primary":"ghost"} size="small" onClick={()=>setFilterDate("all")}>All Time</Btn>
           <Btn variant={filterDate==="today"?"primary":"ghost"} size="small" onClick={()=>setFilterDate("today")}>Today</Btn>
         </div>
-        <Btn variant="ghost" onClick={()=>{
+        {canViewTotals && <Btn variant="ghost" onClick={()=>{
           if (tab==="payments") csv("payments.csv",["Date","Student","Class","Amount","Type","Method","Status","Ref"],filteredPayments.map(p=>[p.date,p.studentName,p.className,p.amount,p.feeType,p.method,p.status,p.reference]));
           if (tab==="balances") csv("balances.csv",["Student","Class","Paid","Balance"],balances.map(b=>[b.name,b.className,b.paid,b.balance]));
           toast("CSV exported","success");
-        }}>Export CSV</Btn>
+        }}>Export CSV</Btn>}
         {canEdit && tab==="payments" && <Btn onClick={()=>setShowPayment(true)}>+ Record Payment</Btn>}
         {canEdit && tab==="payments" && <Btn onClick={()=>setShowRecordPaymentModal(true)}>📝 Manual Payment</Btn>}
         {canEdit && tab==="structure" && <Btn onClick={()=>{setEditStruct(null);setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""});setShowStruct(true);}}>Set Fee Structure</Btn>}
