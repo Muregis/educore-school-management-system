@@ -130,25 +130,31 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   // Auto-verify Paystack when redirected back
   useEffect(() => {
-    const ref    = localStorage.getItem("ps_pending_ref");
-    const name   = localStorage.getItem("ps_pending_name");
-    const amount = localStorage.getItem("ps_pending_amount");
-    const params = new URLSearchParams(window.location.search);
-    const urlRef = params.get("reference") || params.get("trxref");
+    const ref       = localStorage.getItem("ps_pending_ref");
+    const name      = localStorage.getItem("ps_pending_name");
+    const amount    = localStorage.getItem("ps_pending_amount");
+    const prevBal   = localStorage.getItem("ps_pending_balance");
+    const params    = new URLSearchParams(window.location.search);
+    const urlRef    = params.get("reference") || params.get("trxref");
     if (ref && urlRef && auth?.token) {
       localStorage.removeItem("ps_pending_ref");
       localStorage.removeItem("ps_pending_name");
       localStorage.removeItem("ps_pending_amount");
+      localStorage.removeItem("ps_pending_balance");
       window.history.replaceState({}, "", window.location.pathname);
       apiFetch(`/paystack/verify/${urlRef}`, { token: auth?.token })
         .then(result => {
           reloadPayments();
+          const paidAmount = result.amount || amount;
+          const previousBalance = Number(prevBal) || 0;
+          const newBalance = Math.max(0, previousBalance - paidAmount);
           setReceipt({
             studentName: name || "Student",
-            amount:      result.amount || amount,
+            amount:      paidAmount,
             reference:   urlRef,
             method:      "Paystack (" + (result.channel || "card") + ")",
             date:        new Date().toLocaleDateString(),
+            balance:     newBalance
           });
           setShowReceipt(true);
           toast("Paystack payment confirmed!", "success");
@@ -321,9 +327,10 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         token: auth?.token,
       });
 
-      localStorage.setItem("ps_pending_ref",   data.reference);
-      localStorage.setItem("ps_pending_name",  paystackTarget.name);
-      localStorage.setItem("ps_pending_amount", amount);
+      localStorage.setItem("ps_pending_ref",     data.reference);
+      localStorage.setItem("ps_pending_name",    paystackTarget.name);
+      localStorage.setItem("ps_pending_amount",  amount);
+      localStorage.setItem("ps_pending_balance", paystackTarget.balance);
 
       window.location.href = data.authorizationUrl;
     } catch (err) {
@@ -399,28 +406,24 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     if (amt > balance) return toast("Cannot exceed outstanding balance", "error");
 
     try {
-      await apiFetch("/payments", {
+      await apiFetch("/payments/manual", {
         method: "POST",
-        body: { 
-          studentId: sid, 
-          amount: amt, 
-          feeType: paymentForm.feeType, 
-          paymentMethod: paymentForm.method, 
-          paymentDate: paymentForm.date, 
-          status: paymentForm.status, 
-          paidBy: paymentForm.paidBy || null 
-        },
         token: auth?.token,
+        body: { studentId: paymentForm.studentId, amount: amt, method: paymentForm.method, date: paymentForm.date },
       });
       await reloadPayments();
       setShowPayment(false);
       const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
+      // Calculate balance AFTER this payment (current balance minus this payment)
+      const studentBalance = calculateLedgerBalance(s, []);
+      const newBalance = Math.max(0, studentBalance.balance - amt);
       setReceipt({ 
         studentName: name, 
         amount: amt, 
         reference: `CASH-${Date.now()}`, 
         method: paymentForm.method, 
-        date: paymentForm.date 
+        date: paymentForm.date,
+        balance: newBalance
       });
       setShowReceipt(true);
       toast("Payment recorded", "success");
@@ -532,13 +535,17 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       setBankDepositForm({ studentId: "", amount: "", proofFile: null });
       
       const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
+      // Calculate balance AFTER this deposit
+      const studentBalance = calculateLedgerBalance(s, []);
+      const newBalance = Math.max(0, studentBalance.balance - amt);
       setReceipt({
         studentName: name,
         amount: amt,
         reference: `BANK-${Date.now()}`,
         method: "Bank Deposit",
         date: new Date().toLocaleDateString(),
-        proofUrl: proofUrl
+        proofUrl: proofUrl,
+        balance: newBalance
       });
       setShowReceipt(true);
       toast("Bank deposit recorded pending verification", "success");
@@ -1177,7 +1184,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             reference: response.receiptNumber,
             method: methodLabels[response.paymentMethod] || response.paymentMethod,
             date: new Date(response.date).toLocaleDateString(),
-            balance: studentBalance?.balance || 0
+            balance: Math.max(0, (studentBalance?.balance || 0) - response.amount)
           });
           setShowReceipt(true);
         }}
