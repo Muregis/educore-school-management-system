@@ -7,6 +7,7 @@ import Modal from "../components/Modal";
 import Table from "../components/Table";
 import RecordPaymentModal from "../components/RecordPaymentModal";
 import PaymentReceipt from "../components/PaymentReceipt";
+import DiscountSettings from "../components/DiscountSettings";
 import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
@@ -15,6 +16,7 @@ import { printHTML } from "../lib/print";
 import { Msg } from "../components/Helpers";
 import { calculateStudentBalance, formatBalance, getBalanceStatusColor } from "../services/balanceService";
 import { ledgerBalanceService } from "../services/ledgerBalanceService";
+import { discountService, getDiscountLabel } from "../services/discountService";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 // Inline helpers
@@ -109,6 +111,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [bankDepositForm, setBankDepositForm] = useState({ studentId: "", amount: "", proofFile: null });
   const [bankDepositLoading, setBankDepositLoading] = useState(false);
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
+  const [showDiscountSettings, setShowDiscountSettings] = useState(false);
 
   // New system & term management
   const [useNewSystem, setUseNewSystem] = useState(true);
@@ -199,23 +202,23 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     return "Term 2"; // Legacy default
   };
 
-  // Ledger-first balance calculation with transport and lunch support
-  const calculateLedgerBalance = (student) => {
+  // Ledger-first balance calculation with transport, lunch, and discount support
+  const calculateLedgerBalance = (student, studentDiscounts = []) => {
     const sid = student.id ?? student.student_id;
     const cls = student.className ?? student.class_name ?? "";
-    
+
     // Base expected amount from fee structure
     const baseExpected = expectedByClass(cls);
-    
-    // Get student-specific settings (these would come from student record or API)
-    const transportDirection = student.transport_direction || 'none'; // 'none', 'one_way', 'two_way'
+
+    // Get student-specific settings
+    const transportDirection = student.transport_direction || 'none';
     const lunchEnabled = student.lunch_enabled || false;
     const breakfastEnabled = student.breakfast_enabled || false;
     const openingBalance = Number(student.opening_balance) || 0;
-    
+
     // Calculate additional fees
     const transportFee = ledgerBalanceService.calculateTransportFee(
-      student.transport_base_fee || 0, 
+      student.transport_base_fee || 0,
       transportDirection
     );
     const lunchFee = lunchEnabled ? ledgerBalanceService.calculateLunchFee(
@@ -228,24 +231,46 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       student.breakfast_days || 66,
       student.breakfast_billing_type || 'daily'
     ) : 0;
-    
-    const totalExpected = baseExpected + transportFee + lunchFee + breakfastFee;
-    
+
+    // Calculate gross amount (before discount)
+    const grossAmount = baseExpected + transportFee + lunchFee + breakfastFee + openingBalance;
+
+    // Apply discount if available
+    const discountCalc = discountService.calculateFeeWithDiscount({
+      baseFee: baseExpected,
+      transportFee,
+      lunchFee,
+      breakfastFee,
+      openingBalance,
+      discounts: studentDiscounts
+    });
+
+    const totalExpected = discountCalc.netAmount;
+    const totalDiscount = discountCalc.discountAmount;
+    const discountPercent = discountCalc.discountPercent;
+    const discountType = discountCalc.discountType;
+    const discountLabel = discountCalc.discountLabel;
+
     // Calculate paid amount from payments
     const paid = normalisedPayments
       .filter(p => String(p.studentId) === String(sid) && p.status === "paid")
       .reduce((sum, p) => sum + Number(p.amount), 0);
-    
+
     // Ledger formula: (Opening + Expected + Additions) - (Payments + Waivers + Refunds)
     const totalCredits = openingBalance + totalExpected;
-    const totalDebits = paid; // + waivers + refunds would be added here
+    const totalDebits = paid;
     const balance = Math.max(0, totalCredits - totalDebits);
-    
+
     return {
       studentId: sid,
       name: student.firstName ? `${student.firstName} ${student.lastName}` : `${student.first_name} ${student.last_name}`,
       className: cls,
       expected: totalExpected,
+      grossAmount,
+      totalDiscount,
+      discountPercent,
+      discountType,
+      discountLabel,
       paid,
       balance,
       openingBalance,
@@ -257,7 +282,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       email: student.email ?? student.parentEmail ?? "",
       transportDirection,
       lunchEnabled,
-      breakfastEnabled
+      breakfastEnabled,
+      hasDiscount: discountCalc.hasDiscount
     };
   };
 
@@ -678,6 +704,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         {canEdit && tab==="payments" && <Btn onClick={()=>setShowPayment(true)}>+ Record Payment</Btn>}
         {canEdit && tab==="payments" && <Btn onClick={()=>setShowRecordPaymentModal(true)}>📝 Manual Payment</Btn>}
         {canEdit && tab==="structure" && <Btn onClick={()=>{setEditStruct(null);setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""});setShowStruct(true);}}>Set Fee Structure</Btn>}
+        {(canEdit || auth?.role === "admin") && <Btn variant="ghost" onClick={()=>setShowDiscountSettings(true)}>🎁 Discounts</Btn>}
       </div>
 
       {/* Payments Tab */}
@@ -737,7 +764,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           {balances.length===0 ? <Msg text="No balances available." /> : (
         <div style={{ overflowX: "auto" }}>
           <Table
-            headers={["Student","Class","Base Fee","+Transport","+Lunch","+Breakfast","+Opening",...(canViewTotals ? ["Paid"] : []),"Balance","Status","Pay"]}
+            headers={["Student","Class","Base Fee","+Transport","+Lunch","+Breakfast","+Opening",...(canViewTotals ? ["Paid"] : []),"Discount","Balance","Status","Pay"]}
             rows={balances.map(b=>[
               <span key={b.studentId} style={{color:C.text,fontWeight:600}}>{b.name}</span>,
               b.className,
@@ -763,6 +790,15 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
               </span>,
               // Paid (hidden total expected) - only visible to finance/director/superadmin
               ...(canViewTotals ? [<span key="paid" style={{color:'#22c55e'}}>{money(b.paid)}</span>] : []),
+              // Discount
+              <span key="discount" style={{fontSize:12,color:b.hasDiscount?'#22c55e':'#64748b'}}>
+                {b.hasDiscount ? (
+                  <>
+                    <span style={{fontWeight:600}}>{b.discountPercent}%</span>
+                    <small style={{display:'block',fontSize:10}}>{b.discountLabel}</small>
+                  </>
+                ) : "—"}
+              </span>,
               // Balance
               <span key="balance" style={{fontWeight:700,color:b.balance>0?'#ef4444':'#22c55e'}}>{money(b.balance)}</span>,
               // Status
@@ -790,6 +826,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             <span>🍽️ <strong>Lunch:</strong> Daily or termly rate</span>
             <span>🥐 <strong>Breakfast:</strong> Daily or termly rate</span>
             <span>📖 <strong>Opening:</strong> Balance carried forward</span>
+            <span>🎁 <strong>Discount:</strong> Sibling/Staff/Scholarship</span>
           </div>
         </div>
       )}
@@ -1096,18 +1133,19 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         toast={toast}
         onSuccess={(response) => {
           reloadPayments();
-          const student = students.find(s => (s.id || s.student_id) === parseInt(response.studentId));
+          const sid = String(response.studentId);
+          const student = students.find(s => String(s.id || s.student_id) === sid);
           const firstName = student?.firstName || student?.first_name || "";
           const lastName = student?.lastName || student?.last_name || "";
           const studentName = `${firstName} ${lastName}`.trim() || "Student";
-          
+
           // Format payment method nicely
           const methodLabels = {
             'cash': 'Cash',
             'bank_transfer': 'Bank Transfer',
             'mpesa_manual': 'M-Pesa Manual'
           };
-          
+
           setReceipt({
             studentName: studentName,
             amount: response.amount,
@@ -1117,6 +1155,14 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           });
           setShowReceipt(true);
         }}
+      />
+
+      {/* Discount Settings Modal */}
+      <DiscountSettings
+        isOpen={showDiscountSettings}
+        onClose={() => setShowDiscountSettings(false)}
+        auth={auth}
+        toast={toast}
       />
     </div>
   );

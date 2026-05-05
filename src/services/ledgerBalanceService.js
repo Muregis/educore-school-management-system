@@ -307,11 +307,16 @@ async function addLedgerEntry({
  */
 export function calculateTransportFee(baseFee, direction = 'two_way') {
   const base = parseFloat(baseFee) || 0;
-  
+
+  // No transport if direction is 'none' or not set
+  if (!direction || direction === 'none') {
+    return 0;
+  }
+
   if (direction === 'one_way') {
     return Math.round(base * 0.6 * 100) / 100; // 60% for one-way
   }
-  
+
   return base; // 100% for two-way
 }
 
