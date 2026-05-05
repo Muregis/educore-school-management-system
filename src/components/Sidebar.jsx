@@ -97,14 +97,42 @@ const Sidebar = ({
   const roleColor = auth?.role ? ROLE_COLORS[auth.role] || C.accent : C.accent;
   const isParent = auth?.role === "parent";
   
-  // Filter navigation groups based on allowed pages
+  // Role-based navigation filtering
+  const ROLE_NAV_LIMITS = {
+    admin: ["dashboard", "students", "attendance", "grades", "fees", "reportcards", "admissions", "communication", "timetable", "library", "transport", "discipline", "mpesa-reconcile"],
+    director: null, // null = all access
+    superadmin: null, // null = all access
+    teacher: ["dashboard", "grades", "attendance", "timetable", "lessonplans"],
+    finance: ["dashboard", "fees", "invoices", "mpesa-reconcile", "reportcards"],
+    hr: ["dashboard", "hr", "staff"],
+    librarian: ["dashboard", "library"],
+    parent: ["dashboard", "grades", "fees", "attendance", "communication"],
+    student: ["dashboard", "grades", "attendance", "timetable", "library"],
+  };
+
+  // Filter navigation groups based on role and allowed pages
   const filteredGroups = useMemo(() => {
-    if (!allowedPages.length) return NAVIGATION_GROUPS;
-    return NAVIGATION_GROUPS.map(group => ({
-      ...group,
-      items: group.items.filter(item => allowedPages.includes(item.id))
-    })).filter(group => group.id === "dashboard" || group.items.length > 0);
-  }, [allowedPages]);
+    const roleLimit = ROLE_NAV_LIMITS[auth?.role];
+    let groups = NAVIGATION_GROUPS;
+
+    // Apply role-based filtering if limits exist for this role
+    if (roleLimit) {
+      groups = groups.map(group => ({
+        ...group,
+        items: group.items.filter(item => roleLimit.includes(item.id))
+      })).filter(group => group.id === "dashboard" || group.items.length > 0);
+    }
+
+    // Apply additional allowedPages filtering if provided
+    if (allowedPages.length) {
+      groups = groups.map(group => ({
+        ...group,
+        items: group.items.filter(item => allowedPages.includes(item.id))
+      })).filter(group => group.id === "dashboard" || group.items.length > 0);
+    }
+
+    return groups;
+  }, [allowedPages, auth?.role]);
 
   useEffect(() => {
     setOpenGroup(findGroupForPage(page));

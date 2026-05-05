@@ -330,7 +330,7 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance'), as
         mpesa_phone: mpesaPhone || null,
         proof_url: proofUrl || null,
         payment_date: paymentDate || new Date().toISOString(),
-        status: 'completed',
+        status: 'paid',
         received_by_user_id: userId,
         notes: notes || null,
         created_at: new Date().toISOString()
@@ -351,6 +351,10 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance'), as
       success: true,
       paymentId: data.payment_id,
       receiptNumber: data.reference_number,
+      studentId: studentId,
+      amount: parseFloat(amount),
+      paymentMethod: paymentMethod,
+      date: paymentDate || new Date().toISOString(),
       message: `${paymentMethod} payment of KES ${amount} recorded successfully`
     });
 

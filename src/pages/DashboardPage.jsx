@@ -209,8 +209,70 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     }, {})
   ).slice(-7);
 
-  // Admin/Director/Superadmin dashboard
-  if (["admin", "director", "superadmin"].includes(auth?.role)) {
+  // Admin/Secretary dashboard - limited view (receives payments, no outstanding view)
+  if (auth?.role === "admin") {
+    const cards = [
+      ["Boys", boys],
+      ["Girls", girls],
+      ["Total Students", totalStudents],
+      ["Teachers", teachers.length],
+      ["Present Records", present],
+      ["Fees Collected", money(paid)],
+    ];
+
+    return (
+      <div style={{ display: "grid", gap: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 12 }}>
+          {cards.map(x => (
+            <div key={x[0]} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }}>
+              <div style={{ color: C.textMuted, fontSize: 12 }}>{x[0]}</div>
+              <div style={{ color: C.text, fontWeight: 800, fontSize: 24 }}>{x[1]}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }}>
+            <div style={{ color: C.text, fontWeight: 700, marginBottom: 10 }}>Attendance Trend (Last 7 Days)</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", alignItems: "end", gap: 8, minHeight: 120 }}>
+              {attendanceByDate.length === 0 ? (
+                <div style={{ color: C.textMuted, fontSize: 12 }}>No attendance data yet.</div>
+              ) : (
+                attendanceByDate.map(([date, values]) => {
+                  const pct = values.total === 0 ? 0 : Math.round((values.present / values.total) * 100);
+                  return (
+                    <div key={date} style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 10, color: C.textMuted }}>{pct}%</div>
+                      <div style={{ height: `${Math.max(8, pct)}px`, background: C.accent, borderRadius: 6, margin: "4px 0" }} />
+                      <div style={{ fontSize: 10, color: C.textMuted }}>{date.slice(5)}</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }}>
+            <div style={{ color: C.text, fontWeight: 700, marginBottom: 10 }}>Grade Distribution</div>
+            {["EE", "ME", "AE", "BE"].map(g => (
+              <div key={g} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.textSub }}>
+                  <span>{g}</span>
+                  <span>{gradeCount[g]}</span>
+                </div>
+                <div style={{ height: 8, borderRadius: 20, background: C.surface }}>
+                  <div style={{ height: "100%", width: `${Math.min(100, gradeCount[g] * 12)}%`, borderRadius: 20, background: g === "EE" ? C.green : g === "ME" ? C.teal : g === "AE" ? C.amber : C.rose }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Director/Superadmin dashboard - full management view
+  if (["director", "superadmin"].includes(auth?.role)) {
     const pendingPlans = lessonPlansLoading ? "…" : lessonPlans.length;
     const cards = [
       ["Boys", boys],

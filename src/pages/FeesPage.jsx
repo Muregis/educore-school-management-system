@@ -1096,12 +1096,24 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         toast={toast}
         onSuccess={(response) => {
           reloadPayments();
+          const student = students.find(s => (s.id || s.student_id) === parseInt(response.studentId));
+          const firstName = student?.firstName || student?.first_name || "";
+          const lastName = student?.lastName || student?.last_name || "";
+          const studentName = `${firstName} ${lastName}`.trim() || "Student";
+          
+          // Format payment method nicely
+          const methodLabels = {
+            'cash': 'Cash',
+            'bank_transfer': 'Bank Transfer',
+            'mpesa_manual': 'M-Pesa Manual'
+          };
+          
           setReceipt({
-            studentName: students.find(s => (s.id || s.student_id) === parseInt(response.studentId))?.first_name + " " + students.find(s => (s.id || s.student_id) === parseInt(response.studentId))?.last_name || "Student",
+            studentName: studentName,
             amount: response.amount,
             reference: response.receiptNumber,
-            method: response.paymentMethod,
-            date: new Date().toLocaleDateString(),
+            method: methodLabels[response.paymentMethod] || response.paymentMethod,
+            date: new Date(response.date).toLocaleDateString(),
           });
           setShowReceipt(true);
         }}
