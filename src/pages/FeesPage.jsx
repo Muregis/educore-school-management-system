@@ -287,7 +287,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     };
   };
 
-  const balances = students.map(calculateLedgerBalance)
+  const balances = students.map(s => calculateLedgerBalance(s))
     .filter(b => filterClass === "all" || b.className === filterClass);
 
   const filteredPayments = normalisedPayments.filter(p => filterClass === "all" || p.className === filterClass);
