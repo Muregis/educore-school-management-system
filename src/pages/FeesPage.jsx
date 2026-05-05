@@ -16,7 +16,7 @@ import { printHTML } from "../lib/print";
 import { Msg } from "../components/Helpers";
 import { calculateStudentBalance, formatBalance, getBalanceStatusColor } from "../services/balanceService";
 import { ledgerBalanceService } from "../services/ledgerBalanceService";
-import { discountService, getDiscountLabel } from "../services/discountService";
+import discountService from "../services/discountService";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 // Inline helpers
