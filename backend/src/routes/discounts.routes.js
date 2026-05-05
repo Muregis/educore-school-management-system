@@ -39,7 +39,7 @@ router.get('/config', async (req, res, next) => {
       .eq('school_id', schoolId)
       .eq('is_active', true);
 
-    // If no configs exist yet seed defaults
+    // If no configs exist yet seed defaults, or update any that are 0%
     if (!configs || configs.length === 0) {
       const defaults = DEFAULT_CONFIGS.map(c => ({
         ...c,
@@ -52,6 +52,18 @@ router.get('/config', async (req, res, next) => {
         .select('*');
 
       configs = seeded;
+    } else {
+      // Update any configs that have 0% when they should have default values
+      for (const config of configs) {
+        const defaultConfig = DEFAULT_CONFIGS.find(d => d.discount_type === config.discount_type);
+        if (defaultConfig && config.discount_value === 0) {
+          await supabase
+            .from('discount_configs')
+            .update({ discount_value: defaultConfig.discount_value })
+            .eq('config_id', config.config_id);
+          config.discount_value = defaultConfig.discount_value;
+        }
+      }
     }
 
     // Add labels

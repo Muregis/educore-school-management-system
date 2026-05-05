@@ -261,6 +261,83 @@ router.get("/fee-defaulters", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── Class-wise fee summary ────────────────────────────────────────────────
+router.get("/class-fee-summary", async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    
+    // Get all students
+    const { data: allStudents, error: stuErr } = await supabase
+      .from('students')
+      .select('student_id, first_name, last_name, class_name')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
+    if (stuErr) throw stuErr;
+    
+    // Get fee structures
+    const { data: feeStructures, error: feeErr } = await supabase
+      .from('fee_structures')
+      .select('class_name, tuition, activity, misc')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
+    if (feeErr) throw feeErr;
+    
+    // Get all paid payments
+    const { data: payments, error: payErr } = await supabase
+      .from('payments')
+      .select('student_id, amount')
+      .eq('school_id', schoolId)
+      .eq('status', 'paid')
+      .eq('is_deleted', false);
+    if (payErr) throw payErr;
+    
+    // Build fee structure map
+    const feeMap = {};
+    feeStructures?.forEach(fs => {
+      const expected = Number(fs.tuition) + Number(fs.activity) + Number(fs.misc);
+      feeMap[fs.class_name] = expected;
+    });
+    
+    // Build payment map per student
+    const paymentMap = {};
+    payments?.forEach(payment => {
+      if (!paymentMap[payment.student_id]) {
+        paymentMap[payment.student_id] = 0;
+      }
+      paymentMap[payment.student_id] += Number(payment.amount);
+    });
+    
+    // Calculate per-class summary
+    const classSummary = {};
+    allStudents?.forEach(student => {
+      const cls = student.class_name;
+      if (!classSummary[cls]) {
+        classSummary[cls] = {
+          class_name: cls,
+          student_count: 0,
+          total_expected: 0,
+          total_paid: 0,
+          total_outstanding: 0
+        };
+      }
+      
+      const expected = feeMap[cls] || 0;
+      const paid = paymentMap[student.student_id] || 0;
+      const outstanding = Math.max(0, expected - paid);
+      
+      classSummary[cls].student_count += 1;
+      classSummary[cls].total_expected += expected;
+      classSummary[cls].total_paid += paid;
+      classSummary[cls].total_outstanding += outstanding;
+    });
+    
+    // Convert to array and sort by class name
+    const result = Object.values(classSummary).sort((a, b) => a.class_name.localeCompare(b.class_name));
+    
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
 // ─── Grade distribution by subject ───────────────────────────────────────────
 router.get("/grade-distribution", async (req, res, next) => {
   try {

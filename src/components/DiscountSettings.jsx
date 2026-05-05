@@ -179,15 +179,10 @@ export default function DiscountSettings({ isOpen, onClose, auth, toast }) {
                 color: "#60a5fa"
               }}
             >
-              <strong>Note:</strong> If a student qualifies for multiple discounts, only the
+              <strong>Note:</strong> If a student has multiple discounts, only the
               <strong> highest discount</strong> applies. Discounts are not stacked.
               <br /><br />
-              <strong>How it works:</strong>
-              <ul style={{ margin: "8px 0", paddingLeft: 20 }}>
-                <li>Sibling discounts auto-detect via parent phone match</li>
-                <li>Staff child discount detects via HR staff phone match</li>
-                <li>Manual/scholarship discounts require admin approval</li>
-              </ul>
+              Apply discounts directly to students from the Fees page — no eligibility checks required.
             </div>
 
             {/* Actions */}

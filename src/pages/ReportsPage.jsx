@@ -606,6 +606,7 @@ export default function ReportsPage({ auth }) {
   const [attendance, setAttendance] = useState([]);
   const [defaulters, setDefaulters] = useState([]);
   const [grades, setGrades]         = useState([]);
+  const [classFeeSummary, setClassFeeSummary] = useState([]);
   const [tab, setTab]               = useState("overview");
   const [filterClass, setFilterClass] = useState("all");
   const [loading, setLoading]       = useState(true);
@@ -629,12 +630,8 @@ export default function ReportsPage({ auth }) {
       apiFetch("/reports/attendance-rate",        { token }),
       apiFetch("/reports/fee-defaulters",         { token }),
       apiFetch("/reports/grade-distribution",     { token }),
-      apiFetch("/reports/summary",                { token: auth.token }),
-      apiFetch("/reports/monthly-fee-collection", { token: auth.token }),
-      apiFetch("/reports/attendance-rate",        { token: auth.token }),
-      apiFetch("/reports/fee-defaulters",         { token: auth.token }),
-      apiFetch("/reports/grade-distribution",     { token: auth.token }),
-    ]).then(([s, m, a, d, g]) => {
+      apiFetch("/reports/class-fee-summary",      { token }), // New endpoint for class-wise fees
+    ]).then(([s, m, a, d, g, cfs]) => {
       const normSummary = s ? {
         students:       s.totalStudents  ?? s.students       ?? 0,
         teachers:       s.totalTeachers  ?? s.teachers       ?? 0,
@@ -646,6 +643,7 @@ export default function ReportsPage({ auth }) {
       setMonthly((m || []).map(row => ({ ...row, total: row.total ?? row.collected ?? 0 })));
       setAttendance(a);
       setDefaulters(d);
+      setClassFeeSummary(cfs || []);
       setGrades((g || []).map(row => ({
         ...row,
         avg_score:  row.avg_score  ?? row.avgScore  ?? 0,
@@ -726,6 +724,31 @@ export default function ReportsPage({ auth }) {
       {/* ── Fees ── */}
       {tab === "fees" && (
         <div>
+          {/* Class-wise Outstanding Balance */}
+          <h3 style={{ color:C.text, marginBottom:12 }}>Outstanding Balance by Class</h3>
+          {classFeeSummary.length === 0 ? (
+            <p style={{ color:C.textMuted }}>Loading class fee data...</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 24 }}>
+              {classFeeSummary.map(cls => (
+                <div key={cls.class_name} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14 }}>
+                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>{cls.class_name}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: cls.total_outstanding > 0 ? '#ef4444' : '#22c55e' }}>
+                    {money(cls.total_outstanding)}
+                  </div>
+                  <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>
+                    {cls.student_count} students · {money(cls.total_paid)} paid
+                  </div>
+                  {cls.total_expected > 0 && (
+                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
+                      Expected: {money(cls.total_expected)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           <h3 style={{ color:C.text, marginBottom:8 }}>Monthly Fee Collection</h3>
           {monthly.length === 0 ? <p style={{ color:C.textMuted }}>No payment data yet.</p> : (
             <div style={{ display:"flex", flexDirection:"column", gap:6 }}>

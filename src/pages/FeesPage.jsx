@@ -113,6 +113,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [bankDepositLoading, setBankDepositLoading] = useState(false);
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [showDiscountSettings, setShowDiscountSettings] = useState(false);
+  const [studentDiscounts, setStudentDiscounts] = useState({}); // Map of studentId -> discount array
 
   // New system & term management
   const [useNewSystem, setUseNewSystem] = useState(true);
@@ -127,6 +128,23 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     const data = await apiFetch("/payments", { token: auth.token });
     setPayments(data.map(normalisePayment));
   }, [auth, setPayments]);
+
+  // Load student discounts
+  useEffect(() => {
+    if (!auth?.token) return;
+    discountService.getStudentDiscounts(auth.token)
+      .then(discounts => {
+        // Group by student_id
+        const grouped = {};
+        discounts.forEach(d => {
+          const sid = d.student_id;
+          if (!grouped[sid]) grouped[sid] = [];
+          grouped[sid].push(d);
+        });
+        setStudentDiscounts(grouped);
+      })
+      .catch(err => console.error("Failed to load discounts:", err));
+  }, [auth?.token, reloadPayments]);
 
   // Auto-verify Paystack when redirected back
   useEffect(() => {
@@ -293,7 +311,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     };
   };
 
-  const balances = students.map(s => calculateLedgerBalance(s, []))
+  const balances = students.map(s => calculateLedgerBalance(s, studentDiscounts[s.id ?? s.student_id] || []))
     .filter(b => filterClass === "all" || b.className === filterClass);
 
   const filteredPayments = normalisedPayments.filter(p => filterClass === "all" || p.className === filterClass);
@@ -415,7 +433,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       setShowPayment(false);
       const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
       // Calculate balance AFTER this payment (current balance minus this payment)
-      const studentBalance = calculateLedgerBalance(s, []);
+      const studentBalance = calculateLedgerBalance(s, studentDiscounts[sid] || []);
       const newBalance = Math.max(0, studentBalance.balance - amt);
       setReceipt({ 
         studentName: name, 
@@ -791,7 +809,37 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           )}
 
           {filteredBalances.length===0 ? <Msg text={filterDate==="today" ? "No balances for today." : "No balances available."} /> : (
-        <div style={{ overflowX: "auto" }}>
+        <>
+          {/* Class Summary Cards - Director/Superadmin only */}
+          {["director", "superadmin"].includes(auth?.role) && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 16 }}>
+              {ALL_CLASSES.map(cls => {
+                const classBalances = balances.filter(b => b.className === cls);
+                const classStudents = classBalances.length;
+                const totalOutstanding = classBalances.reduce((sum, b) => sum + b.balance, 0);
+                const totalPaid = classBalances.reduce((sum, b) => sum + b.paid, 0);
+                const totalExpected = classBalances.reduce((sum, b) => sum + b.expected, 0);
+                if (classStudents === 0) return null;
+                return (
+                  <div key={cls} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14 }}>
+                    <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>{cls}</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: totalOutstanding > 0 ? '#ef4444' : '#22c55e' }}>
+                      {money(totalOutstanding)}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>
+                      {classStudents} students · {money(totalPaid)} paid
+                    </div>
+                    {totalExpected > 0 && (
+                      <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
+                        Expected: {money(totalExpected)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div style={{ overflowX: "auto" }}>
           <Table
             headers={["Student","Class","Base Fee","+Transport","+Lunch","+Breakfast","+Opening",...(canViewTotals ? ["Paid"] : []),"Discount","Balance","Status","Pay"]}
             rows={filteredBalances.map(b=>[

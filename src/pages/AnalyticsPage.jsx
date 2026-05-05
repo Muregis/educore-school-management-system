@@ -357,6 +357,42 @@ Provide a structured analysis with:
             <StatCard title="Pending Balance" value={money(stats.pendingFees)} color="#EF4444" />
             <StatCard title="Collection Rate" value={`${stats.pendingFees > 0 ? ((stats.totalCollected / (stats.totalCollected + stats.pendingFees)) * 100).toFixed(1) : 100}%`} color="#EAB308" />
           </div>
+
+          {/* Class-wise Outstanding Balance */}
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
+            <h3 style={{ margin: "0 0 16px", color: C.text, fontSize: 16 }}>Outstanding Balance by Class</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+              {ALL_CLASSES.map(cls => {
+                const classStudents = students.filter(s => (s.className || s.class_name) === cls);
+                if (classStudents.length === 0) return null;
+                
+                const classExpected = classStudents.reduce((sum, s) => {
+                  const struct = feeStructures.find(f => f.className === cls);
+                  return sum + (struct ? (Number(struct.tuition || 0) + Number(struct.activity || 0) + Number(struct.misc || 0)) : 0);
+                }, 0);
+                
+                const classPaid = classStudents.reduce((sum, s) => {
+                  const sid = s.id ?? s.student_id;
+                  return sum + payments.filter(p => p.studentId === sid).reduce((t, p) => t + Number(p.amount), 0);
+                }, 0);
+                
+                const classOutstanding = Math.max(0, classExpected - classPaid);
+                
+                return (
+                  <div key={cls} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+                    <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>{cls}</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: classOutstanding > 0 ? '#ef4444' : '#22c55e' }}>
+                      {money(classOutstanding)}
+                    </div>
+                    <div style={{ fontSize: 10, color: C.textSub, marginTop: 4 }}>
+                      {classStudents.length} students · {money(classPaid)} paid
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
             <h3 style={{ margin: "0 0 16px", color: C.text, fontSize: 16 }}>Monthly Payment Collection</h3>
             {paymentChartData.length > 0 ? (
