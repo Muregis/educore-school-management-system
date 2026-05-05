@@ -906,6 +906,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       )}
         </>
       )}
+        </>
+      )}
 
       {/* Fee Structure Tab */}
       {tab==="structure" && (normalisedStructures.length===0 ? <Msg text="No fee structures set." /> : (
