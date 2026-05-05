@@ -47,6 +47,9 @@ function normalise(s) {
     breakfast_daily_rate: s.breakfast_daily_rate ?? 0,
     breakfast_days: s.breakfast_days ?? 66,
     breakfast_billing_type: s.breakfast_billing_type ?? "daily",
+    discount_type: s.discount_type ?? "",
+    discount_value: s.discount_value ?? 0,
+    discount_is_percentage: s.discount_is_percentage ?? true,
   };
 }
 
@@ -63,7 +66,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", lunch_enabled: false, lunch_daily_rate: "", lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: 66, breakfast_billing_type: "daily" });
+  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", lunch_enabled: false, lunch_daily_rate: "", lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: 66, breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -121,7 +124,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
   const openAdd = () => {
     setEditId(null); setErr("");
-    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "" });
+    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", lunch_enabled: false, lunch_daily_rate: "", lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: 66, breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
     setShow(true);
   };
 
@@ -143,7 +146,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       if (editId) {
         await apiFetch(`/students/${editId}`, {
           method: "PUT",
-          body: { admissionNumber: f.admission || null, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null, openingBalance: f.opening_balance, openingBalanceType: f.opening_balance_type, lunchEnabled: f.lunch_enabled, lunchDailyRate: f.lunch_daily_rate, lunchDays: f.lunch_days, lunchBillingType: f.lunch_billing_type, breakfastEnabled: f.breakfast_enabled, breakfastDailyRate: f.breakfast_daily_rate, breakfastDays: f.breakfast_days, breakfastBillingType: f.breakfast_billing_type },
+          body: { admissionNumber: f.admission || null, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null, openingBalance: f.opening_balance, openingBalanceType: f.opening_balance_type, lunchEnabled: f.lunch_enabled, lunchDailyRate: f.lunch_daily_rate, lunchDays: f.lunch_days, lunchBillingType: f.lunch_billing_type, breakfastEnabled: f.breakfast_enabled, breakfastDailyRate: f.breakfast_daily_rate, breakfastDays: f.breakfast_days, breakfastBillingType: f.breakfast_billing_type, discountType: f.discount_type || null, discountValue: f.discount_value ? Number(f.discount_value) : 0, discountIsPercentage: f.discount_is_percentage },
           token: auth?.token,
         });
         setStudents(prev => prev.map(s => (s.id === editId || s.student_id === editId) ? { ...normalise(s), ...f, id: editId } : s));
@@ -448,7 +451,50 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
                 </div>
               )}
             </Field>
-            
+
+            <Field label="Fee Discount" style={{ gridColumn: "1 / -1" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, alignItems: "start" }}>
+                <select
+                  style={inputStyle}
+                  value={f.discount_type || ""}
+                  onChange={e => setF({ ...f, discount_type: e.target.value })}
+                >
+                  <option value="">No Discount</option>
+                  <option value="sibling_2nd">2nd Sibling</option>
+                  <option value="sibling_3rd">3rd Sibling</option>
+                  <option value="sibling_4th_plus">4th+ Sibling</option>
+                  <option value="staff_child">Staff Child</option>
+                  <option value="scholarship">Scholarship</option>
+                  <option value="bursary">Bursary</option>
+                  <option value="other">Other</option>
+                </select>
+                <input
+                  style={inputStyle}
+                  type="number"
+                  min="0"
+                  max={f.discount_is_percentage ? 100 : 999999}
+                  value={f.discount_value || ""}
+                  onChange={e => setF({ ...f, discount_value: e.target.value })}
+                  placeholder={f.discount_is_percentage ? "Discount %" : "Amount (KES)"}
+                  disabled={!f.discount_type}
+                />
+                <select
+                  style={inputStyle}
+                  value={f.discount_is_percentage ? "percentage" : "amount"}
+                  onChange={e => setF({ ...f, discount_is_percentage: e.target.value === "percentage" })}
+                  disabled={!f.discount_type}
+                >
+                  <option value="percentage">Percentage (%)</option>
+                  <option value="amount">Fixed Amount (KES)</option>
+                </select>
+              </div>
+              {f.discount_type && (
+                <small style={{ color: C.textMuted, fontSize: 11, display: "block", marginTop: 4 }}>
+                  Discount applies to base tuition fee only. Transport, lunch, and breakfast are not discounted.
+                </small>
+              )}
+            </Field>
+
             <Field label="Opening Balance (KES)" style={{ gridColumn: "1 / -1" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
                 <input 

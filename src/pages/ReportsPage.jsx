@@ -668,6 +668,22 @@ export default function ReportsPage({ auth }) {
   const filteredGrades     = filterClass === "all" ? grades     : grades.filter(g => g.class_name === filterClass);
   const filteredDefaulters = filterClass === "all" ? defaulters : defaulters.filter(d => d.class_name === filterClass);
 
+  // Defaulters pagination state
+  const [defaultersPage, setDefaultersPage] = useState(1);
+  const [defaultersPageSize, setDefaultersPageSize] = useState(20);
+
+  // Calculate paginated defaulters
+  const totalDefaulters = filteredDefaulters.length;
+  const totalDefaulterPages = defaultersPageSize === 'all' ? 1 : Math.ceil(totalDefaulters / defaultersPageSize);
+  const paginatedDefaulters = defaultersPageSize === 'all'
+    ? filteredDefaulters
+    : filteredDefaulters.slice((defaultersPage - 1) * defaultersPageSize, defaultersPage * defaultersPageSize);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setDefaultersPage(1);
+  }, [filterClass, defaultersPageSize]);
+
   if (loading) return <div style={{ color:C.textMuted, padding:32 }}>Loading reports…</div>;
 
   return (
@@ -877,7 +893,7 @@ export default function ReportsPage({ auth }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredDefaulters.map((d, i) => {
+                    {paginatedDefaulters.map((d, i) => {
                       const balancePercentage = d.balance_percentage || (d.expected_amount > 0 ? (d.balance / d.expected_amount) * 100 : 0);
                       let severityColor, severityBg, severityLabel;
                       
@@ -995,27 +1011,63 @@ export default function ReportsPage({ auth }) {
                 </table>
               </div>
 
-              {/* Pagination for >20 defaulters */}
-              {filteredDefaulters.length > 20 && (
-                <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:8, marginTop:16, fontSize:12, color:C.textMuted }}>
-                  <span>Showing first 20 of {filteredDefaulters.length} defaulters</span>
-                  <button 
-                    style={{ 
-                      background:C.accent, 
-                      color:"#fff", 
-                      border:"none", 
-                      borderRadius:6, 
-                      padding:"4px 12px", 
-                      cursor:"pointer",
-                      fontSize:12
-                    }}
-                    onClick={() => {
-                      // TODO: Implement full pagination
-                      alert("Full pagination coming soon - for now showing top 20 defaulters");
-                    }}
-                  >
-                    View All
-                  </button>
+              {/* Pagination controls */}
+              {totalDefaulters > 0 && (
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:16, flexWrap:"wrap", gap:12 }}>
+                  {/* Page size selector */}
+                  <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:C.textMuted }}>
+                    <span>Show:</span>
+                    <select
+                      style={{ background:C.card, color:C.text, border:`1px solid ${C.border}`, borderRadius:6, padding:"4px 8px", fontSize:12 }}
+                      value={defaultersPageSize}
+                      onChange={(e) => setDefaultersPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                    >
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value="all">All</option>
+                    </select>
+                    <span>of {totalDefaulters} defaulters</span>
+                  </div>
+
+                  {/* Page navigation */}
+                  {defaultersPageSize !== 'all' && totalDefaulterPages > 1 && (
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      <button
+                        style={{
+                          background: defaultersPage === 1 ? C.border : C.card,
+                          color: defaultersPage === 1 ? C.textMuted : C.text,
+                          border: `1px solid ${C.border}`,
+                          borderRadius:6,
+                          padding:"4px 10px",
+                          cursor: defaultersPage === 1 ? "default" : "pointer",
+                          fontSize:12
+                        }}
+                        onClick={() => setDefaultersPage(p => Math.max(1, p - 1))}
+                        disabled={defaultersPage === 1}
+                      >
+                        ‹ Prev
+                      </button>
+                      <span style={{ fontSize:12, color:C.textMuted, padding:"0 8px" }}>
+                        Page {defaultersPage} of {totalDefaulterPages}
+                      </span>
+                      <button
+                        style={{
+                          background: defaultersPage === totalDefaulterPages ? C.border : C.card,
+                          color: defaultersPage === totalDefaulterPages ? C.textMuted : C.text,
+                          border: `1px solid ${C.border}`,
+                          borderRadius:6,
+                          padding:"4px 10px",
+                          cursor: defaultersPage === totalDefaulterPages ? "default" : "pointer",
+                          fontSize:12
+                        }}
+                        onClick={() => setDefaultersPage(p => Math.min(totalDefaulterPages, p + 1))}
+                        disabled={defaultersPage === totalDefaulterPages}
+                      >
+                        Next ›
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </>

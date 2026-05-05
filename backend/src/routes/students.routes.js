@@ -293,7 +293,8 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
       email, address, photoUrl, status,
       openingBalance, openingBalanceType,
       lunchEnabled, lunchDailyRate, lunchDays, lunchBillingType,
-      breakfastEnabled, breakfastDailyRate, breakfastDays, breakfastBillingType
+      breakfastEnabled, breakfastDailyRate, breakfastDays, breakfastBillingType,
+      discountType, discountValue, discountIsPercentage
     } = req.body;
 
     const normalizedDateOfBirth = normalizeDateInput(dateOfBirth);
@@ -367,6 +368,9 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
         breakfast_daily_rate: breakfastDailyRate !== undefined ? parseFloat(breakfastDailyRate) || 0 : undefined,
         breakfast_days: breakfastDays !== undefined ? parseInt(breakfastDays) || 66 : undefined,
         breakfast_billing_type: breakfastBillingType || 'daily',
+        discount_type: discountType || null,
+        discount_value: discountValue !== undefined ? parseFloat(discountValue) || 0 : undefined,
+        discount_is_percentage: discountIsPercentage !== undefined ? Boolean(discountIsPercentage) : true,
       })
       .eq('student_id', req.params.id)
       .eq('school_id', schoolId)

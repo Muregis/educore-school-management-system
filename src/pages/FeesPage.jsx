@@ -7,7 +7,6 @@ import Modal from "../components/Modal";
 import Table from "../components/Table";
 import RecordPaymentModal from "../components/RecordPaymentModal";
 import PaymentReceipt from "../components/PaymentReceipt";
-import DiscountSettings from "../components/DiscountSettings";
 import { ALL_CLASSES } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
@@ -82,7 +81,7 @@ function loadPaystackScript() {
   });
 }
 
-export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, canViewTotals, canManageDiscounts, canDeletePayments, toast, linkedStudentId, school }) {
+export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, canViewTotals, canDeletePayments, toast, linkedStudentId, school }) {
   const [tab, setTab]                 = useState("payments");
   const [showPayment, setShowPayment] = useState(false);
   const [showStruct, setShowStruct]   = useState(false);
@@ -112,7 +111,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [bankDepositForm, setBankDepositForm] = useState({ studentId: "", amount: "", proofFile: null });
   const [bankDepositLoading, setBankDepositLoading] = useState(false);
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
-  const [showDiscountSettings, setShowDiscountSettings] = useState(false);
   const [studentDiscounts, setStudentDiscounts] = useState({}); // Map of studentId -> discount array
 
   // New system & term management
@@ -751,7 +749,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         {canEdit && tab==="payments" && <Btn onClick={()=>setShowPayment(true)}>+ Record Payment</Btn>}
         {canEdit && tab==="payments" && <Btn onClick={()=>setShowRecordPaymentModal(true)}>📝 Manual Payment</Btn>}
         {canEdit && tab==="structure" && <Btn onClick={()=>{setEditStruct(null);setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""});setShowStruct(true);}}>Set Fee Structure</Btn>}
-        {canManageDiscounts && <Btn variant="ghost" onClick={()=>setShowDiscountSettings(true)}>🎁 Manage Discounts</Btn>}
       </div>
 
       {/* Payments Tab */}
@@ -810,8 +807,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
           {filteredBalances.length===0 ? <Msg text={filterDate==="today" ? "No balances for today." : "No balances available."} /> : (
         <>
-          {/* Class Summary Cards - Director/Superadmin only */}
-          {["director", "superadmin"].includes(auth?.role) && (
+          {/* Class Summary Cards - Admin/Director/Superadmin only */}
+          {["admin", "director", "superadmin"].includes(auth?.role) && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 16 }}>
               {ALL_CLASSES.map(cls => {
                 const classBalances = balances.filter(b => b.className === cls);
@@ -1237,14 +1234,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           setShowReceipt(true);
         }}
       />
-
-      {/* Discount Settings Modal */}
-      <DiscountSettings
-        isOpen={showDiscountSettings}
-        onClose={() => setShowDiscountSettings(false)}
-        auth={auth}
-        toast={toast}
-      />
     </div>
   );
 }
@@ -1258,7 +1247,6 @@ FeesPage.propTypes = {
   setPayments: PropTypes.func.isRequired,
   canEdit: PropTypes.bool.isRequired,
   canViewTotals: PropTypes.bool,
-  canManageDiscounts: PropTypes.bool,
   canDeletePayments: PropTypes.bool,
   toast: PropTypes.func.isRequired,
   linkedStudentId: PropTypes.number,
