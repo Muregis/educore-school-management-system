@@ -211,7 +211,7 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
 });
 
 // ─── PUT update payment ───────────────────────────────────────────────────────
-router.put("/:id", requireRoles("admin", "finance"), async (req, res, next) => {
+router.put("/:id", requireRoles("director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { amount, feeType, paymentMethod, referenceNumber, paymentDate, status, paidBy } = req.body;
@@ -248,7 +248,7 @@ router.put("/:id", requireRoles("admin", "finance"), async (req, res, next) => {
 });
 
 // ─── DELETE payment ───────────────────────────────────────────────────────────
-router.delete("/:id", requireRoles("admin", "finance"), async (req, res, next) => {
+router.delete("/:id", requireRoles("director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 
@@ -311,7 +311,7 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance'), as
 
     // Generate receipt number
     const receiptNumber = paymentMethod === 'cash'
-      ? `CASH-${Date.now()}`
+      ? (referenceNumber ? `CASH-${referenceNumber}` : `CASH-${Date.now()}`)
       : paymentMethod === 'bank_transfer'
       ? `BANK-${referenceNumber}`
       : `MPESA-${mpesaCode}`;

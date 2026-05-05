@@ -82,7 +82,7 @@ function loadPaystackScript() {
   });
 }
 
-export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, canViewTotals, toast, linkedStudentId, school }) {
+export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, canViewTotals, canManageDiscounts, canDeletePayments, toast, linkedStudentId, school }) {
   const [tab, setTab]                 = useState("payments");
   const [showPayment, setShowPayment] = useState(false);
   const [showStruct, setShowStruct]   = useState(false);
@@ -99,6 +99,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [paystackLoading, setPaystackLoading] = useState(false);
   const [editStruct, setEditStruct]   = useState(null);
   const [filterClass, setFilterClass] = useState("all");
+  const [filterDate, setFilterDate] = useState("all"); // 'all' | 'today'
   const [page, setPage]               = useState(1);
   const [paymentForm, setPaymentForm] = useState({ studentId: "", amount: "", feeType: "tuition", method: "cash", date: new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
   const [paymentClass, setPaymentClass] = useState("");
@@ -678,11 +679,29 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     printHTML(html, { title: `Receipt - ${receipt?.studentName || "Payment"}` });
   };
 
+  // Calculate today's collection
+  const today = new Date().toISOString().slice(0, 10);
+  const todayPayments = normalisedPayments.filter(p => {
+    const paymentDate = p.date || p.payment_date;
+    return p.status === "paid" && paymentDate && paymentDate.startsWith(today);
+  });
+  const todayCollection = todayPayments.reduce((s, p) => s + Number(p.amount), 0);
+
+  // Filter balances to show only students with today's activity if filterDate is 'today'
+  const filteredBalances = filterDate === "today"
+    ? balances.filter(b => {
+        // Show student if they have a payment today OR have outstanding balance and are active
+        const hasPaymentToday = todayPayments.some(p => String(p.studentId) === String(b.studentId));
+        return hasPaymentToday || (b.balance > 0);
+      })
+    : balances;
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        <Badge text={`Daily Collection: ${money(normalisedPayments.filter(p=>p.status==="paid").reduce((s,p)=>s+Number(p.amount),0))}`} tone="success" />
+        <Badge text={`Today's Collection: ${money(todayCollection)}`} tone="success" />
         <Badge text={`Students: ${students.length}`} tone="info" />
+        {filterDate === "today" && <Badge text="Showing: Today Only" tone="warning" />}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
@@ -691,11 +710,15 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
         <select style={inputStyle} value={filterClass} onChange={e=>setFilterClass(e.target.value)}>
           <option value="all">All classes</option>
           {ALL_CLASSES.map(c=><option key={c}>{c}</option>)}
         </select>
+        <div style={{ display: "flex", gap: 4 }}>
+          <Btn variant={filterDate==="all"?"primary":"ghost"} size="small" onClick={()=>setFilterDate("all")}>All Time</Btn>
+          <Btn variant={filterDate==="today"?"primary":"ghost"} size="small" onClick={()=>setFilterDate("today")}>Today</Btn>
+        </div>
         <Btn variant="ghost" onClick={()=>{
           if (tab==="payments") csv("payments.csv",["Date","Student","Class","Amount","Type","Method","Status","Ref"],filteredPayments.map(p=>[p.date,p.studentName,p.className,p.amount,p.feeType,p.method,p.status,p.reference]));
           if (tab==="balances") csv("balances.csv",["Student","Class","Paid","Balance"],balances.map(b=>[b.name,b.className,b.paid,b.balance]));
@@ -704,7 +727,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         {canEdit && tab==="payments" && <Btn onClick={()=>setShowPayment(true)}>+ Record Payment</Btn>}
         {canEdit && tab==="payments" && <Btn onClick={()=>setShowRecordPaymentModal(true)}>📝 Manual Payment</Btn>}
         {canEdit && tab==="structure" && <Btn onClick={()=>{setEditStruct(null);setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""});setShowStruct(true);}}>Set Fee Structure</Btn>}
-        {(canEdit || auth?.role === "admin") && <Btn variant="ghost" onClick={()=>setShowDiscountSettings(true)}>🎁 Discounts</Btn>}
+        {canManageDiscounts && <Btn variant="ghost" onClick={()=>setShowDiscountSettings(true)}>🎁 Manage Discounts</Btn>}
       </div>
 
       {/* Payments Tab */}
@@ -720,7 +743,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 <span key="pb" style={{color:C.textSub,fontSize:12}}>{p.paidBy||"—"}</span>,
                 <Badge key="st" text={p.status} tone={p.status==="paid"?"success":p.status==="pending"?"warning":"danger"} />,
                 <span key="ref" style={{fontSize:11,color:C.textMuted}}>{p.reference||"—"}</span>,
-                canEdit && <Btn key="del" variant="danger" onClick={()=>delPayment(p.id)}>Delete</Btn>
+                canDeletePayments && <Btn key="del" variant="danger" onClick={()=>delPayment(p.id)}>Delete</Btn>
               ])}
             />
           </div>
@@ -761,11 +784,11 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             </div>
           )}
 
-          {balances.length===0 ? <Msg text="No balances available." /> : (
+          {filteredBalances.length===0 ? <Msg text={filterDate==="today" ? "No balances for today." : "No balances available."} /> : (
         <div style={{ overflowX: "auto" }}>
           <Table
             headers={["Student","Class","Base Fee","+Transport","+Lunch","+Breakfast","+Opening",...(canViewTotals ? ["Paid"] : []),"Discount","Balance","Status","Pay"]}
-            rows={balances.map(b=>[
+            rows={filteredBalances.map(b=>[
               <span key={b.studentId} style={{color:C.text,fontWeight:600}}>{b.name}</span>,
               b.className,
               // Base fee (tuition + activity + misc)
@@ -1139,6 +1162,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           const lastName = student?.lastName || student?.last_name || "";
           const studentName = `${firstName} ${lastName}`.trim() || "Student";
 
+          // Calculate current balance for this student
+          const studentBalance = calculateLedgerBalance(student);
+
           // Format payment method nicely
           const methodLabels = {
             'cash': 'Cash',
@@ -1152,6 +1178,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             reference: response.receiptNumber,
             method: methodLabels[response.paymentMethod] || response.paymentMethod,
             date: new Date(response.date).toLocaleDateString(),
+            balance: studentBalance?.balance || 0
           });
           setShowReceipt(true);
         }}
@@ -1177,6 +1204,8 @@ FeesPage.propTypes = {
   setPayments: PropTypes.func.isRequired,
   canEdit: PropTypes.bool.isRequired,
   canViewTotals: PropTypes.bool,
+  canManageDiscounts: PropTypes.bool,
+  canDeletePayments: PropTypes.bool,
   toast: PropTypes.func.isRequired,
   linkedStudentId: PropTypes.number,
   school: PropTypes.shape({

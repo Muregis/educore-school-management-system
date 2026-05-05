@@ -44,6 +44,10 @@ export default function RecordPaymentModal({
     }
   }, [isOpen]);
 
+  const [cashForm, setCashForm] = useState({
+    referenceNumber: ""
+  });
+
   const resetForms = () => {
     setFormData({
       studentId: "",
@@ -56,6 +60,9 @@ export default function RecordPaymentModal({
     });
     setMpesaForm({
       mpesaCode: ""
+    });
+    setCashForm({
+      referenceNumber: ""
     });
     setSelectedClass("");
     setFilteredStudents([]);
@@ -108,6 +115,8 @@ export default function RecordPaymentModal({
         payload.bankName = bankForm.bankName;
       } else if (activeTab === "mpesa_manual") {
         payload.mpesaCode = mpesaForm.mpesaCode;
+      } else if (activeTab === "cash") {
+        payload.referenceNumber = cashForm.referenceNumber;
       }
 
       const response = await apiFetch("/payments/record-manual", {
@@ -272,6 +281,21 @@ export default function RecordPaymentModal({
               value={mpesaForm.mpesaCode}
               onChange={(e) => setMpesaForm({ ...mpesaForm, mpesaCode: e.target.value })}
               placeholder="e.g. QHX7Y8Z9AB"
+              style={inputStyle}
+            />
+          </div>
+        )}
+
+        {activeTab === "cash" && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: "block", color: "#94a3b8", fontSize: 12, marginBottom: 4 }}>
+              Reference Number (Optional)
+            </label>
+            <input
+              type="text"
+              value={cashForm.referenceNumber}
+              onChange={(e) => setCashForm({ ...cashForm, referenceNumber: e.target.value })}
+              placeholder="Enter slip number or reference (optional)"
               style={inputStyle}
             />
           </div>

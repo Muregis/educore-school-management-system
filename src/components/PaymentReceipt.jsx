@@ -44,6 +44,7 @@ export default function PaymentReceipt({ isOpen, onClose, receipt, school }) {
           <div class="row"><span>Payment Method</span><strong>${receipt?.method || "N/A"}</strong></div>
           <div class="row"><span>Receipt Number</span><strong>${receipt?.reference || "N/A"}</strong></div>
           <div class="row"><span>Date</span><strong>${receipt?.date || new Date().toLocaleDateString()}</strong></div>
+          ${receipt?.balance !== undefined ? `<div class="row"><span>Outstanding Balance</span><strong style="color:${receipt.balance > 0 ? '#ef4444' : '#22c55e'}">KES ${Number(receipt?.balance || 0).toLocaleString()} ${receipt.balance > 0 ? '(owing)' : '(cleared)'}</strong></div>` : ""}
           ${receipt?.receivedBy ? `<div class="row"><span>Received By</span><strong>${receipt.receivedBy}</strong></div>` : ""}
         </div>
 
@@ -137,6 +138,14 @@ export default function PaymentReceipt({ isOpen, onClose, receipt, school }) {
             <span style={{ color: "#6b7280" }}>Date</span>
             <strong style={{ color: "#111827" }}>{receipt.date}</strong>
           </div>
+          {receipt.balance !== undefined && (
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #e5e7eb", fontSize: "14px" }}>
+              <span style={{ color: "#6b7280" }}>Outstanding Balance</span>
+              <strong style={{ color: receipt.balance > 0 ? "#ef4444" : "#22c55e", fontSize: "16px" }}>
+                KES {Number(receipt.balance).toLocaleString()} {receipt.balance > 0 ? "(owing)" : "(cleared)"}
+              </strong>
+            </div>
+          )}
           {receipt.receivedBy && (
             <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #e5e7eb", fontSize: "14px" }}>
               <span style={{ color: "#6b7280" }}>Received By</span>
@@ -182,7 +191,8 @@ PaymentReceipt.propTypes = {
     reference: PropTypes.string,
     method: PropTypes.string,
     date: PropTypes.string,
-    receivedBy: PropTypes.string
+    receivedBy: PropTypes.string,
+    balance: PropTypes.number
   }),
   school: PropTypes.object
 };

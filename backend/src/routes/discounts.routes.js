@@ -66,7 +66,7 @@ router.get('/config', async (req, res, next) => {
 
 // PATCH /api/discounts/config
 // Update discount percentages
-router.patch('/config', requireRoles('admin', 'director'), async (req, res, next) => {
+router.patch('/config', requireRoles('director', 'superadmin'), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const { configs } = req.body;
@@ -100,7 +100,7 @@ router.patch('/config', requireRoles('admin', 'director'), async (req, res, next
 
 // GET /api/discounts/detect/:studentId
 // Auto-detect what discounts a student qualifies for
-router.get('/detect/:studentId', requireRoles('admin', 'finance', 'director'), async (req, res, next) => {
+router.get('/detect/:studentId', requireRoles('finance', 'director', 'superadmin'), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
@@ -232,7 +232,7 @@ router.get('/detect/:studentId', requireRoles('admin', 'finance', 'director'), a
 
 // POST /api/discounts/apply
 // Apply discount to a student
-router.post('/apply', requireRoles('admin', 'finance', 'director'), async (req, res, next) => {
+router.post('/apply', requireRoles('finance', 'director', 'superadmin'), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const {
@@ -290,7 +290,7 @@ router.post('/apply', requireRoles('admin', 'finance', 'director'), async (req, 
 
 // POST /api/discounts/remove
 // Remove a discount from a student
-router.post('/remove', requireRoles('admin', 'finance', 'director'), async (req, res, next) => {
+router.post('/remove', requireRoles('director', 'superadmin'), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const { studentId, discountType } = req.body;
@@ -321,7 +321,7 @@ router.post('/remove', requireRoles('admin', 'finance', 'director'), async (req,
 
 // GET /api/discounts/student/:studentId
 // Get all discounts for a specific student
-router.get('/student/:studentId', requireRoles('admin', 'finance', 'director'), async (req, res, next) => {
+router.get('/student/:studentId', requireRoles('finance', 'director', 'superadmin'), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
@@ -352,7 +352,7 @@ router.get('/student/:studentId', requireRoles('admin', 'finance', 'director'), 
 
 // GET /api/discounts/students
 // List all students with active discounts
-router.get('/students', requireRoles('admin', 'finance', 'director'), async (req, res, next) => {
+router.get('/students', requireRoles('finance', 'director', 'superadmin'), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 
@@ -386,7 +386,7 @@ router.get('/students', requireRoles('admin', 'finance', 'director'), async (req
 
 // GET /api/discounts/calculate/:studentId
 // Calculate discount for a student based on gross amount
-router.get('/calculate/:studentId', requireRoles('admin', 'finance', 'director'), async (req, res, next) => {
+router.get('/calculate/:studentId', requireRoles('finance', 'director', 'superadmin'), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
