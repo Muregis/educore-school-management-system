@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import PropTypes from "prop-types";
 import Badge from "../components/Badge";
 import Btn from "../components/Btn";
+import { Msg } from "../components/Helpers";
 import { C } from "../lib/theme";
 import { money } from "../lib/utils";
 
@@ -46,16 +47,45 @@ export default function PortalDashboardPage({
     .filter(p => p.status === "paid")
     .reduce((sum, p) => sum + Number(p.amount), 0);
   
-  const classFee = feeStructures.find(f => f.className === student?.className)?.amount || 0;
+  // Calculate class fee from fee structure (tuition + activity + misc)
+  const feeStruct = feeStructures?.find(f => 
+    (f.className ?? f.class_name) === (student?.className ?? student?.class_name)
+  );
+  const classFee = feeStruct
+    ? (Number(feeStruct.tuition || 0) + Number(feeStruct.activity || 0) + Number(feeStruct.misc || 0))
+    : 0;
   const balance = classFee - totalPaid;
   
-  const avgGrade = studentResults.length > 0
-    ? Math.round(studentResults.reduce((sum, r) => sum + (Number(r.marks) / Number(r.total || r.total_marks) * 100), 0) / studentResults.length)
-    : 0;
+  // Calculate average grade across all subjects
+  const avgGrade = useMemo(() => {
+    if (studentResults.length === 0) return 0;
+    const validResults = studentResults.filter(r => r.marks != null && (r.total || r.total_marks));
+    if (validResults.length === 0) return 0;
+    const totalPercentage = validResults.reduce((sum, r) => {
+      const percentage = (Number(r.marks) / Number(r.total || r.total_marks || 100)) * 100;
+      return sum + percentage;
+    }, 0);
+    return Math.round(totalPercentage / validResults.length);
+  }, [studentResults]);
 
-  const recentResults = [...studentResults]
-    .sort((a, b) => new Date(b.date || b.created_at) - new Date(a.date || a.created_at))
-    .slice(0, 5);
+  const recentResults = useMemo(() => {
+    return [...studentResults]
+      .sort((a, b) => {
+        const dateA = new Date(a.date || a.created_at || a.createdAt || 0);
+        const dateB = new Date(b.date || b.created_at || b.createdAt || 0);
+        return dateB - dateA;
+      })
+      .slice(0, 5);
+  }, [studentResults]);
+
+  // Handle missing student
+  if (!student) {
+    return (
+      <div style={{ padding: 40, textAlign: "center" }}>
+        <Msg text="No student data available. Please contact the school administrator." />
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -82,14 +112,14 @@ export default function PortalDashboardPage({
           fontWeight: 800,
           color: "#fff"
         }}>
-          {student?.firstName?.[0]}{student?.lastName?.[0]}
+          {(student?.firstName ?? student?.first_name)?.[0]}{(student?.lastName ?? student?.last_name)?.[0]}
         </div>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700, color: C.text }}>
-            {student?.firstName} {student?.lastName}
+            {student?.firstName ?? student?.first_name} {student?.lastName ?? student?.last_name}
           </div>
           <div style={{ fontSize: 13, color: C.textSub, marginTop: 4 }}>
-            {student?.admission || student?.admission_number} • {student?.className}
+            {student?.admission || student?.admission_number} • {student?.className ?? student?.class_name}
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             <Badge text={student?.status || "Active"} tone="success" />
@@ -154,9 +184,9 @@ export default function PortalDashboardPage({
                     fontWeight: 700, 
                     color: Number(r.marks) >= 75 ? "#22C55E" : Number(r.marks) >= 50 ? "#F59E0B" : "#EF4444" 
                   }}>
-                    {r.marks}/{r.total || r.total_marks}
+                    {r.marks}/{r.total || r.total_marks || 100}
                   </div>
-                  <div style={{ fontSize: 11, color: C.textSub }}>Grade {r.grade}</div>
+                  {r.grade && <div style={{ fontSize: 11, color: C.textSub }}>Grade {r.grade}</div>}
                 </div>
               </div>
             ))}

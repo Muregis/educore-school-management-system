@@ -113,6 +113,39 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [studentDiscounts, setStudentDiscounts] = useState({}); // Map of studentId -> discount array
 
+  // Day End settings (stored in localStorage)
+  const [dayEndTime, setDayEndTime] = useState(() => localStorage.getItem('dayEndTime') || '18:00'); // Default 6 PM
+  const [lastDayClosed, setLastDayClosed] = useState(() => localStorage.getItem('lastDayClosed') || null);
+  const [showDayEndSettings, setShowDayEndSettings] = useState(false);
+
+  // Save day end settings to localStorage
+  const saveDayEndTime = (time) => {
+    setDayEndTime(time);
+    localStorage.setItem('dayEndTime', time);
+  };
+
+  // Close the current business day
+  const closeDay = () => {
+    const now = new Date().toISOString();
+    setLastDayClosed(now);
+    localStorage.setItem('lastDayClosed', now);
+    toast('Day closed successfully. New day starts after day end time.', 'success');
+  };
+
+  // Get business "today" based on day end time
+  const getBusinessToday = () => {
+    const now = new Date();
+    const [hours, minutes] = dayEndTime.split(':').map(Number);
+    const dayEnd = new Date(now);
+    dayEnd.setHours(hours, minutes, 0, 0);
+    
+    // If current time is after day end time, "today" is actually tomorrow
+    if (now >= dayEnd) {
+      now.setDate(now.getDate() + 1);
+    }
+    return now.toISOString().slice(0, 10);
+  };
+
   // New system & term management
   const [useNewSystem, setUseNewSystem] = useState(true);
   const [ledgerView, setLedgerView] = useState(false);
@@ -701,11 +734,15 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     printHTML(html, { title: `Receipt - ${receipt?.studentName || "Payment"}` });
   };
 
-  // Calculate today's collection
-  const today = new Date().toISOString().slice(0, 10);
+  // Calculate today's collection (based on business day)
+  const businessToday = getBusinessToday();
   const todayPayments = normalisedPayments.filter(p => {
     const paymentDate = p.date || p.payment_date;
-    return p.status === "paid" && paymentDate && paymentDate.startsWith(today);
+    // Only count payments after last day closed (if day was manually closed)
+    if (lastDayClosed && new Date(paymentDate) <= new Date(lastDayClosed)) {
+      return false;
+    }
+    return p.status === "paid" && paymentDate && paymentDate.startsWith(businessToday);
   });
   const todayCollection = todayPayments.reduce((s, p) => s + Number(p.amount), 0);
 
@@ -720,16 +757,22 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
         <Badge text={`Today's Collection: ${money(todayCollection)}`} tone="success" />
         <Badge text={`Students: ${students.length}`} tone="info" />
         {filterDate === "today" && <Badge text="Showing: Today Only" tone="warning" />}
+        <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 'auto' }}>
+          Day ends at {dayEndTime} • Business day: {businessToday}
+        </span>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-        {["payments","balances","structure"].map(t => (
-          <Btn key={t} variant={tab===t?"primary":"ghost"} onClick={()=>setTab(t)}>{t.charAt(0).toUpperCase()+t.slice(1)}</Btn>
-        ))}
+      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <select style={inputStyle} value={tab} onChange={e=>setTab(e.target.value)}>
+          <option value="payments">Payments</option>
+          <option value="balances">Balances</option>
+          <option value="structure">Fee Structure</option>
+        </select>
+        <span style={{ fontSize: 12, color: C.textMuted }}>Select view mode</span>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
@@ -749,6 +792,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         {canEdit && tab==="payments" && <Btn onClick={()=>setShowPayment(true)}>+ Record Payment</Btn>}
         {canEdit && tab==="payments" && <Btn onClick={()=>setShowRecordPaymentModal(true)}>📝 Manual Payment</Btn>}
         {canEdit && tab==="structure" && <Btn onClick={()=>{setEditStruct(null);setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""});setShowStruct(true);}}>Set Fee Structure</Btn>}
+        {canEdit && <Btn variant="ghost" onClick={()=>setShowDayEndSettings(true)}>⚙️ Day Settings</Btn>}
+        {canEdit && <Btn variant="primary" onClick={closeDay}>🔒 Close Day</Btn>}
       </div>
 
       {/* Payments Tab */}
@@ -807,8 +852,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
           {filteredBalances.length===0 ? <Msg text={filterDate==="today" ? "No balances for today." : "No balances available."} /> : (
         <>
-          {/* Class Summary Cards - Admin/Director/Superadmin only */}
-          {["admin", "director", "superadmin"].includes(auth?.role) && (
+          {/* Class Summary Cards - Director/Superadmin only */}
+          {["director", "superadmin"].includes(auth?.role) && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 16 }}>
               {ALL_CLASSES.map(cls => {
                 const classBalances = balances.filter(b => b.className === cls);
@@ -1236,6 +1281,44 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           setShowReceipt(true);
         }}
       />
+
+      {/* Day End Settings Modal */}
+      {showDayEndSettings && (
+        <Modal title="Day End Settings" onClose={()=>setShowDayEndSettings(false)}>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 13, color: C.textSub, marginBottom: 8 }}>
+              Business Day End Time
+            </label>
+            <input
+              type="time"
+              style={inputStyle}
+              value={dayEndTime}
+              onChange={(e) => saveDayEndTime(e.target.value)}
+            />
+            <small style={{ color: C.textMuted, fontSize: 11, display: 'block', marginTop: 4 }}>
+              After this time, "Today's Collection" will reset for the next business day.
+            </small>
+          </div>
+          
+          <div style={{ marginBottom: 16, padding: 12, background: C.card, borderRadius: 8 }}>
+            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 4 }}>Current Status</div>
+            <div style={{ fontSize: 14, color: C.text }}>
+              Day ends at: <strong>{dayEndTime}</strong><br/>
+              Business date: <strong>{businessToday}</strong><br/>
+              Last closed: {lastDayClosed ? new Date(lastDayClosed).toLocaleString() : 'Never'}
+            </div>
+          </div>
+          
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Btn variant="ghost" onClick={()=>setShowDayEndSettings(false)}>Close</Btn>
+            <Btn variant="danger" onClick={()=>{
+              localStorage.removeItem('lastDayClosed');
+              setLastDayClosed(null);
+              toast('Day closure reset', 'success');
+            }}>Reset Day Closure</Btn>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

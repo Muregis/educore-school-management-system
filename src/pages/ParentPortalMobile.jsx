@@ -92,7 +92,7 @@ export default function ParentPortalMobile({
                 className={`mobile-chip ${(activeChild?.id ?? activeChild?.student_id) === (child.id ?? child.student_id) ? 'active' : ''}`}
                 onClick={() => setActiveChildId(child.id ?? child.student_id)}
               >
-                {child.firstName} {child.lastName}
+                {child.firstName ?? child.first_name} {child.lastName ?? child.last_name}
               </button>
             ))}
           </div>
@@ -123,6 +123,17 @@ export default function ParentPortalMobile({
           Total Paid: {money(totalPaid)} • Class Fee: {money(classFee)}
         </div>
       </div>
+
+      {/* No Children State */}
+      {myChildren.length === 0 && (
+        <div className="mobile-card" style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>👨‍👩‍👧‍👦</div>
+          <div className="mobile-title" style={{ marginBottom: 8 }}>No Children Found</div>
+          <div style={{ fontSize: 13, color: '#7A92B8' }}>
+            Your account is not linked to any students. Please contact the school to verify your parent phone number.
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="mobile-card">
@@ -214,7 +225,7 @@ export default function ParentPortalMobile({
           </button>
         </div>
         {childResults.slice(0, 3).map(result => (
-          <div key={result.id ?? result.result_id} style={{
+          <div key={result.id ?? result.result_id ?? `${result.subject}-${result.marks}`} style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -235,17 +246,21 @@ export default function ParentPortalMobile({
                 fontWeight: '700',
                 color: Number(result.marks) >= 75 ? '#22C55E' : Number(result.marks) >= 50 ? '#F59E0B' : '#F43F5E'
               }}>
-                {result.marks}/{result.total || result.total_marks}
+                {result.marks}/{result.total || result.total_marks || 100}
               </div>
-              <div className={`grade-badge grade-${result.grade?.toLowerCase()}`} style={{ marginTop: '4px' }}>
-                {result.grade}
-              </div>
+              {result.grade && (
+                <div className={`grade-badge grade-${result.grade?.toLowerCase()}`} style={{ marginTop: '4px' }}>
+                  {result.grade}
+                </div>
+              )}
             </div>
           </div>
         ))}
         {childResults.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '20px', color: '#7A92B8' }}>
-            No grades recorded yet
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#7A92B8' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📚</div>
+            <div>No grades recorded yet</div>
+            <div style={{ fontSize: 12, marginTop: 8, opacity: 0.7 }}>Grades will appear here once teachers enter them</div>
           </div>
         )}
       </div>
@@ -259,7 +274,7 @@ export default function ParentPortalMobile({
         <div className="mobile-subtitle">All subjects for {activeChild?.firstName} {activeChild?.lastName}</div>
 
         {childResults.map(result => (
-          <div key={result.id ?? result.result_id} style={{
+          <div key={result.id ?? result.result_id ?? `${result.subject}-${result.marks}`} style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -280,18 +295,22 @@ export default function ParentPortalMobile({
                 fontWeight: '700',
                 color: Number(result.marks) >= 75 ? '#22C55E' : Number(result.marks) >= 50 ? '#F59E0B' : '#F43F5E'
               }}>
-                {result.marks}/{result.total || result.total_marks}
+                {result.marks}/{result.total || result.total_marks || 100}
               </div>
-              <div className={`grade-badge grade-${result.grade?.toLowerCase()}`} style={{ marginTop: '8px' }}>
-                {result.grade}
-              </div>
+              {result.grade && (
+                <div className={`grade-badge grade-${result.grade?.toLowerCase()}`} style={{ marginTop: '8px' }}>
+                  {result.grade}
+                </div>
+              )}
             </div>
           </div>
         ))}
 
         {childResults.length === 0 && (
           <div style={{ textAlign: 'center', padding: '40px 20px', color: '#7A92B8' }}>
-            No grades available
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
+            <div>No grades available</div>
+            <div style={{ fontSize: 12, marginTop: 8, opacity: 0.7 }}>Check back after exams</div>
           </div>
         )}
       </div>
@@ -316,7 +335,7 @@ export default function ParentPortalMobile({
       <div className="mobile-card">
         <div className="mobile-title">Payment History</div>
         {childPayments.map(payment => (
-          <div key={payment.id ?? payment.payment_id} style={{
+          <div key={payment.id ?? payment.payment_id ?? payment.reference} style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -328,7 +347,9 @@ export default function ParentPortalMobile({
                 {payment.description || 'School Fees'}
               </div>
               <div style={{ fontSize: '12px', color: '#7A92B8' }}>
-                {new Date(payment.date || payment.created_at).toLocaleDateString()}
+                {payment.date || payment.payment_date || payment.created_at 
+                  ? new Date(payment.date || payment.payment_date || payment.created_at).toLocaleDateString() 
+                  : 'Date not available'}
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -355,8 +376,10 @@ export default function ParentPortalMobile({
         ))}
 
         {childPayments.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '20px', color: '#7A92B8' }}>
-            No payment history
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#7A92B8' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>💳</div>
+            <div>No payment history</div>
+            <div style={{ fontSize: 12, marginTop: 8, opacity: 0.7 }}>Payments will appear here once recorded</div>
           </div>
         )}
       </div>
@@ -412,7 +435,7 @@ export default function ParentPortalMobile({
       <div className="mobile-card">
         <div className="mobile-title">Recent Attendance</div>
         {childAttendance.slice(0, 10).map(record => (
-          <div key={record.id ?? record.attendance_id} style={{
+          <div key={record.id ?? record.attendance_id ?? `${record.date}-${record.status}`} style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -421,11 +444,13 @@ export default function ParentPortalMobile({
           }}>
             <div>
               <div style={{ fontSize: '14px', fontWeight: '600', color: '#E2EAF8' }}>
-                {new Date(record.date).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  month: 'short',
-                  day: 'numeric'
-                })}
+                {record.date || record.attendance_date 
+                  ? new Date(record.date || record.attendance_date).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      month: 'short',
+                      day: 'numeric'
+                    })
+                  : 'Date unavailable'}
               </div>
             </div>
             <div style={{
@@ -442,8 +467,10 @@ export default function ParentPortalMobile({
         ))}
 
         {childAttendance.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '20px', color: '#7A92B8' }}>
-            No attendance records
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#7A92B8' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📅</div>
+            <div>No attendance records</div>
+            <div style={{ fontSize: 12, marginTop: 8, opacity: 0.7 }}>Records will appear once teachers mark attendance</div>
           </div>
         )}
       </div>
@@ -455,7 +482,9 @@ export default function ParentPortalMobile({
       <div className="mobile-card">
         <div className="mobile-title">Messages</div>
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#7A92B8' }}>
-          Messaging feature coming soon
+          <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
+          <div>Messaging feature coming soon</div>
+          <div style={{ fontSize: 12, marginTop: 8, opacity: 0.7 }}>Contact the school directly for urgent matters</div>
         </div>
       </div>
     </div>
@@ -476,8 +505,8 @@ export default function ParentPortalMobile({
     <div className="mobile-container">
       <MobileHeader
         schoolName={school?.name || 'EduCore'}
-        studentName={activeChild ? `${activeChild.firstName} ${activeChild.lastName}` : null}
-        avatar={activeChild ? `${activeChild.firstName?.[0]}${activeChild.lastName?.[0]}` : null}
+        studentName={activeChild ? `${activeChild.firstName ?? activeChild.first_name} ${activeChild.lastName ?? activeChild.last_name}` : (myChildren.length === 0 ? 'No Student Linked' : null)}
+        avatar={activeChild ? `${(activeChild.firstName ?? activeChild.first_name)?.[0]}${(activeChild.lastName ?? activeChild.last_name)?.[0]}` : '?'}
       />
 
       {renderContent()}
