@@ -554,7 +554,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       
       const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
       // Calculate balance AFTER this deposit
-      const studentBalance = calculateLedgerBalance(s, []);
+      const studentBalance = calculateLedgerBalance(s, studentDiscounts[sid] || []);
       const newBalance = Math.max(0, studentBalance.balance - amt);
       setReceipt({
         studentName: name,
@@ -1217,7 +1217,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           const studentName = `${firstName} ${lastName}`.trim() || "Student";
 
           // Calculate current balance for this student
-          const studentBalance = calculateLedgerBalance(student);
+          const studentBalance = calculateLedgerBalance(student, studentDiscounts[response.studentId] || []);
 
           // Format payment method nicely
           const methodLabels = {
