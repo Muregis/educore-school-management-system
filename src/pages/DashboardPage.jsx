@@ -290,13 +290,14 @@ export default function DashboardPage({ auth, school, students, teachers, attend
       ["Teachers", teachers.length],
       ["Present Records", present],
       ["Today's Collection", money(todayCollection)],
+      ["Total Collection", money(totalPaid)],
       ["Outstanding", money(outstanding)],
       ["Pending Plans", pendingPlans],
     ];
 
     return (
       <div style={{ display: "grid", gap: 14 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(8,1fr)", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(9,1fr)", gap: 12 }}>
           {cards.map(x => (
             <div key={x[0]} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }}>
               <div style={{ color: C.textMuted, fontSize: 12 }}>{x[0]}</div>
