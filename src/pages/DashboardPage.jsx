@@ -180,7 +180,16 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   const girls = students.filter(s => s.gender === "female").length;
   const totalStudents = students.length;
   const present = attendance.filter(a => a.status === "present").length;
-  const paid = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
+  // Calculate today's collection (not total/all-time)
+  const today = new Date().toISOString().slice(0, 10);
+  const todayPayments = payments.filter(p => {
+    const paymentDate = p.date || p.payment_date;
+    return p.status === "paid" && paymentDate && paymentDate.startsWith(today);
+  });
+  const todayCollection = todayPayments.reduce((s, p) => s + Number(p.amount), 0);
+  
+  // Keep total paid for reference (used elsewhere)
+  const totalPaid = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
 
   const expectedByClass = cls => {
     const fs = feeStructures.find(f => f.className === cls);
@@ -217,7 +226,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
       ["Total Students", totalStudents],
       ["Teachers", teachers.length],
       ["Present Records", present],
-      ["Fees Collected", money(paid)],
+      ["Today's Collection", money(todayCollection)],
     ];
 
     return (
@@ -280,7 +289,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
       ["Total Students", totalStudents],
       ["Teachers", teachers.length],
       ["Present Records", present],
-      ["Fees Collected", money(paid)],
+      ["Today's Collection", money(todayCollection)],
       ["Outstanding", money(outstanding)],
       ["Pending Plans", pendingPlans],
     ];
@@ -497,10 +506,10 @@ export default function DashboardPage({ auth, school, students, teachers, attend
       .slice(0, 5);
 
     const cards = [
-      ["Collected This Month", money(collectedThisMonth)],
-      ["Total Outstanding", money(outstanding)],
-      ["Total Students", students.length],
-      ["Payment Records", payments.length],
+      ["Today's Collection", money(todayCollection)],
+      ["This Month", money(collectedThisMonth)],
+      ["Outstanding", money(outstanding)],
+      ["Students", students.length],
     ];
 
     return (
