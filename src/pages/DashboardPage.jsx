@@ -8,6 +8,7 @@ import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
 
 // Define money here locally just in case it was a global that gets lost in strict module scope
+const money = (val) => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(val || 0);
 // Premium Stat Card Component
   const StatCard = ({ label, value, color, loading = false }) => (
     <Card style={{ 
