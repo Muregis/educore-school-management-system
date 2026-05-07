@@ -333,8 +333,10 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
       return res.status(404).json({ message: "Student not found" });
     }
 
-    // Only check for duplicates if the admission number is actually different
-    if (normalizedAdmissionNumber && normalizedAdmissionNumber !== normalizeAdmissionNumber(currentStudent.admission_number)) {
+    // Only check for duplicates if admission number is actually different and not null/empty
+    if (normalizedAdmissionNumber && 
+        normalizedAdmissionNumber !== normalizeAdmissionNumber(currentStudent.admission_number) &&
+        normalizedAdmissionNumber.trim() !== '') {
       const { data: existing } = await supabase
         .from('students')
         .select('student_id', 'admission_number')
