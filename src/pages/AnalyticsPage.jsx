@@ -159,7 +159,7 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
       gradeDist, avgMarks,
       presentCount, absentCount, attendanceRate,
     };
-  }, [students, payments, results, attendance, feeStructures]);
+  }, [students, payments, results, attendance, feeStructures, studentBalances]);
 
   // Generate AI analysis
   const generateAIReport = useCallback(async () => {
