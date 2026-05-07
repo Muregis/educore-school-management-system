@@ -120,13 +120,12 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     setErr("");
     if (!f.firstName.trim() || !f.lastName.trim()) return setErr("First and last name are required.");
     
-    // Validate admission number uniqueness (only if we have students data)
-    if (f.admission && f.admission.trim() && Array.isArray(students) && students.length > 0) {
+    // Validate admission number uniqueness (only for new students)
+    if (!editId && f.admission && f.admission.trim() && Array.isArray(students) && students.length > 0) {
       const cleanAdmission = f.admission.trim();
-      // Check if admission number already exists in current students list (excluding current student)
+      // Check if admission number already exists in current students list
       const existingStudent = students.find(s => 
-        s && ((s.admission === cleanAdmission || s.admission_number === cleanAdmission)) && 
-        (s.id !== editId && s.student_id !== editId)
+        s && (s.admission === cleanAdmission || s.admission_number === cleanAdmission)
       );
       if (existingStudent) {
         return setErr(`Admission number "${cleanAdmission}" already exists. Please use a different admission number.`);
