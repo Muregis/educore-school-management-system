@@ -1,7 +1,8 @@
 const SESSION_KEY = "educore.session";
 const LEGACY_AUTH_KEY = "educore.auth";
 const LEGACY_TOKEN_KEY = "token";
-const DEFAULT_PROD_API_BASE = "https://educore-school-management-system.onrender.com/api";
+// Render deploys the backend as `educore-api`; this must match so auth endpoints resolve.
+const DEFAULT_PROD_API_BASE = "https://educore-api.onrender.com/api";
 const DEFAULT_LOCAL_API_BASE = "http://localhost:10000/api";
 
 function getApiBase() {

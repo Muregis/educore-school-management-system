@@ -1,7 +1,8 @@
 // simple wrapper for calling backend API with optional auth token
 import { clearSession, getAuthHeaders, getSession } from "./auth.js";
 
-const DEFAULT_PROD_API_BASE = "https://educore-school-management-system.onrender.com/api";
+// Render deploys the backend as `educore-api`; this must match so `/api/auth/*` routes resolve.
+const DEFAULT_PROD_API_BASE = "https://educore-api.onrender.com/api";
 const DEFAULT_LOCAL_API_BASE = "http://localhost:10000/api";
 
 function getDefaultApiBase() {
