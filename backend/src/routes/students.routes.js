@@ -401,44 +401,29 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
         discount_is_percentage: discountIsPercentage !== undefined ? Boolean(discountIsPercentage) : true,
       });
 
+    // Create minimal update object with only fields that definitely exist
+    const updateData = {
+      first_name: firstName,
+      last_name: lastName,
+      gender,
+      class_name: className || null,
+      date_of_birth: normalizedDateOfBirth,
+      phone: normalizedPhone,
+      parent_name: parentName || null,
+      parent_phone: normalizedParentPhone,
+      status: status || 'active',
+    };
+
+    // Only add admission number if it's being changed
+    if (normalizedAdmissionNumber) {
+      updateData.admission_number = normalizedAdmissionNumber;
+    }
+
+    console.log('[DEBUG] Minimal update data:', updateData);
+
     const { data: updated, error } = await supabase
       .from('students')
-      .update({
-        ...(normalizedAdmissionNumber && { admission_number: normalizedAdmissionNumber }),
-        first_name: firstName,
-        last_name: lastName,
-        gender,
-        class_id: resolvedClassId,
-        class_name: className || null,
-        date_of_birth: normalizedDateOfBirth,
-        nemis_number: nemisNumber || null,
-        phone: normalizedPhone,
-        email: email || null,
-        address: address || null,
-        parent_name: parentName || null,
-        parent_phone: normalizedParentPhone,
-        blood_group: bloodGroup || null,
-        allergies: allergies || null,
-        medical_conditions: medicalConditions || null,
-        emergency_contact_name: emergencyContactName || null,
-        emergency_contact_phone: emergencyContactPhone || null,
-        emergency_contact_relationship: emergencyContactRelationship || null,
-        photo_url: photoUrl || null,
-        status: status || 'active',
-        opening_balance: openingBalance !== undefined ? parseFloat(openingBalance) || 0 : undefined,
-        opening_balance_type: openingBalanceType || 'owing',
-        lunch_enabled: lunchEnabled || false,
-        lunch_daily_rate: lunchDailyRate !== undefined ? parseFloat(lunchDailyRate) || 0 : undefined,
-        lunch_days: lunchDays !== undefined ? parseInt(lunchDays) || 66 : undefined,
-        lunch_billing_type: lunchBillingType || 'daily',
-        breakfast_enabled: breakfastEnabled || false,
-        breakfast_daily_rate: breakfastDailyRate !== undefined ? parseFloat(breakfastDailyRate) || 0 : undefined,
-        breakfast_days: breakfastDays !== undefined ? parseInt(breakfastDays) || 66 : undefined,
-        breakfast_billing_type: breakfastBillingType || 'daily',
-        discount_type: discountType || null,
-        discount_value: discountValue !== undefined ? parseFloat(discountValue) || 0 : undefined,
-        discount_is_percentage: discountIsPercentage !== undefined ? Boolean(discountIsPercentage) : true,
-      })
+      .update(updateData)
       .eq('student_id', req.params.id)
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
