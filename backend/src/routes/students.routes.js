@@ -321,7 +321,7 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
 
     // Check for duplicate if admission number is being changed
     // First, get the current student's admission number
-    const { data: currentStudent } = await supabase
+    const { data: currentStudent, error: currentError } = await supabase
       .from('students')
       .select('admission_number')
       .eq('student_id', req.params.id)
@@ -329,21 +329,33 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
       .eq('is_deleted', false)
       .single();
 
+    if (currentError) {
+      console.log('[ERROR] Failed to fetch current student:', currentError);
+      return res.status(500).json({ message: "Database error fetching student" });
+    }
+
     if (!currentStudent) {
       return res.status(404).json({ message: "Student not found" });
     }
 
     // Only check for duplicates if admission number is actually different and not null/empty
+    const currentAdmissionNumber = normalizeAdmissionNumber(currentStudent.admission_number);
     if (normalizedAdmissionNumber && 
-        normalizedAdmissionNumber !== normalizeAdmissionNumber(currentStudent.admission_number) &&
+        normalizedAdmissionNumber !== currentAdmissionNumber &&
         normalizedAdmissionNumber.trim() !== '') {
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
         .from('students')
         .select('student_id', 'admission_number')
         .eq('school_id', schoolId)
         .eq('admission_number', normalizedAdmissionNumber)
         .eq('is_deleted', false)
         .limit(1);
+      
+      if (existingError) {
+        console.log('[ERROR] Failed to check duplicate admission number:', existingError);
+        return res.status(500).json({ message: "Database error checking duplicate" });
+      }
+      
       if (existing?.length) {
         return res.status(409).json({ message: "Admission number already exists" });
       }
