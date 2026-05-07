@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { apiFetch } from "../lib/api.js";
-import { getSession, saveSession } from "../lib/auth.js";
-import { C } from "../lib/theme.js";
+import { apiFetch } from "../lib/api";
+import { getSession, saveSession } from "../lib/auth";
+import { C } from "../lib/theme";
 
-export function useBranches() {
+export function useBranches(token) {
   const [branches, setBranches] = useState([]);
-  const [allSchools, setAllSchools] = useState([]); // For director
+  const [allSchools, setAllSchools] = useState([]);
   const [currentBranch, setCurrentBranch] = useState(null);
   const [parentSchool, setParentSchool] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -13,25 +13,21 @@ export function useBranches() {
   const [canAccessBranches, setCanAccessBranches] = useState(false);
   const [isDirector, setIsDirector] = useState(false);
 
-  const token = sessionStorage.getItem("token");
-
   const fetchBranches = async () => {
     if (!token) {
       setCanAccessBranches(false);
       return;
     }
-    
+
     setLoading(true);
     try {
       const data = await apiFetch("/branches/my-branches", { token });
-      
-      // Director sees all schools
+
       if (data.canManageAll && data.allSchools) {
-        setAllSchools(data.allSchools);
+        setAllSchools(data.allSchools || []);
         setIsDirector(true);
         setCanAccessBranches(true);
       } else {
-        // Regular admin sees branches
         setBranches(data.branches || []);
         setCurrentBranch(data.school);
         setParentSchool(data.parent_school);
@@ -53,14 +49,13 @@ export function useBranches() {
 
   const switchBranch = async (branchId) => {
     if (!token) return;
-    
+
     try {
       const data = await apiFetch(`/branches/switch/${branchId}`, {
         method: "PUT",
         token
       });
-      
-      // Update sessionStorage with new school context
+
       const auth = JSON.parse(sessionStorage.getItem("educore.auth") || "{}");
       auth.schoolId = data.newSchoolId;
       auth.school = data.newSchool;
@@ -70,10 +65,8 @@ export function useBranches() {
         sessionId: session?.sessionId || auth.sessionId,
         user: auth,
       });
-      
-      // Reload to apply new context
+
       window.location.reload();
-      
       return data;
     } catch (err) {
       console.error("Error switching branch:", err);
@@ -96,7 +89,7 @@ export function useBranches() {
   };
 }
 
-export function BranchSelector({ className = "", style = {} }) {
+export function BranchSelector({ className = "", style = {}, token }) {
   const {
     branches,
     allSchools,
@@ -106,14 +99,14 @@ export function BranchSelector({ className = "", style = {} }) {
     canAccessBranches,
     isDirector,
     switchBranch,
-  } = useBranches();
+  } = useBranches(token);
 
   const [isOpen, setIsOpen] = useState(false);
-  
+
   const auth = JSON.parse(sessionStorage.getItem("educore.auth") || "{}");
   const userRole = auth?.role;
   const currentSchoolId = auth?.schoolId;
-  
+
   if (userRole === "parent" || userRole === "student") {
     return null;
   }
@@ -121,7 +114,7 @@ export function BranchSelector({ className = "", style = {} }) {
   if (!canAccessBranches) {
     return null;
   }
-  
+
   if (!isDirector && branches.length === 0) {
     return null;
   }
@@ -139,14 +132,18 @@ export function BranchSelector({ className = "", style = {} }) {
       setIsOpen(false);
       return;
     }
-    
+
     if (window.confirm("Switching branches will reload the page. Continue?")) {
-      await switchBranch(branchId);
+      try {
+        await switchBranch(branchId);
+      } catch (err) {
+        alert("Failed to switch: " + err.message);
+      }
     }
     setIsOpen(false);
   };
 
-  const currentSchoolName = isDirector 
+  const currentSchoolName = isDirector
     ? (allSchools.find(s => s.school_id === currentSchoolId)?.name || "All Schools")
     : formatBranchName(currentBranch);
 
@@ -160,21 +157,27 @@ export function BranchSelector({ className = "", style = {} }) {
           alignItems: "center",
           gap: 8,
           padding: "8px 12px",
-          background: C.card,
-          border: `1px solid ${C.border}`,
-          borderRadius: 8,
-          color: C.text,
+          background: "var(--color-bg-card)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-md)",
+          color: "var(--color-text-primary)",
           cursor: "pointer",
-          fontSize: 13,
+          fontSize: "13px",
           fontWeight: 600,
-          transition: "all 0.2s"
+          transition: "all var(--transition-fast)",
+          whiteSpace: "nowrap"
         }}
       >
         <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ color: C.accent }}>🏢</span>
+          <span style={{ color: "var(--color-primary)" }}>🏢</span>
           <span>{currentSchoolName}</span>
         </span>
-        <span style={{ fontSize: 10, color: C.textSub, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</span>
+        <span style={{
+          fontSize: 10,
+          color: "var(--color-text-muted)",
+          transform: isOpen ? "rotate(180deg)" : "none",
+          transition: "transform var(--transition-fast)"
+        }}>▼</span>
       </button>
 
       {isOpen && (
@@ -184,25 +187,34 @@ export function BranchSelector({ className = "", style = {} }) {
             style={{ position: "fixed", inset: 0, zIndex: 1000 }}
             onClick={() => setIsOpen(false)}
           />
-          <div className="branch-selector-dropdown"
+          <div
+            className="branch-selector-dropdown"
             style={{
               position: "absolute",
               right: 0,
               marginTop: 8,
               width: 280,
-              background: C.surface,
-              border: `1px solid ${C.border}`,
-              borderRadius: 12,
+              background: "var(--color-bg-surface)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-lg)",
               boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
               zIndex: 1001,
               overflow: "hidden"
-            }}>
-            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, background: C.card }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: C.textSub, margin: 0, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            }}
+          >
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border)", background: "var(--color-bg-card)" }}>
+              <p style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "var(--color-text-muted)",
+                margin: 0,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em"
+              }}>
                 {isDirector ? "Select School" : "Change Campus"}
               </p>
             </div>
-            
+
             <div style={{ maxHeight: 320, overflowY: "auto" }}>
               {isDirector ? (
                 allSchools.map((school) => {
@@ -216,21 +228,28 @@ export function BranchSelector({ className = "", style = {} }) {
                         width: "100%",
                         textAlign: "left",
                         padding: "12px 16px",
-                        background: isActive ? C.accentDim : "transparent",
+                        background: isActive ? "var(--color-primary-muted)" : "transparent",
                         border: "none",
-                        borderLeft: `4px solid ${isActive ? C.accent : "transparent"}`,
-                        color: C.text,
+                        borderLeft: `4px solid ${isActive ? "var(--color-primary)" : "transparent"}`,
+                        color: "var(--color-text-primary)",
                         cursor: "pointer",
-                        transition: "background 0.2s"
+                        transition: "background var(--transition-fast)"
                       }}
                     >
                       <div style={{ fontWeight: 600, fontSize: 14 }}>
                         {school.name}
                         {school.is_branch && (
-                          <span style={{ marginLeft: 8, fontSize: 10, background: C.border, padding: "2px 6px", borderRadius: 4, color: C.textSub }}>Branch</span>
+                          <span style={{
+                            marginLeft: 8,
+                            fontSize: 10,
+                            background: "var(--color-border)",
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                            color: "var(--color-text-muted)"
+                          }}>Branch</span>
                         )}
                       </div>
-                      <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>
+                      <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>
                         ID: {school.school_id} {school.branch_code && ` • ${school.branch_code}`}
                       </div>
                     </button>
@@ -246,18 +265,18 @@ export function BranchSelector({ className = "", style = {} }) {
                         width: "100%",
                         textAlign: "left",
                         padding: "12px 16px",
-                        background: currentSchoolId === parentSchool.school_id ? C.accentDim : "transparent",
+                        background: currentSchoolId === parentSchool.school_id ? "var(--color-primary-muted)" : "transparent",
                         border: "none",
-                        borderLeft: `4px solid ${currentSchoolId === parentSchool.school_id ? C.accent : "transparent"}`,
-                        color: C.text,
+                        borderLeft: `4px solid ${currentSchoolId === parentSchool.school_id ? "var(--color-primary)" : "transparent"}`,
+                        color: "var(--color-text-primary)",
                         cursor: "pointer"
                       }}
                     >
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{parentSchool.name}</div>
-                      <div style={{ fontSize: 11, color: C.textSub, marginTop: 2 }}>Main Campus</div>
+                      <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>Main Campus</div>
                     </button>
                   )}
-                  
+
                   {branches.map((branch) => {
                     const isActive = currentSchoolId === branch.school_id;
                     return (
@@ -269,15 +288,15 @@ export function BranchSelector({ className = "", style = {} }) {
                           width: "100%",
                           textAlign: "left",
                           padding: "12px 16px",
-                          background: isActive ? C.accentDim : "transparent",
+                          background: isActive ? "var(--color-primary-muted)" : "transparent",
                           border: "none",
-                          borderLeft: `4px solid ${isActive ? C.accent : "transparent"}`,
-                          color: C.text,
+                          borderLeft: `4px solid ${isActive ? "var(--color-primary)" : "transparent"}`,
+                          color: "var(--color-text-primary)",
                           cursor: "pointer"
                         }}
                       >
                         <div style={{ fontWeight: 600, fontSize: 14 }}>{branch.name}</div>
-                        <div style={{ fontSize: 11, color: C.textSub, marginTop: 2 }}>
+                        <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>
                           {branch.branch_code} {branch.branch_address && ` • ${branch.branch_address}`}
                         </div>
                       </button>
