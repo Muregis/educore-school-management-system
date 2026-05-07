@@ -157,7 +157,6 @@ router.get("/school", async (req, res, next) => {
       ...data,
       term: data.term || settings.get("current_term") || "",
       year: data.year || settings.get("academic_year") || "",
-      academic_year: data.academic_year || data.year || settings.get("academic_year") || "",
       term_start: data.term_start || settings.get("term_start") || settings.get("term_start_date") || "",
       term_end: data.term_end || settings.get("term_end") || settings.get("term_end_date") || "",
       motto: data.motto || settings.get("school_motto") || "",
@@ -172,15 +171,14 @@ router.get("/school", async (req, res, next) => {
       school_type: data.school_type || settings.get("school_type") || "",
       type: data.school_type || settings.get("school_type") || "",  // alias for frontend compatibility
       curriculum: data.curriculum || settings.get("curriculum") || "",
-      library_shortcode: data.library_shortcode || settings.get("library_shortcode") || "",
     });
   } catch (err) {
     next(err);
   }
 });
 
-// PUT /api/settings/school - update school profile fields
-router.put("/school", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
+// PUT /api/settings/school - update school profile fields except WhatsApp number
+router.put("/school", requireRoles("admin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     console.log('[DEBUG] PUT /settings/school - schoolId:', schoolId, 'body:', req.body);
@@ -191,7 +189,6 @@ router.put("/school", requireRoles("admin", "director", "superadmin"), async (re
       address,
       county,
       term,
-      academic_year,
       year,
       term_start,
       term_end,
@@ -206,8 +203,6 @@ router.put("/school", requireRoles("admin", "director", "superadmin"), async (re
       admin_title,
       school_type,
       curriculum,
-      whatsapp_business_number,
-      library_shortcode,
     } = req.body;
 
     const updatePayload = {
@@ -223,7 +218,6 @@ router.put("/school", requireRoles("admin", "director", "superadmin"), async (re
     if (address !== undefined) updatePayload.address = address;
     if (county !== undefined) updatePayload.county = county;
     if (logo_url !== undefined) updatePayload.logo_url = logo_url;
-    if (whatsapp_business_number !== undefined) updatePayload.whatsapp_business_number = whatsapp_business_number;
     const { data, error } = await supabase
       .from("schools")
       .update(updatePayload)
@@ -235,7 +229,7 @@ router.put("/school", requireRoles("admin", "director", "superadmin"), async (re
 
     await upsertSchoolSettings(schoolId, {
       current_term: term,
-      academic_year: academic_year || year,
+      academic_year: year,
       term_start: term_start,
       term_end: term_end,
       term_start_date: term_start,  // alias for compatibility
@@ -251,7 +245,6 @@ router.put("/school", requireRoles("admin", "director", "superadmin"), async (re
       admin_title,
       school_type,
       curriculum,
-      library_shortcode,
     });
 
     const settings = await getSchoolSettingsMap(schoolId);
@@ -267,7 +260,7 @@ router.put("/school", requireRoles("admin", "director", "superadmin"), async (re
         motto: settings.get("school_motto") || "",
         tagline: settings.get("school_tagline") || "",
         hero_message: settings.get("hero_message") || "",
-        logo_url: data.logo_url || settings.get("logo_url") || settings.get("school_logo") || "",
+        logo_url: settings.get("logo_url") || settings.get("school_logo") || "",
         primary_color: settings.get("primary_color") || "",
         secondary_color: settings.get("secondary_color") || "",
         established_year: settings.get("established_year") || "",

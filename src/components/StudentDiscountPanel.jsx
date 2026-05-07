@@ -213,7 +213,7 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
             justifyContent: "center",
             zIndex: 1000
           }}
-          onClick={() => setShowManualForm(false)}
+          onClick={() => setShowAddForm(false)}
         >
           <div
             style={{

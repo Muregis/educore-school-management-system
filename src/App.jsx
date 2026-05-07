@@ -42,7 +42,7 @@ import ParentGuard from "./components/ParentGuard"; // NEW: Parent-student bindi
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
-import { apiFetch } from "./lib/api";
+import { API_BASE, apiFetch } from "./lib/api";
 import { clearSession, getSession, logout, saveSession } from "./lib/auth";
 
 // Mobile portal imports
@@ -343,6 +343,20 @@ export default function App() {
     setTimetable(timetableRes.status === "fulfilled" ? (timetableRes.value || []) : []);
   }, [setSchool, setStudents, setTeachers, setAttendance, setResults, setPayments, setFeeStructures, setTimetable]);
 
+  useEffect(() => {
+    const ping = () => fetch(`${API_BASE}/health`).catch(() => {});
+    ping();
+    const interval = setInterval(ping, 14 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    hydrateTenantData(auth).catch((err) => {
+      console.error("[tenant_hydrate] Failed to refresh tenant data:", err.message);
+    });
+  }, [auth?.token, auth?.schoolId, hydrateTenantData]);
+
   const handleLogout = useCallback(() => {
     logout();
     clearTenantLocalState();
@@ -469,7 +483,11 @@ export default function App() {
     analysis: ["admin","teacher","director","superadmin"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,
     "update-requests": ["admin","parent"].includes(auth.role) ? <UpdateRequestsPage auth={auth} students={students} pendingUpdates={pendingUpdates} setPendingUpdates={setPendingUpdates} toast={toast} /> : <Forbidden />,
     settings: ["admin","director","superadmin"].includes(auth.role)
-      ? <AdminSettings auth={auth} onPermissionsSaved={() => loadRolePermissions(auth.token)} />
+      ? <AdminSettings
+          auth={auth}
+          onPermissionsSaved={() => loadRolePermissions(auth.token)}
+          onSchoolSaved={(savedSchool) => setSchool({ ...school, ...savedSchool })}
+        />
       : <Forbidden />,
   };
 

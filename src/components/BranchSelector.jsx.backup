@@ -51,10 +51,14 @@ export function useBranches(token) {
     if (!token) return;
 
     try {
-      localStorage.setItem("educore.activeSchool", String(branchId));
+      const data = await apiFetch(`/branches/switch/${branchId}`, {
+        method: "PUT",
+        token
+      });
 
       const auth = JSON.parse(sessionStorage.getItem("educore.auth") || "{}");
-      auth.schoolId = branchId;
+      auth.schoolId = data.newSchoolId;
+      auth.school = data.newSchool;
       const session = getSession();
       saveSession({
         token: session?.token || auth.token,
@@ -63,7 +67,7 @@ export function useBranches(token) {
       });
 
       window.location.reload();
-      return { newSchoolId: branchId };
+      return data;
     } catch (err) {
       console.error("Error switching branch:", err);
       setError(err.message);

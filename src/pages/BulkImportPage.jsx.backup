@@ -331,19 +331,10 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
     } else if (exportFilter === "defaulter") {
       filteredStudents = allStudents.filter(s => {
         const studentId = s.id ?? s.student_id;
-        
-        // Use student's outstanding_balance if available
-        let balance;
-        if (s.outstanding_balance !== undefined && s.outstanding_balance !== null) {
-          balance = Number(s.outstanding_balance);
-        } else {
-          // Fallback to calculating from fee structures and payments
-          const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
-          const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
-          const paidAmount = payments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid").reduce((sum, p) => sum + Number(p.amount || 0), 0);
-          balance = expectedAmount - paidAmount;
-        }
-        
+        const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
+        const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
+        const paidAmount = payments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid").reduce((sum, p) => sum + Number(p.amount || 0), 0);
+        const balance = expectedAmount - paidAmount;
         return balance > exportDefaulterAmount;
       });
     } else if (exportFilter === "individual") {
@@ -362,19 +353,11 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
       const studentId = s.id ?? s.student_id;
       
       // Fee calculations
-      let paidAmount, balance;
-      if (s.outstanding_balance !== undefined && s.outstanding_balance !== null) {
-        balance = Number(s.outstanding_balance);
-        // For total_fees_paid, use payments
-        const studentPayments = allPayments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid");
-        paidAmount = studentPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-      } else {
-        const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
-        const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
-        const studentPayments = allPayments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid");
-        paidAmount = studentPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-        balance = expectedAmount - paidAmount;
-      }
+      const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
+      const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
+      const studentPayments = allPayments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid");
+      const paidAmount = studentPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const balance = expectedAmount - paidAmount;
       const lastPaymentDate = studentPayments.length > 0 ? 
         new Date(Math.max(...studentPayments.map(p => new Date(p.createdAt || p.created_at)))).toLocaleDateString() : "";
       

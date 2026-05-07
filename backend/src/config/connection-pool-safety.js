@@ -124,5 +124,3 @@ export function validateTenantContextMiddleware(schoolId) {
   };
 }
 
-// Export for use in main application
-export { resetTenantSessionEnhanced };

@@ -594,35 +594,4 @@ router.post("/upload-photo", requireRoles("admin", "teacher", "director", "super
   }
 });
 
-// ─── PATCH /:id/fees — update student fees/balance ─────────────────────────
-router.patch("/:id/fees", requireRoles("admin", "finance", "director", "superadmin"), async (req, res, next) => {
-  try {
-    const { schoolId } = req.user;
-    const {
-      outstanding_balance,
-      transport_fee,
-      lunch_fee,
-      breakfast_fee
-    } = req.body;
-
-    const { data, error } = await supabase
-      .from("students")
-      .update({
-        outstanding_balance: outstanding_balance !== undefined ? parseFloat(outstanding_balance) : undefined,
-        transport_fee: transport_fee !== undefined ? parseFloat(transport_fee) : undefined,
-        lunch_fee: lunch_fee !== undefined ? parseFloat(lunch_fee) : undefined,
-        breakfast_fee: breakfast_fee !== undefined ? parseFloat(breakfast_fee) : undefined,
-        updated_at: new Date().toISOString()
-      })
-      .eq('student_id', req.params.id)
-      .eq('school_id', schoolId)
-      .eq('is_deleted', false)
-      .select('student_id')
-      .single();
-
-    if (error) throw error;
-    res.json({ success: true, student_id: data.student_id });
-  } catch (err) { next(err); }
-});
-
 export default router;

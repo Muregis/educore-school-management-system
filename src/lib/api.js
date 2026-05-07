@@ -1,8 +1,9 @@
 // simple wrapper for calling backend API with optional auth token
 import { clearSession, getAuthHeaders, getSession } from "./auth.js";
 
-// Render deploys the backend as `educore-api`; this must match so `/api/auth/*` routes resolve.
-const DEFAULT_PROD_API_BASE = "https://educore-api.onrender.com/api";
+// Production Render backend. Keep this fallback aligned with Vercel so a
+// missing VITE_API_URL does not strand the app on an old service URL.
+const DEFAULT_PROD_API_BASE = "https://educore-school-management-system.onrender.com/api";
 const DEFAULT_LOCAL_API_BASE = "http://localhost:10000/api";
 
 function getDefaultApiBase() {

@@ -656,7 +656,7 @@ const TABS = [
 ];
 
 // ─── SCHOOL INFO TAB ──────────────────────────────────────────────────────────
-const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
+const SchoolInfoTab = ({ onSave, auth }) => {
   const [form, setForm] = useState({
     name:        "",
     motto:       "",
@@ -668,7 +668,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
     address:     "",
     county:      "",
     term:        "Term 2",
-    academic_year: "2025",
+    year:        "2025",
     term_start:  "2025-05-05",
     term_end:    "2025-08-01",
     admin_name:  "",
@@ -677,7 +677,6 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
     favicon_url: "",
     primary_color: "#3B82F6",
     secondary_color: "#1A2A42",
-    library_shortcode: "",
   });
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
@@ -703,19 +702,14 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
         primary_color: data.primary_color || prev.primary_color,
         secondary_color: data.secondary_color || prev.secondary_color,
         term: data.term || prev.term,
-        academic_year: data.academic_year || data.year || prev.academic_year,
+        year: data.year || prev.year,
         term_start: data.term_start || data.term_start_date || prev.term_start,
         term_end: data.term_end || data.term_end_date || prev.term_end,
         type: data.school_type || data.type || prev.type,
         curriculum: data.curriculum || prev.curriculum,
         admin_name: data.admin_name || prev.admin_name,
         admin_title: data.admin_title || prev.admin_title,
-        library_shortcode: data.library_shortcode || prev.library_shortcode,
       }));
-      // Apply primary color immediately
-      if (data.primary_color) {
-        document.documentElement.style.setProperty('--color-primary', data.primary_color);
-      }
     } catch (err) {
       // School data not found, keep defaults
       console.log('[DEBUG] Load school data failed:', err);
@@ -728,19 +722,11 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth]);
 
-  const f = k => e => {
-    const value = e.target.value;
-    setForm({ ...form, [k]: value });
-    if (k === 'primary_color') {
-      document.documentElement.style.setProperty('--color-primary', value);
-    }
-  };
+  const f = k => e => setForm({ ...form, [k]: e.target.value });
 
   const saveSchoolInfo = async () => {
     setLoading(true); setMessage(null);
     try {
-      let nextLogoUrl = form.logo_url;
-
       // Upload logo file first if one was selected
       if (logoFile) {
         setUploadingLogo(true);
@@ -758,7 +744,6 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
           }
           const { logo_url } = await uploadRes.json();
           if (logo_url) {
-            nextLogoUrl = logo_url;
             setForm(prev => ({ ...prev, logo_url }));
             setLogoPreview(null);
             setLogoFile(null);
@@ -783,28 +768,24 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
           county: form.county,
           whatsapp_business_number: form.whatsapp_business_number,
           term: form.term,
-          academic_year: form.academic_year,
+          year: form.year,
           term_start: form.term_start,
           term_end: form.term_end,
           motto: form.motto,
           tagline: form.motto, // Use motto as tagline if not separately set
-          logo_url: nextLogoUrl,
+          logo_url: form.logo_url,
           primary_color: form.primary_color,
           secondary_color: form.secondary_color,
           school_type: form.type,
           curriculum: form.curriculum,
           admin_name: form.admin_name,
           admin_title: form.admin_title,
-          library_shortcode: form.library_shortcode,
         },
         token: auth?.token,
       });
       console.log('[DEBUG] School settings save response:', saveRes);
       
       setMessage({ type: "success", text: "School settings saved successfully!" });
-      if (saveRes?.school) {
-        onSchoolSaved?.(saveRes.school);
-      }
       
       // Reload data to ensure form has latest values from backend
       await loadSchoolData();
@@ -931,7 +912,6 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
         <Inp label="Phone Number" value={form.phone} onChange={f("phone")} placeholder="+254 7XX XXX XXX" />
         <Inp label="Physical Address" value={form.address} onChange={f("address")} placeholder="Street, Town" />
         <Inp label="County" value={form.county} onChange={f("county")} placeholder="e.g. Nairobi" />
-        <Inp label="Library Shortcode" value={form.library_shortcode} onChange={f("library_shortcode")} placeholder="e.g. LIB-001" />
       </div>
 
       <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
@@ -972,7 +952,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
       <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Current Academic Term</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0 24px" }}>
         <Sel label="Term" value={form.term} onChange={f("term")} options={["Term 1","Term 2","Term 3"].map(t=>({value:t,label:t}))} />
-        <Inp label="Academic Year" value={form.academic_year} onChange={f("academic_year")} placeholder="e.g. 2025" />
+        <Inp label="Year" value={form.year} onChange={f("year")} placeholder="e.g. 2025" />
         <Inp label="Term Start" type="date" value={form.term_start} onChange={f("term_start")} />
         <Inp label="Term End" type="date" value={form.term_end} onChange={f("term_end")} />
       </div>
@@ -1007,7 +987,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
   );
 };
 
-SchoolInfoTab.propTypes = { onSave: PropTypes.func.isRequired, auth: PropTypes.object, onSchoolSaved: PropTypes.func };
+SchoolInfoTab.propTypes = { onSave: PropTypes.func.isRequired, auth: PropTypes.object };
 
 // ─── USERS TAB ────────────────────────────────────────────────────────────────
 const UsersTab = ({ onSave, auth }) => {
@@ -1679,7 +1659,7 @@ const NotificationsTab = ({ onSave }) => {
 NotificationsTab.propTypes = { onSave: PropTypes.func.isRequired };
 
 // ─── ADMIN SETTINGS PAGE ──────────────────────────────────────────────────────
-export default function AdminSettings({ auth, initialTab, onPermissionsSaved, onSchoolSaved }) {
+export default function AdminSettings({ auth, initialTab, onPermissionsSaved }) {
   const [activeTab, setActiveTab] = useState(initialTab || "school");
   const [toast, setToast] = useState(null);
 
@@ -1691,7 +1671,7 @@ export default function AdminSettings({ auth, initialTab, onPermissionsSaved, on
   const renderTab = () => {
     const save = () => showToast("Changes saved successfully!");
     switch (activeTab) {
-      case "school":        return <SchoolInfoTab onSave={save} auth={auth} onSchoolSaved={onSchoolSaved} />;
+      case "school":        return <SchoolInfoTab onSave={save} auth={auth} />;
       case "users":         return <UsersTab onSave={save} auth={auth} />;
       case "permissions":   return <PermissionsTab onSave={save} onPermissionsSaved={onPermissionsSaved} auth={auth} />;
       case "security":      return <SecurityTab onSave={save} />;
