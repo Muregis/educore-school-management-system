@@ -42,12 +42,9 @@ const NAVIGATION_GROUPS = [
       { id: "transport", label: "Transport", icon: "T" },
       { id: "exams", label: "Exams", icon: "E" },
       { id: "announcements", label: "Announcements", icon: "N" },
-      { id: "messaging", label: "Messaging", icon: "M" },
       { id: "subjects", label: "Subjects", icon: "B" },
       { id: "invoices", label: "Invoices", icon: "I" },
-      { id: "medical", label: "Medical", icon: "M" },
       { id: "lessonplans", label: "Lesson Plans", icon: "L" },
-      { id: "pendingplans", label: "Pending Plans", icon: "Q" }
     ]
   },
   {
@@ -59,9 +56,6 @@ const NAVIGATION_GROUPS = [
       { id: "analytics", label: "Analytics", icon: "A" },
       { id: "accounts", label: "Accounts", icon: "A" },
       { id: "settings", label: "Settings", icon: "S" },
-      { id: "branch-management", label: "Branches", icon: "B" },
-      { id: "admin-permissions", label: "Admin Permissions", icon: "P" },
-      { id: "upgrade", label: "Upgrade Plan", icon: "U" }
     ]
   }
 ];
@@ -113,12 +107,12 @@ const Sidebar = ({
 
   // ROLE FILTERING LOGIC
   const ROLE_NAV_LIMITS = {
-    admin: ["dashboard", "students", "teachers", "subjects", "attendance", "grades", "fees", "invoices", "reportcards", "discipline", "transport", "communication", "messaging", "timetable", "library", "lessonplans", "announcements", "exams", "admissions", "hr", "medical", "bulk-import"],
+    admin: ["dashboard", "students", "teachers", "subjects", "attendance", "grades", "fees", "invoices", "reportcards", "discipline", "transport", "communication", "timetable", "library", "lessonplans", "announcements", "exams", "admissions", "hr", "bulk-import"],
     director: null, 
     superadmin: null, 
-    teacher: ["dashboard", "subjects", "attendance", "grades", "reportcards", "discipline", "timetable", "communication", "messaging", "library", "analysis", "lessonplans", "announcements", "exams"],
-    finance: ["dashboard", "fees", "mpesa-reconcile", "invoices", "announcements", "upgrade"],
-    hr: ["dashboard", "hr", "staff", "announcements", "upgrade"],
+    teacher: ["dashboard", "subjects", "attendance", "grades", "reportcards", "discipline", "timetable", "communication", "library", "analysis", "lessonplans", "announcements", "exams"],
+    finance: ["dashboard", "fees", "mpesa-reconcile", "invoices", "announcements"],
+    hr: ["dashboard", "hr", "staff", "announcements"],
     librarian: ["dashboard", "library", "announcements"],
     parent: ["dashboard", "grades", "fees", "attendance", "communication", "announcements"],
     student: ["dashboard", "grades", "attendance", "reportcards", "library", "announcements"],

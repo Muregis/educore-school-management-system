@@ -9,21 +9,21 @@ const { promisify } = require('util');
 // Role permissions mapping
 const ROLE_PERMISSIONS = {
   admin: [
-    'dashboard', 'upgrade', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees',
+    'dashboard', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees',
     'mpesa-reconcile', 'admissions', 'invoices', 'reportcards', 'discipline', 'transport',
-    'communication', 'messaging', 'timetable', 'reports', 'analytics', 'accounts', 'hr',
-    'library', 'lessonplans', 'pendingplans', 'settings', 'announcements', 'bulk-import',
-    'exams', 'medical', 'update-requests'
+    'communication', 'timetable', 'reports', 'analytics', 'accounts', 'hr',
+    'library', 'lessonplans', 'settings', 'announcements', 'bulk-import',
+    'exams', 'update-requests'
   ],
   teacher: [
     'dashboard', 'attendance', 'grades', 'reportcards', 'discipline', 'timetable',
-    'communication', 'messaging', 'library', 'analysis', 'lessonplans', 'announcements', 'exams'
+    'communication', 'library', 'analysis', 'lessonplans', 'announcements', 'exams'
   ],
   finance: [
-    'dashboard', 'fees', 'mpesa-reconcile', 'invoices', 'announcements', 'upgrade'
+    'dashboard', 'fees', 'mpesa-reconcile', 'invoices', 'announcements'
   ],
   hr: [
-    'dashboard', 'hr', 'staff', 'announcements', 'upgrade'
+    'dashboard', 'hr', 'staff', 'announcements'
   ],
   librarian: [
     'dashboard', 'library', 'announcements'

@@ -18,7 +18,6 @@ import TransportPage from "./pages/TransportPage";
 import CommunicationPage from "./pages/CommunicationPage";
 import AccountsPage from "./pages/AdminAccountsPage";
 import AdminSettings from "./pages/AdminSettings";
-import MessagingPage from "./pages/MessagingPage";
 import ReportsPage from "./pages/ReportsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import AnalysisPage from "./pages/AnalysisPage";
@@ -30,25 +29,19 @@ import HRPage from "./pages/HRPage";
 import LibraryPage from "./pages/LibraryPage";
 import StaffPage from "./pages/StaffPage";
 import LessonPlansPage from "./pages/LessonPlansPage";
-import PendingPlansPage from "./pages/PendingPlansPage";
 import AnnouncementsPage from "./pages/AnnouncementsPage";
 import PortalDashboardPage from "./pages/PortalDashboardPage";
 import SubjectsPage from "./pages/SubjectsPage";
 import MpesaReconciliationPage from "./pages/MpesaReconciliationPage";
 import BulkImportPage from "./pages/BulkImportPage";
 import ExamsPage from "./pages/ExamsPage";
-import MedicalRecordsPage from "./pages/MedicalRecordsPage";
 import QRVerificationPage from "./pages/QRVerificationPage";
-import UpgradePage from "./pages/UpgradePage";
 import UpdateRequestsPage from "./pages/UpdateRequestsPage";
-import BranchManagementPage from "./pages/BranchManagementPage"; // NEW: Branch management
-import AdminPermissionsPage from "./pages/AdminPermissionsPage"; // NEW: Admin permissions
 import OfflineStatusBar from "./components/OfflineStatusBar"; // NEW: Offline/sync status indicator
 import ParentGuard from "./components/ParentGuard"; // NEW: Parent-student binding enforcement
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
-import { BranchSelector } from "./components/BranchSelector"; // NEW: Branch/campus selector
 import { apiFetch } from "./lib/api";
 import { clearSession, getSession, logout, saveSession } from "./lib/auth";
 
@@ -458,7 +451,6 @@ export default function App() {
     fees: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <FeesPage auth={auth} school={school} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} canViewTotals={canViewTotals} canDeletePayments={canDeletePayments} toast={toast} linkedStudentId={linkedStudentId} />,
     "mpesa-reconcile": <MpesaReconciliationPage auth={auth} students={students} toast={toast} />,
     "bulk-import": ["admin","director","superadmin"].includes(auth.role) ? <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} payments={payments} feeStructures={feeStructures} results={results} /> : <Forbidden />,
-    upgrade: ["admin","director","superadmin","finance"].includes(auth.role) ? <UpgradePage auth={auth} toast={toast} /> : <Forbidden />,
     exams: <ExamsPage auth={auth} students={students} subjects={[]} toast={toast} />,
     admissions: <AdmissionsPage auth={auth} canEdit={canEdit} toast={toast} />,
     invoices: <InvoicesPage auth={auth} school={school} students={students} canEdit={canEdit} toast={toast} />,
@@ -471,16 +463,11 @@ export default function App() {
     timetable: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <TimetablePage auth={auth} teachers={teachers} canEdit={canEdit} toast={toast} />,
     accounts: ["admin","director","superadmin"].includes(auth.role) ? <AccountsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
     lessonplans: ["admin","teacher","director","superadmin"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
-    pendingplans: ["admin","director","superadmin"].includes(auth.role) ? <PendingPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     announcements: perms?.pages.includes("announcements") ? <AnnouncementsPage auth={auth} toast={toast} /> : <Forbidden />,
-    messaging: ["admin","teacher","director","superadmin"].includes(auth.role) ? <MessagingPage auth={auth} /> : <Forbidden />,
     analytics: ["admin","director","superadmin"].includes(auth.role) ? <AnalyticsPage auth={auth} students={students} teachers={teachers} payments={payments} results={results} attendance={attendance} feeStructures={feeStructures} toast={toast} /> : <Forbidden />,
     reports: ["admin","teacher","director","superadmin"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
     analysis: ["admin","teacher","director","superadmin"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,
-    medical: ["admin","director","superadmin"].includes(auth.role) ? <MedicalRecordsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
     "update-requests": ["admin","parent"].includes(auth.role) ? <UpdateRequestsPage auth={auth} students={students} pendingUpdates={pendingUpdates} setPendingUpdates={setPendingUpdates} toast={toast} /> : <Forbidden />,
-    "branch-management": ["admin","director","superadmin"].includes(auth.role) ? <BranchManagementPage auth={auth} toast={toast} /> : <Forbidden />,
-    "admin-permissions": ["director","superadmin"].includes(auth.role) ? <AdminPermissionsPage auth={auth} toast={toast} /> : <Forbidden />,
     settings: ["admin","director","superadmin"].includes(auth.role)
       ? <AdminSettings auth={auth} onPermissionsSaved={() => loadRolePermissions(auth.token)} />
       : <Forbidden />,
@@ -626,9 +613,6 @@ export default function App() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-            {!isMobile && ["admin","director","superadmin"].includes(auth.role) && (
-              <BranchSelector />
-            )}
             {!isMobile && (
               <div style={{ 
                 background: `${roleColor}15`, 

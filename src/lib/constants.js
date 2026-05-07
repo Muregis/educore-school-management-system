@@ -14,17 +14,17 @@ export const DEFAULTS = {
 
 export const ROLE = {
   // Director - HIGHEST ROLE - Full control over all schools, can delegate permissions
-  director:  { pages:["dashboard","upgrade","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical","update-requests","branch-management","admin-permissions"], edit:true, canDelegate:true },
+  director:  { pages:["dashboard","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true, canDelegate:true },
   // Superadmin - System-level full access
-  superadmin:{ pages:["dashboard","upgrade","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","messaging","timetable","reports","analytics","accounts","hr","library","lessonplans","pendingplans","settings","announcements","bulk-import","exams","medical","update-requests","branch-management"], edit:true },
+  superadmin:{ pages:["dashboard","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true },
   // Admin - School administrator with full school-level access
-  admin:     { pages:["dashboard","students","teachers","subjects","attendance","grades","fees","invoices","reportcards","discipline","transport","communication","messaging","timetable","library","lessonplans","announcements","exams","admissions"], edit:true },
+  admin:     { pages:["dashboard","students","teachers","subjects","attendance","grades","fees","invoices","reportcards","discipline","transport","communication","timetable","library","lessonplans","announcements","exams","admissions"], edit:true },
   // Teacher - Classroom operations
-  teacher:   { pages:["dashboard","subjects","attendance","grades","reportcards","discipline","timetable","communication","messaging","library","analysis","lessonplans","announcements","exams"], edit:true },
+  teacher:   { pages:["dashboard","subjects","attendance","grades","reportcards","discipline","timetable","communication","library","analysis","lessonplans","announcements","exams"], edit:true },
   // Finance - Fee operations
-  finance:   { pages:["dashboard","fees","mpesa-reconcile","invoices","announcements","upgrade"], edit:true },
+  finance:   { pages:["dashboard","fees","mpesa-reconcile","invoices","announcements"], edit:true },
   // HR - Staff management
-  hr:        { pages:["dashboard","hr","staff","announcements","upgrade"], edit:true },
+  hr:        { pages:["dashboard","hr","staff","announcements"], edit:true },
   // Librarian - Library management
   librarian: { pages:["dashboard","library","announcements"], edit:true },
   // Parent - View child data (minimal essential pages only)
@@ -35,7 +35,6 @@ export const ROLE = {
 
 export const NAV = [
   { id:"dashboard",       label:"Dashboard",      icon:"\u{1F4CA}" },
-  { id:"upgrade",         label:"Upgrade Plan",   icon:"\u2B50" },
   { id:"students",        label:"Students",       icon:"\u{1F465}" },
   { id:"teachers",        label:"Teachers",       icon:"\u{1F9D1}\u200D\u{1F3EB}" },
   { id:"staff",           label:"Staff",          icon:"\u{1F3EB}" },
@@ -50,7 +49,6 @@ export const NAV = [
   { id:"discipline",      label:"Discipline",     icon:"\u2696" },
   { id:"transport",       label:"Transport",      icon:"\u{1F68C}" },
   { id:"communication",   label:"Communication",  icon:"\u{1F4AC}" },
-  { id:"messaging",       label:"Messaging",      icon:"\u{1F4AC}" },
   { id:"timetable",       label:"Timetable",      icon:"\u{1F5D3}" },
   { id:"reports",         label:"Reports",        icon:"\u{1F4CA}" },
   { id:"analytics",       label:"Analytics",      icon:"\u{1F4C8}" },
@@ -61,14 +59,10 @@ export const NAV = [
   { id:"announcements",   label:"Announcements",  icon:"\u{1F4E2}" },
   { id:"exams",           label:"Exams",          icon:"\u{1F4DD}" },
   { id:"bulk-import",     label:"Import/Export",  icon:"\u{1F4C1}" },
-  { id:"medical",         label:"Medical",        icon:"\u{1F3E5}" },
   { id:"update-requests", label:"Update Requests",icon:"\u{1F4DD}" },
-  { id:"branch-management", label:"Branches",   icon:"\u{1F3DB}" },
-  { id:"admin-permissions", label:"Admin Permissions",icon:"\u{1F510}" },
   { id:"settings",        label:"Settings",       icon:"\u2699" },
 ];
 
 export const NAV_EXTRAS = [
   { id: "lessonplans",  label: "Lesson Plans",  icon: "\u{1F4DD}" },
-  { id: "pendingplans", label: "Pending Plans", icon: "\u23F3" },
 ];
