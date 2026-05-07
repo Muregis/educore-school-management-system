@@ -341,9 +341,17 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
       return res.status(404).json({ message: "Student not found" });
     }
 
-    // Only check for duplicates if admission number is being changed
+    // Only check for duplicates if admission number is being changed and not null/empty
     const currentAdmissionNumber = normalizeAdmissionNumber(currentStudent.admission_number);
-    if (normalizedAdmissionNumber && normalizedAdmissionNumber !== currentAdmissionNumber) {
+    console.log('[DEBUG] Admission number check:', { 
+      admissionNumber, 
+      normalizedAdmissionNumber, 
+      currentAdmissionNumber,
+      shouldCheck: admissionNumber && admissionNumber.trim() !== '' && normalizedAdmissionNumber !== currentAdmissionNumber
+    });
+    if (admissionNumber && 
+        admissionNumber.trim() !== '' && 
+        normalizedAdmissionNumber !== currentAdmissionNumber) {
       const { data: existing, error: existingError } = await supabase
         .from('students')
         .select('student_id', 'admission_number')
