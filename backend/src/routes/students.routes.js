@@ -320,13 +320,26 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
     const normalizedAdmissionNumber = admissionNumber ? normalizeAdmissionNumber(admissionNumber) : null;
 
     // Check for duplicate if admission number is being changed
-    if (normalizedAdmissionNumber) {
+    // First, get the current student's admission number
+    const { data: currentStudent } = await supabase
+      .from('students')
+      .select('admission_number')
+      .eq('student_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (!currentStudent) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    // Only check for duplicates if the admission number is actually different
+    if (normalizedAdmissionNumber && normalizedAdmissionNumber !== currentStudent.admission_number) {
       const { data: existing } = await supabase
         .from('students')
         .select('student_id', 'admission_number')
         .eq('school_id', schoolId)
         .eq('admission_number', normalizedAdmissionNumber)
-        .neq('student_id', req.params.id)
         .eq('is_deleted', false)
         .limit(1);
       if (existing?.length) {
