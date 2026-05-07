@@ -252,7 +252,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     const transportDirection = student.transport_direction || 'none';
     const lunchEnabled = student.lunch_enabled || false;
     const breakfastEnabled = student.breakfast_enabled || false;
-    const openingBalance = Number(student.opening_balance) || 0;
+    const openingBalanceAmount = Number(student.opening_balance) || 0;
+    const openingBalance = student.opening_balance_type === "credit" ? -openingBalanceAmount : openingBalanceAmount;
 
     const transportFee = ledgerBalanceService.calculateTransportFee(student.transport_base_fee || 0, transportDirection);
     const lunchFee = lunchEnabled ? ledgerBalanceService.calculateLunchFee(student.lunch_daily_rate || 100, student.lunch_days || 66, student.lunch_billing_type || 'daily') : 0;

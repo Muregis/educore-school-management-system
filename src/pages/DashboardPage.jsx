@@ -231,9 +231,14 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     return fs ? Number(fs.tuition || 0) + Number(fs.activity || 0) + Number(fs.misc || 0) : 0;
   };
 
+  const openingBalanceImpact = student => {
+    const amount = Number(student.opening_balance || student.openingBalance || 0);
+    return (student.opening_balance_type || student.openingBalanceType) === "credit" ? -amount : amount;
+  };
+
   const outstanding = students.reduce((sum, s) => {
     const cls = s.className ?? s.class_name ?? "";
-    const expected = expectedByClass(cls);
+    const expected = expectedByClass(cls) + openingBalanceImpact(s);
     const sid = s.id ?? s.student_id ?? s.studentId ?? s.student_id;
     const paidByStudent = payments
       .filter(p => String(p.studentId ?? p.student_id) === String(sid) && (p.status ?? "paid") === "paid")
@@ -512,10 +517,11 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     const collectedThisMonth = monthlyPayments.reduce((s, p) => s + Number(p.amount), 0);
     
     const outstandingByClass = students.map(s => {
-      const cls = s.className;
-      const expected = expectedByClass(cls);
+      const cls = s.className ?? s.class_name ?? "";
+      const expected = expectedByClass(cls) + openingBalanceImpact(s);
+      const sid = s.id ?? s.student_id ?? s.studentId;
       const paid = payments.filter(p => 
-        String(p.studentId) === String(s.id) && p.status === "paid"
+        String(p.studentId ?? p.student_id) === String(sid) && (p.status ?? "paid") === "paid"
       ).reduce((sum, p) => sum + Number(p.amount), 0);
       return { className: cls, outstanding: Math.max(0, expected - paid) };
     }).reduce((acc, item) => {

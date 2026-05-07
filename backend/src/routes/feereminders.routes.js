@@ -20,6 +20,11 @@ import { sendPaymentReceipt } from "../utils/smsUtils.js";
 const router = Router();
 router.use(authRequired);
 
+function getOpeningBalanceImpact(student) {
+  const amount = Number(student?.opening_balance || 0);
+  return student?.opening_balance_type === "credit" ? -amount : amount;
+}
+
 // POST /api/fees/send-reminders
 router.post("/send-reminders", requireRoles("admin", "finance", "director", "superadmin"), async (req, res, next) => {
   try {
@@ -31,7 +36,7 @@ router.post("/send-reminders", requireRoles("admin", "finance", "director", "sup
     // 1. Load all active students (read-only)
     const { data: students, error: sErr } = await supabase
       .from("students")
-      .select("student_id, first_name, last_name, class_name, parent_phone, admission_number")
+      .select("student_id, first_name, last_name, class_name, parent_phone, admission_number, opening_balance, opening_balance_type")
       .eq("school_id", schoolId)
       .eq("status", "active")
       .eq("is_deleted", false);
@@ -72,7 +77,7 @@ router.post("/send-reminders", requireRoles("admin", "finance", "director", "sup
     // 4. Compute defaulters
     const defaulters = [];
     for (const s of (students || [])) {
-      const expected = feeByClass.get(s.class_name) || 0;
+      const expected = (feeByClass.get(s.class_name) || 0) + getOpeningBalanceImpact(s);
       if (expected <= 0) continue; // no fee structure for this class — skip
       const paid    = paidByStudent.get(s.student_id) || 0;
       const balance = expected - paid;

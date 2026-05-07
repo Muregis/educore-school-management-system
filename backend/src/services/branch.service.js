@@ -104,7 +104,7 @@ export async function canAccessBranches(userId, schoolId) {
  * DIRECTOR: Returns ALL school IDs in the system
  */
 export async function getAccessibleSchoolIds(userId, schoolId) {
-  if (!userId || !schoolId) return [schoolId];
+  if (!userId) return schoolId ? [schoolId] : [];
   
   // Get user's role
   const { data: user, error } = await supabase
@@ -114,7 +114,7 @@ export async function getAccessibleSchoolIds(userId, schoolId) {
     .eq("is_deleted", false)
     .maybeSingle();
   
-  if (error || !user) return [schoolId];
+  if (error || !user) return schoolId ? [schoolId] : [];
   
   // Director/Superadmin can access ALL schools
   if (user.role === "director" || user.role === "superadmin") {
@@ -123,9 +123,11 @@ export async function getAccessibleSchoolIds(userId, schoolId) {
       .select("school_id")
       .eq("is_deleted", false);
     
-    if (schoolsError) return [schoolId];
-    return allSchools?.map(s => s.school_id) || [schoolId];
+    if (schoolsError) return schoolId ? [schoolId] : [];
+    return allSchools?.map(s => s.school_id) || (schoolId ? [schoolId] : []);
   }
+
+  if (!schoolId) return [];
   
   // Regular admin - check if can access branches
   const canAccess = await canAccessBranches(userId, schoolId);

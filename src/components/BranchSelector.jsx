@@ -105,7 +105,7 @@ export function BranchSelector({ className = "", style = {}, token }) {
 
   const auth = JSON.parse(sessionStorage.getItem("educore.auth") || "{}");
   const userRole = auth?.role;
-  const currentSchoolId = auth?.schoolId;
+  const currentSchoolId = auth?.schoolId ? Number(auth.schoolId) : null;
 
   if (userRole === "parent" || userRole === "student") {
     return null;
@@ -128,7 +128,7 @@ export function BranchSelector({ className = "", style = {}, token }) {
   };
 
   const handleSwitch = async (branchId) => {
-    if (branchId === currentSchoolId) {
+    if (Number(branchId) === currentSchoolId) {
       setIsOpen(false);
       return;
     }

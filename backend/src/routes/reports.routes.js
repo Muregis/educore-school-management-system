@@ -7,6 +7,11 @@ const router = Router();
 router.use(authRequired);
 router.use(requireRoles("admin", "teacher", "finance"));
 
+function getOpeningBalanceImpact(student) {
+  const amount = Number(student?.opening_balance || 0);
+  return student?.opening_balance_type === "credit" ? -amount : amount;
+}
+
 // ─── Summary dashboard stats ──────────────────────────────────────────────────
 router.get("/summary", async (req, res, next) => {
   try {
@@ -188,7 +193,7 @@ router.get("/fee-defaulters", async (req, res, next) => {
       // Get students with their classes
       const { data: allStudents, error: stuErr } = await supabase
         .from('students')
-        .select('student_id, first_name, last_name, admission_number, class_name, parent_phone')
+        .select('student_id, first_name, last_name, admission_number, class_name, parent_phone, opening_balance, opening_balance_type')
         .eq('school_id', schoolId)
         .eq('is_deleted', false)
         .order('class_name', { ascending: true });
@@ -234,7 +239,8 @@ router.get("/fee-defaulters", async (req, res, next) => {
       
       // Calculate defaulters with proper balances
       const defaultersList = allStudents?.map(student => {
-        const expected = feeMap[student.class_name] || 0;
+        const openingBalance = getOpeningBalanceImpact(student);
+        const expected = (feeMap[student.class_name] || 0) + openingBalance;
         const paid = paymentMap[student.student_id]?.total || 0;
         const balance = Math.max(0, expected - paid);
         const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
@@ -269,7 +275,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
     // Get all students
     const { data: allStudents, error: stuErr } = await supabase
       .from('students')
-      .select('student_id, first_name, last_name, class_name')
+      .select('student_id, first_name, last_name, class_name, opening_balance, opening_balance_type')
       .eq('school_id', schoolId)
       .eq('is_deleted', false);
     if (stuErr) throw stuErr;
@@ -321,7 +327,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
         };
       }
       
-      const expected = feeMap[cls] || 0;
+      const expected = (feeMap[cls] || 0) + getOpeningBalanceImpact(student);
       const paid = paymentMap[student.student_id] || 0;
       const outstanding = Math.max(0, expected - paid);
       

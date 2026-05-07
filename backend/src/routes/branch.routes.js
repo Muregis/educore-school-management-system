@@ -313,6 +313,7 @@ router.put("/switch/:branchId", authRequired, async (req, res) => {
   try {
     const { branchId } = req.params;
     const { user_id, school_id: currentSchoolId, role } = req.user;
+    const targetSchoolId = Number(branchId);
     
     // Parents cannot switch branches
     if (role === "parent" || role === "student") {
@@ -321,10 +322,11 @@ router.put("/switch/:branchId", authRequired, async (req, res) => {
       });
     }
     
-    // Get accessible schools
+    // Get accessible schools. Directors/superadmins may not have a current school
+    // in their token, so the service resolves their full school list from user role.
     const accessibleIds = await getAccessibleSchoolIds(user_id, currentSchoolId);
     
-    if (!accessibleIds.includes(Number(branchId))) {
+    if (!accessibleIds.includes(targetSchoolId)) {
       return res.status(403).json({ 
         error: "You don't have access to this branch",
         accessibleBranches: accessibleIds
@@ -335,7 +337,7 @@ router.put("/switch/:branchId", authRequired, async (req, res) => {
     const { data: branch, error } = await supabase
       .from("schools")
       .select("school_id, name, code, is_branch, parent_school_id, branch_code")
-      .eq("school_id", branchId)
+      .eq("school_id", targetSchoolId)
       .eq("is_deleted", false)
       .maybeSingle();
     
