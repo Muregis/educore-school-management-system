@@ -5,46 +5,46 @@ const NAVIGATION_GROUPS = [
   {
     id: "dashboard",
     label: "Dashboard",
-    icon: "D",
+    icon: "📊",
     items: []
   },
   {
     id: "core",
     label: "CORE • DAILY USE",
     items: [
-      { id: "students", label: "Students", icon: "S" },
-      { id: "attendance", label: "Attendance", icon: "P" },
-      { id: "grades", label: "Grades", icon: "G" },
-      { id: "fees", label: "Fees", icon: "F" },
-      { id: "mpesa-reconcile", label: "M-Pesa Reconcile", icon: "M" }
+      { id: "students", label: "Students", icon: "👥" },
+      { id: "attendance", label: "Attendance", icon: "✅" },
+      { id: "grades", label: "Grades", icon: "🧾" },
+      { id: "fees", label: "Fees", icon: "💳" },
+      { id: "mpesa-reconcile", label: "M-Pesa Reconcile", icon: "📱" }
     ]
   },
   {
     id: "operations",
     label: "OPERATIONS • WEEKLY USE",
     items: [
-      { id: "reportcards", label: "Report Cards", icon: "R" },
-      { id: "admissions", label: "Admissions", icon: "A" },
-      { id: "bulk-import", label: "Import/Export", icon: "I" },
-      { id: "timetable", label: "Timetable", icon: "K" },
-      { id: "discipline", label: "Discipline", icon: "D" },
-      { id: "communication", label: "Communication", icon: "C" }
+      { id: "reportcards", label: "Report Cards", icon: "📄" },
+      { id: "admissions", label: "Admissions", icon: "📝" },
+      { id: "bulk-import", label: "Import/Export", icon: "📁" },
+      { id: "timetable", label: "Timetable", icon: "🗓️" },
+      { id: "discipline", label: "Discipline", icon: "⚖️" },
+      { id: "communication", label: "Communication", icon: "💬" }
     ]
   },
   {
     id: "management",
     label: "MANAGEMENT",
     items: [
-      { id: "teachers", label: "Teachers", icon: "T" },
-      { id: "staff", label: "Staff", icon: "S" },
-      { id: "hr", label: "HR", icon: "H" },
-      { id: "library", label: "Library", icon: "L" },
-      { id: "transport", label: "Transport", icon: "T" },
-      { id: "exams", label: "Exams", icon: "E" },
-      { id: "announcements", label: "Announcements", icon: "N" },
-      { id: "subjects", label: "Subjects", icon: "B" },
-      { id: "invoices", label: "Invoices", icon: "I" },
-      { id: "lessonplans", label: "Lesson Plans", icon: "L" },
+      { id: "teachers", label: "Teachers", icon: "👩‍🏫" },
+      { id: "staff", label: "Staff", icon: "🏫" },
+      { id: "hr", label: "HR", icon: "🧑‍💼" },
+      { id: "library", label: "Library", icon: "📚" },
+      { id: "transport", label: "Transport", icon: "🚌" },
+      { id: "exams", label: "Exams", icon: "📝" },
+      { id: "announcements", label: "Announcements", icon: "📢" },
+      { id: "subjects", label: "Subjects", icon: "📘" },
+      { id: "invoices", label: "Invoices", icon: "🧾" },
+      { id: "lessonplans", label: "Lesson Plans", icon: "📋" },
     ]
   },
   {
@@ -52,10 +52,10 @@ const NAVIGATION_GROUPS = [
     label: "SYSTEM • ADMIN ONLY",
     systemOnly: true,
     items: [
-      { id: "reports", label: "Reports", icon: "R" },
-      { id: "analytics", label: "Analytics", icon: "A" },
-      { id: "accounts", label: "Accounts", icon: "A" },
-      { id: "settings", label: "Settings", icon: "S" },
+      { id: "reports", label: "Reports", icon: "📊" },
+      { id: "analytics", label: "Analytics", icon: "📈" },
+      { id: "accounts", label: "Accounts", icon: "🔐" },
+      { id: "settings", label: "Settings", icon: "⚙️" },
     ]
   }
 ];
@@ -331,7 +331,7 @@ const Sidebar = ({
               boxShadow: "var(--shadow-glow-primary)"
             }}
           >
-            E
+            🎓
           </div>
         )}
         

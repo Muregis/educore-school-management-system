@@ -112,7 +112,7 @@ router.patch('/config', requireRoles('director', 'superadmin'), async (req, res,
 
 // GET /api/discounts/detect/:studentId
 // Auto-detect what discounts a student qualifies for
-router.get('/detect/:studentId', requireRoles('finance', 'director', 'superadmin'), async (req, res, next) => {
+router.get('/detect/:studentId', requireRoles('finance', 'director', 'superadmin', 'admin'), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
@@ -333,7 +333,7 @@ router.post('/remove', requireRoles('director', 'superadmin'), async (req, res, 
 
 // GET /api/discounts/student/:studentId
 // Get all discounts for a specific student
-router.get('/student/:studentId', requireRoles('finance', 'director', 'superadmin'), async (req, res, next) => {
+router.get('/student/:studentId', requireRoles('finance', 'director', 'superadmin', 'admin'), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
@@ -364,7 +364,7 @@ router.get('/student/:studentId', requireRoles('finance', 'director', 'superadmi
 
 // GET /api/discounts/students
 // List all students with active discounts
-router.get('/students', requireRoles('finance', 'director', 'superadmin'), async (req, res, next) => {
+router.get('/students', requireRoles('finance', 'director', 'superadmin', 'admin'), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 
@@ -398,7 +398,7 @@ router.get('/students', requireRoles('finance', 'director', 'superadmin'), async
 
 // GET /api/discounts/calculate/:studentId
 // Calculate discount for a student based on gross amount
-router.get('/calculate/:studentId', requireRoles('finance', 'director', 'superadmin'), async (req, res, next) => {
+router.get('/calculate/:studentId', requireRoles('finance', 'director', 'superadmin', 'admin'), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;

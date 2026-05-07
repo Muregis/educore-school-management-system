@@ -117,7 +117,7 @@ const RESPONSIVE_CSS = `
 `;
 
 const ROLE_COLORS  = { admin:"#3B82F6", teacher:"#14B8A6", finance:"#F59E0B", hr:"#A855F7", librarian:"#22C55E", parent:"#F43F5E", student:"#38BDF8" };
-const ROLE_AVATARS = { admin:"A", teacher:"T", finance:"F", hr:"H", librarian:"L", parent:"P", student:"S" };
+const ROLE_AVATARS = { admin:"🛡️", teacher:"👩‍🏫", finance:"💳", hr:"🧑‍💼", librarian:"📚", parent:"👪", student:"🎒" };
 const BOTTOM_NAV_PAGES = {
   director:  ["dashboard","students","staff","attendance","fees"],
   superadmin:["dashboard","students","staff","attendance","fees"],

@@ -227,13 +227,17 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   const totalPaid = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
 
   const expectedByClass = cls => {
-    const fs = feeStructures.find(f => f.className === cls);
-    return fs ? Number(fs.tuition) + Number(fs.activity) + Number(fs.misc) : 0;
+    const fs = feeStructures.find(f => (f.className ?? f.class_name) === cls);
+    return fs ? Number(fs.tuition || 0) + Number(fs.activity || 0) + Number(fs.misc || 0) : 0;
   };
 
   const outstanding = students.reduce((sum, s) => {
-    const expected = expectedByClass(s.className);
-    const paidByStudent = payments.filter(p => p.studentId === s.id && p.status === "paid").reduce((acc, p) => acc + Number(p.amount), 0);
+    const cls = s.className ?? s.class_name ?? "";
+    const expected = expectedByClass(cls);
+    const sid = s.id ?? s.student_id ?? s.studentId ?? s.student_id;
+    const paidByStudent = payments
+      .filter(p => String(p.studentId ?? p.student_id) === String(sid) && (p.status ?? "paid") === "paid")
+      .reduce((acc, p) => acc + Number(p.amount || 0), 0);
     return sum + Math.max(0, expected - paidByStudent);
   }, 0);
 
