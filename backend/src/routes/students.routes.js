@@ -172,7 +172,7 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
         .from('students')
         .select('student_id')
         .eq('school_id', schoolId)
-        .ilike('admission_number', finalAdmissionNumber)
+        .eq('admission_number', finalAdmissionNumber)
         .eq('is_deleted', false)
         .limit(1);
       if (existing?.length) {
@@ -350,7 +350,7 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
         .from('students')
         .select('student_id', 'admission_number')
         .eq('school_id', schoolId)
-        .eq('admission_number', normalizedAdmissionNumber)
+        .ilike('admission_number', normalizedAdmissionNumber)
         .eq('is_deleted', false)
         .neq('student_id', req.params.id)
         .limit(1);
