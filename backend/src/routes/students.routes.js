@@ -285,6 +285,9 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
 // ─── PUT /:id — update student ────────────────────────────────────────────────
 router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), async (req, res, next) => {
   try {
+    console.log('[DEBUG] PUT /students/:id called with ID:', req.params.id);
+    console.log('[DEBUG] Request body:', req.body);
+    
     const { schoolId } = req.user;
     const {
       admissionNumber, firstName, lastName, gender, className, classId,
@@ -361,6 +364,43 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
       }
     }
 
+    console.log('[DEBUG] About to update student with data:', {
+        ...(normalizedAdmissionNumber && { admission_number: normalizedAdmissionNumber }),
+        first_name: firstName,
+        last_name: lastName,
+        gender,
+        class_id: resolvedClassId,
+        class_name: className || null,
+        date_of_birth: normalizedDateOfBirth,
+        nemis_number: nemisNumber || null,
+        phone: normalizedPhone,
+        email: email || null,
+        address: address || null,
+        parent_name: parentName || null,
+        parent_phone: normalizedParentPhone,
+        blood_group: bloodGroup || null,
+        allergies: allergies || null,
+        medical_conditions: medicalConditions || null,
+        emergency_contact_name: emergencyContactName || null,
+        emergency_contact_phone: emergencyContactPhone || null,
+        emergency_contact_relationship: emergencyContactRelationship || null,
+        photo_url: photoUrl || null,
+        status: status || 'active',
+        opening_balance: openingBalance !== undefined ? parseFloat(openingBalance) || 0 : undefined,
+        opening_balance_type: openingBalanceType || 'owing',
+        lunch_enabled: lunchEnabled || false,
+        lunch_daily_rate: lunchDailyRate !== undefined ? parseFloat(lunchDailyRate) || 0 : undefined,
+        lunch_days: lunchDays !== undefined ? parseInt(lunchDays) || 66 : undefined,
+        lunch_billing_type: lunchBillingType || 'daily',
+        breakfast_enabled: breakfastEnabled || false,
+        breakfast_daily_rate: breakfastDailyRate !== undefined ? parseFloat(breakfastDailyRate) || 0 : undefined,
+        breakfast_days: breakfastDays !== undefined ? parseInt(breakfastDays) || 66 : undefined,
+        breakfast_billing_type: breakfastBillingType || 'daily',
+        discount_type: discountType || null,
+        discount_value: discountValue !== undefined ? parseFloat(discountValue) || 0 : undefined,
+        discount_is_percentage: discountIsPercentage !== undefined ? Boolean(discountIsPercentage) : true,
+      });
+
     const { data: updated, error } = await supabase
       .from('students')
       .update({
@@ -405,7 +445,12 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
       .select('student_id')
       .single();
 
-    if (error) throw error;
+    console.log('[DEBUG] Update result:', { updated, error });
+
+    if (error) {
+      console.log('[ERROR] Database update error:', error);
+      throw error;
+    }
     if (!updated) return res.status(404).json({ message: "Student not found" });
 
     // Update portal account emails if admission number changed
