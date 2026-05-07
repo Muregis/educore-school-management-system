@@ -352,6 +352,7 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
         .eq('school_id', schoolId)
         .eq('admission_number', normalizedAdmissionNumber)
         .eq('is_deleted', false)
+        .neq('student_id', req.params.id)
         .limit(1);
       
       if (existingError) {
@@ -434,6 +435,10 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
 
     if (error) {
       console.log('[ERROR] Database update error:', error);
+      // Handle duplicate constraint violation specifically
+      if (error.code === '23505' && error.message?.includes('admission_number')) {
+        return res.status(409).json({ message: "Admission number already exists" });
+      }
       throw error;
     }
     if (!updated) return res.status(404).json({ message: "Student not found" });
@@ -444,7 +449,7 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
         // First check if user accounts exist before updating
         const { data: existingUsers } = await supabase
           .from('users')
-          .select('user_id', 'email')
+          .select('user_id', 'email', 'role')
           .eq('student_id', req.params.id)
           .eq('school_id', schoolId);
         
