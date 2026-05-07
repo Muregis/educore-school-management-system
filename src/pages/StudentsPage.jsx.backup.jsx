@@ -44,8 +44,6 @@ function normalise(s) {
     status:      s.status      ?? "active",
     opening_balance: s.opening_balance ?? 0,
     opening_balance_type: s.opening_balance_type ?? "owing",
-    transport_direction: s.transport_direction ?? "none",
-    transport_base_fee: s.transport_base_fee ?? 0,
     lunch_enabled: s.lunch_enabled ?? false,
     lunch_daily_rate: s.lunch_daily_rate ?? 0,
     lunch_days: s.lunch_days ?? 66,
@@ -146,7 +144,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       if (editId) {
         await apiFetch(`/students/${editId}`, {
           method: "PUT",
-          body: { admissionNumber: f.admission || null, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null, openingBalance: f.opening_balance, openingBalanceType: f.opening_balance_type, transportDirection: f.transport_direction || "none", transportBaseFee: f.transport_base_fee || 0, lunchEnabled: f.lunch_enabled, lunchDailyRate: f.lunch_daily_rate, lunchDays: f.lunch_days, lunchBillingType: f.lunch_billing_type, breakfastEnabled: f.breakfast_enabled, breakfastDailyRate: f.breakfast_daily_rate, breakfastDays: f.breakfast_days, breakfastBillingType: f.breakfast_billing_type, discountType: f.discount_type || null, discountValue: f.discount_value ? Number(f.discount_value) : 0, discountIsPercentage: f.discount_is_percentage },
+          body: { admissionNumber: f.admission || null, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null, openingBalance: f.opening_balance, openingBalanceType: f.opening_balance_type, lunchEnabled: f.lunch_enabled, lunchDailyRate: f.lunch_daily_rate, lunchDays: f.lunch_days, lunchBillingType: f.lunch_billing_type, breakfastEnabled: f.breakfast_enabled, breakfastDailyRate: f.breakfast_daily_rate, breakfastDays: f.breakfast_days, breakfastBillingType: f.breakfast_billing_type, discountType: f.discount_type || null, discountValue: f.discount_value ? Number(f.discount_value) : 0, discountIsPercentage: f.discount_is_percentage },
           token: auth?.token,
         });
         setStudents(prev => prev.map(s => (s.id === editId || s.student_id === editId) ? { ...normalise(s), ...f, id: editId } : s));
@@ -169,7 +167,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           err.message?.includes("duplicate key") ||
           err.message?.includes("23505") ||
           err.message?.includes("ER_DUP_ENTRY")) {
-        setErr(err.message || `Admission number "${f.admission}" already exists in this school. Please use a different admission number.`);
+        setErr(`Admission number "${f.admission}" already exists in this school. Please use a different admission number.`);
       } else {
         setErr(err.message || "Save failed");
       }

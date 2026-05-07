@@ -189,14 +189,10 @@ export default function LoginView({ onLogin }) {
     setLoading(true);
     try {
       const numericSchoolId = schoolId ? Number(schoolId) : null;
-      const raw = await apiFetch("/auth/login", {
+      const data = await apiFetch("/auth/login", {
         method: "POST",
         body: { email, password, schoolId: numericSchoolId },
       });
-      const data = raw?.data || raw;
-      if (!data?.token || !data?.user) {
-        throw new Error("Login succeeded but the server response was missing session data.");
-      }
       onLogin({
         id: data.user.userId,
         name: data.user.name,
@@ -222,7 +218,7 @@ export default function LoginView({ onLogin }) {
     setLoading(true);
     try {
       const numericSchoolId = schoolId ? Number(schoolId) : null;
-      const raw = await apiFetch("/auth/portal-login", {
+      const data = await apiFetch("/auth/portal-login", {
         method: "POST",
         body: {
           admissionNumber: admission.trim(),
@@ -231,10 +227,6 @@ export default function LoginView({ onLogin }) {
           schoolId: numericSchoolId,
         },
       });
-      const data = raw?.data || raw;
-      if (!data?.token || !data?.user) {
-        throw new Error("Login succeeded but the server response was missing session data.");
-      }
       onLogin({
         id: data.user.userId,
         name: data.user.name,
@@ -514,4 +506,5 @@ const toggleButtonStyle = {
 LoginView.propTypes = {
   onLogin: PropTypes.func.isRequired,
 };
+
 

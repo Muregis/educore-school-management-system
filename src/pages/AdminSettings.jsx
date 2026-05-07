@@ -799,8 +799,6 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
         },
         token: auth?.token,
       });
-      console.log('[DEBUG] School settings save response:', saveRes);
-      
       setMessage({ type: "success", text: "School settings saved successfully!" });
       if (saveRes?.school) {
         onSchoolSaved?.(saveRes.school);

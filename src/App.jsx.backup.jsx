@@ -41,7 +41,7 @@ import OfflineStatusBar from "./components/OfflineStatusBar"; // NEW: Offline/sy
 import ParentGuard from "./components/ParentGuard"; // NEW: Parent-student binding enforcement
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import Sidebar from "./components/Sidebar";
-import BranchSelector from "./components/BranchSelector";
+import Topbar from "./components/Topbar";
 import { API_BASE, apiFetch } from "./lib/api";
 import { clearSession, getSession, logout, saveSession } from "./lib/auth";
 
@@ -179,13 +179,6 @@ export default function App() {
   const [sideCollapsed, setSideCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen]       = useState(false);
   const [rolePermissions, setRolePermissions] = useState(null);
-  const [activeSchoolId, setActiveSchoolId] = useState(() => {
-    try {
-      return localStorage.getItem("educore.activeSchool") || getSession()?.user?.schoolId || null;
-    } catch {
-      return getSession()?.user?.schoolId || null;
-    }
-  });
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -362,30 +355,7 @@ export default function App() {
     hydrateTenantData(auth).catch((err) => {
       console.error("[tenant_hydrate] Failed to refresh tenant data:", err.message);
     });
-  }, [auth?.token, auth?.schoolId, activeSchoolId, hydrateTenantData]);
-
-  const handleSchoolSwitch = useCallback(async (schoolId, selectedSchool) => {
-    const nextSchoolId = Number(schoolId);
-    if (!nextSchoolId || !auth?.token) return;
-
-    localStorage.setItem("educore.activeSchool", String(nextSchoolId));
-    setActiveSchoolId(String(nextSchoolId));
-
-    const nextAuth = {
-      ...auth,
-      schoolId: nextSchoolId,
-      school_id: nextSchoolId,
-    };
-    saveSession({ token: auth.token, sessionId: auth.sessionId, user: nextAuth });
-    setAuth(nextAuth);
-
-    if (selectedSchool) {
-      setSchool(prev => ({ ...prev, ...selectedSchool, school_id: nextSchoolId }));
-    }
-
-    await hydrateTenantData(nextAuth);
-    toast(`Switched to ${selectedSchool?.name || "selected school"}`, "success");
-  }, [auth, hydrateTenantData, setSchool, toast]);
+  }, [auth?.token, auth?.schoolId, hydrateTenantData]);
 
   const handleLogout = useCallback(() => {
     logout();
@@ -578,7 +548,7 @@ export default function App() {
           <main style={{ marginLeft: isMobile ? 0 : sideW, flex:1, transition:"margin-left 0.2s ease", minWidth:0 }}>
         <div className="ec-topbar" style={{ 
           height: "var(--topbar-height)", 
-          background: "var(--color-bg-surface)", 
+          background: "rgba(255, 255, 255, 0.86)", 
           backdropFilter: "blur(18px)",
           WebkitBackdropFilter: "blur(18px)",
           borderBottom: "1px solid var(--color-border)", 
@@ -589,7 +559,7 @@ export default function App() {
           position: "sticky", 
           top: 0, 
           zIndex: 40,
-          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.18)"
+          boxShadow: "0 10px 30px rgba(15, 23, 42, 0.06)"
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
             {isMobile && (
@@ -661,13 +631,6 @@ export default function App() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-            {!isMobile && ["admin","director","superadmin"].includes(auth.role) && (
-              <BranchSelector
-                token={auth?.token}
-                activeSchoolId={activeSchoolId}
-                onSwitch={handleSchoolSwitch}
-              />
-            )}
             {!isMobile && (
               <div style={{ 
                 background: `${roleColor}15`, 

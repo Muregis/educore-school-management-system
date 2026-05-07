@@ -133,25 +133,6 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
   const [csvContent, setCsvContent] = useState("");
   const fileInputRef = useRef(null);
 
-  const defaulterPreviewCount = useMemo(() => {
-    if (exportFilter !== "defaulter") return 0;
-    return optimizedStudents.filter((s) => {
-      let balance;
-      if (s.outstanding_balance !== undefined && s.outstanding_balance !== null) {
-        balance = Number(s.outstanding_balance);
-      } else {
-        const studentId = s.id ?? s.student_id;
-        const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
-        const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
-        const paidAmount = optimizedPayments
-          .filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid")
-          .reduce((sum, p) => sum + Number(p.amount || 0), 0);
-        balance = expectedAmount - paidAmount;
-      }
-      return balance > Number(exportDefaulterAmount || 0);
-    }).length;
-  }, [exportFilter, optimizedStudents, optimizedPayments, feeStructures, exportDefaulterAmount]);
-
   // CSV Template
   const csvTemplate = `first_name,last_name,gender,class_name,admission_number,parent_name,parent_phone,date_of_birth,nemis_number,status
 John,Doe,male,Grade 1,ADM001,Jane Doe,0712345678,2015-03-15,NEM123456,active
@@ -315,11 +296,6 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
             admission: s.admission_number,
             parentName: s.parent_name,
             parentPhone: s.parent_phone,
-            outstanding_balance: s.outstanding_balance,
-            opening_balance: s.opening_balance,
-            transport_fee: s.transport_fee,
-            lunch_fee: s.lunch_fee,
-            breakfast_fee: s.breakfast_fee,
             dob: s.date_of_birth,
             nemisNumber: s.nemis_number,
             bloodGroup: s.blood_group,
@@ -364,7 +340,7 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
           // Fallback to calculating from fee structures and payments
           const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
           const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
-          const paidAmount = allPayments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid").reduce((sum, p) => sum + Number(p.amount || 0), 0);
+          const paidAmount = payments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid").reduce((sum, p) => sum + Number(p.amount || 0), 0);
           balance = expectedAmount - paidAmount;
         }
         
@@ -384,17 +360,18 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
     
     const rows = filteredStudents.map(s => {
       const studentId = s.id ?? s.student_id;
-      const studentPayments = allPayments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid");
       
       // Fee calculations
       let paidAmount, balance;
       if (s.outstanding_balance !== undefined && s.outstanding_balance !== null) {
         balance = Number(s.outstanding_balance);
         // For total_fees_paid, use payments
+        const studentPayments = allPayments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid");
         paidAmount = studentPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
       } else {
         const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
         const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
+        const studentPayments = allPayments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid");
         paidAmount = studentPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
         balance = expectedAmount - paidAmount;
       }
@@ -444,7 +421,7 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    const suffix = exportFilter === "defaulter" ? `defaulters-above-${exportDefaulterAmount || 0}` : exportFilter === "class" ? exportClass.replace(" ", "_") : "all";
+    const suffix = exportFilter === "defaulter" ? "defaulters" : exportFilter === "class" ? exportClass.replace(" ", "_") : "all";
     link.download = `students_export_${suffix}_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     
@@ -747,9 +724,6 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
                   placeholder="0"
                 />
                 <span style={{ color: C.textSub, marginLeft: 8, fontSize: 13 }}>Students with balance greater than this amount</span>
-                <div style={{ color: C.text, marginTop: 10, fontSize: 13, fontWeight: 600 }}>
-                  Preview: {defaulterPreviewCount} students above KES {Number(exportDefaulterAmount || 0).toLocaleString()}
-                </div>
               </div>
             )}
 

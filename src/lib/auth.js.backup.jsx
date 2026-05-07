@@ -27,13 +27,10 @@ export function saveSession(data) {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
   sessionStorage.setItem(LEGACY_AUTH_KEY, JSON.stringify({ ...session.user, token: session.token, sessionId: session.sessionId }));
   if (session.token) sessionStorage.setItem(LEGACY_TOKEN_KEY, session.token);
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  localStorage.setItem(LEGACY_AUTH_KEY, JSON.stringify({ ...session.user, token: session.token, sessionId: session.sessionId }));
-  if (session.token) localStorage.setItem(LEGACY_TOKEN_KEY, session.token);
 }
 
 export function getSession() {
-  const raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
+  const raw = sessionStorage.getItem(SESSION_KEY);
   if (raw) {
     try {
       return JSON.parse(raw);
@@ -43,7 +40,7 @@ export function getSession() {
     }
   }
 
-  const legacyRaw = sessionStorage.getItem(LEGACY_AUTH_KEY) || localStorage.getItem(LEGACY_AUTH_KEY);
+  const legacyRaw = sessionStorage.getItem(LEGACY_AUTH_KEY);
   if (!legacyRaw) return null;
 
   try {
@@ -64,9 +61,6 @@ export function clearSession() {
   sessionStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(LEGACY_AUTH_KEY);
   sessionStorage.removeItem(LEGACY_TOKEN_KEY);
-  localStorage.removeItem(SESSION_KEY);
-  localStorage.removeItem(LEGACY_AUTH_KEY);
-  localStorage.removeItem(LEGACY_TOKEN_KEY);
 }
 
 export function getAuthHeaders(token = null) {
@@ -92,7 +86,6 @@ export function getAuthHeaders(token = null) {
     if (schoolId) {
       headers["x-school-id"] = schoolId;
       headers["X-School-Id"] = schoolId;
-      headers["x-active-school-id"] = schoolId;
     }
   }
 

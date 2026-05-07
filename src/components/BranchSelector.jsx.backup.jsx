@@ -3,7 +3,7 @@ import { apiFetch } from "../lib/api";
 import { getSession, saveSession } from "../lib/auth";
 import { C } from "../lib/theme";
 
-export function useBranches(token, onSwitch) {
+export function useBranches(token) {
   const [branches, setBranches] = useState([]);
   const [allSchools, setAllSchools] = useState([]);
   const [currentBranch, setCurrentBranch] = useState(null);
@@ -55,7 +55,6 @@ export function useBranches(token, onSwitch) {
 
       const auth = JSON.parse(sessionStorage.getItem("educore.auth") || "{}");
       auth.schoolId = branchId;
-      auth.school_id = branchId;
       const session = getSession();
       saveSession({
         token: session?.token || auth.token,
@@ -63,12 +62,8 @@ export function useBranches(token, onSwitch) {
         user: auth,
       });
 
-      const selectedSchool = [...allSchools, currentBranch, parentSchool, ...branches]
-        .filter(Boolean)
-        .find((school) => Number(school.school_id) === Number(branchId));
-
-      await onSwitch?.(branchId, selectedSchool);
-      return { newSchoolId: branchId, newSchool: selectedSchool };
+      window.location.reload();
+      return { newSchoolId: branchId };
     } catch (err) {
       console.error("Error switching branch:", err);
       setError(err.message);
@@ -90,7 +85,7 @@ export function useBranches(token, onSwitch) {
   };
 }
 
-export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) {
+export function BranchSelector({ className = "", style = {}, token }) {
   const {
     branches,
     allSchools,
@@ -100,17 +95,13 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
     canAccessBranches,
     isDirector,
     switchBranch,
-  } = useBranches(token, onSwitch);
+  } = useBranches(token);
 
   const [isOpen, setIsOpen] = useState(false);
 
   const auth = JSON.parse(sessionStorage.getItem("educore.auth") || "{}");
   const userRole = auth?.role;
-  const currentSchoolId = activeSchoolId
-    ? Number(activeSchoolId)
-    : auth?.schoolId
-      ? Number(auth.schoolId)
-      : null;
+  const currentSchoolId = auth?.schoolId ? Number(auth.schoolId) : null;
 
   if (userRole === "parent" || userRole === "student") {
     return null;
@@ -138,10 +129,12 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
       return;
     }
 
-    try {
-      await switchBranch(branchId);
-    } catch (err) {
-      alert("Failed to switch: " + err.message);
+    if (window.confirm("Switching branches will reload the page. Continue?")) {
+      try {
+        await switchBranch(branchId);
+      } catch (err) {
+        alert("Failed to switch: " + err.message);
+      }
     }
     setIsOpen(false);
   };
@@ -270,9 +263,6 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
                     >
                       <div style={{ fontWeight: 600, fontSize: 14 }}>
                         {school.name}
-                        {isActive && (
-                          <span style={{ float: "right", color: "var(--color-primary)", fontWeight: 800 }}>✓</span>
-                        )}
                         {school.is_branch && (
                           <span style={{
                             marginLeft: 8,
@@ -321,9 +311,6 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
                       }}
                     >
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{parentSchool.name}</div>
-                      {currentSchoolId === parentSchool.school_id && (
-                        <span style={{ float: "right", color: "var(--color-primary)", fontWeight: 800 }}>✓</span>
-                      )}
                       <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>Main Campus</div>
                     </button>
                   )}
@@ -360,9 +347,6 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
                         }}
                       >
                         <div style={{ fontWeight: 600, fontSize: 14 }}>{branch.name}</div>
-                        {isActive && (
-                          <span style={{ float: "right", color: "var(--color-primary)", fontWeight: 800 }}>✓</span>
-                        )}
                         <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>
                           {branch.branch_code} {branch.branch_address && ` • ${branch.branch_address}`}
                         </div>

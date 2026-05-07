@@ -297,8 +297,7 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
       openingBalance, openingBalanceType,
       lunchEnabled, lunchDailyRate, lunchDays, lunchBillingType,
       breakfastEnabled, breakfastDailyRate, breakfastDays, breakfastBillingType,
-      discountType, discountValue, discountIsPercentage,
-      transportDirection, transportBaseFee, transport_direction, transport_base_fee
+      discountType, discountValue, discountIsPercentage
     } = req.body;
 
     const normalizedDateOfBirth = normalizeDateInput(dateOfBirth);
@@ -354,7 +353,7 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
       console.log('[DEBUG] Checking for duplicates...');
       const { data: existing, error: existingError } = await supabase
         .from('students')
-        .select('student_id, admission_number')
+        .select('student_id', 'admission_number')
         .eq('school_id', schoolId)
         .ilike('admission_number', normalizedAdmissionNumber)
         .eq('is_deleted', false)
@@ -370,7 +369,7 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
       
       if (existing?.length) {
         console.log('[DEBUG] Duplicate found:', existing);
-        return res.status(409).json({ message: `Admission number "${normalizedAdmissionNumber}" already exists` });
+        return res.status(409).json({ message: "Admission number already exists" });
       }
     }
 
@@ -424,27 +423,6 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
       status: status || 'active',
     };
 
-    const optionalUpdates = {};
-    if ("openingBalance" in req.body) optionalUpdates.opening_balance = parseFloat(openingBalance) || 0;
-    if ("openingBalanceType" in req.body) optionalUpdates.opening_balance_type = openingBalanceType || "owing";
-    if ("lunchEnabled" in req.body) optionalUpdates.lunch_enabled = Boolean(lunchEnabled);
-    if ("lunchDailyRate" in req.body) optionalUpdates.lunch_daily_rate = parseFloat(lunchDailyRate) || 0;
-    if ("lunchDays" in req.body) optionalUpdates.lunch_days = parseInt(lunchDays, 10) || 66;
-    if ("lunchBillingType" in req.body) optionalUpdates.lunch_billing_type = lunchBillingType || "daily";
-    if ("breakfastEnabled" in req.body) optionalUpdates.breakfast_enabled = Boolean(breakfastEnabled);
-    if ("breakfastDailyRate" in req.body) optionalUpdates.breakfast_daily_rate = parseFloat(breakfastDailyRate) || 0;
-    if ("breakfastDays" in req.body) optionalUpdates.breakfast_days = parseInt(breakfastDays, 10) || 66;
-    if ("breakfastBillingType" in req.body) optionalUpdates.breakfast_billing_type = breakfastBillingType || "daily";
-    if ("discountType" in req.body) optionalUpdates.discount_type = discountType || null;
-    if ("discountValue" in req.body) optionalUpdates.discount_value = parseFloat(discountValue) || 0;
-    if ("discountIsPercentage" in req.body) optionalUpdates.discount_is_percentage = Boolean(discountIsPercentage);
-    if ("transportDirection" in req.body || "transport_direction" in req.body) optionalUpdates.transport_direction = transportDirection || transport_direction || "none";
-    if ("transportBaseFee" in req.body || "transport_base_fee" in req.body) optionalUpdates.transport_base_fee = parseFloat(transportBaseFee ?? transport_base_fee) || 0;
-
-    Object.entries(optionalUpdates).forEach(([key, value]) => {
-      if (value !== undefined) updateData[key] = value;
-    });
-
     // Only add admission number if it's being changed
     if (normalizedAdmissionNumber) {
       updateData.admission_number = normalizedAdmissionNumber;
@@ -467,7 +445,7 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
       console.log('[ERROR] Database update error:', error);
       // Handle duplicate constraint violation specifically
       if (error.code === '23505' && error.message?.includes('admission_number')) {
-        return res.status(409).json({ message: `Admission number "${normalizedAdmissionNumber || admissionNumber || ""}" already exists` });
+        return res.status(409).json({ message: "Admission number already exists" });
       }
       throw error;
     }
@@ -624,42 +602,18 @@ router.patch("/:id/fees", requireRoles("admin", "finance", "director", "superadm
       outstanding_balance,
       transport_fee,
       lunch_fee,
-      breakfast_fee,
-      opening_balance,
-      opening_balance_type,
-      transport_direction,
-      transport_base_fee,
-      lunch_enabled,
-      lunch_daily_rate,
-      lunch_days,
-      lunch_billing_type,
-      breakfast_enabled,
-      breakfast_daily_rate,
-      breakfast_days,
-      breakfast_billing_type
+      breakfast_fee
     } = req.body;
-
-    const updateData = { updated_at: new Date().toISOString() };
-    if (outstanding_balance !== undefined) updateData.outstanding_balance = parseFloat(outstanding_balance) || 0;
-    if (transport_fee !== undefined) updateData.transport_fee = parseFloat(transport_fee) || 0;
-    if (lunch_fee !== undefined) updateData.lunch_fee = parseFloat(lunch_fee) || 0;
-    if (breakfast_fee !== undefined) updateData.breakfast_fee = parseFloat(breakfast_fee) || 0;
-    if (opening_balance !== undefined) updateData.opening_balance = parseFloat(opening_balance) || 0;
-    if (opening_balance_type !== undefined) updateData.opening_balance_type = opening_balance_type || "owing";
-    if (transport_direction !== undefined) updateData.transport_direction = transport_direction || "none";
-    if (transport_base_fee !== undefined) updateData.transport_base_fee = parseFloat(transport_base_fee) || 0;
-    if (lunch_enabled !== undefined) updateData.lunch_enabled = Boolean(lunch_enabled);
-    if (lunch_daily_rate !== undefined) updateData.lunch_daily_rate = parseFloat(lunch_daily_rate) || 0;
-    if (lunch_days !== undefined) updateData.lunch_days = parseInt(lunch_days, 10) || 66;
-    if (lunch_billing_type !== undefined) updateData.lunch_billing_type = lunch_billing_type || "daily";
-    if (breakfast_enabled !== undefined) updateData.breakfast_enabled = Boolean(breakfast_enabled);
-    if (breakfast_daily_rate !== undefined) updateData.breakfast_daily_rate = parseFloat(breakfast_daily_rate) || 0;
-    if (breakfast_days !== undefined) updateData.breakfast_days = parseInt(breakfast_days, 10) || 66;
-    if (breakfast_billing_type !== undefined) updateData.breakfast_billing_type = breakfast_billing_type || "daily";
 
     const { data, error } = await supabase
       .from("students")
-      .update(updateData)
+      .update({
+        outstanding_balance: outstanding_balance !== undefined ? parseFloat(outstanding_balance) : undefined,
+        transport_fee: transport_fee !== undefined ? parseFloat(transport_fee) : undefined,
+        lunch_fee: lunch_fee !== undefined ? parseFloat(lunch_fee) : undefined,
+        breakfast_fee: breakfast_fee !== undefined ? parseFloat(breakfast_fee) : undefined,
+        updated_at: new Date().toISOString()
+      })
       .eq('student_id', req.params.id)
       .eq('school_id', schoolId)
       .eq('is_deleted', false)

@@ -262,7 +262,6 @@ router.put("/school", requireRoles("admin", "director", "superadmin"), async (re
         ...data,
         term: settings.get("current_term") || "",
         year: settings.get("academic_year") || "",
-        academic_year: settings.get("academic_year") || "",
         term_start: settings.get("term_start") || settings.get("term_start_date") || "",
         term_end: settings.get("term_end") || settings.get("term_end_date") || "",
         motto: settings.get("school_motto") || "",
@@ -276,8 +275,6 @@ router.put("/school", requireRoles("admin", "director", "superadmin"), async (re
         admin_title: settings.get("admin_title") || "",
         school_type: settings.get("school_type") || "",
         curriculum: settings.get("curriculum") || "",
-        library_shortcode: settings.get("library_shortcode") || "",
-        whatsapp_business_number: data.whatsapp_business_number || "",
       },
     });
   } catch (err) { next(err); }
