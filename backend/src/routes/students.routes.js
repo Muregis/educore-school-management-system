@@ -334,7 +334,7 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
     }
 
     // Only check for duplicates if the admission number is actually different
-    if (normalizedAdmissionNumber && normalizedAdmissionNumber !== currentStudent.admission_number) {
+    if (normalizedAdmissionNumber && normalizedAdmissionNumber !== normalizeAdmissionNumber(currentStudent.admission_number)) {
       const { data: existing } = await supabase
         .from('students')
         .select('student_id', 'admission_number')
