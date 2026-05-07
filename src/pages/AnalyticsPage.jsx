@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import PropTypes from "prop-types";
 import { money, countBy } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { ALL_CLASSES } from "../lib/constants";
+import { calculateBatchBalances } from "../services/balanceService";
 
 import Card from "../components/ui/Card";
 import StatCard from "../components/ui/StatCard";
@@ -88,6 +89,31 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
   const [activeTab, setActiveTab] = useState("overview");
   const [aiReport, setAiReport] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
+  const [studentBalances, setStudentBalances] = useState({});
+  const [balancesLoading, setBalancesLoading] = useState(false);
+
+  // Fetch student balances
+  useEffect(() => {
+    if (!auth?.token || students.length === 0) return;
+
+    const fetchBalances = async () => {
+      setBalancesLoading(true);
+      try {
+        const studentIds = students.map(s => s.id ?? s.student_id).filter(Boolean);
+        const balances = await calculateBatchBalances({
+          studentIds,
+          token: auth.token
+        });
+        setStudentBalances(balances);
+      } catch (err) {
+        console.error('Error fetching student balances:', err);
+      } finally {
+        setBalancesLoading(false);
+      }
+    };
+
+    fetchBalances();
+  }, [auth?.token, students]);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -96,13 +122,23 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
     const byClass = countBy(students, "className");
     const byGender = countBy(students, "gender");
 
-    // Fee stats
+    // Fee stats - use proper balance calculations that include opening balance
     const totalCollected = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
     const pendingFees = students.reduce((sum, s) => {
-      const struct = feeStructures.find(f => f.className === s.className);
-      const expected = struct ? (Number(struct.tuition || 0) + Number(struct.activity || 0) + Number(struct.misc || 0)) : 0;
-      const studentPayments = payments.filter(p => p.studentId === (s.id ?? s.student_id)).reduce((t, p) => t + Number(p.amount), 0);
-      return sum + Math.max(0, expected - studentPayments);
+      const studentId = s.id ?? s.student_id;
+      const balanceData = studentBalances[studentId];
+      
+      if (balanceData && balanceData.success) {
+        // Use the proper balance calculation that includes opening balance
+        return sum + Math.max(0, balanceData.balance || 0);
+      } else {
+        // Fallback to manual calculation if balance data not available
+        const struct = feeStructures.find(f => f.className === s.className);
+        const expected = struct ? (Number(struct.tuition || 0) + Number(struct.activity || 0) + Number(struct.misc || 0)) : 0;
+        const openingBalance = Number(s.opening_balance || 0);
+        const studentPayments = payments.filter(p => p.studentId === studentId).reduce((t, p) => t + Number(p.amount), 0);
+        return sum + Math.max(0, (openingBalance + expected) - studentPayments);
+      }
     }, 0);
 
     // Grade stats
