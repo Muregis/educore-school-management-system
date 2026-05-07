@@ -1,36 +1,35 @@
 import React, { useState, useMemo, useCallback } from "react";
 import PropTypes from "prop-types";
-import { C } from "../lib/theme";
 import { money, countBy } from "../lib/utils";
 import { apiFetch } from "../lib/api";
-import Btn from "../components/Btn";
 import { ALL_CLASSES } from "../lib/constants";
 
-const inputStyle = {
-  background: C.card, color: C.text, border: `1px solid ${C.border}`,
-  borderRadius: 8, padding: "6px 10px", fontSize: 13,
-};
+import Card from "../components/ui/Card";
+import StatCard from "../components/ui/StatCard";
+import Button from "../components/ui/Button";
+import Tabs from "../components/ui/Tabs";
+import EmptyState from "../components/ui/EmptyState";
 
 // Simple chart components without external library
 function BarChart({ data, height = 200 }) {
-  if (!data?.length) return <div style={{ color: C.textSub }}>No data</div>;
+  if (!data?.length) return <div style={{ color: "var(--color-text-secondary)", textAlign: "center", padding: "20px" }}>No data</div>;
   const validData = data.map(d => ({ ...d, value: Number(d.value) || 0 }));
   const max = Math.max(...validData.map(d => d.value), 1);
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", height, gap: 8, padding: "20px 0" }}>
+    <div style={{ display: "flex", alignItems: "flex-end", height, gap: "var(--space-2)", padding: "var(--space-4) 0" }}>
       {validData.map((d, i) => (
         <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{ 
             width: "100%", 
             height: `${(d.value / max) * 100}%`, 
-            background: d.color || C.accent,
+            background: d.color || "var(--color-primary)",
             borderRadius: "4px 4px 0 0",
             minHeight: 4,
           }} />
-          <div style={{ fontSize: 11, marginTop: 4, color: C.textSub, textAlign: "center" }}>
+          <div style={{ fontSize: "11px", marginTop: "var(--space-1)", color: "var(--color-text-secondary)", textAlign: "center", wordBreak: "break-word" }}>
             {d.label}
           </div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>
+          <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-primary)" }}>
             {d.value}
           </div>
         </div>
@@ -41,11 +40,11 @@ function BarChart({ data, height = 200 }) {
 
 function PieChart({ data, size = 150 }) {
   const total = data.reduce((sum, d) => sum + (Number(d.value) || 0), 0);
-  if (!total || total <= 0) return <div style={{ color: C.textSub }}>No data</div>;
+  if (!total || total <= 0) return <div style={{ color: "var(--color-text-secondary)", textAlign: "center", padding: "20px" }}>No data</div>;
   let currentAngle = 0;
   
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         {data.map((d, i) => {
           const angle = (d.value / total) * 360;
@@ -67,46 +66,20 @@ function PieChart({ data, size = 150 }) {
               key={i}
               d={`M ${size/2} ${size/2} L ${x1} ${y1} A ${size/2 - 10} ${size/2 - 10} 0 ${largeArc} 1 ${x2} ${y2} Z`}
               fill={d.color}
-              stroke="#fff"
+              stroke="var(--color-bg-base)"
               strokeWidth={2}
             />
           );
         })}
       </svg>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
         {data.map((d, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 12, height: 12, background: d.color, borderRadius: 2 }} />
-            <span style={{ fontSize: 12, color: C.text }}>{d.label}: {d.value} ({((d.value/total)*100).toFixed(1)}%)</span>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+            <div style={{ width: 12, height: 12, background: d.color, borderRadius: "var(--radius-sm)" }} />
+            <span style={{ fontSize: "13px", color: "var(--color-text-primary)" }}>{d.label}: {d.value} ({((d.value/total)*100).toFixed(1)}%)</span>
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-function StatCard({ title, value, subtitle, trend, color = C.accent }) {
-  return (
-    <div style={{ 
-      background: C.surface, 
-      border: `1px solid ${C.border}`, 
-      borderRadius: 12, 
-      padding: 20,
-      borderLeft: `4px solid ${color}`,
-    }}>
-      <div style={{ fontSize: 13, color: C.textSub, marginBottom: 8 }}>{title}</div>
-      <div style={{ fontSize: 32, fontWeight: 800, color }}>{value}</div>
-      {subtitle && <div style={{ fontSize: 12, color: C.textSub, marginTop: 4 }}>{subtitle}</div>}
-      {trend && (
-        <div style={{ 
-          fontSize: 12, 
-          marginTop: 8, 
-          color: trend > 0 ? "#22C55E" : "#EF4444",
-          fontWeight: 600,
-        }}>
-          {trend > 0 ? "↑" : "↓"} {Math.abs(trend)}% from last term
-        </div>
-      )}
     </div>
   );
 }
@@ -208,29 +181,27 @@ Provide a structured analysis with:
   }, [auth, stats, teachers.length, results.length]);
 
   // Chart data
-
-  // Chart data
   const classChartData = useMemo(() => {
     return Object.entries(stats.byClass).map(([name, value]) => ({
       label: name,
       value,
-      color: C.accent,
+      color: "var(--color-primary)",
     }));
   }, [stats.byClass]);
 
   const genderChartData = useMemo(() => {
     return [
-      { label: "Male", value: stats.byGender.male || 0, color: "#3B82F6" },
-      { label: "Female", value: stats.byGender.female || 0, color: "#EC4899" },
+      { label: "Male", value: stats.byGender.male || 0, color: "var(--color-info)" },
+      { label: "Female", value: stats.byGender.female || 0, color: "#ec4899" },
     ].filter(d => d.value > 0);
   }, [stats.byGender]);
 
   const gradeChartData = useMemo(() => {
-    const colors = { A: "#22C55E", B: "#84CC16", C: "#EAB308", D: "#F97316", E: "#EF4444", F: "#DC2626" };
+    const colors = { A: "var(--color-success)", B: "#84CC16", C: "var(--color-warning)", D: "#F97316", E: "var(--color-danger)", F: "#DC2626" };
     return Object.entries(stats.gradeDist).map(([grade, value]) => ({
       label: grade,
       value,
-      color: colors[grade] || C.accent,
+      color: colors[grade] || "var(--color-primary)",
     })).sort((a, b) => b.value - a.value);
   }, [stats.gradeDist]);
 
@@ -243,184 +214,179 @@ Provide a structured analysis with:
     return Object.entries(byMonth).slice(-6).map(([month, value]) => ({
       label: month,
       value: Math.round(value),
-      color: "#22C55E",
+      color: "var(--color-success)",
     }));
   }, [payments]);
 
+  const tabs = [
+    { id: "overview", label: "Overview" },
+    { id: "academic", label: "Academic" },
+    { id: "financial", label: "Financial" },
+    { id: "attendance", label: "Attendance" },
+    { id: "ai-analysis", label: "🤖 AI Analysis" },
+  ];
+
   return (
     <div>
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-        {["overview", "academic", "financial", "attendance", "ai-analysis"].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            style={{
-              padding: "10px 20px",
-              borderRadius: 8,
-              border: "none",
-              background: activeTab === tab ? C.accent : C.surface,
-              color: activeTab === tab ? "#fff" : C.text,
-              cursor: "pointer",
-              fontWeight: 600,
-              textTransform: "capitalize",
-            }}
-          >
-            {tab === "ai-analysis" ? "🤖 AI Analysis" : tab}
-          </button>
-        ))}
-      </div>
+      <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
 
-      {/* AI Analysis Tab */}
-      {activeTab === "ai-analysis" && (
-        <div style={{ display: "grid", gap: 20 }}>
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
-            <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-              <Btn onClick={generateAIReport} disabled={aiLoading}>
-                {aiLoading ? "Generating..." : "Generate AI Analysis"}
-              </Btn>
-            </div>
-            {aiReport && (
-              <div style={{
-                background: C.card,
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                padding: 16,
-                fontSize: 13,
-                lineHeight: 1.6,
-                color: C.text,
-                whiteSpace: "pre-wrap",
-              }}>
-                {aiReport}
+      <div style={{ marginTop: "var(--space-4)" }}>
+        {/* AI Analysis Tab */}
+        {activeTab === "ai-analysis" && (
+          <div style={{ display: "grid", gap: "var(--space-4)" }}>
+            <Card style={{ padding: "var(--space-4)" }}>
+              <div style={{ marginBottom: "var(--space-4)" }}>
+                <Button onClick={generateAIReport} disabled={aiLoading} size="lg">
+                  {aiLoading ? "Generating..." : "Generate AI Analysis"}
+                </Button>
               </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Overview Tab */}
-      {activeTab === "overview" && (
-        <div style={{ display: "grid", gap: 20 }}>
-          {/* Key Stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-            <StatCard title="Total Students" value={stats.totalStudents} subtitle={`${stats.activeStudents} active`} color="#3B82F6" />
-            <StatCard title="Teachers" value={teachers.length} subtitle="Staff members" color="#8B5CF6" />
-            <StatCard title="Total Collected" value={money(stats.totalCollected)} subtitle="Fees this term" color="#22C55E" />
-            <StatCard title="Pending Fees" value={money(stats.pendingFees)} subtitle="Outstanding balance" color="#EF4444" />
-          </div>
-
-          {/* Charts Row */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: 16 }}>
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
-              <h3 style={{ margin: "0 0 16px", color: C.text, fontSize: 16 }}>Students by Class</h3>
-              {classChartData.length > 0 ? (
-                <BarChart data={classChartData} height={180} />
-              ) : (
-                <div style={{ color: C.textSub, textAlign: "center", padding: 40 }}>No data available</div>
+              {aiReport && (
+                <div style={{
+                  background: "var(--color-bg-base)",
+                  border: `1px solid var(--color-border)`,
+                  borderRadius: "var(--radius-md)",
+                  padding: "var(--space-4)",
+                  fontSize: "14px",
+                  lineHeight: 1.6,
+                  color: "var(--color-text-primary)",
+                  whiteSpace: "pre-wrap",
+                }}>
+                  {aiReport}
+                </div>
               )}
-            </div>
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
-              <h3 style={{ margin: "0 0 16px", color: C.text, fontSize: 16 }}>Gender Distribution</h3>
-              {genderChartData.length > 0 ? (
-                <PieChart data={genderChartData} size={140} />
-              ) : (
-                <div style={{ color: C.textSub, textAlign: "center", padding: 40 }}>No data available</div>
+              {!aiReport && !aiLoading && (
+                <EmptyState icon="🧠" title="AI Analytics Ready" description="Click the button above to generate a deep-dive analysis of your school's current standing." />
               )}
+            </Card>
+          </div>
+        )}
+
+        {/* Overview Tab */}
+        {activeTab === "overview" && (
+          <div style={{ display: "grid", gap: "var(--space-4)" }}>
+            {/* Key Stats */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
+              <StatCard title="Total Students" value={stats.totalStudents} subtitle={`${stats.activeStudents} active`} icon="🎓" trend={0} />
+              <StatCard title="Teachers" value={teachers.length} subtitle="Staff members" icon="👨‍🏫" trend={0} />
+              <StatCard title="Total Collected" value={money(stats.totalCollected)} subtitle="Fees this term" icon="💰" trend={0} />
+              <StatCard title="Pending Fees" value={money(stats.pendingFees)} subtitle="Outstanding balance" icon="⏳" trend={0} />
+            </div>
+
+            {/* Charts Row */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "var(--space-4)" }}>
+              <Card style={{ padding: "var(--space-4)" }}>
+                <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Students by Class</h3>
+                {classChartData.length > 0 ? (
+                  <BarChart data={classChartData} height={180} />
+                ) : (
+                  <EmptyState icon="📊" title="No Data" description="No class distribution data available." />
+                )}
+              </Card>
+              <Card style={{ padding: "var(--space-4)" }}>
+                <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Gender Distribution</h3>
+                {genderChartData.length > 0 ? (
+                  <PieChart data={genderChartData} size={140} />
+                ) : (
+                  <EmptyState icon="📊" title="No Data" description="No gender distribution data available." />
+                )}
+              </Card>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Academic Tab */}
-      {activeTab === "academic" && (
-        <div style={{ display: "grid", gap: 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-            <StatCard title="Average Marks" value={stats.avgMarks.toFixed(1)} subtitle="Out of 100" color="#8B5CF6" />
-            <StatCard title="Total Results" value={results.length} subtitle="Grades recorded" color="#3B82F6" />
-          </div>
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
-            <h3 style={{ margin: "0 0 16px", color: C.text, fontSize: 16 }}>Grade Distribution</h3>
-            {gradeChartData.length > 0 ? (
-              <BarChart data={gradeChartData} height={200} />
-            ) : (
-              <div style={{ color: C.textSub, textAlign: "center", padding: 40 }}>No grades recorded yet</div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Financial Tab */}
-      {activeTab === "financial" && (
-        <div style={{ display: "grid", gap: 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-            <StatCard title="Total Collected" value={money(stats.totalCollected)} color="#22C55E" />
-            <StatCard title="Pending Balance" value={money(stats.pendingFees)} color="#EF4444" />
-            <StatCard title="Collection Rate" value={`${stats.pendingFees > 0 ? ((stats.totalCollected / (stats.totalCollected + stats.pendingFees)) * 100).toFixed(1) : 100}%`} color="#EAB308" />
-          </div>
-
-          {/* Class-wise Outstanding Balance */}
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
-            <h3 style={{ margin: "0 0 16px", color: C.text, fontSize: 16 }}>Outstanding Balance by Class</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-              {ALL_CLASSES.map(cls => {
-                const classStudents = students.filter(s => (s.className || s.class_name) === cls);
-                if (classStudents.length === 0) return null;
-                
-                const classExpected = classStudents.reduce((sum, s) => {
-                  const struct = feeStructures.find(f => f.className === cls);
-                  return sum + (struct ? (Number(struct.tuition || 0) + Number(struct.activity || 0) + Number(struct.misc || 0)) : 0);
-                }, 0);
-                
-                const classPaid = classStudents.reduce((sum, s) => {
-                  const sid = s.id ?? s.student_id;
-                  return sum + payments.filter(p => p.studentId === sid).reduce((t, p) => t + Number(p.amount), 0);
-                }, 0);
-                
-                const classOutstanding = Math.max(0, classExpected - classPaid);
-                
-                return (
-                  <div key={cls} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
-                    <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>{cls}</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: classOutstanding > 0 ? '#ef4444' : '#22c55e' }}>
-                      {money(classOutstanding)}
-                    </div>
-                    <div style={{ fontSize: 10, color: C.textSub, marginTop: 4 }}>
-                      {classStudents.length} students · {money(classPaid)} paid
-                    </div>
-                  </div>
-                );
-              })}
+        {/* Academic Tab */}
+        {activeTab === "academic" && (
+          <div style={{ display: "grid", gap: "var(--space-4)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
+              <StatCard title="Average Marks" value={stats.avgMarks.toFixed(1)} subtitle="Out of 100" icon="📈" trend={0} />
+              <StatCard title="Total Results" value={results.length} subtitle="Grades recorded" icon="📋" trend={0} />
             </div>
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Grade Distribution</h3>
+              {gradeChartData.length > 0 ? (
+                <BarChart data={gradeChartData} height={200} />
+              ) : (
+                <EmptyState icon="📊" title="No Data" description="No grades recorded yet." />
+              )}
+            </Card>
           </div>
+        )}
 
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
-            <h3 style={{ margin: "0 0 16px", color: C.text, fontSize: 16 }}>Monthly Payment Collection</h3>
-            {paymentChartData.length > 0 ? (
-              <BarChart data={paymentChartData} height={200} />
-            ) : (
-              <div style={{ color: C.textSub, textAlign: "center", padding: 40 }}>No payment data</div>
-            )}
-          </div>
-        </div>
-      )}
+        {/* Financial Tab */}
+        {activeTab === "financial" && (
+          <div style={{ display: "grid", gap: "var(--space-4)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
+              <StatCard title="Total Collected" value={money(stats.totalCollected)} icon="💵" trend={0} />
+              <StatCard title="Pending Balance" value={money(stats.pendingFees)} icon="⏳" trend={0} />
+              <StatCard title="Collection Rate" value={`${stats.pendingFees > 0 ? ((stats.totalCollected / (stats.totalCollected + stats.pendingFees)) * 100).toFixed(1) : 100}%`} icon="📊" trend={0} />
+            </div>
 
-      {/* Attendance Tab */}
-      {activeTab === "attendance" && (
-        <div style={{ display: "grid", gap: 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
-            <StatCard title="Attendance Rate" value={`${stats.attendanceRate.toFixed(1)}%`} subtitle="Present students" color="#22C55E" />
-            <StatCard title="Present Count" value={stats.presentCount} color="#3B82F6" />
-            <StatCard title="Absent Count" value={stats.absentCount} color="#EF4444" />
+            {/* Class-wise Outstanding Balance */}
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Outstanding Balance by Class</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "var(--space-3)" }}>
+                {ALL_CLASSES.map(cls => {
+                  const classStudents = students.filter(s => (s.className || s.class_name) === cls);
+                  if (classStudents.length === 0) return null;
+                  
+                  const classExpected = classStudents.reduce((sum, s) => {
+                    const struct = feeStructures.find(f => f.className === cls);
+                    return sum + (struct ? (Number(struct.tuition || 0) + Number(struct.activity || 0) + Number(struct.misc || 0)) : 0);
+                  }, 0);
+                  
+                  const classPaid = classStudents.reduce((sum, s) => {
+                    const sid = s.id ?? s.student_id;
+                    return sum + payments.filter(p => p.studentId === sid).reduce((t, p) => t + Number(p.amount), 0);
+                  }, 0);
+                  
+                  const classOutstanding = Math.max(0, classExpected - classPaid);
+                  
+                  return (
+                    <div key={cls} style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
+                      <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginBottom: "var(--space-1)" }}>{cls}</div>
+                      <div style={{ fontSize: "18px", fontWeight: 700, color: classOutstanding > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                        {money(classOutstanding)}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "var(--space-1)" }}>
+                        {classStudents.length} students · {money(classPaid)} paid
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Monthly Payment Collection</h3>
+              {paymentChartData.length > 0 ? (
+                <BarChart data={paymentChartData} height={200} />
+              ) : (
+                <EmptyState icon="📊" title="No Data" description="No payment data available." />
+              )}
+            </Card>
           </div>
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
-            <h3 style={{ margin: "0 0 16px", color: C.text, fontSize: 16 }}>Attendance Distribution</h3>
-            <PieChart data={[
-              { label: "Present", value: stats.presentCount, color: "#22C55E" },
-              { label: "Absent", value: stats.absentCount, color: "#EF4444" },
-            ]} size={160} />
+        )}
+
+        {/* Attendance Tab */}
+        {activeTab === "attendance" && (
+          <div style={{ display: "grid", gap: "var(--space-4)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
+              <StatCard title="Attendance Rate" value={`${stats.attendanceRate.toFixed(1)}%`} subtitle="Present students" icon="✅" trend={0} />
+              <StatCard title="Present Count" value={stats.presentCount} icon="🟢" trend={0} />
+              <StatCard title="Absent Count" value={stats.absentCount} icon="🔴" trend={0} />
+            </div>
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Attendance Distribution</h3>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <PieChart data={[
+                  { label: "Present", value: stats.presentCount, color: "var(--color-success)" },
+                  { label: "Absent", value: stats.absentCount, color: "var(--color-danger)" },
+                ]} size={160} />
+              </div>
+            </Card>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

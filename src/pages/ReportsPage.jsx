@@ -1,16 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
-import { C } from "../lib/theme";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
-import { ALL_CLASSES } from "../lib/constants";
-import { calculateGrade, CBC_LEVELS } from "../lib/grading";
+import { calculateGrade } from "../lib/grading";
 
-// ─── Shared helpers ────────────────────────────────────────────────────────
-const inputStyle = {
-  background: C.card, color: C.text, border: `1px solid ${C.border}`,
-  borderRadius: 8, padding: "6px 10px", fontSize: 13,
-};
+import Card from "../components/ui/Card";
+import Button from "../components/ui/Button";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Table from "../components/ui/Table";
+import EmptyState from "../components/ui/EmptyState";
 
 // Use shared grading utility instead of local definition
 const gradeInfo = (score) => {
@@ -24,22 +23,28 @@ const gradeInfo = (score) => {
 };
 
 const ScoreBar = ({ score, color }) => (
-  <div style={{ flex:1, background: C.border, borderRadius:6, height:8, overflow:"hidden" }}>
+  <div style={{ flex: 1, background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-full)", height: "8px", overflow: "hidden" }}>
     <div style={{
       width: `${Math.min(score, 100)}%`,
-      background: color || (score >= 70 ? "#4ade80" : score >= 50 ? "#facc15" : "#f87171"),
-      height: "100%", borderRadius:6, transition: "width 0.5s ease",
+      background: color || (score >= 70 ? "var(--color-success)" : score >= 50 ? "var(--color-warning)" : "var(--color-danger)"),
+      height: "100%", borderRadius: "var(--radius-full)", transition: "width 0.5s ease",
     }} />
   </div>
 );
 
 const StatCard = ({ label, value, tone = "default" }) => {
-  const colors = { success:"#4ade80", warning:"#facc15", danger:"#f87171", info:"#60a5fa", default:C.accent };
+  const colors = { 
+    success: "var(--color-success)", 
+    warning: "var(--color-warning)", 
+    danger: "var(--color-danger)", 
+    info: "var(--color-info)", 
+    default: "var(--color-primary)" 
+  };
   return (
-    <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"16px 20px", minWidth:160 }}>
-      <div style={{ fontSize:12, color:C.textMuted, marginBottom:4 }}>{label}</div>
-      <div style={{ fontSize:24, fontWeight:800, color:colors[tone] }}>{value}</div>
-    </div>
+    <Card style={{ padding: "var(--space-3)", flex: 1, minWidth: "160px" }}>
+      <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginBottom: "var(--space-1)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
+      <div style={{ fontSize: "24px", fontWeight: 800, color: colors[tone] }}>{value}</div>
+    </Card>
   );
 };
 
@@ -199,11 +204,9 @@ Keep the tone professional but simple enough for a school administrator to act o
         body: { prompt },
       });
       
-      // Backend returns { text } directly, not { choices: [...] }
       if (result?.text) {
         setAiReport(result.text);
       } else if (result?.choices?.[0]?.message?.content) {
-        // Fallback for raw Groq format
         setAiReport(result.choices[0].message.content);
       } else if (result?.error) {
         setAiError("AI service error: " + result.error);
@@ -217,7 +220,6 @@ Keep the tone professional but simple enough for a school administrator to act o
     setAiLoading(false);
   };
 
-  // ── Render markdown-ish report (simple parser — no dependency needed)
   const renderReport = (text) => {
     const lines = text.split("\n");
     const elements = [];
@@ -226,374 +228,351 @@ Keep the tone professional but simple enough for a school administrator to act o
     lines.forEach(line => {
       if (line.startsWith("## ")) {
         elements.push(
-          <div key={key++} style={{ marginTop:24, marginBottom:8, paddingBottom:6,
-            borderBottom:`1px solid ${C.border}` }}>
-            <span style={{ fontSize:16, fontWeight:800, color:C.accent }}>{line.replace("## ","")}</span>
+          <div key={key++} style={{ marginTop: "var(--space-4)", marginBottom: "var(--space-2)", paddingBottom: "var(--space-1)", borderBottom: "1px solid var(--color-border)" }}>
+            <span style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-primary)" }}>{line.replace("## ","")}</span>
           </div>
         );
       } else if (line.startsWith("- ") || line.startsWith("* ")) {
         elements.push(
-          <div key={key++} style={{ display:"flex", gap:8, marginBottom:6, paddingLeft:8 }}>
-            <span style={{ color:C.accent, flexShrink:0 }}>•</span>
-            <span style={{ fontSize:13, color:C.textSub, lineHeight:1.6 }}>{line.slice(2)}</span>
+          <div key={key++} style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-1)", paddingLeft: "var(--space-2)" }}>
+            <span style={{ color: "var(--color-primary)", flexShrink: 0 }}>•</span>
+            <span style={{ fontSize: "14px", color: "var(--color-text-secondary)", lineHeight: 1.6 }}>{line.slice(2)}</span>
           </div>
         );
       } else if (line.match(/^\d+\. /)) {
         const num = line.match(/^(\d+)\.\s/)[1];
         elements.push(
-          <div key={key++} style={{ display:"flex", gap:10, marginBottom:6, paddingLeft:8 }}>
-            <span style={{ color:C.accent, fontWeight:700, flexShrink:0, minWidth:20 }}>{num}.</span>
-            <span style={{ fontSize:13, color:C.textSub, lineHeight:1.6 }}>{line.replace(/^\d+\.\s/,"")}</span>
+          <div key={key++} style={{ display: "flex", gap: "10px", marginBottom: "var(--space-1)", paddingLeft: "var(--space-2)" }}>
+            <span style={{ color: "var(--color-primary)", fontWeight: 700, flexShrink: 0, minWidth: 20 }}>{num}.</span>
+            <span style={{ fontSize: "14px", color: "var(--color-text-secondary)", lineHeight: 1.6 }}>{line.replace(/^\d+\.\s/,"")}</span>
           </div>
         );
       } else if (line.trim() === "") {
-        elements.push(<div key={key++} style={{ height:6 }} />);
+        elements.push(<div key={key++} style={{ height: "var(--space-2)" }} />);
       } else {
         elements.push(
-          <p key={key++} style={{ fontSize:13, color:C.textSub, margin:"4px 0", lineHeight:1.7 }}>{line}</p>
+          <p key={key++} style={{ fontSize: "14px", color: "var(--color-text-secondary)", margin: "4px 0", lineHeight: 1.7 }}>{line}</p>
         );
       }
     });
     return elements;
   };
 
-  const th = { textAlign:"left", padding:"8px 10px", borderBottom:`1px solid ${C.border}`, color:C.textMuted, fontSize:12 };
-  const td = (extra={}) => ({ padding:"8px 10px", color:C.text, ...extra });
   const streamSorted = data ? [...data.streamAverages].sort((a,b) => b.avg_score - a.avg_score) : [];
   const byClass = {};
   streamSorted.forEach(s => {
     if (!byClass[s.class_name]) byClass[s.class_name] = [];
     byClass[s.class_name].push(s);
   });
-  const urgencyColor = { high:"#f87171", medium:"#facc15", maintain:"#4ade80" };
-  const urgencyBg    = { high:"#1c0505", medium:"#1c1400", maintain:"#052e16" };
+  
+  const urgencyColor = { high:"var(--color-danger)", medium:"var(--color-warning)", maintain:"var(--color-success)" };
+  const urgencyBg    = { high:"color-mix(in srgb, var(--color-danger) 10%, transparent)", medium:"color-mix(in srgb, var(--color-warning) 10%, transparent)", maintain:"color-mix(in srgb, var(--color-success) 10%, transparent)" };
   const urgencyLabel = { high:"🔴 High Priority", medium:"🟡 Medium Priority", maintain:"🟢 Maintain" };
   const interventions = data ? buildInterventions(data.subjectRankings, data.streamAverages) : [];
 
   if (!loading && data && data.streamAverages.length === 0) return (
-    <div style={{ textAlign:"center", padding:60, color:C.textMuted }}>
-      <div style={{ fontSize:40, marginBottom:12 }}>📊</div>
-      <div style={{ fontWeight:700, color:C.text, marginBottom:8 }}>No results data yet</div>
-      <div style={{ fontSize:13 }}>Enter results in the Grades page to see stream analysis.</div>
-    </div>
+    <Card style={{ textAlign: "center", padding: "60px var(--space-4)" }}>
+      <EmptyState icon="📊" title="No results data yet" description="Enter results in the Grades page to see stream analysis." />
+    </Card>
   );
 
   return (
     <div>
-      {/* ── Filters + mode toggle ── */}
-      <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap", alignItems:"flex-end",
-        justifyContent:"space-between" }}>
-        <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"flex-end" }}>
-          <div>
-            <div style={{ fontSize:11, color:C.textMuted, marginBottom:4 }}>Term</div>
-            <select style={inputStyle} value={term} onChange={e => setTerm(e.target.value)}>
-              {availTerms.map(t => <option key={t}>{t}</option>)}
-            </select>
+      <Card style={{ padding: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+        <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div style={{ width: "150px" }}>
+              <Select 
+                label="Term"
+                value={term} 
+                onChange={e => setTerm(e.target.value)}
+                options={availTerms.map(t => ({ value: t, label: t }))}
+              />
+            </div>
+            <div style={{ width: "150px" }}>
+              <Select 
+                label="Class (optional)"
+                value={className} 
+                onChange={e => setClassName(e.target.value)}
+                options={[
+                  { value: "", label: "All Classes" },
+                  ...availClasses.map(c => ({ value: c, label: c }))
+                ]}
+              />
+            </div>
+            <Button onClick={load}>
+              Refresh
+            </Button>
           </div>
-          <div>
-            <div style={{ fontSize:11, color:C.textMuted, marginBottom:4 }}>Class (optional)</div>
-            <select style={inputStyle} value={className} onChange={e => setClassName(e.target.value)}>
-              <option value="">All Classes</option>
-              {availClasses.map(c => <option key={c}>{c}</option>)}
-            </select>
+
+          <div style={{ display: "flex", gap: "var(--space-2)", background: "var(--color-bg-base)", padding: "var(--space-1)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
+            {[["visual","📊 Visual Report"],["ai","🤖 AI Report"]].map(([mode, label]) => (
+              <Button 
+                key={mode} 
+                variant={reportMode === mode ? "primary" : "ghost"} 
+                size="sm"
+                onClick={() => setReportMode(mode)}
+              >
+                {label}
+              </Button>
+            ))}
           </div>
-          <button onClick={load} style={{ background:C.accent, color:"#fff", border:"none",
-            borderRadius:8, padding:"7px 18px", fontWeight:700, fontSize:13, cursor:"pointer" }}>
-            Refresh
-          </button>
         </div>
+      </Card>
 
-        {/* Mode toggle */}
-        <div style={{ display:"flex", gap:6 }}>
-          {[["visual","📊 Visual Report"],["ai","🤖 AI Report"]].map(([mode, label]) => (
-            <button key={mode} onClick={() => setReportMode(mode)} style={{
-              padding:"7px 14px", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer",
-              background: reportMode === mode ? C.accent : C.card,
-              color: reportMode === mode ? "#fff" : C.textMuted,
-              border: `1px solid ${reportMode === mode ? C.accent : C.border}`,
-            }}>{label}</button>
-          ))}
-        </div>
-      </div>
-
-      {loading && <div style={{ color:C.textMuted, padding:32 }}>Loading data…</div>}
+      {loading && <div style={{ color: "var(--color-text-muted)", padding: "32px", textAlign: "center" }}>Loading data…</div>}
 
       {/* ══════════ AI REPORT MODE ══════════ */}
       {!loading && data && reportMode === "ai" && (
         <div>
-          {/* Generate button */}
           {!aiReport && !aiLoading && (
-            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16,
-              padding:40, textAlign:"center", marginBottom:20 }}>
-              <div style={{ fontSize:36, marginBottom:12 }}>🤖</div>
-              <div style={{ fontWeight:700, color:C.text, fontSize:16, marginBottom:8 }}>
+            <Card style={{ padding: "40px", textAlign: "center", marginBottom: "var(--space-4)" }}>
+              <div style={{ fontSize: "48px", marginBottom: "var(--space-3)" }}>🤖</div>
+              <h3 style={{ fontWeight: 700, color: "var(--color-text-primary)", fontSize: "20px", margin: "0 0 var(--space-2) 0" }}>
                 AI Performance Report
-              </div>
-              <div style={{ color:C.textMuted, fontSize:13, marginBottom:20, maxWidth:480, margin:"0 auto 20px" }}>
+              </h3>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: "14px", marginBottom: "var(--space-4)", maxWidth: "500px", margin: "0 auto var(--space-4)" }}>
                 Claude AI will analyse your stream data and generate a full 7-section academic performance
                 report with ranked subjects, stream comparisons, risk groups, and practical recommendations.
-              </div>
-              <button onClick={generateAIReport} style={{
-                background:`linear-gradient(135deg, ${C.accent}, #6366f1)`,
-                color:"#fff", border:"none", borderRadius:10,
-                padding:"12px 32px", fontWeight:800, fontSize:15, cursor:"pointer",
-              }}>
+              </p>
+              <Button onClick={generateAIReport} size="lg" style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-info))", border: "none" }}>
                 Generate AI Report
-              </button>
+              </Button>
               {aiError && (
-                <div style={{ marginTop:16, color:"#f87171", fontSize:13 }}>{aiError}</div>
+                <div style={{ marginTop: "var(--space-3)", color: "var(--color-danger)", fontSize: "13px", fontWeight: 500 }}>{aiError}</div>
               )}
-            </div>
+            </Card>
           )}
 
-          {/* Loading */}
           {aiLoading && (
-            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16,
-              padding:60, textAlign:"center" }}>
-              <div style={{ fontSize:32, marginBottom:12, animation:"spin 1s linear infinite" }}>⚙️</div>
-              <div style={{ fontWeight:700, color:C.text, marginBottom:6 }}>Generating Report…</div>
-              <div style={{ color:C.textMuted, fontSize:13 }}>Claude is analysing your school data</div>
-            </div>
+            <Card style={{ padding: "60px var(--space-4)", textAlign: "center" }}>
+              <div style={{ fontSize: "32px", marginBottom: "var(--space-3)", animation: "spin 1s linear infinite" }}>⚙️</div>
+              <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-1)" }}>Generating Report…</div>
+              <div style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>Claude is analysing your school data</div>
+            </Card>
           )}
 
-          {/* Report output */}
           {aiReport && !aiLoading && (
             <div>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-                <div style={{ fontWeight:700, color:C.text, fontSize:15 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
+                <div style={{ fontWeight: 700, color: "var(--color-text-primary)", fontSize: "16px" }}>
                   AI Academic Performance Report — {data.meta.term}{data.meta.class_name ? " · "+data.meta.class_name : ""}
                 </div>
-                <div style={{ display:"flex", gap:8 }}>
-                  <button onClick={generateAIReport} style={{
-                    background:C.card, border:`1px solid ${C.border}`, color:C.textSub,
-                    borderRadius:8, padding:"6px 14px", fontSize:12, cursor:"pointer", fontWeight:600,
-                  }}>↺ Regenerate</button>
-                  <button onClick={() => {
+                <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                  <Button variant="secondary" size="sm" onClick={generateAIReport}>
+                    ↺ Regenerate
+                  </Button>
+                  <Button size="sm" onClick={() => {
                     const el = document.createElement("a");
                     el.href = "data:text/plain;charset=utf-8," + encodeURIComponent(aiReport);
                     el.download = `performance-report-${data.meta.term.replace(" ","-")}.txt`;
                     el.click();
-                  }} style={{
-                    background:C.accent, border:"none", color:"#fff",
-                    borderRadius:8, padding:"6px 14px", fontSize:12, cursor:"pointer", fontWeight:700,
-                  }}>⬇ Download</button>
+                  }}>
+                    ⬇ Download
+                  </Button>
                 </div>
               </div>
-              <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:16, padding:28 }}>
+              <Card style={{ padding: "var(--space-4)" }}>
                 {renderReport(aiReport)}
-              </div>
+              </Card>
             </div>
           )}
         </div>
       )}
 
       {/* ══════════ VISUAL REPORT MODE ══════════ */}
-      {!loading && data && reportMode === "visual" && (<>
-
-        {/* SECTION 1 — Class Performance by Stream */}
-        <div style={{ marginBottom:32 }}>
-          <h3 style={{ color:C.text, marginBottom:4 }}>1. Class Performance by Stream</h3>
-          <p style={{ color:C.textMuted, fontSize:13, marginBottom:16 }}>
-            Average score per stream. Click a stream card to see subject breakdown.
-          </p>
-          {Object.entries(byClass).map(([cls, streams]) => (
-            <div key={cls} style={{ marginBottom:24 }}>
-              <div style={{ fontWeight:700, color:C.text, fontSize:14, marginBottom:10,
-                borderLeft:`3px solid ${C.accent}`, paddingLeft:10 }}>{cls}</div>
-              <div style={{ display:"flex", flexWrap:"wrap", gap:10 }}>
-                {streams.map(s => {
-                  const g = gradeInfo(s.avg_score);
-                  const isActive = activeStream === s.stream_label;
-                  return (
-                    <div key={s.stream_label}
-                      onClick={() => setActiveStream(isActive ? null : s.stream_label)}
-                      style={{ background: isActive ? g.bg : C.card,
-                        border:`2px solid ${isActive ? g.color : C.border}`,
-                        borderRadius:12, padding:"14px 20px", cursor:"pointer",
-                        minWidth:180, transition:"all 0.15s",
-                        boxShadow: isActive ? `0 0 0 2px ${g.color}33` : "none",
-                      }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                        <div style={{ fontWeight:700, color:C.text, fontSize:15 }}>Stream {s.stream}</div>
-                        <div style={{ background:g.bg, border:`1px solid ${g.color}`, borderRadius:20,
-                          padding:"2px 10px", fontSize:11, fontWeight:800, color:g.color }}>{g.label}</div>
-                      </div>
-                      <div style={{ fontSize:28, fontWeight:900, color:g.color, marginBottom:4 }}>{s.avg_score}%</div>
-                      <ScoreBar score={s.avg_score} color={g.color} />
-                      <div style={{ fontSize:11, color:C.textMuted, marginTop:6 }}>
-                        {s.student_count} students · {g.text}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Stream drilldown */}
-              {activeStream && streams.some(s => s.stream_label === activeStream) && (() => {
-                const sd = data.streamVsSubject.data[activeStream];
-                const subjects = sd ? data.streamVsSubject.subjects
-                  .map(s => ({ subject:s, avg_score: sd[s] ?? null }))
-                  .filter(x => x.avg_score !== null)
-                  .sort((a,b) => b.avg_score - a.avg_score) : [];
-                return subjects.length > 0 ? (
-                  <div style={{ background:C.card, border:`1px solid ${C.border}`,
-                    borderRadius:12, padding:20, marginTop:12 }}>
-                    <div style={{ fontWeight:700, color:C.text, marginBottom:12, fontSize:14 }}>
-                      {activeStream} — Subject Breakdown
-                    </div>
-                    {subjects.map(sub => {
-                      const g = gradeInfo(sub.avg_score);
-                      return (
-                        <div key={sub.subject} style={{ display:"flex", alignItems:"center", gap:12, marginBottom:10 }}>
-                          <div style={{ width:140, fontSize:13, color:C.textSub }}>{sub.subject}</div>
-                          <ScoreBar score={sub.avg_score} color={g.color} />
-                          <div style={{ width:44, fontWeight:700, color:g.color, fontSize:13, textAlign:"right" }}>{sub.avg_score}%</div>
-                          <div style={{ background:g.bg, border:`1px solid ${g.color}`, borderRadius:20,
-                            padding:"1px 8px", fontSize:10, fontWeight:800, color:g.color, minWidth:28, textAlign:"center" }}>{g.label}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : null;
-              })()}
-            </div>
-          ))}
-        </div>
-
-        {/* SECTION 2 — Subject Ranking */}
-        <div style={{ marginBottom:32 }}>
-          <h3 style={{ color:C.text, marginBottom:4 }}>2. Subject Performance Ranking</h3>
-          <p style={{ color:C.textMuted, fontSize:13, marginBottom:16 }}>
-            Subjects ranked highest to lowest. Identifies strong and weak curriculum areas.
-          </p>
-          <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, overflow:"hidden" }}>
-            <table style={{ width:"100%", borderCollapse:"collapse" }}>
-              <thead>
-                <tr>{["Rank","Subject","Average","Highest","Lowest","Entries","Grade"].map(h =>
-                  <th key={h} style={th}>{h}</th>)}</tr>
-              </thead>
-              <tbody>
-                {data.subjectRankings.map((s, i) => {
-                  const g = gradeInfo(s.avg_score);
-                  return (
-                    <tr key={s.subject} style={{ borderBottom:`1px solid ${C.border}` }}>
-                      <td style={td({ color:C.textMuted, fontWeight:700 })}>#{i+1}</td>
-                      <td style={td({ fontWeight:600 })}>{s.subject}</td>
-                      <td style={{ padding:"8px 10px" }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                          <ScoreBar score={s.avg_score} color={g.color} />
-                          <span style={{ fontWeight:800, color:g.color, fontSize:14, minWidth:42 }}>{s.avg_score}%</span>
-                        </div>
-                      </td>
-                      <td style={td({ color:"#4ade80" })}>{s.highest}%</td>
-                      <td style={td({ color:"#f87171" })}>{s.lowest}%</td>
-                      <td style={td({ color:C.textMuted })}>{s.entries}</td>
-                      <td style={{ padding:"8px 10px" }}>
-                        <span style={{ background:g.bg, border:`1px solid ${g.color}`, borderRadius:20,
-                          padding:"2px 10px", fontSize:11, fontWeight:800, color:g.color }}>{g.label}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* SECTION 3 — Stream vs Subject */}
-        {data.streamVsSubject.subjects.length > 0 && (
-          <div style={{ marginBottom:32 }}>
-            <h3 style={{ color:C.text, marginBottom:4 }}>3. Stream vs Subject Comparison</h3>
-            <p style={{ color:C.textMuted, fontSize:13, marginBottom:16 }}>
-              How each stream performs per subject — highlights which stream needs targeted help.
+      {!loading && data && reportMode === "visual" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+          {/* SECTION 1 — Class Performance by Stream */}
+          <Card style={{ padding: "var(--space-4)" }}>
+            <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>1. Class Performance by Stream</h3>
+            <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
+              Average score per stream. Click a stream card to see subject breakdown.
             </p>
-            <div style={{ overflowX:"auto" }}>
-              <table style={{ borderCollapse:"collapse", minWidth:600, width:"100%" }}>
-                <thead>
-                  <tr>
-                    <th style={{ ...th, minWidth:130 }}>Subject</th>
-                    {data.streamVsSubject.streams.map(sl =>
-                      <th key={sl} style={{ ...th, textAlign:"center", minWidth:80 }}>{sl}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.streamVsSubject.subjects.map(subj => (
-                    <tr key={subj} style={{ borderBottom:`1px solid ${C.border}` }}>
-                      <td style={{ padding:"8px 10px", color:C.text, fontWeight:600 }}>{subj}</td>
-                      {data.streamVsSubject.streams.map(sl => {
-                        const score = data.streamVsSubject.data[sl]?.[subj];
-                        if (score == null) return <td key={sl} style={{ padding:"8px 10px", textAlign:"center", color:C.textMuted }}>—</td>;
-                        const g = gradeInfo(score);
-                        return (
-                          <td key={sl} style={{ padding:"8px 10px", textAlign:"center" }}>
-                            <span style={{ background:g.bg, border:`1px solid ${g.color}44`,
-                              borderRadius:8, padding:"3px 8px", fontSize:12, fontWeight:800, color:g.color }}>
-                              {score}%
-                            </span>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* SECTION 4 — Way Forward */}
-        <div style={{ marginBottom:32 }}>
-          <h3 style={{ color:C.text, marginBottom:4 }}>4. Proposed Way Forward</h3>
-          <p style={{ color:C.textMuted, fontSize:13, marginBottom:16 }}>
-            Data-driven interventions based on current performance. Switch to 🤖 AI Report for a full narrative analysis.
-          </p>
-          {interventions.length === 0 ? (
-            <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12,
-              padding:20, color:C.textMuted, textAlign:"center" }}>
-              Add more results to generate recommendations.
-            </div>
-          ) : (
-            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-              {interventions.map((iv, i) => (
-                <div key={i} style={{ background:urgencyBg[iv.urgency],
-                  border:`1px solid ${urgencyColor[iv.urgency]}44`,
-                  borderLeft:`4px solid ${urgencyColor[iv.urgency]}`,
-                  borderRadius:12, padding:"16px 20px" }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
-                    <div style={{ fontWeight:700, color:C.text, fontSize:14 }}>{iv.subject}</div>
-                    <span style={{ background:`${urgencyColor[iv.urgency]}22`,
-                      border:`1px solid ${urgencyColor[iv.urgency]}44`, borderRadius:20,
-                      padding:"2px 10px", fontSize:11, fontWeight:700,
-                      color:urgencyColor[iv.urgency], whiteSpace:"nowrap" }}>
-                      {urgencyLabel[iv.urgency]}
-                    </span>
-                  </div>
-                  <div style={{ fontSize:13, color:C.textSub, marginBottom:8 }}>
-                    <strong>Finding:</strong> {iv.finding}
-                  </div>
-                  <div style={{ fontSize:13, color:C.text }}>
-                    <strong style={{ color:urgencyColor[iv.urgency] }}>Action:</strong> {iv.action}
-                  </div>
+            {Object.entries(byClass).map(([cls, streams]) => (
+              <div key={cls} style={{ marginBottom: "var(--space-4)" }}>
+                <div style={{ fontWeight: 700, color: "var(--color-text-primary)", fontSize: "15px", marginBottom: "var(--space-2)", borderLeft: `3px solid var(--color-primary)`, paddingLeft: "var(--space-2)" }}>{cls}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "var(--space-3)" }}>
+                  {streams.map(s => {
+                    const g = gradeInfo(s.avg_score);
+                    const isActive = activeStream === s.stream_label;
+                    return (
+                      <div key={s.stream_label}
+                        onClick={() => setActiveStream(isActive ? null : s.stream_label)}
+                        style={{ 
+                          background: isActive ? g.bg : "var(--color-bg-surface)",
+                          border: `2px solid ${isActive ? g.color : "var(--color-border)"}`,
+                          borderRadius: "var(--radius-lg)", 
+                          padding: "var(--space-3)", 
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                          boxShadow: isActive ? `0 4px 12px color-mix(in srgb, ${g.color} 20%, transparent)` : "none",
+                        }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
+                          <div style={{ fontWeight: 700, color: "var(--color-text-primary)", fontSize: "16px" }}>Stream {s.stream}</div>
+                          <Badge text={g.label} style={{ background: g.bg, color: g.color, borderColor: g.color }} />
+                        </div>
+                        <div style={{ fontSize: "32px", fontWeight: 800, color: g.color, marginBottom: "var(--space-1)", letterSpacing: "-0.02em" }}>{s.avg_score}%</div>
+                        <ScoreBar score={s.avg_score} color={g.color} />
+                        <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "var(--space-2)", fontWeight: 500 }}>
+                          {s.student_count} students · {g.text}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
-          )}
-          <div style={{ marginTop:20, background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:20 }}>
-            <div style={{ fontWeight:700, color:C.text, marginBottom:12 }}>📋 Standard Recommendations</div>
-            {[
-              ["📚 Remedial Classes", "Identify students scoring below 50% and enrol them in targeted after-school remedial programmes grouped by subject weakness."],
-              ["🔄 Teaching Methodology Review", "Compare approaches of high-performing and low-performing streams. Share effective techniques school-wide through peer observations."],
-              ["📈 Monthly Performance Tracking", "Set up monthly mini-tests and track progress. Share results with teachers, parents and administration each month."],
-              ["👨‍👩‍👧 Parent Engagement", "Hold a termly meeting with parents of struggling students. Share specific targets and actions parents can support at home."],
-              ["🏆 Celebrate Strengths", "Publicly recognise top-performing streams and subjects each term to build a culture of academic excellence."],
-            ].map(([title, desc]) => (
-              <div key={title} style={{ display:"flex", gap:12, marginBottom:12, alignItems:"flex-start" }}>
-                <div style={{ fontWeight:700, color:C.accent, whiteSpace:"nowrap", minWidth:230, fontSize:13 }}>{title}</div>
-                <div style={{ fontSize:13, color:C.textSub }}>{desc}</div>
+                
+                {/* Stream drilldown */}
+                {activeStream && streams.some(s => s.stream_label === activeStream) && (() => {
+                  const sd = data.streamVsSubject.data[activeStream];
+                  const subjects = sd ? data.streamVsSubject.subjects
+                    .map(s => ({ subject:s, avg_score: sd[s] ?? null }))
+                    .filter(x => x.avg_score !== null)
+                    .sort((a,b) => b.avg_score - a.avg_score) : [];
+                  return subjects.length > 0 ? (
+                    <div style={{ background: "color-mix(in srgb, var(--color-primary) 5%, transparent)", border: `1px solid color-mix(in srgb, var(--color-primary) 20%, transparent)`,
+                      borderRadius: "var(--radius-md)", padding: "var(--space-3)", marginTop: "var(--space-3)" }}>
+                      <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-3)", fontSize: "15px" }}>
+                        {activeStream} — Subject Breakdown
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "var(--space-2)" }}>
+                        {subjects.map(sub => {
+                          const g = gradeInfo(sub.avg_score);
+                          return (
+                            <div key={sub.subject} style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", background: "var(--color-bg-base)", padding: "var(--space-2)", borderRadius: "var(--radius-md)" }}>
+                              <div style={{ width: 120, fontSize: "13px", color: "var(--color-text-primary)", fontWeight: 500 }}>{sub.subject}</div>
+                              <ScoreBar score={sub.avg_score} color={g.color} />
+                              <div style={{ width: 40, fontWeight: 700, color: g.color, fontSize: "14px", textAlign: "right" }}>{sub.avg_score}%</div>
+                              <div style={{ width: 30, textAlign: "center" }}>
+                                <Badge text={g.label} style={{ background: g.bg, color: g.color, borderColor: "transparent", padding: "2px 6px" }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
               </div>
             ))}
-          </div>
+          </Card>
+
+          {/* SECTION 2 — Subject Ranking */}
+          <Card style={{ padding: "var(--space-4)" }}>
+            <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>2. Subject Performance Ranking</h3>
+            <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
+              Subjects ranked highest to lowest. Identifies strong and weak curriculum areas.
+            </p>
+            <div style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
+              <Table 
+                headers={["Rank", "Subject", "Average", "Highest", "Lowest", "Entries", "Grade"]}
+                data={data.subjectRankings.map((s, i) => {
+                  const g = gradeInfo(s.avg_score);
+                  return [
+                    <span key="rank" style={{ color: "var(--color-text-secondary)", fontWeight: 700 }}>#{i+1}</span>,
+                    <span key="subject" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{s.subject}</span>,
+                    <div key="avg" style={{ display: "flex", alignItems: "center", gap: "10px", width: "120px" }}>
+                      <ScoreBar score={s.avg_score} color={g.color} />
+                      <span style={{ fontWeight: 800, color: g.color, fontSize: "14px", minWidth: "42px", textAlign: "right" }}>{s.avg_score}%</span>
+                    </div>,
+                    <span key="high" style={{ color: "var(--color-success)", fontWeight: 600 }}>{s.highest}%</span>,
+                    <span key="low" style={{ color: "var(--color-danger)", fontWeight: 600 }}>{s.lowest}%</span>,
+                    <span key="entries" style={{ color: "var(--color-text-secondary)" }}>{s.entries}</span>,
+                    <Badge key="grade" text={g.label} style={{ background: g.bg, color: g.color, borderColor: g.color }} />
+                  ];
+                })}
+              />
+            </div>
+          </Card>
+
+          {/* SECTION 3 — Stream vs Subject */}
+          {data.streamVsSubject.subjects.length > 0 && (
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>3. Stream vs Subject Comparison</h3>
+              <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
+                How each stream performs per subject — highlights which stream needs targeted help.
+              </p>
+              <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                <Table 
+                  headers={["Subject", ...data.streamVsSubject.streams]}
+                  data={data.streamVsSubject.subjects.map(subj => {
+                    const row = [
+                      <span key="subject" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{subj}</span>
+                    ];
+                    
+                    data.streamVsSubject.streams.forEach(sl => {
+                      const score = data.streamVsSubject.data[sl]?.[subj];
+                      if (score == null) {
+                        row.push(<span key={sl} style={{ color: "var(--color-text-muted)" }}>—</span>);
+                      } else {
+                        const g = gradeInfo(score);
+                        row.push(
+                          <Badge key={sl} text={`${score}%`} style={{ background: g.bg, color: g.color, borderColor: "transparent", fontWeight: 800 }} />
+                        );
+                      }
+                    });
+                    
+                    return row;
+                  })}
+                />
+              </div>
+            </Card>
+          )}
+
+          {/* SECTION 4 — Way Forward */}
+          <Card style={{ padding: "var(--space-4)" }}>
+            <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>4. Proposed Way Forward</h3>
+            <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
+              Data-driven interventions based on current performance. Switch to 🤖 AI Report for a full narrative analysis.
+            </p>
+            
+            {interventions.length === 0 ? (
+              <EmptyState icon="💡" title="Need more data" description="Add more results to generate recommendations." />
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+                {interventions.map((iv, i) => (
+                  <div key={i} style={{ 
+                    background: urgencyBg[iv.urgency],
+                    border: `1px solid color-mix(in srgb, ${urgencyColor[iv.urgency]} 30%, transparent)`,
+                    borderLeft: `4px solid ${urgencyColor[iv.urgency]}`,
+                    borderRadius: "var(--radius-md)", 
+                    padding: "var(--space-3)" 
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--space-2)" }}>
+                      <div style={{ fontWeight: 700, color: "var(--color-text-primary)", fontSize: "15px" }}>{iv.subject}</div>
+                      <Badge text={urgencyLabel[iv.urgency]} style={{ background: "transparent", color: urgencyColor[iv.urgency], borderColor: urgencyColor[iv.urgency] }} />
+                    </div>
+                    <div style={{ fontSize: "14px", color: "var(--color-text-secondary)", marginBottom: "var(--space-1)" }}>
+                      <strong style={{ color: "var(--color-text-primary)" }}>Finding:</strong> {iv.finding}
+                    </div>
+                    <div style={{ fontSize: "14px", color: "var(--color-text-primary)" }}>
+                      <strong style={{ color: urgencyColor[iv.urgency] }}>Action:</strong> {iv.action}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div style={{ marginTop: "var(--space-4)", background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-4)" }}>
+              <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-3)", fontSize: "16px" }}>📋 Standard Recommendations</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+                {[
+                  ["📚 Remedial Classes", "Identify students scoring below 50% and enrol them in targeted after-school remedial programmes grouped by subject weakness."],
+                  ["🔄 Teaching Methodology Review", "Compare approaches of high-performing and low-performing streams. Share effective techniques school-wide through peer observations."],
+                  ["📈 Monthly Performance Tracking", "Set up monthly mini-tests and track progress. Share results with teachers, parents and administration each month."],
+                  ["👨‍👩‍👧 Parent Engagement", "Hold a termly meeting with parents of struggling students. Share specific targets and actions parents can support at home."],
+                  ["🏆 Celebrate Strengths", "Publicly recognise top-performing streams and subjects each term to build a culture of academic excellence."],
+                ].map(([title, desc]) => (
+                  <div key={title} style={{ display: "flex", gap: "var(--space-3)", alignItems: "flex-start" }}>
+                    <div style={{ fontWeight: 700, color: "var(--color-primary)", whiteSpace: "nowrap", width: "230px", flexShrink: 0, fontSize: "14px" }}>{title}</div>
+                    <div style={{ fontSize: "14px", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>{desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
         </div>
-      </>)}
+      )}
     </div>
   );
 }
@@ -613,7 +592,7 @@ export default function ReportsPage({ auth }) {
   const [classOptions, setClassOptions] = useState([]);
 
   useEffect(() => {
-    const token = auth?.token || sessionStorage.getItem("token") || localStorage.getItem("token");
+    const token = auth?.token || sessionStorage.getItem("token");
     if (token) {
       apiFetch('/classes', { token })
         .then(res => setClassOptions(res.data || res || []))
@@ -622,7 +601,7 @@ export default function ReportsPage({ auth }) {
   }, [auth]);
 
   useEffect(() => {
-    const token = auth?.token || sessionStorage.getItem("token") || localStorage.getItem("token");
+    const token = auth?.token || sessionStorage.getItem("token");
     if (!token) { setLoading(false); return; }
     Promise.all([
       apiFetch("/reports/summary",                { token }),
@@ -656,10 +635,11 @@ export default function ReportsPage({ auth }) {
 
   const tabBtn = id => (
     <button key={id} onClick={() => setTab(id)} style={{
-      padding:"7px 14px", border:"none",
-      borderBottom:`2px solid ${tab === id ? C.accent : "transparent"}`,
-      background:"transparent", color: tab === id ? C.accent : C.textMuted,
-      cursor:"pointer", fontWeight: tab === id ? 700 : 400, fontSize:13,
+      padding: "10px 16px", border: "none",
+      borderBottom: `2px solid ${tab === id ? "var(--color-primary)" : "transparent"}`,
+      background: "transparent", color: tab === id ? "var(--color-primary)" : "var(--color-text-secondary)",
+      cursor: "pointer", fontWeight: tab === id ? 600 : 500, fontSize: "14px",
+      transition: "all 0.2s ease"
     }}>
       {id === "analysis" ? "📊 Analysis" : id.charAt(0).toUpperCase() + id.slice(1)}
     </button>
@@ -684,13 +664,13 @@ export default function ReportsPage({ auth }) {
     setDefaultersPage(1);
   }, [filterClass, defaultersPageSize]);
 
-  if (loading) return <div style={{ color:C.textMuted, padding:32 }}>Loading reports…</div>;
+  if (loading) return <div style={{ color: "var(--color-text-muted)", padding: "32px", textAlign: "center" }}>Loading reports…</div>;
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Summary cards */}
       {summary && (
-        <div style={{ display:"flex", flexWrap:"wrap", gap:10, marginBottom:20 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)" }}>
           <StatCard label="Active Students"  value={summary.students}               tone="info" />
           <StatCard label="Active Teachers"  value={summary.teachers}               tone="info" />
           <StatCard label="Fees Collected"   value={money(summary.feesCollected)}   tone="success" />
@@ -700,383 +680,297 @@ export default function ReportsPage({ auth }) {
       )}
 
       {/* Tabs */}
-      <div style={{ display:"flex", borderBottom:`1px solid ${C.border}`, marginBottom:16, flexWrap:"wrap" }}>
+      <div style={{ display: "flex", borderBottom: "1px solid var(--color-border)", flexWrap: "wrap" }}>
         {["overview","fees","attendance","grades","defaulters","analysis"].map(tabBtn)}
       </div>
 
-      {/* Class filter (grades / defaulters tabs) */}
-      {["grades","defaulters"].includes(tab) && (
-        <select style={{ background:C.card, color:C.text, border:`1px solid ${C.border}`,
-          borderRadius:8, padding:"6px 10px", marginBottom:12, fontSize:13 }}
-          value={filterClass} onChange={e => setFilterClass(e.target.value)}>
-          <option value="all">All classes</option>
-          {classOptions.map(c => <option key={c.class_id} value={c.class_name}>{c.class_name}</option>)}
-        </select>
-      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+        {/* Class filter (grades / defaulters tabs) */}
+        {["grades","defaulters"].includes(tab) && (
+          <div style={{ width: "250px" }}>
+            <Select 
+              value={filterClass} 
+              onChange={e => setFilterClass(e.target.value)}
+              options={[
+                { value: "all", label: "All classes" },
+                ...classOptions.map(c => ({ value: c.class_name, label: c.class_name }))
+              ]}
+            />
+          </div>
+        )}
 
-      {/* ── Overview ── */}
-      {tab === "overview" && (
-        <div>
-          <h3 style={{ color:C.text, marginBottom:8 }}>Monthly Fee Collection</h3>
-          {monthly.length === 0 ? <p style={{ color:C.textMuted }}>No payment data yet.</p> : (
-            <div style={{ overflowX:"auto" }}>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead><tr>{["Month","Transactions","Total"].map(h =>
-                  <th key={h} style={{ textAlign:"left", padding:"8px 10px", borderBottom:`1px solid ${C.border}`, color:C.textMuted, fontSize:12 }}>{h}</th>)}
-                </tr></thead>
-                <tbody>{monthly.map((m, i) => (
-                  <tr key={i} style={{ borderBottom:`1px solid ${C.border}` }}>
-                    <td style={{ padding:"8px 10px", color:C.text }}>{m.month}</td>
-                    <td style={{ padding:"8px 10px", color:C.textSub }}>{m.transactions}</td>
-                    <td style={{ padding:"8px 10px", color:"#4ade80", fontWeight:700 }}>{money(m.total)}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Fees ── */}
-      {tab === "fees" && (
-        <div>
-          {/* Class-wise Outstanding Balance */}
-          <h3 style={{ color:C.text, marginBottom:12 }}>Outstanding Balance by Class</h3>
-          {classFeeSummary.length === 0 ? (
-            <p style={{ color:C.textMuted }}>Loading class fee data...</p>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 24 }}>
-              {classFeeSummary.map(cls => (
-                <div key={cls.class_name} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14 }}>
-                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>{cls.class_name}</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: cls.total_outstanding > 0 ? '#ef4444' : '#22c55e' }}>
-                    {money(cls.total_outstanding)}
-                  </div>
-                  <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>
-                    {cls.student_count} students · {money(cls.total_paid)} paid
-                  </div>
-                  {cls.total_expected > 0 && (
-                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
-                      Expected: {money(cls.total_expected)}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          <h3 style={{ color:C.text, marginBottom:8 }}>Monthly Fee Collection</h3>
-          {monthly.length === 0 ? <p style={{ color:C.textMuted }}>No payment data yet.</p> : (
-            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-              {monthly.map((m, i) => {
-                const max = Math.max(...monthly.map(x => Number(x.total)));
-                const pct = max > 0 ? (Number(m.total) / max) * 100 : 0;
-                return (
-                  <div key={i} style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <div style={{ width:70, fontSize:12, color:C.textMuted }}>{m.month}</div>
-                    <div style={{ flex:1, background:C.border, borderRadius:6, height:20, overflow:"hidden" }}>
-                      <div style={{ width:`${pct}%`, background:C.accent, height:"100%", borderRadius:6, transition:"width 0.4s" }} />
-                    </div>
-                    <div style={{ width:100, fontSize:12, color:C.text, textAlign:"right" }}>{money(m.total)}</div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Attendance ── */}
-      {tab === "attendance" && (
-        <div>
-          <h3 style={{ color:C.text, marginBottom:8 }}>Attendance Rate by Class</h3>
-          {attendance.length === 0 ? <p style={{ color:C.textMuted }}>No attendance data yet.</p> : (
-            <div style={{ overflowX:"auto" }}>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead><tr>{["Class","Total Records","Present","Rate"].map(h =>
-                  <th key={h} style={{ textAlign:"left", padding:"8px 10px", borderBottom:`1px solid ${C.border}`, color:C.textMuted, fontSize:12 }}>{h}</th>)}
-                </tr></thead>
-                <tbody>{attendance.map((a, i) => (
-                  <tr key={i} style={{ borderBottom:`1px solid ${C.border}` }}>
-                    <td style={{ padding:"8px 10px", color:C.text, fontWeight:600 }}>{a.class_name}</td>
-                    <td style={{ padding:"8px 10px", color:C.textSub }}>{a.total}</td>
-                    <td style={{ padding:"8px 10px", color:C.textSub }}>{a.present}</td>
-                    <td style={{ padding:"8px 10px" }}>
-                      <span style={{ color: Number(a.rate)>=80 ? "#4ade80" : Number(a.rate)>=60 ? "#facc15" : "#f87171", fontWeight:700 }}>{a.rate}%</span>
-                    </td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Grades ── */}
-      {tab === "grades" && (
-        <div>
-          <h3 style={{ color:C.text, marginBottom:8 }}>Grade Averages by Subject</h3>
-          {filteredGrades.length === 0 ? <p style={{ color:C.textMuted }}>No grade data yet.</p> : (
-            <div style={{ overflowX:"auto" }}>
-              <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                <thead><tr>{["Class","Subject","Average","Highest","Lowest","Entries"].map(h =>
-                  <th key={h} style={{ textAlign:"left", padding:"8px 10px", borderBottom:`1px solid ${C.border}`, color:C.textMuted, fontSize:12 }}>{h}</th>)}
-                </tr></thead>
-                <tbody>{filteredGrades.map((g, i) => (
-                  <tr key={i} style={{ borderBottom:`1px solid ${C.border}` }}>
-                    <td style={{ padding:"8px 10px", color:C.text }}>{g.class_name}</td>
-                    <td style={{ padding:"8px 10px", color:C.textSub }}>{g.subject}</td>
-                    <td style={{ padding:"8px 10px", fontWeight:700, color: Number(g.avg_score)>=70 ? "#4ade80" : Number(g.avg_score)>=50 ? "#facc15" : "#f87171" }}>{g.avg_score}</td>
-                    <td style={{ padding:"8px 10px", color:"#4ade80" }}>{g.highest}</td>
-                    <td style={{ padding:"8px 10px", color:"#f87171" }}>{g.lowest}</td>
-                    <td style={{ padding:"8px 10px", color:C.textMuted }}>{g.entries}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Defaulters ── */}
-      {tab === "defaulters" && (
-        <div>
-          <h3 style={{ color:C.text, marginBottom:8 }}>Fee Defaulters (Highest Balance First)</h3>
-          {filteredDefaulters.length === 0 ? <p style={{ color:C.textMuted }}>No defaulters — all fees cleared! 🎉</p> : (
-            <>
-              {/* Summary stats */}
-              <div style={{ display:"flex", gap:10, marginBottom:16, flexWrap:"wrap" }}>
-                <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:"12px 16px" }}>
-                  <div style={{ fontSize:11, color:C.textMuted }}>Total Defaulters</div>
-                  <div style={{ fontSize:18, fontWeight:800, color:"#f87171" }}>{filteredDefaulters.length}</div>
-                </div>
-                <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:"12px 16px" }}>
-                  <div style={{ fontSize:11, color:C.textMuted }}>Total Outstanding</div>
-                  <div style={{ fontSize:18, fontWeight:800, color:"#f87171" }}>
-                    {money(filteredDefaulters.reduce((sum, d) => sum + (d.balance || 0), 0))}
-                  </div>
-                </div>
-                <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:8, padding:"12px 16px" }}>
-                  <div style={{ fontSize:11, color:C.textMuted }}>Highest Balance</div>
-                  <div style={{ fontSize:18, fontWeight:800, color:"#f87171" }}>
-                    {money(filteredDefaulters[0]?.balance || 0)}
-                  </div>
-                </div>
+        {/* ── Overview ── */}
+        {tab === "overview" && (
+          <Card style={{ padding: "var(--space-4)" }}>
+            <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Monthly Fee Collection</h3>
+            {monthly.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No payment data yet.</p> : (
+              <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                <Table 
+                  headers={["Month", "Transactions", "Total"]}
+                  data={monthly.map((m, i) => [
+                    <span key="month" style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>{m.month}</span>,
+                    <span key="tx" style={{ color: "var(--color-text-secondary)" }}>{m.transactions}</span>,
+                    <span key="total" style={{ color: "var(--color-success)", fontWeight: 700 }}>{money(m.total)}</span>
+                  ])}
+                />
               </div>
+            )}
+          </Card>
+        )}
 
-              {/* Legend */}
-              <div style={{ display:"flex", gap:16, marginBottom:12, fontSize:12 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                  <div style={{ width:12, height:12, background:"#1c0505", borderRadius:2 }}></div>
-                  <span style={{ color:C.textMuted }}>Critical (50% balance)</span>
-                </div>
-                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                  <div style={{ width:12, height:12, background:"#1c1400", borderRadius:2 }}></div>
-                  <span style={{ color:C.textMuted }}>Warning (10-50% balance)</span>
-                </div>
-                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                  <div style={{ width:12, height:12, background:"#1c1a00", borderRadius:2 }}></div>
-                  <span style={{ color:C.textMuted }}>Info (&lt;10% balance)</span>
-                </div>
-              </div>
-
-              {/* Enhanced table with color coding */}
-              <div style={{ overflowX:"auto" }}>
-                <table style={{ width:"100%", borderCollapse:"collapse" }}>
-                  <thead>
-                    <tr>
-                      {["Student","Class","Admission","Phone","Expected","Paid","Balance","% Owed","Status","Last Payment","Actions"].map(h =>
-                        <th key={h} style={{ textAlign:"left", padding:"8px 10px", borderBottom:`1px solid ${C.border}`, color:C.textMuted, fontSize:12 }}>
-                          {h}
-                        </th>
+        {/* ── Fees ── */}
+        {tab === "fees" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+            {/* Class-wise Outstanding Balance */}
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Outstanding Balance by Class</h3>
+              {classFeeSummary.length === 0 ? (
+                <p style={{ color: "var(--color-text-muted)" }}>Loading class fee data...</p>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "var(--space-3)" }}>
+                  {classFeeSummary.map(cls => (
+                    <div key={cls.class_name} style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
+                      <div style={{ fontSize: "13px", color: "var(--color-text-secondary)", marginBottom: "var(--space-1)", fontWeight: 600 }}>{cls.class_name}</div>
+                      <div style={{ fontSize: "20px", fontWeight: 800, color: cls.total_outstanding > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                        {money(cls.total_outstanding)}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "var(--space-2)" }}>
+                        <span style={{ fontWeight: 600 }}>{cls.student_count}</span> students · <span style={{ color: "var(--color-success)", fontWeight: 500 }}>{money(cls.total_paid)} paid</span>
+                      </div>
+                      {cls.total_expected > 0 && (
+                        <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>
+                          Expected: {money(cls.total_expected)}
+                        </div>
                       )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedDefaulters.map((d, i) => {
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Monthly Fee Collection</h3>
+              {monthly.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No payment data yet.</p> : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                  {monthly.map((m, i) => {
+                    const max = Math.max(...monthly.map(x => Number(x.total)));
+                    const pct = max > 0 ? (Number(m.total) / max) * 100 : 0;
+                    return (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-2) 0" }}>
+                        <div style={{ width: "80px", fontSize: "13px", color: "var(--color-text-secondary)", fontWeight: 500 }}>{m.month}</div>
+                        <div style={{ flex: 1, background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-full)", height: "24px", overflow: "hidden" }}>
+                          <div style={{ width: `${pct}%`, background: "linear-gradient(90deg, var(--color-primary), var(--color-info))", height: "100%", borderRadius: "var(--radius-full)", transition: "width 0.4s" }} />
+                        </div>
+                        <div style={{ width: "120px", fontSize: "14px", color: "var(--color-text-primary)", textAlign: "right", fontWeight: 700 }}>{money(m.total)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* ── Attendance ── */}
+        {tab === "attendance" && (
+          <Card style={{ padding: "var(--space-4)" }}>
+            <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Attendance Rate by Class</h3>
+            {attendance.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No attendance data yet.</p> : (
+              <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                <Table 
+                  headers={["Class", "Total Records", "Present", "Rate"]}
+                  data={attendance.map((a, i) => [
+                    <span key="class" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{a.class_name}</span>,
+                    <span key="total" style={{ color: "var(--color-text-secondary)" }}>{a.total}</span>,
+                    <span key="present" style={{ color: "var(--color-text-secondary)" }}>{a.present}</span>,
+                    <span key="rate" style={{ color: Number(a.rate) >= 80 ? "var(--color-success)" : Number(a.rate) >= 60 ? "var(--color-warning)" : "var(--color-danger)", fontWeight: 700 }}>{a.rate}%</span>
+                  ])}
+                />
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* ── Grades ── */}
+        {tab === "grades" && (
+          <Card style={{ padding: "var(--space-4)" }}>
+            <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Grade Averages by Subject</h3>
+            {filteredGrades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
+              <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                <Table 
+                  headers={["Class", "Subject", "Average", "Highest", "Lowest", "Entries"]}
+                  data={filteredGrades.map((g, i) => [
+                    <span key="class" style={{ color: "var(--color-text-primary)" }}>{g.class_name}</span>,
+                    <span key="subject" style={{ color: "var(--color-text-secondary)" }}>{g.subject}</span>,
+                    <span key="avg" style={{ fontWeight: 700, color: Number(g.avg_score) >= 70 ? "var(--color-success)" : Number(g.avg_score) >= 50 ? "var(--color-warning)" : "var(--color-danger)" }}>{g.avg_score}</span>,
+                    <span key="high" style={{ color: "var(--color-success)", fontWeight: 600 }}>{g.highest}</span>,
+                    <span key="low" style={{ color: "var(--color-danger)", fontWeight: 600 }}>{g.lowest}</span>,
+                    <span key="entries" style={{ color: "var(--color-text-muted)" }}>{g.entries}</span>
+                  ])}
+                />
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* ── Defaulters ── */}
+        {tab === "defaulters" && (
+          <Card style={{ padding: "var(--space-4)" }}>
+            <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Fee Defaulters (Highest Balance First)</h3>
+            {filteredDefaulters.length === 0 ? <EmptyState icon="🎉" title="No Defaulters" description="All fees have been cleared!" /> : (
+              <>
+                {/* Summary stats */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+                  <div style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-1)" }}>Total Defaulters</div>
+                    <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-danger)" }}>{filteredDefaulters.length}</div>
+                  </div>
+                  <div style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-1)" }}>Total Outstanding</div>
+                    <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-danger)" }}>
+                      {money(filteredDefaulters.reduce((sum, d) => sum + (d.balance || 0), 0))}
+                    </div>
+                  </div>
+                  <div style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-1)" }}>Highest Balance</div>
+                    <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-danger)" }}>
+                      {money(filteredDefaulters[0]?.balance || 0)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Legend */}
+                <div style={{ display: "flex", gap: "var(--space-4)", marginBottom: "var(--space-3)", fontSize: "13px", padding: "var(--space-2)", background: "var(--color-bg-base)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <div style={{ width: 14, height: 14, background: "var(--color-danger)", borderRadius: 3 }}></div>
+                    <span style={{ color: "var(--color-text-secondary)", fontWeight: 500 }}>Critical (&gt;50% balance)</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <div style={{ width: 14, height: 14, background: "var(--color-warning)", borderRadius: 3 }}></div>
+                    <span style={{ color: "var(--color-text-secondary)", fontWeight: 500 }}>Warning (10-50% balance)</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <div style={{ width: 14, height: 14, background: "var(--color-info)", borderRadius: 3 }}></div>
+                    <span style={{ color: "var(--color-text-secondary)", fontWeight: 500 }}>Info (&lt;10% balance)</span>
+                  </div>
+                </div>
+
+                {/* Enhanced table with color coding */}
+                <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                  <Table 
+                    headers={["Student", "Class", "Admission", "Phone", "Expected", "Paid", "Balance", "% Owed", "Status", "Last Payment", "Actions"]}
+                    data={paginatedDefaulters.map((d, i) => {
                       const balancePercentage = d.balance_percentage || (d.expected_amount > 0 ? (d.balance / d.expected_amount) * 100 : 0);
                       let severityColor, severityBg, severityLabel;
                       
                       if (balancePercentage > 50) {
-                        severityColor = "#f87171"; severityBg = "#1c0505"; severityLabel = "Critical";
+                        severityColor = "var(--color-danger)"; severityBg = "color-mix(in srgb, var(--color-danger) 15%, transparent)"; severityLabel = "Critical";
                       } else if (balancePercentage >= 10) {
-                        severityColor = "#facc15"; severityBg = "#1c1400"; severityLabel = "Warning";
+                        severityColor = "var(--color-warning)"; severityBg = "color-mix(in srgb, var(--color-warning) 15%, transparent)"; severityLabel = "Warning";
                       } else {
-                        severityColor = "#fbbf24"; severityBg = "#1c1a00"; severityLabel = "Low";
+                        severityColor = "var(--color-info)"; severityBg = "color-mix(in srgb, var(--color-info) 15%, transparent)"; severityLabel = "Low";
                       }
 
-                      return (
-                        <tr key={i} style={{ 
-                          borderBottom:`1px solid ${C.border}`,
-                          background: i % 2 === 0 ? "transparent" : C.card
-                        }}>
-                          <td style={{ padding:"8px 10px", color:C.text, fontWeight:600 }}>
-                            {d.student_name || `${d.first_name || ''} ${d.last_name || ''}`}
-                          </td>
-                          <td style={{ padding:"8px 10px", color:C.textSub }}>{d.class_name}</td>
-                          <td style={{ padding:"8px 10px", color:C.textMuted, fontSize:12 }}>{d.admission_number}</td>
-                          <td style={{ padding:"8px 10px", color:C.textMuted, fontSize:12 }}>{d.parent_phone}</td>
-                          <td style={{ padding:"8px 10px", color:C.textSub }}>
-                            {money(d.expected_amount || d.expected || 0)}
-                          </td>
-                          <td style={{ padding:"8px 10px", color:"#4ade80" }}>
-                            {money(d.paid_amount || d.paid || 0)}
-                          </td>
-                          <td style={{ 
-                            padding:"8px 10px", 
-                            color:severityColor, 
-                            fontWeight:700,
-                            background: severityBg + "22"
-                          }}>
-                            {money(d.balance)}
-                          </td>
-                          <td style={{ padding:"8px 10px" }}>
-                            <span style={{
-                              background: severityBg,
-                              border:`1px solid ${severityColor}44`,
-                              borderRadius:12,
-                              padding:"2px 8px",
-                              fontSize:11,
-                              fontWeight:700,
-                              color:severityColor
-                            }}>
-                              {balancePercentage.toFixed(1)}%
-                            </span>
-                          </td>
-                          <td style={{ padding:"8px 10px" }}>
-                            <span style={{
-                              background: severityBg,
-                              border:`1px solid ${severityColor}44`,
-                              borderRadius:12,
-                              padding:"2px 8px",
-                              fontSize:11,
-                              fontWeight:700,
-                              color:severityColor,
-                              whiteSpace:"nowrap"
-                            }}>
-                              {severityLabel}
-                            </span>
-                          </td>
-                          <td style={{ padding:"8px 10px", color:C.textMuted, fontSize:12 }}>
-                            {d.last_payment_date ? new Date(d.last_payment_date).toLocaleDateString() : "Never"}
-                          </td>
-                          <td style={{ padding:"8px 10px" }}>
-                            <button
-                              onClick={() => {
-                                const phone = d.parent_phone;
-                                const studentName = d.student_name || `${d.first_name || ''} ${d.last_name || ''}`;
-                                const balance = money(d.balance);
-                                const message = encodeURIComponent(
-                                  `🏫 *FEE REMINDER*\n\n` +
-                                  `📚 *Student:* ${studentName}\n` +
-                                  `📝 *Class:* ${d.class_name}\n` +
-                                  `💰 *Outstanding Balance:* ${balance}\n\n` +
-                                  `Dear Parent,\n` +
-                                  `Please settle the outstanding fee balance at your earliest convenience.\n` +
-                                  `Payment options available via the school portal.\n\n` +
-                                  `Thank you for your cooperation.\n` +
-                                  `_EduCore School Management_`
-                                );
-                                
-                                const cleanPhone = phone ? phone.replace(/[^\d]/g, '') : '';
-                                if (cleanPhone) {
-                                  const waMeLink = `https://wa.me/254${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone.startsWith('254') ? cleanPhone.slice(3) : cleanPhone}?text=${message}`;
-                                  window.open(waMeLink, '_blank');
-                                } else {
-                                  alert('No phone number available for this student');
-                                }
-                              }}
-                              style={{
-                                background: "#25D366",
-                                color: "#fff",
-                                border: "none",
-                                borderRadius: 6,
-                                padding: "4px 8px",
-                                fontSize: 11,
-                                cursor: "pointer",
-                                fontWeight: 600,
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 4
-                              }}
-                              title="Send WhatsApp reminder"
-                            >
-                                📱 Send
-                            </button>
-                          </td>
-                        </tr>
-                      );
+                      return [
+                        <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{d.student_name || `${d.first_name || ''} ${d.last_name || ''}`}</span>,
+                        <span key="class" style={{ color: "var(--color-text-secondary)" }}>{d.class_name}</span>,
+                        <span key="admin" style={{ color: "var(--color-text-muted)", fontSize: "12px", fontFamily: "var(--font-mono)" }}>{d.admission_number}</span>,
+                        <span key="phone" style={{ color: "var(--color-text-muted)", fontSize: "12px", fontFamily: "var(--font-mono)" }}>{d.parent_phone}</span>,
+                        <span key="expected" style={{ color: "var(--color-text-secondary)" }}>{money(d.expected_amount || d.expected || 0)}</span>,
+                        <span key="paid" style={{ color: "var(--color-success)", fontWeight: 500 }}>{money(d.paid_amount || d.paid || 0)}</span>,
+                        <Badge key="balance" text={money(d.balance)} style={{ background: severityBg, color: severityColor, borderColor: "transparent", fontWeight: 700 }} />,
+                        <span key="pct" style={{ color: severityColor, fontWeight: 600 }}>{balancePercentage.toFixed(1)}%</span>,
+                        <Badge key="status" text={severityLabel} style={{ background: severityBg, color: severityColor, borderColor: severityColor }} />,
+                        <span key="date" style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{d.last_payment_date ? new Date(d.last_payment_date).toLocaleDateString() : "Never"}</span>,
+                        <Button
+                          key="action"
+                          size="sm"
+                          onClick={() => {
+                            const phone = d.parent_phone;
+                            const studentName = d.student_name || `${d.first_name || ''} ${d.last_name || ''}`;
+                            const balance = money(d.balance);
+                            const message = encodeURIComponent(
+                              `🏫 *FEE REMINDER*\n\n` +
+                              `📚 *Student:* ${studentName}\n` +
+                              `📝 *Class:* ${d.class_name}\n` +
+                              `💰 *Outstanding Balance:* ${balance}\n\n` +
+                              `Dear Parent,\n` +
+                              `Please settle the outstanding fee balance at your earliest convenience.\n` +
+                              `Payment options available via the school portal.\n\n` +
+                              `Thank you for your cooperation.\n` +
+                              `_EduCore School Management_`
+                            );
+                            
+                            const cleanPhone = phone ? phone.replace(/[^\d]/g, '') : '';
+                            if (cleanPhone) {
+                              const waMeLink = `https://wa.me/254${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone.startsWith('254') ? cleanPhone.slice(3) : cleanPhone}?text=${message}`;
+                              window.open(waMeLink, '_blank');
+                            } else {
+                              alert('No phone number available for this student');
+                            }
+                          }}
+                          style={{ background: "#25D366", color: "#fff", borderColor: "#25D366", padding: "4px 8px" }}
+                        >
+                          📱 Send
+                        </Button>
+                      ];
                     })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination controls */}
-              {totalDefaulters > 0 && (
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:16, flexWrap:"wrap", gap:12 }}>
-                  {/* Page size selector */}
-                  <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:12, color:C.textMuted }}>
-                    <span>Show:</span>
-                    <select
-                      style={{ background:C.card, color:C.text, border:`1px solid ${C.border}`, borderRadius:6, padding:"4px 8px", fontSize:12 }}
-                      value={defaultersPageSize}
-                      onChange={(e) => setDefaultersPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                    >
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                      <option value="all">All</option>
-                    </select>
-                    <span>of {totalDefaulters} defaulters</span>
-                  </div>
-
-                  {/* Page navigation */}
-                  {defaultersPageSize !== 'all' && totalDefaulterPages > 1 && (
-                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                      <button
-                        style={{
-                          background: defaultersPage === 1 ? C.border : C.card,
-                          color: defaultersPage === 1 ? C.textMuted : C.text,
-                          border: `1px solid ${C.border}`,
-                          borderRadius:6,
-                          padding:"4px 10px",
-                          cursor: defaultersPage === 1 ? "default" : "pointer",
-                          fontSize:12
-                        }}
-                        onClick={() => setDefaultersPage(p => Math.max(1, p - 1))}
-                        disabled={defaultersPage === 1}
-                      >
-                        ‹ Prev
-                      </button>
-                      <span style={{ fontSize:12, color:C.textMuted, padding:"0 8px" }}>
-                        Page {defaultersPage} of {totalDefaulterPages}
-                      </span>
-                      <button
-                        style={{
-                          background: defaultersPage === totalDefaulterPages ? C.border : C.card,
-                          color: defaultersPage === totalDefaulterPages ? C.textMuted : C.text,
-                          border: `1px solid ${C.border}`,
-                          borderRadius:6,
-                          padding:"4px 10px",
-                          cursor: defaultersPage === totalDefaulterPages ? "default" : "pointer",
-                          fontSize:12
-                        }}
-                        onClick={() => setDefaultersPage(p => Math.min(totalDefaulterPages, p + 1))}
-                        disabled={defaultersPage === totalDefaulterPages}
-                      >
-                        Next ›
-                      </button>
-                    </div>
-                  )}
+                  />
                 </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
 
-      {/* ── Analysis ── */}
-      {tab === "analysis" && <AnalysisTab auth={auth} />}
+                {/* Pagination controls */}
+                {totalDefaulters > 0 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-3)", flexWrap: "wrap", gap: "var(--space-3)" }}>
+                    {/* Page size selector */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "13px", color: "var(--color-text-secondary)" }}>
+                      <span style={{ fontWeight: 500 }}>Show:</span>
+                      <select
+                        style={{ background: "var(--color-bg-surface)", color: "var(--color-text-primary)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", padding: "4px 8px", fontSize: "13px", cursor: "pointer" }}
+                        value={defaultersPageSize}
+                        onChange={(e) => setDefaultersPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                      >
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                        <option value="all">All</option>
+                      </select>
+                      <span>of <strong style={{ color: "var(--color-text-primary)" }}>{totalDefaulters}</strong> defaulters</span>
+                    </div>
+
+                    {/* Page navigation */}
+                    {defaultersPageSize !== 'all' && totalDefaulterPages > 1 && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setDefaultersPage(p => Math.max(1, p - 1))}
+                          disabled={defaultersPage === 1}
+                        >
+                          ‹ Prev
+                        </Button>
+                        <span style={{ fontSize: "13px", color: "var(--color-text-secondary)", padding: "0 var(--space-2)", fontWeight: 500 }}>
+                          Page {defaultersPage} of {totalDefaulterPages}
+                        </span>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setDefaultersPage(p => Math.min(totalDefaulterPages, p + 1))}
+                          disabled={defaultersPage === totalDefaulterPages}
+                        >
+                          Next ›
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </Card>
+        )}
+
+        {/* ── Analysis ── */}
+        {tab === "analysis" && <AnalysisTab auth={auth} />}
+      </div>
     </div>
   );
 }

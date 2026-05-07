@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { API_BASE, apiFetch } from "../lib/api.js";
+import { apiFetch } from "../lib/api.js";
+import { getSession, saveSession } from "../lib/auth.js";
 import { C } from "../lib/theme.js";
-
-const API_URL = API_BASE;
 
 export function useBranches() {
   const [branches, setBranches] = useState([]);
@@ -65,7 +64,12 @@ export function useBranches() {
       const auth = JSON.parse(sessionStorage.getItem("educore.auth") || "{}");
       auth.schoolId = data.newSchoolId;
       auth.school = data.newSchool;
-      sessionStorage.setItem("educore.auth", JSON.stringify(auth));
+      const session = getSession();
+      saveSession({
+        token: session?.token || auth.token,
+        sessionId: session?.sessionId || auth.sessionId,
+        user: auth,
+      });
       
       // Reload to apply new context
       window.location.reload();

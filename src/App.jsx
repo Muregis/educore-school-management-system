@@ -47,8 +47,10 @@ import OfflineStatusBar from "./components/OfflineStatusBar"; // NEW: Offline/sy
 import ParentGuard from "./components/ParentGuard"; // NEW: Parent-student binding enforcement
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import Sidebar from "./components/Sidebar";
+import Topbar from "./components/Topbar";
 import { BranchSelector } from "./components/BranchSelector"; // NEW: Branch/campus selector
 import { apiFetch } from "./lib/api";
+import { clearSession, getSession, logout, saveSession } from "./lib/auth";
 
 // Mobile portal imports
 import ParentPortalMobile from "./pages/ParentPortalMobile";
@@ -64,10 +66,27 @@ function useIsMobile() {
   return isMobile;
 }
 
+// Helper functions for school color integration
+function darkenColor(hex, percent) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.max(0, (num >> 16) - Math.round(2.55 * percent));
+  const g = Math.max(0, ((num >> 8) & 0xFF) - Math.round(2.55 * percent));
+  const b = Math.max(0, (num & 0xFF) - Math.round(2.55 * percent));
+  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+function hexToRgba(hex, alpha) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 const RESPONSIVE_CSS = `
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #1A2A42; border-radius: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 10px; }
   @media (max-width: 767px) {
     .ec-page-content { padding-bottom: 80px !important; }
     .ec-topbar { padding: 0 16px !important; }
@@ -76,7 +95,7 @@ const RESPONSIVE_CSS = `
   }
   .ec-bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
-    background: #0B1120; border-top: 1px solid #1A2A42;
+    background: var(--color-bg-surface); border-top: 1px solid var(--color-border);
     display: flex; align-items: stretch;
     padding-bottom: env(safe-area-inset-bottom, 0px);
     box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
@@ -86,10 +105,10 @@ const RESPONSIVE_CSS = `
     align-items: center; justify-content: center;
     padding: 8px 4px 6px; gap: 3px;
     background: none; border: none; cursor: pointer;
-    color: #3D5070; font-size: 10px; font-weight: 600;
+    color: var(--color-text-muted); font-size: 10px; font-weight: 600;
     letter-spacing: 0.03em; transition: color 0.15s; min-height: 56px;
   }
-  .ec-bottom-nav-item.active { color: #3B82F6; }
+  .ec-bottom-nav-item.active { color: var(--color-primary); }
   .ec-bottom-nav-item .icon { font-size: 20px; line-height: 1; }
   .ec-drawer-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.6);
@@ -97,7 +116,7 @@ const RESPONSIVE_CSS = `
   }
   .ec-drawer {
     position: fixed; top: 0; left: 0; bottom: 0; width: 280px; z-index: 70;
-    background: #0B1120; border-right: 1px solid #1A2A42;
+    background: var(--color-bg-surface); border-right: 1px solid var(--color-border);
     display: flex; flex-direction: column;
     transform: translateX(-100%); transition: transform 0.25s ease; overflow: hidden;
   }
@@ -134,8 +153,7 @@ const TENANT_STATE_KEYS = [
 
 function clearTenantLocalState() {
   TENANT_STATE_KEYS.forEach((key) => localStorage.removeItem(key));
-  sessionStorage.removeItem("educore.auth");
-  sessionStorage.removeItem("token");
+  clearSession();
 }
 export default function App() {
   // Check if this is a QR verification URL
@@ -157,22 +175,8 @@ export default function App() {
   const [pendingUpdates, setPendingUpdates] = useLocalState("educore.pendingUpdates", DEFAULTS.pendingUpdates);
 
   const [auth, setAuth] = useState(() => {
-    // Check if this is a new browser session
-    // sessionStorage is cleared when browser closes, so if sessionStart is missing, it's a new session
-    const sessionStart = sessionStorage.getItem("educore.sessionStart");
-    
-    if (!sessionStart) {
-      // New browser session - clear any leftover auth and require login
-      sessionStorage.setItem("educore.sessionStart", Date.now().toString());
-      sessionStorage.removeItem("educore.auth");
-      sessionStorage.removeItem("token");
-      return null;
-    }
-    
-    // Existing session (page refresh) - restore auth from sessionStorage
-    const raw = sessionStorage.getItem("educore.auth");
-    if (!raw) return null;
-    try { return JSON.parse(raw); } catch { return null; }
+    const session = getSession();
+    return session?.user ? { ...session.user, token: session.token, sessionId: session.sessionId } : null;
   });
 
   const [page, setPage]                   = useState("dashboard");
@@ -192,6 +196,29 @@ export default function App() {
       document.head.appendChild(el);
     }
   }, []);
+
+  // Apply school's primary color to entire app
+  useEffect(() => {
+    if (school?.primary_color) {
+      // Apply school's chosen color to entire app
+      document.documentElement.style.setProperty('--color-school-primary', school.primary_color);
+      document.documentElement.style.setProperty('--color-primary', school.primary_color);
+      // Generate darker shade for hover
+      document.documentElement.style.setProperty('--color-school-primary-hover', darkenColor(school.primary_color, 15));
+      document.documentElement.style.setProperty('--color-primary-hover', darkenColor(school.primary_color, 15));
+      // Generate muted version for backgrounds
+      document.documentElement.style.setProperty(
+        '--color-primary-muted',
+        hexToRgba(school.primary_color, 0.15)
+      );
+      // Update glow effect
+      document.documentElement.style.setProperty(
+        '--color-primary-glow',
+        hexToRgba(school.primary_color, 0.15)
+      );
+      document.documentElement.style.setProperty('--color-school-glow', hexToRgba(school.primary_color, 0.15));
+    }
+  }, [school]);
 
   useEffect(() => { setDrawerOpen(false); }, [page]);
 
@@ -324,6 +351,7 @@ export default function App() {
   }, [setSchool, setStudents, setTeachers, setAttendance, setResults, setPayments, setFeeStructures, setTimetable]);
 
   const handleLogout = useCallback(() => {
+    logout();
     clearTenantLocalState();
     resetClientData();
     setAuth(null);
@@ -335,8 +363,7 @@ export default function App() {
     clearTenantLocalState();
     resetClientData();
 
-    sessionStorage.setItem("educore.auth", JSON.stringify(u));
-    if (u?.token) sessionStorage.setItem("token", u.token);
+    saveSession({ token: u.token, sessionId: u.sessionId, user: u });
 
     setAuth(u);
     setActiveChildId(null);
@@ -349,6 +376,25 @@ export default function App() {
       console.error("[tenant_hydrate] Failed to load fresh tenant data:", err.message);
     }
   }, [hydrateTenantData, resetClientData, toast]);
+
+  useEffect(() => {
+    if (!auth) return undefined;
+
+    let timer;
+    const resetTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(logout, 10 * 60 * 1000);
+    };
+
+    const events = ["mousedown", "mousemove", "keydown", "scroll", "touchstart"];
+    events.forEach(eventName => window.addEventListener(eventName, resetTimer, { passive: true }));
+
+    resetTimer();
+    return () => {
+      clearTimeout(timer);
+      events.forEach(eventName => window.removeEventListener(eventName, resetTimer));
+    };
+  }, [auth]);
 
   const resetDemo = useCallback(async () => {
     if (!auth?.token || !auth?.schoolId) {
@@ -373,7 +419,7 @@ export default function App() {
 
   if (isQRVerification) {
     return (
-      <div style={{ minHeight:"100vh", display:"flex", background:C.bg, color:C.text, fontFamily:"'DM Sans','Segoe UI',sans-serif" }}>
+      <div className="school-theme-primary" style={{ minHeight:"100vh", display:"flex", background:C.bg, color:C.text, fontFamily:"var(--font-body)" }}>
         <QRVerificationPage studentId={studentId} />
         <Toasts items={toasts} remove={id => setToasts(prev => prev.filter(t => t.id !== id))} />
       </div>
@@ -465,7 +511,7 @@ export default function App() {
   );
 
   return (
-    <div style={{ minHeight:"100vh", display:"flex", background:C.bg, color:C.text, fontFamily:"'DM Sans','Segoe UI',sans-serif" }}>
+    <div className="school-theme-primary" style={{ minHeight:"100vh", display:"flex", background:C.bg, color:C.text, fontFamily:"var(--font-body)" }}>
 
       {/* QR Verification Page - Public Access */}
       {isQRVerification ? (
@@ -495,59 +541,179 @@ export default function App() {
           )}
 
           <main style={{ marginLeft: isMobile ? 0 : sideW, flex:1, transition:"margin-left 0.2s ease", minWidth:0 }}>
-        <div className="ec-topbar" style={{ height:62, background:C.surface, borderBottom:`1px solid ${C.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", padding:"0 20px", position:"sticky", top:0, zIndex:40 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+        <div className="ec-topbar" style={{ 
+          height: "var(--topbar-height)", 
+          background: "rgba(255, 255, 255, 0.86)", 
+          backdropFilter: "blur(18px)",
+          WebkitBackdropFilter: "blur(18px)",
+          borderBottom: "1px solid var(--color-border)", 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          padding: "0 var(--space-5)", 
+          position: "sticky", 
+          top: 0, 
+          zIndex: 40,
+          boxShadow: "0 10px 30px rgba(15, 23, 42, 0.06)"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
             {isMobile && (
-              <button onClick={() => setDrawerOpen(true)} style={{ background:"transparent", border:`1px solid ${C.border}`, borderRadius:8, color:C.textMuted, cursor:"pointer", padding:"6px 10px", fontSize:16 }}>☰</button>
+              <button 
+                onClick={() => setDrawerOpen(true)} 
+                style={{ 
+                  background: "var(--color-bg-card)", 
+                  border: "1px solid var(--color-border)", 
+                  borderRadius: "var(--radius-md)", 
+                  color: "var(--color-text-primary)", 
+                  cursor: "pointer", 
+                  width: "40px",
+                  height: "40px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "18px",
+                  boxShadow: "var(--shadow-card)",
+                  transition: "all var(--transition-fast)"
+                }} 
+                className="touch-target"
+              >
+                ☰
+              </button>
             )}
-            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
               {school.logo_url && !isMobile && (
-                <img src={school.logo_url} alt="Logo" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} />
+                <img 
+                  src={school.logo_url} 
+                  alt="Logo" 
+                  style={{ 
+                    width: "36px", 
+                    height: "36px", 
+                    borderRadius: "var(--radius-md)", 
+                    objectFit: "cover",
+                    boxShadow: "var(--shadow-glow)",
+                    border: "2px solid var(--color-bg-card)"
+                  }} 
+                />
               )}
               <div>
-                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                  <span style={{ fontSize:16 }}>{currentNav?.icon}</span>
-                  <span style={{ fontWeight:800, fontSize: isMobile ? 15 : 18, color:C.text }}>{currentNav?.label || page}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                  <span style={{ fontSize: "20px", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))" }}>{currentNav?.icon}</span>
+                  <span style={{ 
+                    fontFamily: "var(--font-heading)",
+                    fontWeight: "800", 
+                    fontSize: isMobile ? "18px" : "22px", 
+                    color: "var(--color-text-primary)",
+                    letterSpacing: "-0.01em"
+                  }}>
+                    {currentNav?.label || page}
+                  </span>
                 </div>
                 {!isMobile && (
-                  <div style={{ color:C.textMuted, fontSize:11, marginTop:1 }}>
+                  <div style={{ 
+                    color: "var(--color-text-muted)", 
+                    fontSize: "12px", 
+                    marginTop: "2px",
+                    fontWeight: "500",
+                    letterSpacing: "0.02em"
+                  }}>
                     {isPortal
                       ? `${isParent ? "Parent" : "Student"} · ${activeChild ? `${activeChild.firstName ?? activeChild.first_name} ${activeChild.lastName ?? activeChild.last_name}` : auth.name}`
-                      : school.name + " · " + school.term + " " + school.year}
+                      : `${school.name} · ${school.term} ${school.year}`}
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            {/* NEW: Branch Selector - shows for admin/director only */}
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
             {!isMobile && ["admin","director","superadmin"].includes(auth.role) && (
               <BranchSelector />
             )}
             {!isMobile && (
-              <div style={{ background:`${roleColor}18`, border:`1px solid ${roleColor}44`, borderRadius:20, padding:"4px 12px", fontSize:11, fontWeight:700, color:roleColor, textTransform:"capitalize" }}>{auth.role}</div>
+              <div style={{ 
+                background: `${roleColor}15`, 
+                border: `1px solid ${roleColor}30`, 
+                borderRadius: "var(--radius-full)", 
+                padding: "4px 12px", 
+                fontSize: "11px", 
+                fontWeight: "700", 
+                color: roleColor, 
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                boxShadow: `0 0 10px ${roleColor}10`
+              }}>
+                {auth.role}
+              </div>
             )}
             {["admin","teacher","finance"].includes(auth.role) && (
-              <div style={{ position:"relative" }}>
-                <button onClick={() => setShowBell(!showBell)} style={{ border:`1px solid ${C.border}`, borderRadius:9, background:C.card, color:C.textSub, cursor:"pointer", padding:"7px 11px", fontSize:13, position:"relative" }}>
+              <div style={{ position: "relative" }}>
+                <button 
+                  onClick={() => setShowBell(!showBell)} 
+                  style={{ 
+                    border: "1px solid var(--color-border)", 
+                    borderRadius: "var(--radius-full)", 
+                    background: "var(--color-bg-card)", 
+                    color: "var(--color-text-secondary)", 
+                    cursor: "pointer", 
+                    width: "40px",
+                    height: "40px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "18px", 
+                    position: "relative",
+                    transition: "all var(--transition-fast)"
+                  }} 
+                  className="touch-target"
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-bg-hover)'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-bg-card)'; e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+                >
                   🔔
                   {notifications.filter(n => !n.read).length > 0 && (
-                    <span style={{ position:"absolute", top:4, right:5, width:8, height:8, borderRadius:"50%", background:C.rose, border:`2px solid ${C.surface}` }} />
+                    <span style={{ 
+                      position: "absolute", 
+                      top: "0px", 
+                      right: "0px", 
+                      width: "12px", 
+                      height: "12px", 
+                      borderRadius: "50%", 
+                      background: "var(--color-danger)", 
+                      border: "2px solid var(--color-bg-surface)",
+                      boxShadow: "0 0 8px var(--color-danger)"
+                    }} />
                   )}
                 </button>
                 {showBell && <NotificationPanel list={notifications} markAll={() => setNotifications(notifications.map(n => ({ ...n, read:true })))} />}
               </div>
             )}
             {isMobile && (
-              <button onClick={handleLogout} style={{ width:34, height:34, borderRadius:8, background:`${roleColor}22`, border:`1px solid ${roleColor}44`, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800, fontSize:14, color:roleColor, cursor:"pointer" }} title="Logout">
+              <button 
+                onClick={handleLogout} 
+                style={{ 
+                  width: "40px", 
+                  height: "40px", 
+                  borderRadius: "var(--radius-full)", 
+                  background: `${roleColor}15`, 
+                  border: `1px solid ${roleColor}30`, 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  fontWeight: "800", 
+                  fontSize: "14px", 
+                  color: roleColor, 
+                  cursor: "pointer",
+                  boxShadow: `0 0 10px ${roleColor}10`
+                }} 
+                title="Logout" 
+                className="touch-target"
+              >
                 {ROLE_AVATARS[auth.role] || "?"}
               </button>
             )}
           </div>
         </div>
 
-        <div className="ec-page-content" style={{ padding: isMobile ? 14 : 20 }}>
+        <div className="ec-page-content" style={{ padding: isMobile ? "var(--space-4)" : "var(--space-5)" }}>
           {!pageExists ? <NotFound /> : !allowed ? <Forbidden /> : (pages[page] || <NotFound />)}
         </div>
       </main>
@@ -555,12 +721,12 @@ export default function App() {
       {isMobile && (
         <nav className="ec-bottom-nav">
           {bottomNavItems.map(n => (
-            <button key={n.id} className={`ec-bottom-nav-item ${page === n.id ? "active" : ""}`} onClick={() => setPage(n.id)}>
+            <button key={n.id} className={`ec-bottom-nav-item ${page === n.id ? "active" : ""} touch-target`} onClick={() => setPage(n.id)}>
               <span className="icon">{n.icon}</span>
               <span>{n.label.length > 8 ? n.label.slice(0,7)+"…" : n.label}</span>
             </button>
           ))}
-          <button className="ec-bottom-nav-item" onClick={() => setDrawerOpen(true)}>
+          <button className="ec-bottom-nav-item touch-target" onClick={() => setDrawerOpen(true)}>
             <span className="icon">⋯</span>
             <span>More</span>
           </button>

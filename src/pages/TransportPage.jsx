@@ -1,14 +1,16 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
-import Btn from "../components/Btn";
-import Field from "../components/Field";
-import Badge from "../components/Badge";
-import Table from "../components/Table";
-import Modal from "../components/Modal";
-import { Msg } from "../components/Helpers";
-import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { ALL_CLASSES } from "../lib/constants";
+
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Modal from "../components/ui/Modal";
+import EmptyState from "../components/ui/EmptyState";
+import Table from "../components/ui/Table";
 
 export default function TransportPage({ auth, canEdit, toast, students }) {
   const [tab, setTab]           = useState("routes");
@@ -89,201 +91,249 @@ export default function TransportPage({ auth, canEdit, toast, students }) {
   };
 
   return (
-    <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-        <Btn variant={tab === "routes"      ? "primary" : "ghost"} onClick={() => setTab("routes")}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: "var(--space-2)" }}>
+        <Button variant={tab === "routes" ? "primary" : "secondary"} onClick={() => setTab("routes")}>
           Routes ({routes.length})
-        </Btn>
-        <Btn variant={tab === "assignments" ? "primary" : "ghost"} onClick={() => setTab("assignments")}>
+        </Button>
+        <Button variant={tab === "assignments" ? "primary" : "secondary"} onClick={() => setTab("assignments")}>
           Assignments ({assignments.length})
-        </Btn>
+        </Button>
       </div>
 
       {tab === "routes" && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-            {canEdit && <Btn onClick={() => setShowRoute(true)}>+ Add Route</Btn>}
+        <Card style={{ padding: "var(--space-3)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
+            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "var(--color-text-primary)" }}>Transport Routes</h3>
+            {canEdit && <Button onClick={() => setShowRoute(true)}>+ Add Route</Button>}
           </div>
-          {loading ? <Msg text="Loading..." /> : routes.length === 0 ? <Msg text="No transport routes found." /> : (
-            <div style={{ overflowX: "auto" }}>
+          
+          {loading ? (
+            <EmptyState icon="⏳" title="Loading Routes" description="Loading transport routes..." />
+          ) : routes.length === 0 ? (
+            <EmptyState icon="🚌" title="No Routes Found" description="There are no transport routes configured yet." />
+          ) : (
+            <div style={{ margin: "calc(var(--space-3) * -1)", marginTop: 0 }}>
               <Table
                 headers={["Route", "Driver", "Vehicle", "Fee (KES)", "Students", "Status", "Actions"]}
-                rows={routes.map(r => {
+                data={routes.map(r => {
                   const routeAssignments = assignments.filter(a => a.transport_id === r.transport_id && a.status === "active");
                   return [
-                    <span key={r.transport_id} style={{ color: C.text, fontWeight: 600 }}>{r.route_name}</span>,
-                    r.driver_name    || "-",
-                    r.vehicle_number || "-",
-                    Number(r.fee || 0).toLocaleString(),
-                    <Badge key="sb" text={`${routeAssignments.length} students`} tone="info" />,
-                    <Badge key="s" text={r.status} tone={r.status === "active" ? "success" : "danger"} />,
-                    <Btn variant="ghost" onClick={() => setViewRouteStudents(r)}>View Students</Btn>,
+                    <span key={r.transport_id} style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{r.route_name}</span>,
+                    <span key="driver" style={{ color: "var(--color-text-secondary)" }}>{r.driver_name || "-"}</span>,
+                    <span key="vehicle" style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{r.vehicle_number || "-"}</span>,
+                    <span key="fee" style={{ fontWeight: 500, color: "var(--color-text-primary)" }}>{Number(r.fee || 0).toLocaleString()}</span>,
+                    <Badge key="sb" text={`${routeAssignments.length} students`} variant="info" />,
+                    <Badge key="s" text={r.status} variant={r.status === "active" ? "success" : "danger"} />,
+                    <Button key="action" size="sm" variant="secondary" onClick={() => setViewRouteStudents(r)}>View Students</Button>,
                   ];
                 })}
               />
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {tab === "assignments" && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-            {canEdit && <Btn onClick={() => setShowAssign(true)}>+ Assign Student</Btn>}
+        <Card style={{ padding: "var(--space-3)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
+            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "var(--color-text-primary)" }}>Student Transport Assignments</h3>
+            {canEdit && <Button onClick={() => setShowAssign(true)}>+ Assign Student</Button>}
           </div>
-          {loading ? <Msg text="Loading..." /> : assignments.length === 0 ? <Msg text="No assignments found." /> : (
-            <div style={{ overflowX: "auto" }}>
+          
+          {loading ? (
+            <EmptyState icon="⏳" title="Loading Assignments" description="Loading student assignments..." />
+          ) : assignments.length === 0 ? (
+            <EmptyState icon="👨‍🎓" title="No Assignments" description="No students have been assigned to transport routes yet." />
+          ) : (
+            <div style={{ margin: "calc(var(--space-3) * -1)", marginTop: 0 }}>
               <Table
                 headers={["Student", "Admission", "Class", "Route", "Transport Fee", "Paid", "Start Date", "End Date", "Status"]}
-                rows={assignments.map(a => {
+                data={assignments.map(a => {
                   const student = a.student || {};
                   const route = a.route || {};
                   const routeFee = route.fee || 0;
                   return [
-                    <span key={a.id} style={{ color: C.text, fontWeight: 600 }}>{student.first_name || student.firstName || "Unknown"} {student.last_name || student.lastName || ""}</span>,
-                    student.admission_number || student.admission || "-",
-                    student.class_name || student.className || "-",
-                    route.route_name || "-",
-                    Number(routeFee).toLocaleString(),
-                    <Badge key="p" text="Check Fees" tone="info" />,
-                    a.start_date?.slice(0, 10) || "-",
-                    a.end_date?.slice(0, 10) || "-",
-                    <Badge key="s" text={a.status} tone={a.status === "active" ? "success" : "danger"} />,
+                    <span key={a.id} style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{student.first_name || student.firstName || "Unknown"} {student.last_name || student.lastName || ""}</span>,
+                    <span key="adm" style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{student.admission_number || student.admission || "-"}</span>,
+                    <span key="cls" style={{ color: "var(--color-text-secondary)" }}>{student.class_name || student.className || "-"}</span>,
+                    <span key="rt" style={{ color: "var(--color-text-primary)" }}>{route.route_name || "-"}</span>,
+                    <span key="fee" style={{ fontWeight: 500, color: "var(--color-text-primary)" }}>{Number(routeFee).toLocaleString()}</span>,
+                    <Badge key="p" text="Check Fees" variant="info" />,
+                    <span key="start" style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>{a.start_date?.slice(0, 10) || "-"}</span>,
+                    <span key="end" style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>{a.end_date?.slice(0, 10) || "-"}</span>,
+                    <Badge key="s" text={a.status} variant={a.status === "active" ? "success" : "danger"} />,
                   ];
                 })}
               />
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {showRoute && (
-        <Modal title="Add Transport Route" onClose={() => setShowRoute(false)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Route Name">
-              <input style={inputStyle} value={rf.routeName}
-                onChange={e => setRf({ ...rf, routeName: e.target.value })}
-                placeholder="e.g. Westlands Route" />
-            </Field>
-            <Field label="Driver Name">
-              <input style={inputStyle} value={rf.driverName}
-                onChange={e => setRf({ ...rf, driverName: e.target.value })} />
-            </Field>
-            <Field label="Vehicle Number">
-              <input style={inputStyle} value={rf.vehicleNumber}
-                onChange={e => setRf({ ...rf, vehicleNumber: e.target.value })}
-                placeholder="e.g. KCA 123A" />
-            </Field>
-            <Field label="Fee (KES)">
-              <input type="number" style={inputStyle} value={rf.fee}
-                onChange={e => setRf({ ...rf, fee: e.target.value })} />
-            </Field>
-            <Field label="Status">
-              <select style={inputStyle} value={rf.status} onChange={e => setRf({ ...rf, status: e.target.value })}>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </Field>
+        <Modal title="Add Transport Route" onClose={() => setShowRoute(false)} footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowRoute(false)}>Cancel</Button>
+            <Button onClick={saveRoute}>Save Route</Button>
+          </>
+        }>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+            <Input 
+              label="Route Name *"
+              value={rf.routeName}
+              onChange={e => setRf({ ...rf, routeName: e.target.value })}
+              placeholder="e.g. Westlands Route" 
+            />
+            
+            <Input 
+              label="Driver Name"
+              value={rf.driverName}
+              onChange={e => setRf({ ...rf, driverName: e.target.value })} 
+            />
+            
+            <Input 
+              label="Vehicle Number"
+              value={rf.vehicleNumber}
+              onChange={e => setRf({ ...rf, vehicleNumber: e.target.value })}
+              placeholder="e.g. KCA 123A" 
+            />
+            
+            <Input 
+              label="Fee (KES)"
+              type="number" 
+              value={rf.fee}
+              onChange={e => setRf({ ...rf, fee: e.target.value })} 
+            />
+            
+            <Select 
+              label="Status"
+              value={rf.status} 
+              onChange={e => setRf({ ...rf, status: e.target.value })}
+              options={[
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" }
+              ]}
+            />
           </div>
-          {err && <div style={{ color: "#ef4444", fontSize: 12, margin: "8px 0" }}>{err}</div>}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-            <Btn variant="ghost" onClick={() => setShowRoute(false)}>Cancel</Btn>
-            <Btn onClick={saveRoute}>Save Route</Btn>
-          </div>
+          {err && <div style={{ color: "var(--color-danger)", fontSize: "12px", margin: "12px 0 0 0", fontWeight: 500 }}>{err}</div>}
         </Modal>
       )}
 
       {showAssign && (
-        <Modal title="Assign Student to Route" onClose={() => setShowAssign(false)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Class">
-              <select style={inputStyle} value={af.studentClass} onChange={e => setAf({ ...af, studentClass: e.target.value, studentId: "" })}>
-                <option value="">All Classes</option>
-                {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </Field>
-            <Field label="Student">
-              <select style={inputStyle} value={af.studentId} onChange={e => setAf({ ...af, studentId: e.target.value })}>
-                <option value="">-- Select Student --</option>
-                {filteredStudents.map(s => (
-                  <option key={s.id ?? s.student_id} value={s.id ?? s.student_id}>
-                    {s.firstName || s.first_name} {s.lastName || s.last_name} ({s.admission_number || s.admission})
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Route">
-              <select style={inputStyle} value={af.transportId}
-                onChange={e => setAf({ ...af, transportId: e.target.value })}>
-                <option value="">Select route</option>
-                {routes.map(r => (
-                  <option key={r.transport_id} value={r.transport_id}>{r.route_name}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Start Date">
-              <input type="date" style={inputStyle} value={af.startDate}
-                onChange={e => setAf({ ...af, startDate: e.target.value })} />
-            </Field>
-            <Field label="End Date">
-              <input type="date" style={inputStyle} value={af.endDate}
-                onChange={e => setAf({ ...af, endDate: e.target.value })} />
-            </Field>
-            <Field label="Status">
-              <select style={inputStyle} value={af.status} onChange={e => setAf({ ...af, status: e.target.value })}>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </Field>
+        <Modal title="Assign Student to Route" onClose={() => setShowAssign(false)} footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowAssign(false)}>Cancel</Button>
+            <Button onClick={saveAssignment}>Assign Student</Button>
+          </>
+        }>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+            <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+              <Select 
+                label="Class Filter"
+                value={af.studentClass} 
+                onChange={e => setAf({ ...af, studentClass: e.target.value, studentId: "" })}
+                options={[
+                  { value: "", label: "All Classes" },
+                  ...ALL_CLASSES.map(c => ({ value: c, label: c }))
+                ]}
+              />
+              
+              <Select 
+                label="Student *"
+                value={af.studentId} 
+                onChange={e => setAf({ ...af, studentId: e.target.value })}
+                options={[
+                  { value: "", label: "-- Select Student --" },
+                  ...filteredStudents.map(s => ({
+                    value: s.id ?? s.student_id,
+                    label: `${s.firstName || s.first_name} ${s.lastName || s.last_name} (${s.admission_number || s.admission})`
+                  }))
+                ]}
+              />
+            </div>
+            
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Select 
+                label="Transport Route *"
+                value={af.transportId}
+                onChange={e => setAf({ ...af, transportId: e.target.value })}
+                options={[
+                  { value: "", label: "-- Select route --" },
+                  ...routes.map(r => ({ value: r.transport_id, label: r.route_name }))
+                ]}
+              />
+            </div>
+            
+            <Input 
+              label="Start Date *"
+              type="date" 
+              value={af.startDate}
+              onChange={e => setAf({ ...af, startDate: e.target.value })} 
+            />
+            
+            <Input 
+              label="End Date"
+              type="date" 
+              value={af.endDate}
+              onChange={e => setAf({ ...af, endDate: e.target.value })} 
+            />
+            
+            <Select 
+              label="Status"
+              value={af.status} 
+              onChange={e => setAf({ ...af, status: e.target.value })}
+              options={[
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" }
+              ]}
+            />
           </div>
-          {err && <div style={{ color: "#ef4444", fontSize: 12, margin: "8px 0" }}>{err}</div>}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-            <Btn variant="ghost" onClick={() => setShowAssign(false)}>Cancel</Btn>
-            <Btn onClick={saveAssignment}>Assign</Btn>
-          </div>
+          {err && <div style={{ color: "var(--color-danger)", fontSize: "12px", margin: "12px 0 0 0", fontWeight: 500 }}>{err}</div>}
         </Modal>
       )}
 
       {viewRouteStudents && (
-        <Modal title={`Students on ${viewRouteStudents.route_name}`} onClose={() => setViewRouteStudents(null)}>
+        <Modal title={`Students on ${viewRouteStudents.route_name}`} onClose={() => setViewRouteStudents(null)} footer={
+          <Button onClick={() => setViewRouteStudents(null)}>Close</Button>
+        }>
           {(() => {
             const routeAssignments = assignments.filter(a => a.transport_id === viewRouteStudents.transport_id && a.status === "active");
             return (
-              <div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
                 {canEdit && (
-                  <div style={{ marginBottom: 16 }}>
-                    <Btn onClick={() => {
+                  <div>
+                    <Button variant="secondary" onClick={() => {
                       setAf({ studentClass: "", studentId: "", transportId: viewRouteStudents.transport_id, startDate: new Date().toISOString().slice(0, 10), endDate: "", status: "active" });
                       setViewRouteStudents(null);
                       setShowAssign(true);
-                    }}>+ Add Student to this Route</Btn>
+                    }}>+ Add Student to this Route</Button>
                   </div>
                 )}
+                
                 {routeAssignments.length === 0 ? (
-                  <Msg text="No students assigned to this route." />
+                  <EmptyState icon="🪑" title="No Students" description="No students currently assigned to this route." />
                 ) : (
-                  <div style={{ overflowX: "auto" }}>
+                  <Card style={{ padding: 0, overflow: "hidden", margin: "0 calc(var(--space-4) * -1)" }}>
                     <Table
                       headers={["Student", "Admission", "Class", "Parent Phone", "Start Date"]}
-                      rows={routeAssignments.map(a => {
+                      data={routeAssignments.map(a => {
                         const student = a.student || {};
                         return [
-                          <span style={{ color: C.text, fontWeight: 600 }}>{student.first_name || student.firstName || "Unknown"} {student.last_name || student.lastName || ""}</span>,
-                          student.admission_number || student.admission || "-",
-                          student.class_name || student.className || "-",
-                          student.parent_phone || student.parentPhone || "-",
-                          a.start_date?.slice(0, 10) || "-",
+                          <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{student.first_name || student.firstName || "Unknown"} {student.last_name || student.lastName || ""}</span>,
+                          <span key="adm" style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{student.admission_number || student.admission || "-"}</span>,
+                          <span key="cls" style={{ color: "var(--color-text-secondary)" }}>{student.class_name || student.className || "-"}</span>,
+                          <span key="phone" style={{ color: "var(--color-text-secondary)" }}>{student.parent_phone || student.parentPhone || "-"}</span>,
+                          <span key="date" style={{ color: "var(--color-text-secondary)" }}>{a.start_date?.slice(0, 10) || "-"}</span>,
                         ];
                       })}
                     />
-                  </div>
+                  </Card>
                 )}
               </div>
             );
           })()}
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-            <Btn onClick={() => setViewRouteStudents(null)}>Close</Btn>
-          </div>
         </Modal>
       )}
     </div>

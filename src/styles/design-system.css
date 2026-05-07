@@ -1,0 +1,556 @@
+/* EduCore Design System - Premium Banking-Grade UI */
+/* Dark theme base (#070F1C) with premium aesthetics */
+
+:root {
+  /* ===========================================
+     DYNAMIC SCHOOL COLOR SYSTEM
+     =========================================== */
+  --color-school-primary: #2563EB;
+  --color-school-primary-hover: #1D4ED8;
+  --color-school-glow: rgba(37, 99, 235, 0.15);
+
+  /* Brand Colors */
+  --color-primary: var(--color-school-primary);
+  --color-primary-hover: var(--color-school-primary-hover);
+  --color-primary-muted: rgba(37, 99, 235, 0.12);
+  --color-primary-soft: rgba(37, 99, 235, 0.08);
+  --color-primary-ring: rgba(37, 99, 235, 0.28);
+  --color-primary-glow: var(--color-school-glow);
+
+  /* ===========================================
+     DARK THEME BASE (#070F1C)
+     =========================================== */
+  --color-bg-base: #070F1C;
+  --color-bg-page: #0A1323;
+  --color-bg-surface: rgba(15, 25, 47, 0.95);
+  --color-bg-card: rgba(22, 36, 62, 0.85);
+  --color-bg-card-elevated: rgba(30, 48, 82, 0.9);
+  --color-bg-hover: rgba(58, 87, 156, 0.15);
+  --color-bg-selected: rgba(37, 99, 235, 0.15);
+  --color-bg-inverse: #F8FAFC;
+
+  /* Text Colors */
+  --color-text-primary: #F8FAFC;
+  --color-text-secondary: #CBD5E1;
+  --color-text-muted: #94A3B8;
+  --color-text-subtle: #64748B;
+  --color-text-inverse: #0F172A;
+
+  /* Borders */
+  --color-border: rgba(100, 116, 139, 0.2);
+  --color-border-strong: rgba(100, 116, 139, 0.35);
+  --color-border-focus: var(--color-primary);
+
+  /* Status Colors */
+  --color-success: #10B981;
+  --color-success-hover: #059669;
+  --color-success-muted: rgba(16, 185, 129, 0.15);
+  --color-warning: #F59E0B;
+  --color-warning-hover: #D97706;
+  --color-warning-muted: rgba(245, 158, 11, 0.15);
+  --color-danger: #EF4444;
+  --color-danger-hover: #DC2626;
+  --color-danger-muted: rgba(239, 68, 68, 0.15);
+  --color-info: #0EA5E9;
+  --color-info-muted: rgba(14, 165, 233, 0.15);
+
+  /* Accent Colors */
+  --color-accent-purple: #8B5CF6;
+  --color-accent-teal: #06B6D4;
+  --color-accent-rose: #F43F5E;
+  --color-accent-amber: #F59E0B;
+  --color-accent-indigo: #6366F1;
+
+  /* Role Colors (for avatars/indicators) */
+  --color-role-director: var(--color-primary);
+  --color-role-admin: #3B82F6;
+  --color-role-teacher: #06B6D4;
+  --color-role-finance: #10B981;
+  --color-role-hr: #8B5CF6;
+  --color-role-librarian: #F59E0B;
+  --color-role-parent: #F43F5E;
+  --color-role-student: #EC4899;
+
+  /* ===========================================
+     TYPOGRAPHY
+     =========================================== */
+  --font-body: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-heading: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-md: 15px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-3xl: 36px;
+
+  /* ===========================================
+     SPACING SYSTEM
+     =========================================== */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --space-10: 64px;
+
+  /* ===========================================
+     BORDER RADIUS
+     =========================================== */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
+
+  /* ===========================================
+     SHADOWS & GLOWS (Banking-grade depth)
+     =========================================== */
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.35);
+  --shadow-elevated: 0 24px 60px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 0 4px var(--color-primary-glow);
+  --shadow-glow-primary: 0 0 30px var(--color-primary-glow);
+  --shadow-inner: inset 0 2px 8px rgba(0, 0, 0, 0.2);
+
+  /* ===========================================
+     MOTION & ANIMATION
+     =========================================== */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-overshoot: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-fast: 140ms var(--ease-standard);
+  --transition-base: 220ms var(--ease-standard);
+  --transition-smooth: 320ms var(--ease-emphasized);
+  --transition-slow: 500ms var(--ease-emphasized);
+
+  /* ===========================================
+     LAYOUT DIMENSIONS
+     =========================================== */
+  --sidebar-width: 240px;
+  --sidebar-collapsed: 64px;
+  --topbar-height: 64px;
+  --bottom-nav-height: 80px;
+}
+
+/* School Theme Class for dynamic primary color */
+.school-theme-primary {
+  --color-primary: var(--color-school-primary);
+  --color-primary-hover: var(--color-school-primary-hover);
+  --color-primary-muted: var(--color-primary-muted);
+}
+
+/* ===========================================
+   GLOBAL SCROLLBAR & OVERLAYS
+   =========================================== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+html {
+  background: var(--color-bg-base);
+}
+
+body {
+  background: 
+    radial-gradient(circle at 10% 20%, rgba(37, 99, 235, 0.08) 0%, transparent 35%),
+    radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 35%),
+    linear-gradient(180deg, var(--color-bg-page) 0%, var(--color-bg-base) 100%);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===========================================
+   TYPOGRAPHY ENHANCEMENTS
+   =========================================== */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
+h1 { font-size: var(--text-3xl); }
+h2 { font-size: var(--text-2xl); }
+h3 { font-size: var(--text-xl); }
+h4 { font-size: var(--text-lg); }
+h5 { font-size: var(--text-md); }
+h6 { font-size: var(--text-sm); }
+
+/* ===========================================
+   FORM CONTROLS
+   =========================================== */
+button, input, select, textarea {
+  font-family: var(--font-body);
+}
+
+button, a, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--color-primary-ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-primary-muted);
+}
+
+/* ===========================================
+   SCROLLBAR STYLING
+   =========================================== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-subtle);
+}
+
+/* ===========================================
+   ANIMATIONS
+   =========================================== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -220% 0; }
+  100% { background-position: 220% 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ===========================================
+   PREMIUM CARD COMPONENT
+   =========================================== */
+.ui-card,
+.premium-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  transition: 
+    transform var(--transition-base), 
+    box-shadow var(--transition-base), 
+    border-color var(--transition-base);
+  will-change: transform;
+}
+
+.ui-card:hover,
+.premium-card:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
+  box-shadow: var(--shadow-elevated);
+  transform: translateY(-2px);
+}
+
+/* ===========================================
+   BUTTON ENHANCEMENTS
+   =========================================== */
+.ui-btn {
+  min-height: 40px;
+  user-select: none;
+  will-change: transform;
+}
+
+.ui-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.ui-btn:not(:disabled):active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ===========================================
+   TABLE STYLES
+   =========================================== */
+.ui-table-wrap {
+  width: 100%;
+  overflow: hidden;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+.ui-table-scroll {
+  overflow-x: auto;
+}
+
+.ui-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.ui-table th {
+  background: rgba(15, 25, 47, 0.6);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.ui-table td {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.ui-table tbody tr {
+  transition: background var(--transition-fast);
+}
+
+.ui-table tbody tr:hover {
+  background: var(--color-bg-hover);
+}
+
+.ui-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Mobile Card View */
+.ui-table-mobile {
+  display: none;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.ui-table-mobile-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-card);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.ui-table-mobile-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ui-table-mobile-row:last-child {
+  border-bottom: 0;
+}
+
+.ui-table-mobile-label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ui-table-mobile-value {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ===========================================
+   SKELETON LOADING
+   =========================================== */
+.skeleton {
+  background: linear-gradient(90deg, rgba(15, 25, 47, 0.4) 25%, rgba(30, 48, 82, 0.6) 50%, rgba(15, 25, 47, 0.4) 75%);
+  background-size: 220% 100%;
+  animation: shimmer 1.35s infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ===========================================
+   ANIMATION CLASSES
+   =========================================== */
+.animate-in {
+  animation: fadeInUp var(--transition-smooth) both;
+}
+
+.stagger-in > * {
+  animation: fadeInUp var(--transition-smooth) both;
+}
+
+.stagger-in > *:nth-child(2) { animation-delay: 40ms; }
+.stagger-in > *:nth-child(3) { animation-delay: 80ms; }
+.stagger-in > *:nth-child(4) { animation-delay: 120ms; }
+.stagger-in > *:nth-child(5) { animation-delay: 160ms; }
+.stagger-in > *:nth-child(6) { animation-delay: 200ms; }
+
+.page-fade {
+  animation: fadeIn var(--transition-smooth);
+}
+
+/* ===========================================
+   MOBILE-FIRST RESPONSIVE
+   =========================================== */
+@media (max-width: 768px) {
+  :root {
+    --topbar-height: 60px;
+  }
+
+  * {
+    touch-action: manipulation;
+  }
+
+  body {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  button,
+  input,
+  select,
+  textarea,
+  .touch-target {
+    min-height: 44px;
+  }
+
+  .ec-page-content {
+    padding: var(--space-4) var(--space-3) calc(84px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .ui-table-scroll {
+    display: none;
+  }
+
+  .ui-table-mobile {
+    display: grid;
+  }
+}
+
+/* ===========================================
+   REDUCED MOTION PREFERENCE
+   =========================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* ===========================================
+   PRINT STYLES
+   =========================================== */
+@media print {
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+  }
+
+  .sidebar,
+  .topbar,
+  .ec-topbar,
+  .ec-bottom-nav,
+  .ec-drawer,
+  .ec-drawer-overlay,
+  .mobile-nav,
+  .no-print,
+  button:not(.print-only) {
+    display: none !important;
+  }
+
+  main {
+    margin-left: 0 !important;
+  }
+
+  .ec-page-content {
+    padding: 0 !important;
+  }
+
+  .ui-card,
+  .premium-card,
+  .ui-table-wrap {
+    box-shadow: none !important;
+    border-color: #CBD5E1 !important;
+    break-inside: avoid;
+  }
+
+  .ui-table-scroll {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .ui-table-mobile {
+    display: none !important;
+  }
+}
+
+/* ===========================================
+   UTILITY CLASSES
+   =========================================== */
+.ec-blur-glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.ec-glow-primary {
+  box-shadow: 0 0 0 4px var(--color-primary-glow), var(--shadow-card);
+}
+
+.ec-text-gradient {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-accent-teal));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}

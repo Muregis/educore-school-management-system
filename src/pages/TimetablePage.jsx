@@ -1,11 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import PropTypes from "prop-types";
-import Btn from "../components/Btn";
-import Field from "../components/Field";
-import Modal from "../components/Modal";
-import { C, inputStyle } from "../lib/theme";
 import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
 import { apiFetch } from "../lib/api";
+
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
+import Modal from "../components/ui/Modal";
+import EmptyState from "../components/ui/EmptyState";
 
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday"];
 
@@ -126,135 +129,177 @@ export default function TimetablePage({ auth, teachers, canEdit, toast }) {
   };
 
   return (
-    <div style={{ padding: 4 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Toolbar */}
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
-        <select value={filterClass} onChange={e => setFilterClass(e.target.value)} style={inputStyle}>
-          {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
-        </select>
-        {canEdit && (
-          <>
-            <Btn onClick={() => { setEditing(null); setForm({ className: filterClass, dayOfWeek: "Monday", period: "", startTime: "08:00", endTime: "09:00", subject: SUBJECTS[0], teacherId: "" }); setShowModal(true); }}>
-              + Add Entry
-            </Btn>
-            <Btn variant="ghost" onClick={() => setShowUpload(true)}>
-              📂 Upload CSV
-            </Btn>
-          </>
-        )}
-      </div>
+      <Card style={{ padding: "var(--space-3)" }}>
+        <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ minWidth: "200px" }}>
+            <Select 
+              value={filterClass} 
+              onChange={e => setFilterClass(e.target.value)}
+              options={ALL_CLASSES.map(c => ({ value: c, label: c }))}
+            />
+          </div>
+          <div style={{ flex: 1 }} />
+          {canEdit && (
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <Button variant="secondary" onClick={() => setShowUpload(true)}>
+                📂 Upload CSV
+              </Button>
+              <Button onClick={() => { setEditing(null); setForm({ className: filterClass, dayOfWeek: "Monday", period: "", startTime: "08:00", endTime: "09:00", subject: SUBJECTS[0], teacherId: "" }); setShowModal(true); }}>
+                + Add Entry
+              </Button>
+            </div>
+          )}
+        </div>
+      </Card>
 
       {/* Timetable grid */}
       {entries.length === 0 ? (
-        <div style={{ color: C.textMuted, padding: 32, textAlign: "center" }}>
-          No timetable entries for {filterClass}. Add entries or upload a CSV.
-        </div>
+        <EmptyState 
+          icon="📅" 
+          title={`No Timetable for ${filterClass}`} 
+          description="Add individual entries or upload a CSV to build the schedule." 
+        />
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "var(--space-3)", alignItems: "start" }}>
           {byDay.filter(d => d.items.length > 0).map(({ day, items }) => (
-            <div key={day} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
-              <div style={{ background: C.accent, padding: "8px 12px", fontWeight: 700, fontSize: 13, color: "#fff" }}>
+            <div key={day} style={{ background: "var(--color-bg-surface)", border: `1px solid var(--color-border)`, borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+              <div style={{ background: "var(--color-primary)", padding: "10px 14px", fontWeight: 700, fontSize: "14px", color: "#ffffff", letterSpacing: "0.02em" }}>
                 {day}
               </div>
-              {items.map(e => (
-                <div key={e.timetable_id} style={{ padding: "8px 12px", borderBottom: `1px solid ${C.border}` }}>
-                  <div style={{ fontWeight: 600, color: C.text, fontSize: 13 }}>{e.subject}</div>
-                  <div style={{ fontSize: 11, color: C.textMuted }}>
-                    {e.start_time?.slice(0,5)} – {e.end_time?.slice(0,5)}
-                    {e.period ? ` · P${e.period}` : ""}
-                  </div>
-                  {e.teacher_name && <div style={{ fontSize: 11, color: C.textSub }}>{e.teacher_name}</div>}
-                  {canEdit && (
-                    <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
-                      <Btn variant="ghost" onClick={() => openEdit(e)} style={{ fontSize: 11, padding: "2px 8px" }}>Edit</Btn>
-                      <Btn variant="danger" onClick={() => remove(e.timetable_id)} style={{ fontSize: 11, padding: "2px 8px" }}>Del</Btn>
+              <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+                {items.map(e => (
+                  <div key={e.timetable_id} style={{ padding: "12px 14px", borderBottom: `1px solid var(--color-border)`, position: "relative" }}>
+                    <div style={{ fontWeight: 600, color: "var(--color-text-primary)", fontSize: "14px", marginBottom: "2px" }}>{e.subject}</div>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginBottom: "2px" }}>
+                      {e.start_time?.slice(0,5)} – {e.end_time?.slice(0,5)}
+                      {e.period ? ` · Period ${e.period}` : ""}
                     </div>
-                  )}
-                </div>
-              ))}
+                    {e.teacher_name && <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>{e.teacher_name}</div>}
+                    
+                    {canEdit && (
+                      <div style={{ display: "flex", gap: "var(--space-1)", marginTop: "var(--space-2)" }}>
+                        <Button size="sm" variant="secondary" onClick={() => openEdit(e)} style={{ padding: "2px 8px", fontSize: "11px", height: "auto", minHeight: "24px" }}>Edit</Button>
+                        <Button size="sm" variant="danger" onClick={() => remove(e.timetable_id)} style={{ padding: "2px 8px", fontSize: "11px", height: "auto", minHeight: "24px" }}>Delete</Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>
       )}
 
       {/* Add/Edit Modal */}
-      {showModal && (
-        <Modal title={editing ? "Edit Entry" : "Add Timetable Entry"} onClose={() => { setShowModal(false); setEditing(null); }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div>
-              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Day</div>
-              <select value={form.dayOfWeek} onChange={e => setForm(f => ({...f, dayOfWeek: e.target.value}))} style={{ ...inputStyle, width: "100%" }}>
-                {DAYS.map(d => <option key={d}>{d}</option>)}
-              </select>
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Subject</div>
-              <select value={form.subject} onChange={e => setForm(f => ({...f, subject: e.target.value}))} style={{ ...inputStyle, width: "100%" }}>
-                {SUBJECTS.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-            <Field label="Start Time" type="time" value={form.startTime} onChange={v => setForm(f => ({...f, startTime: v}))} />
-            <Field label="End Time" type="time" value={form.endTime} onChange={v => setForm(f => ({...f, endTime: v}))} />
-            <Field label="Period #" value={form.period} onChange={v => setForm(f => ({...f, period: v}))} />
-            <div>
-              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Teacher (optional)</div>
-              <select value={form.teacherId} onChange={e => setForm(f => ({...f, teacherId: e.target.value}))} style={{ ...inputStyle, width: "100%" }}>
-                <option value="">— None —</option>
-                {teachers.map(t => <option key={t.teacher_id || t.id} value={t.teacher_id || t.id}>{t.first_name || t.firstName} {t.last_name || t.lastName}</option>)}
-              </select>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
-            <Btn variant="ghost" onClick={() => { setShowModal(false); setEditing(null); }}>Cancel</Btn>
-            <Btn onClick={save}>{editing ? "Update" : "Add"}</Btn>
-          </div>
-        </Modal>
-      )}
+      <Modal isOpen={showModal} title={editing ? "Edit Entry" : "Add Timetable Entry"} onClose={() => { setShowModal(false); setEditing(null); }} footer={
+        <>
+          <Button variant="ghost" onClick={() => { setShowModal(false); setEditing(null); }}>Cancel</Button>
+          <Button onClick={save}>{editing ? "Update Entry" : "Add Entry"}</Button>
+        </>
+      }>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <Select 
+            label="Day"
+            value={form.dayOfWeek} 
+            onChange={e => setForm(f => ({...f, dayOfWeek: e.target.value}))}
+            options={DAYS.map(d => ({ value: d, label: d }))}
+          />
+          
+          <Select 
+            label="Subject"
+            value={form.subject} 
+            onChange={e => setForm(f => ({...f, subject: e.target.value}))}
+            options={SUBJECTS.map(s => ({ value: s, label: s }))}
+          />
+          
+          <Input 
+            label="Start Time" 
+            type="time" 
+            value={form.startTime} 
+            onChange={v => setForm(f => ({...f, startTime: v.target.value}))} 
+          />
+          
+          <Input 
+            label="End Time" 
+            type="time" 
+            value={form.endTime} 
+            onChange={v => setForm(f => ({...f, endTime: v.target.value}))} 
+          />
+          
+          <Input 
+            label="Period #" 
+            type="number"
+            value={form.period} 
+            onChange={v => setForm(f => ({...f, period: v.target.value}))} 
+          />
+          
+          <Select 
+            label="Teacher (optional)"
+            value={form.teacherId} 
+            onChange={e => setForm(f => ({...f, teacherId: e.target.value}))}
+            options={[
+              { value: "", label: "— None —" },
+              ...teachers.map(t => ({ 
+                value: t.teacher_id || t.id, 
+                label: `${t.first_name || t.firstName} ${t.last_name || t.lastName}` 
+              }))
+            ]}
+          />
+        </div>
+      </Modal>
 
       {/* CSV Upload Modal */}
-      {showUpload && (
-        <Modal title="Upload Timetable CSV" onClose={() => { setShowUpload(false); setCsvPreview([]); }}>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12, fontSize: 12, color: C.textSub, marginBottom: 12 }}>
-              <div style={{ fontWeight: 700, marginBottom: 6, color: C.text }}>CSV Format (required columns):</div>
-              <code style={{ display: "block", color: "#22c55e" }}>day_of_week,subject,start_time,end_time,period,class_name,teacher_id</code>
-              <div style={{ marginTop: 6, color: C.textMuted }}>Example row:</div>
-              <code style={{ display: "block", color: "#93c5fd" }}>Monday,Mathematics,08:00,09:00,1,Grade 7,</code>
-              <div style={{ marginTop: 6, color: C.textMuted }}>
-                Leave teacher_id blank if not assigned. class_name overrides the selected class filter.
-              </div>
+      <Modal isOpen={showUpload} title="Upload Timetable CSV" onClose={() => { setShowUpload(false); setCsvPreview([]); }} footer={
+        <>
+          <Button variant="ghost" onClick={() => { setShowUpload(false); setCsvPreview([]); }}>Cancel</Button>
+          <Button onClick={uploadCSV} disabled={!csvPreview.length || uploading}>
+            {uploading ? "Importing..." : `Import ${csvPreview.length} Entries`}
+          </Button>
+        </>
+      }>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          <div style={{ background: "var(--color-bg-surface)", border: `1px solid var(--color-border)`, borderRadius: "var(--radius-md)", padding: "var(--space-3)", fontSize: "13px", color: "var(--color-text-secondary)" }}>
+            <div style={{ fontWeight: 600, marginBottom: "var(--space-2)", color: "var(--color-text-primary)" }}>CSV Format (required columns):</div>
+            <code style={{ display: "block", color: "var(--color-success)", background: "var(--color-bg-base)", padding: "var(--space-2)", borderRadius: "var(--radius-sm)", marginBottom: "var(--space-2)" }}>day_of_week,subject,start_time,end_time,period,class_name,teacher_id</code>
+            <div style={{ color: "var(--color-text-muted)", marginBottom: "var(--space-1)" }}>Example row:</div>
+            <code style={{ display: "block", color: "var(--color-info)", background: "var(--color-bg-base)", padding: "var(--space-2)", borderRadius: "var(--radius-sm)" }}>Monday,Mathematics,08:00,09:00,1,Grade 7,</code>
+            <div style={{ marginTop: "var(--space-3)", fontSize: "12px", color: "var(--color-text-muted)" }}>
+              Leave teacher_id blank if not assigned. class_name overrides the selected class filter.
             </div>
-            <input ref={fileRef} type="file" accept=".csv,.txt" onChange={handleFile}
-              style={{ color: C.text, fontSize: 13 }} />
           </div>
+          
+          <input ref={fileRef} type="file" accept=".csv,.txt" onChange={handleFile}
+            style={{ color: "var(--color-text-primary)", fontSize: "14px", padding: "var(--space-2)" }} />
 
           {csvPreview.length > 0 && (
-            <div>
-              <div style={{ fontWeight: 600, color: C.text, marginBottom: 8 }}>
+            <div style={{ marginTop: "var(--space-2)" }}>
+              <div style={{ fontWeight: 600, color: "var(--color-text-primary)", marginBottom: "var(--space-2)" }}>
                 Preview — {csvPreview.length} entries found
               </div>
-              <div style={{ maxHeight: 200, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 8 }}>
-                <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ background: C.surface }}>
+              <div style={{ maxHeight: "200px", overflowY: "auto", border: `1px solid var(--color-border)`, borderRadius: "var(--radius-md)" }}>
+                <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse" }}>
+                  <thead style={{ position: "sticky", top: 0, background: "var(--color-bg-surface)", zIndex: 1 }}>
+                    <tr>
                       {["Day","Subject","Start","End","Period","Class"].map(h => (
-                        <th key={h} style={{ padding: "6px 8px", textAlign: "left", color: C.textMuted, borderBottom: `1px solid ${C.border}` }}>{h}</th>
+                        <th key={h} style={{ padding: "8px 10px", textAlign: "left", color: "var(--color-text-secondary)", borderBottom: `1px solid var(--color-border)`, fontWeight: 600 }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {csvPreview.slice(0,20).map((r, i) => (
-                      <tr key={i} style={{ borderBottom: `1px solid ${C.border}` }}>
-                        <td style={{ padding: "5px 8px", color: C.text }}>{r.day_of_week}</td>
-                        <td style={{ padding: "5px 8px", color: C.text }}>{r.subject}</td>
-                        <td style={{ padding: "5px 8px", color: C.textSub }}>{r.start_time}</td>
-                        <td style={{ padding: "5px 8px", color: C.textSub }}>{r.end_time}</td>
-                        <td style={{ padding: "5px 8px", color: C.textMuted }}>{r.period}</td>
-                        <td style={{ padding: "5px 8px", color: C.textMuted }}>{r.class_name || filterClass}</td>
+                      <tr key={i} style={{ borderBottom: `1px solid var(--color-border)` }}>
+                        <td style={{ padding: "6px 10px", color: "var(--color-text-primary)" }}>{r.day_of_week}</td>
+                        <td style={{ padding: "6px 10px", color: "var(--color-text-primary)" }}>{r.subject}</td>
+                        <td style={{ padding: "6px 10px", color: "var(--color-text-secondary)" }}>{r.start_time}</td>
+                        <td style={{ padding: "6px 10px", color: "var(--color-text-secondary)" }}>{r.end_time}</td>
+                        <td style={{ padding: "6px 10px", color: "var(--color-text-muted)" }}>{r.period}</td>
+                        <td style={{ padding: "6px 10px", color: "var(--color-text-muted)" }}>{r.class_name || filterClass}</td>
                       </tr>
                     ))}
                     {csvPreview.length > 20 && (
-                      <tr><td colSpan={6} style={{ padding: 8, color: C.textMuted, textAlign: "center" }}>
+                      <tr><td colSpan={6} style={{ padding: "10px", color: "var(--color-text-muted)", textAlign: "center", fontStyle: "italic", background: "var(--color-bg-surface)" }}>
                         +{csvPreview.length - 20} more rows
                       </td></tr>
                     )}
@@ -263,15 +308,8 @@ export default function TimetablePage({ auth, teachers, canEdit, toast }) {
               </div>
             </div>
           )}
-
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
-            <Btn variant="ghost" onClick={() => { setShowUpload(false); setCsvPreview([]); }}>Cancel</Btn>
-            <Btn onClick={uploadCSV} disabled={!csvPreview.length || uploading}>
-              {uploading ? "Importing..." : `Import ${csvPreview.length} Entries`}
-            </Btn>
-          </div>
-        </Modal>
-      )}
+        </div>
+      </Modal>
     </div>
   );
 }

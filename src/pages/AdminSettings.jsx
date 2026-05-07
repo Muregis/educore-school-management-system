@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, API_BASE } from "../lib/api";
+import { getAuthHeaders } from "../lib/auth";
 import { NAV, NAV_EXTRAS, ROLE } from "../lib/constants";
 import PropTypes from "prop-types";
 
@@ -734,9 +735,7 @@ const SchoolInfoTab = ({ onSave, auth }) => {
           formData.append("file", logoFile);
           const uploadRes = await fetch(`${API_BASE}/settings/upload-logo`, {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${auth?.token}`,
-            },
+            headers: getAuthHeaders(auth?.token),
             body: formData,
           });
           if (!uploadRes.ok) {

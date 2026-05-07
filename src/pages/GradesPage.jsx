@@ -57,7 +57,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   }, [currentTerm, term]);
 
   useEffect(() => {
-    const token = auth?.token || sessionStorage.getItem("token") || localStorage.getItem("token");
+    const token = auth?.token || sessionStorage.getItem("token");
     if (token) {
       apiFetch('/classes', { token })
         .then(res => setClassOptions(res.data || res || []))

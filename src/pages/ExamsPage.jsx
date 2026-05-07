@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
-import Btn from "../components/Btn";
-import Field from "../components/Field";
-import Badge from "../components/Badge";
-import Modal from "../components/Modal";
-import Table from "../components/Table";
-import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
-import { Pager, Msg, pager } from "../components/Helpers";
+import { pager } from "../components/Helpers";
+
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Modal from "../components/ui/Modal";
+import EmptyState from "../components/ui/EmptyState";
+import Table from "../components/ui/Table";
 
 const EXAM_TYPES = [
   { id: "internal", label: "Internal Exam" },
@@ -18,6 +21,19 @@ const EXAM_TYPES = [
 ];
 
 const TERMS = ["Term 1", "Term 2", "Term 3"];
+
+function Pager({ page, pages, setPage }) {
+  if (pages <= 1) return null;
+  return (
+    <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "center", marginTop: "var(--space-3)" }}>
+      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+        style={{ padding: "4px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: page === 1 ? "default" : "pointer" }}>‹</button>
+      <span style={{ padding: "4px 10px", fontSize: "13px", color: "var(--color-text-secondary)" }}>{page} / {pages}</span>
+      <button onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}
+        style={{ padding: "4px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: page === pages ? "default" : "pointer" }}>›</button>
+    </div>
+  );
+}
 
 export default function ExamsPage({ auth, students, subjects, toast }) {
   const [exams, setExams] = useState([]);
@@ -111,129 +127,144 @@ export default function ExamsPage({ auth, students, subjects, toast }) {
   };
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
-          <div style={{ fontSize: 12, color: C.textSub }}>Total Exams</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: C.text }}>{exams.length}</div>
-        </div>
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
-          <div style={{ fontSize: 12, color: C.textSub }}>Active</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: "#22C55E" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "var(--space-3)" }}>
+        <Card style={{ padding: "var(--space-3)" }}>
+          <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px", fontWeight: 600 }}>Total Exams</div>
+          <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-text-primary)" }}>{exams.length}</div>
+        </Card>
+        <Card style={{ padding: "var(--space-3)" }}>
+          <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px", fontWeight: 600 }}>Active</div>
+          <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-success)" }}>
             {exams.filter(e => e.status === "active").length}
           </div>
-        </div>
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
-          <div style={{ fontSize: 12, color: C.textSub }}>Published</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: "#3B82F6" }}>
+        </Card>
+        <Card style={{ padding: "var(--space-3)" }}>
+          <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px", fontWeight: 600 }}>Published</div>
+          <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-info)" }}>
             {exams.filter(e => e.status === "published").length}
           </div>
-        </div>
+        </Card>
       </div>
 
-      {/* Actions */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-        <Btn onClick={() => setShowModal(true)}>+ Create Exam</Btn>
-      </div>
+      {/* Actions Container */}
+      <Card style={{ padding: "var(--space-3)" }}>
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          <Button onClick={() => setShowModal(true)}>+ Create Exam</Button>
+        </div>
+      </Card>
 
       {/* Table */}
       {loading ? (
-        <Msg text="Loading exams..." />
+        <EmptyState icon="⏳" title="Loading Exams" description="Please wait while we load your exam records..." />
       ) : exams.length === 0 ? (
-        <Msg text="No exams created yet. Create your first exam!" />
+        <EmptyState icon="📝" title="No Exams Yet" description="No exams created yet. Create your first exam to get started!" />
       ) : (
-        <>
-          <div style={{ overflowX: "auto" }}>
-            <Table
-              headers={["Name", "Type", "Term", "Year", "Dates", "Status", "Actions"]}
-              rows={rows.map(e => [
-                <span key="n" style={{ fontWeight: 600, color: C.text }}>{e.name}</span>,
-                <Badge key="t" text={e.exam_type} tone="info" />,
-                e.term,
-                e.year,
-                `${new Date(e.start_date).toLocaleDateString()} - ${new Date(e.end_date).toLocaleDateString()}`,
-                <Badge key="s" text={e.status} tone={
-                  e.status === "published" ? "success" : 
-                  e.status === "active" ? "warning" : "info"
-                } />,
-                <div key="a" style={{ display: "flex", gap: 6 }}>
-                  <Btn variant="ghost" onClick={() => setSelectedExam(e)}>View</Btn>
-                  <Btn variant="ghost" onClick={() => { /* TODO: Edit */ }}>Edit</Btn>
-                  <Btn variant="danger" onClick={() => deleteExam(e.exam_id)}>Delete</Btn>
-                </div>,
-              ])}
-            />
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <Table
+            headers={["Name", "Type", "Term", "Year", "Dates", "Status", "Actions"]}
+            data={rows.map(e => [
+              <span key="n" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{e.name}</span>,
+              <Badge key="t" text={e.exam_type} variant="info" />,
+              <span key="term" style={{ color: "var(--color-text-secondary)" }}>{e.term}</span>,
+              <span key="year" style={{ color: "var(--color-text-secondary)" }}>{e.year}</span>,
+              <span key="dates" style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>
+                {new Date(e.start_date).toLocaleDateString()} - {new Date(e.end_date).toLocaleDateString()}
+              </span>,
+              <Badge key="s" text={e.status} variant={
+                e.status === "published" ? "success" : 
+                e.status === "active" ? "warning" : "neutral"
+              } />,
+              <div key="a" style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+                <Button size="sm" variant="secondary" onClick={() => setSelectedExam(e)}>View</Button>
+                <Button size="sm" variant="ghost" onClick={() => { /* TODO: Edit */ }}>Edit</Button>
+                <Button size="sm" variant="danger" onClick={() => deleteExam(e.exam_id)}>Delete</Button>
+              </div>,
+            ])}
+          />
+          <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
+            <Pager page={page} pages={pages} setPage={setPage} />
           </div>
-          <Pager page={page} pages={pages} setPage={setPage} />
-        </>
+        </Card>
       )}
 
       {/* Create Modal */}
-      {showModal && (
-        <Modal title="Create New Exam" onClose={() => setShowModal(false)}>
-          <div style={{ display: "grid", gap: 12 }}>
-            <Field label="Exam Name *">
-              <input
-                style={inputStyle}
-                value={form.name}
-                onChange={e => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g., Mid-Term Examination 2024"
-              />
-            </Field>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Field label="Exam Type">
-                <select style={inputStyle} value={form.examType} onChange={e => setForm({ ...form, examType: e.target.value })}>
-                  {EXAM_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                </select>
-              </Field>
-              <Field label="Term">
-                <select style={inputStyle} value={form.term} onChange={e => setForm({ ...form, term: e.target.value })}>
-                  {TERMS.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </Field>
-            </div>
-            <Field label="Year">
-              <input
-                type="number"
-                style={inputStyle}
-                value={form.year}
-                onChange={e => setForm({ ...form, year: e.target.value })}
-              />
-            </Field>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Field label="Start Date *">
-                <input
-                  type="date"
-                  style={inputStyle}
-                  value={form.startDate}
-                  onChange={e => setForm({ ...form, startDate: e.target.value })}
-                />
-              </Field>
-              <Field label="End Date *">
-                <input
-                  type="date"
-                  style={inputStyle}
-                  value={form.endDate}
-                  onChange={e => setForm({ ...form, endDate: e.target.value })}
-                />
-              </Field>
-            </div>
-            <Field label="Description">
-              <textarea
-                style={{ ...inputStyle, height: 80, resize: "vertical" }}
-                value={form.description}
-                onChange={e => setForm({ ...form, description: e.target.value })}
-                placeholder="Optional description or instructions"
-              />
-            </Field>
+      <Modal isOpen={showModal} title="Create New Exam" onClose={() => setShowModal(false)} footer={
+        <>
+          <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+          <Button onClick={saveExam}>Create Exam</Button>
+        </>
+      }>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <Input
+              label="Exam Name *"
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g., Mid-Term Examination 2024"
+            />
           </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-            <Btn variant="ghost" onClick={() => setShowModal(false)}>Cancel</Btn>
-            <Btn onClick={saveExam}>Create Exam</Btn>
+          
+          <Select 
+            label="Exam Type"
+            value={form.examType} 
+            onChange={e => setForm({ ...form, examType: e.target.value })}
+            options={EXAM_TYPES.map(t => ({ value: t.id, label: t.label }))}
+          />
+          
+          <Select 
+            label="Term"
+            value={form.term} 
+            onChange={e => setForm({ ...form, term: e.target.value })}
+            options={TERMS.map(t => ({ value: t, label: t }))}
+          />
+          
+          <div style={{ gridColumn: "1 / -1" }}>
+            <Input
+              label="Year"
+              type="number"
+              value={form.year}
+              onChange={e => setForm({ ...form, year: e.target.value })}
+            />
           </div>
-        </Modal>
-      )}
+          
+          <Input
+            label="Start Date *"
+            type="date"
+            value={form.startDate}
+            onChange={e => setForm({ ...form, startDate: e.target.value })}
+          />
+          
+          <Input
+            label="End Date *"
+            type="date"
+            value={form.endDate}
+            onChange={e => setForm({ ...form, endDate: e.target.value })}
+          />
+          
+          <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+            <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Description</label>
+            <textarea
+              style={{
+                width: "100%",
+                padding: "var(--space-3)",
+                background: "var(--color-bg-base)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-md)",
+                color: "var(--color-text-primary)",
+                fontFamily: "var(--font-body)",
+                fontSize: "14px",
+                height: 80,
+                resize: "vertical"
+              }}
+              value={form.description}
+              onChange={e => setForm({ ...form, description: e.target.value })}
+              placeholder="Optional description or instructions"
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

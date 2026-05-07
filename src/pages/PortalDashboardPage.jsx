@@ -1,10 +1,11 @@
 import React, { useMemo } from "react";
 import PropTypes from "prop-types";
-import Badge from "../components/Badge";
-import Btn from "../components/Btn";
-import { Msg } from "../components/Helpers";
-import { C } from "../lib/theme";
 import { money } from "../lib/utils";
+
+import Badge from "../components/ui/Badge";
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import EmptyState from "../components/ui/EmptyState";
 
 export default function PortalDashboardPage({ 
   auth, 
@@ -81,129 +82,126 @@ export default function PortalDashboardPage({
   // Handle missing student
   if (!student) {
     return (
-      <div style={{ padding: 40, textAlign: "center" }}>
-        <Msg text="No student data available. Please contact the school administrator." />
-      </div>
+      <Card style={{ padding: "var(--space-5)", textAlign: "center" }}>
+        <EmptyState icon="👤" title="No Student Data" description="No student data is available. Please contact the school administrator if you believe this is an error." />
+      </Card>
     );
   }
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Student Info Card */}
-      <div style={{ 
-        background: C.surface, 
-        border: `1px solid ${C.border}`, 
-        borderRadius: 12, 
-        padding: 20,
-        display: "grid",
-        gridTemplateColumns: "auto 1fr",
-        gap: 16,
-        alignItems: "center"
-      }}>
-        <div style={{ 
-          width: 64, 
-          height: 64, 
-          borderRadius: "50%", 
-          background: `linear-gradient(135deg, ${C.accent}, #6366f1)`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 24,
-          fontWeight: 800,
-          color: "#fff"
-        }}>
-          {(student?.firstName ?? student?.first_name)?.[0]}{(student?.lastName ?? student?.last_name)?.[0]}
-        </div>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: C.text }}>
-            {student?.firstName ?? student?.first_name} {student?.lastName ?? student?.last_name}
+      <Card style={{ padding: "var(--space-4)" }}>
+        <div style={{ display: "flex", gap: "var(--space-4)", alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ 
+            width: 72, 
+            height: 72, 
+            borderRadius: "var(--radius-full)", 
+            background: `linear-gradient(135deg, var(--color-primary), var(--color-info))`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "28px",
+            fontWeight: 800,
+            color: "#ffffff",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
+          }}>
+            {(student?.firstName ?? student?.first_name)?.[0]}{(student?.lastName ?? student?.last_name)?.[0]}
           </div>
-          <div style={{ fontSize: 13, color: C.textSub, marginTop: 4 }}>
-            {student?.admission || student?.admission_number} • {student?.className ?? student?.class_name}
-          </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <Badge text={student?.status || "Active"} tone="success" />
-            <Badge text={school?.term + " " + school?.year} tone="info" />
+          <div>
+            <div style={{ fontSize: "24px", fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-1)" }}>
+              {student?.firstName ?? student?.first_name} {student?.lastName ?? student?.last_name}
+            </div>
+            <div style={{ fontSize: "14px", color: "var(--color-text-secondary)", marginBottom: "var(--space-2)", fontWeight: 500 }}>
+              <span style={{ fontFamily: "var(--font-mono)" }}>{student?.admission || student?.admission_number}</span> • {student?.className ?? student?.class_name}
+            </div>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <Badge text={student?.status || "Active"} variant="success" />
+              <Badge text={school?.term + " " + school?.year} variant="info" />
+            </div>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Quick Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-3)" }}>
         <StatCard 
           label="Attendance" 
           value={`${attendanceRate}%`} 
           subtext={`${presentCount} present / ${absentCount} absent`}
-          color={attendanceRate >= 80 ? "#22C55E" : attendanceRate >= 60 ? "#F59E0B" : "#EF4444"}
+          color={attendanceRate >= 80 ? "var(--color-success)" : attendanceRate >= 60 ? "var(--color-warning)" : "var(--color-danger)"}
           onClick={onViewAttendance}
         />
         <StatCard 
           label="Average Grade" 
           value={avgGrade > 0 ? `${avgGrade}%` : "-"} 
           subtext={`${studentResults.length} subjects`}
-          color={avgGrade >= 75 ? "#22C55E" : avgGrade >= 50 ? "#F59E0B" : "#EF4444"}
+          color={avgGrade >= 75 ? "var(--color-success)" : avgGrade >= 50 ? "var(--color-warning)" : "var(--color-danger)"}
           onClick={onViewGrades}
         />
         <StatCard 
           label="Fees Balance" 
           value={money(balance)} 
           subtext={`Paid: ${money(totalPaid)}`}
-          color={balance <= 0 ? "#22C55E" : balance <= classFee * 0.3 ? "#F59E0B" : "#EF4444"}
+          color={balance <= 0 ? "var(--color-success)" : balance <= classFee * 0.3 ? "var(--color-warning)" : "var(--color-danger)"}
           onClick={onViewFees}
         />
       </div>
 
-      {/* Recent Grades */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>Recent Grades</div>
-          <Btn variant="ghost" onClick={onViewGrades}>View All</Btn>
-        </div>
-        {recentResults.length === 0 ? (
-          <div style={{ color: C.textSub, fontSize: 13, padding: "20px 0", textAlign: "center" }}>
-            No grades recorded yet
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "var(--space-4)" }}>
+        {/* Recent Grades */}
+        <Card style={{ padding: "var(--space-4)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
+            <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "var(--color-text-primary)" }}>Recent Grades</h3>
+            <Button variant="ghost" size="sm" onClick={onViewGrades}>View All</Button>
           </div>
-        ) : (
-          <div style={{ display: "grid", gap: 8 }}>
-            {recentResults.map(r => (
-              <div key={r.id ?? r.result_id} style={{ 
-                display: "flex", 
-                justifyContent: "space-between", 
-                alignItems: "center",
-                padding: "10px 12px",
-                background: C.bg,
-                borderRadius: 8
-              }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{r.subject}</div>
-                  <div style={{ fontSize: 12, color: C.textSub }}>{r.exam || r.exam_type || "Exam"}</div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ 
-                    fontSize: 16, 
-                    fontWeight: 700, 
-                    color: Number(r.marks) >= 75 ? "#22C55E" : Number(r.marks) >= 50 ? "#F59E0B" : "#EF4444" 
-                  }}>
-                    {r.marks}/{r.total || r.total_marks || 100}
+          {recentResults.length === 0 ? (
+            <div style={{ color: "var(--color-text-muted)", fontSize: "14px", padding: "var(--space-4) 0", textAlign: "center" }}>
+              No grades recorded yet
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+              {recentResults.map(r => (
+                <div key={r.id ?? r.result_id} style={{ 
+                  display: "flex", 
+                  justifyContent: "space-between", 
+                  alignItems: "center",
+                  padding: "var(--space-3)",
+                  background: "var(--color-bg-base)",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--color-border)"
+                }}>
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--color-text-primary)", marginBottom: "2px" }}>{r.subject}</div>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>{r.exam || r.exam_type || "Exam"}</div>
                   </div>
-                  {r.grade && <div style={{ fontSize: 11, color: C.textSub }}>Grade {r.grade}</div>}
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ 
+                      fontSize: "16px", 
+                      fontWeight: 800, 
+                      color: Number(r.marks) >= 75 ? "var(--color-success)" : Number(r.marks) >= 50 ? "var(--color-warning)" : "var(--color-danger)" 
+                    }}>
+                      {r.marks}/{r.total || r.total_marks || 100}
+                    </div>
+                    {r.grade && <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 600 }}>Grade {r.grade}</div>}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </Card>
 
-      {/* School Info */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>School Information</div>
-        <div style={{ display: "grid", gap: 8 }}>
-          <InfoRow label="School" value={school?.name} />
-          <InfoRow label="Term" value={`${school?.term} ${school?.year}`} />
-          <InfoRow label="Phone" value={school?.phone} />
-          <InfoRow label="Email" value={school?.email} />
-          <InfoRow label="Address" value={school?.address} />
-        </div>
+        {/* School Info */}
+        <Card style={{ padding: "var(--space-4)" }}>
+          <h3 style={{ margin: "0 0 var(--space-4) 0", fontSize: "16px", fontWeight: 700, color: "var(--color-text-primary)" }}>School Information</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+            <InfoRow label="School" value={school?.name} />
+            <InfoRow label="Term" value={`${school?.term} ${school?.year}`} />
+            <InfoRow label="Phone" value={school?.phone} />
+            <InfoRow label="Email" value={school?.email} />
+            <InfoRow label="Address" value={school?.address} />
+          </div>
+        </Card>
       </div>
     </div>
   );
@@ -211,31 +209,30 @@ export default function PortalDashboardPage({
 
 function StatCard({ label, value, subtext, color, onClick }) {
   return (
-    <div 
+    <Card 
       onClick={onClick}
       style={{ 
-        background: C.surface, 
-        border: `1px solid ${C.border}`, 
-        borderRadius: 12, 
-        padding: 16,
+        padding: "var(--space-4)",
         cursor: onClick ? "pointer" : "default",
-        transition: "transform 0.15s",
-        borderLeft: `4px solid ${color}`
+        borderLeft: `4px solid ${color}`,
+        position: "relative",
+        overflow: "hidden"
       }}
     >
-      <div style={{ fontSize: 12, color: C.textSub, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 800, color, marginTop: 4 }}>{value}</div>
-      <div style={{ fontSize: 12, color: C.textSub, marginTop: 2 }}>{subtext}</div>
-    </div>
+      {onClick && <div style={{ position: "absolute", top: "var(--space-2)", right: "var(--space-3)", color: "var(--color-text-muted)", opacity: 0.5 }}>→</div>}
+      <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-1)" }}>{label}</div>
+      <div style={{ fontSize: "32px", fontWeight: 800, color, marginBottom: "var(--space-1)", letterSpacing: "-0.02em" }}>{value}</div>
+      <div style={{ fontSize: "13px", color: "var(--color-text-muted)", fontWeight: 500 }}>{subtext}</div>
+    </Card>
   );
 }
 
 function InfoRow({ label, value }) {
   if (!value) return null;
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
-      <span style={{ color: C.textSub }}>{label}</span>
-      <span style={{ color: C.text, fontWeight: 500 }}>{value}</span>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "var(--space-2)", borderBottom: "1px dashed var(--color-border)" }}>
+      <span style={{ color: "var(--color-text-secondary)", fontSize: "14px", fontWeight: 500 }}>{label}</span>
+      <span style={{ color: "var(--color-text-primary)", fontSize: "14px", fontWeight: 600, textAlign: "right" }}>{value}</span>
     </div>
   );
 }

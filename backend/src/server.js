@@ -6,6 +6,7 @@ import { env } from "./config/env.js";
 console.log('[Server] Env loaded, port:', env.port);
 import { testDbConnection, applyDatabaseMigrations } from "./config/db.js";
 console.log('[Server] DB module imported');
+import { cleanupExpiredSessions } from "./middleware/session.js";
 
 // Debug: Log all registered routes
 function logRoutes() {
@@ -59,6 +60,10 @@ async function start() {
     // Start the server regardless of DB status
     app.listen(env.port, () => {
       console.log(`🚀 EduCore backend running on http://localhost:${env.port}`);
+      cleanupExpiredSessions().catch(err => console.error("[session] Initial cleanup failed:", err.message));
+      setInterval(() => {
+        cleanupExpiredSessions().catch(err => console.error("[session] Cleanup failed:", err.message));
+      }, 60 * 60 * 1000);
       // Log registered routes after startup
       setTimeout(logRoutes, 1000);
     });

@@ -1,22 +1,25 @@
 import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
-import Btn from "../components/Btn";
-import Field from "../components/Field";
-import Badge from "../components/Badge";
-import Modal from "../components/Modal";
-import Table from "../components/Table";
 import RecordPaymentModal from "../components/RecordPaymentModal";
 import PaymentReceipt from "../components/PaymentReceipt";
 import { ALL_CLASSES } from "../lib/constants";
-import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
+import { getAuthHeaders } from "../lib/auth";
 import { printHTML } from "../lib/print";
-import { Msg } from "../components/Helpers";
 import { calculateStudentBalance, formatBalance, getBalanceStatusColor } from "../services/balanceService";
 import { ledgerBalanceService } from "../services/ledgerBalanceService";
 import discountService from "../services/discountService";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
+
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Modal from "../components/ui/Modal";
+import EmptyState from "../components/ui/EmptyState";
+import Table from "../components/ui/Table";
 
 // Inline helpers
 function csv(filename, headers, rows) {
@@ -25,20 +28,22 @@ function csv(filename, headers, rows) {
   a.href = URL.createObjectURL(new Blob([content], { type: "text/csv" }));
   a.download = filename; a.click();
 }
+
 function pager(items, page, size = 20) {
   const pages = Math.max(1, Math.ceil(items.length / size));
   const rows  = items.slice((page - 1) * size, page * size);
   return { pages, rows };
 }
+
 function Pager({ page, pages, setPage }) {
   if (pages <= 1) return null;
   return (
-    <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 12 }}>
+    <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "center", marginTop: "var(--space-3)" }}>
       <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-        style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #334155", background: "#1e293b", color: "#94a3b8", cursor: page === 1 ? "default" : "pointer" }}>‹</button>
-      <span style={{ padding: "4px 10px", fontSize: 13, color: "#94a3b8" }}>{page} / {pages}</span>
+        style={{ padding: "4px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: page === 1 ? "default" : "pointer" }}>‹</button>
+      <span style={{ padding: "4px 10px", fontSize: "13px", color: "var(--color-text-secondary)" }}>{page} / {pages}</span>
       <button onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}
-        style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #334155", background: "#1e293b", color: "#94a3b8", cursor: page === pages ? "default" : "pointer" }}>›</button>
+        style={{ padding: "4px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: page === pages ? "default" : "pointer" }}>›</button>
     </div>
   );
 }
@@ -111,20 +116,18 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [bankDepositForm, setBankDepositForm] = useState({ studentId: "", amount: "", proofFile: null });
   const [bankDepositLoading, setBankDepositLoading] = useState(false);
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
-  const [studentDiscounts, setStudentDiscounts] = useState({}); // Map of studentId -> discount array
+  const [studentDiscounts, setStudentDiscounts] = useState({});
 
   // Day End settings (stored in localStorage)
   const [dayEndTime, setDayEndTime] = useState(() => localStorage.getItem('dayEndTime') || '18:00'); // Default 6 PM
   const [lastDayClosed, setLastDayClosed] = useState(() => localStorage.getItem('lastDayClosed') || null);
   const [showDayEndSettings, setShowDayEndSettings] = useState(false);
 
-  // Save day end settings to localStorage
   const saveDayEndTime = (time) => {
     setDayEndTime(time);
     localStorage.setItem('dayEndTime', time);
   };
 
-  // Close the current business day
   const closeDay = () => {
     const now = new Date().toISOString();
     setLastDayClosed(now);
@@ -132,26 +135,20 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     toast('Day closed successfully. New day starts after day end time.', 'success');
   };
 
-  // Get business "today" based on day end time
   const getBusinessToday = () => {
     const now = new Date();
     const [hours, minutes] = dayEndTime.split(':').map(Number);
     const dayEnd = new Date(now);
     dayEnd.setHours(hours, minutes, 0, 0);
-    
-    // If current time is after day end time, "today" is actually tomorrow
     if (now >= dayEnd) {
       now.setDate(now.getDate() + 1);
     }
     return now.toISOString().slice(0, 10);
   };
 
-  // New system & term management
   const [useNewSystem, setUseNewSystem] = useState(true);
   const [ledgerView, setLedgerView] = useState(false);
   const { term: currentTerm, isReady: isTermReady } = useCurrentTerm(auth);
-
-  // Display term (current or selected)
   const displayTerm = currentTerm || "Term 2";
 
   const reloadPayments = useCallback(async () => {
@@ -160,15 +157,13 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     setPayments(data.map(normalisePayment));
   }, [auth, setPayments]);
 
-  // Load student discounts
   useEffect(() => {
     if (!auth?.token) return;
-    discountService.getStudentDiscounts(auth.token)
+    discountService.getAllDiscountedStudents(auth.token)
       .then(discounts => {
-        // Group by student_id
         const grouped = {};
         discounts.forEach(d => {
-          const sid = d.student_id;
+          const sid = d.student?.student_id || d.student_id;
           if (!grouped[sid]) grouped[sid] = [];
           grouped[sid].push(d);
         });
@@ -177,7 +172,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       .catch(err => console.error("Failed to load discounts:", err));
   }, [auth?.token, reloadPayments]);
 
-  // Auto-verify Paystack when redirected back
   useEffect(() => {
     const ref       = localStorage.getItem("ps_pending_ref");
     const name      = localStorage.getItem("ps_pending_name");
@@ -219,10 +213,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         .catch(e => console.warn("Fee structures:", e));
       reloadPayments().catch(e => console.warn("Payments:", e));
       
-      // Load bank details and school WhatsApp number
-      // OLD: apiFetch("/settings/payment-config", { token: auth.token })
-      // OLD:   .then(data => setBankDetails(data))
-      // OLD:   .catch(e => console.warn("Bank details:", e));
       if (canEdit) {
         apiFetch("/settings/payment-config", { token: auth.token })
           .then(data => setBankDetails(data))
@@ -248,50 +238,28 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     return fs ? Number(fs.tuition) + Number(fs.activity) + Number(fs.misc) : 0;
   };
 
-  // Get current term from fee structures or default to Term 2
   const getCurrentTerm = () => {
     const terms = [...new Set(normalisedStructures.map(f => f.term).filter(Boolean))];
-    // Return most common term or default to Term 2
-    if (terms.length > 0) {
-      return terms[0]; // First term found
-    }
-    return "Term 2"; // Legacy default
+    if (terms.length > 0) return terms[0];
+    return "Term 2";
   };
 
-  // Ledger-first balance calculation with transport, lunch, and discount support
   const calculateLedgerBalance = (student, studentDiscounts = []) => {
     const sid = student.id ?? student.student_id;
     const cls = student.className ?? student.class_name ?? "";
 
-    // Base expected amount from fee structure
     const baseExpected = expectedByClass(cls);
-
-    // Get student-specific settings
     const transportDirection = student.transport_direction || 'none';
     const lunchEnabled = student.lunch_enabled || false;
     const breakfastEnabled = student.breakfast_enabled || false;
     const openingBalance = Number(student.opening_balance) || 0;
 
-    // Calculate additional fees
-    const transportFee = ledgerBalanceService.calculateTransportFee(
-      student.transport_base_fee || 0,
-      transportDirection
-    );
-    const lunchFee = lunchEnabled ? ledgerBalanceService.calculateLunchFee(
-      student.lunch_daily_rate || 100,
-      student.lunch_days || 66,
-      student.lunch_billing_type || 'daily'
-    ) : 0;
-    const breakfastFee = breakfastEnabled ? ledgerBalanceService.calculateBreakfastFee(
-      student.breakfast_daily_rate || 100,
-      student.breakfast_days || 66,
-      student.breakfast_billing_type || 'daily'
-    ) : 0;
+    const transportFee = ledgerBalanceService.calculateTransportFee(student.transport_base_fee || 0, transportDirection);
+    const lunchFee = lunchEnabled ? ledgerBalanceService.calculateLunchFee(student.lunch_daily_rate || 100, student.lunch_days || 66, student.lunch_billing_type || 'daily') : 0;
+    const breakfastFee = breakfastEnabled ? ledgerBalanceService.calculateBreakfastFee(student.breakfast_daily_rate || 100, student.breakfast_days || 66, student.breakfast_billing_type || 'daily') : 0;
 
-    // Calculate gross amount (before discount)
     const grossAmount = baseExpected + transportFee + lunchFee + breakfastFee + openingBalance;
 
-    // Apply discount if available
     const discountCalc = discountService.calculateFeeWithDiscount({
       baseFee: baseExpected,
       transportFee,
@@ -307,13 +275,10 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     const discountType = discountCalc.discountType;
     const discountLabel = discountCalc.discountLabel;
 
-    // Calculate paid amount from payments
     const paid = normalisedPayments
       .filter(p => String(p.studentId) === String(sid) && p.status === "paid")
       .reduce((sum, p) => sum + Number(p.amount), 0);
 
-    // Ledger formula: totalExpected already includes openingBalance minus discount
-    // So just subtract paid from totalExpected to get remaining balance
     const balance = Math.max(0, totalExpected - paid);
 
     return {
@@ -349,7 +314,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const { pages, rows }  = pager(filteredPayments, page);
   useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
 
-  // ─── Paystack payment ───────────────────────────────────────────────
   const openPaystack = (b) => {
     setPaystackTarget(b);
     setPaystackForm({ email: b.email || "", amount: String(b.balance) });
@@ -368,7 +332,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         method: "POST",
         body: {
           email:           paystackForm.email,
-          amount,          // ← now custom amount
+          amount,
           studentId:       paystackTarget.studentId,
           studentName:     paystackTarget.name,
           admissionNumber: paystackTarget.admissionNumber,
@@ -388,7 +352,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     setPaystackLoading(false);
   };
 
-  // ─── Mpesa STK Push ──────────────────────────────────────────────────
   const openMpesa = (b) => {
     setMpesaTarget(b);
     setMpesaForm({ phone:"", amount:String(b.balance) });
@@ -443,7 +406,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     } catch { toast("Could not check status", "error"); }
   };
 
-  // ─── Manual payment ───────────────────────────────────────────────────────
   const savePayment = async () => {
     const sid = Number(paymentForm.studentId);
     const s   = students.find(x => (x.id ?? x.student_id) === sid);
@@ -463,7 +425,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       await reloadPayments();
       setShowPayment(false);
       const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
-      // Calculate balance AFTER this payment (current balance minus this payment)
       const studentBalance = calculateLedgerBalance(s, studentDiscounts[sid] || []);
       const newBalance = Math.max(0, studentBalance.balance - amt);
       setReceipt({ 
@@ -503,7 +464,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     } catch (err) { toast(err.message || "Delete failed", "error"); }
   };
 
-  // ─── Bank Deposit ──────────────────────────────────────────────────────────
   const openBankDeposit = (b) => {
     setBankDepositTarget(b);
     setBankDepositForm({ studentId: b.studentId, amount: String(b.balance) });
@@ -513,13 +473,11 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type (image or PDF)
       const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
       if (!allowedTypes.includes(file.type)) {
         toast("Please upload an image (JPG/PNG) or PDF file", "error");
         return;
       }
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         toast("File size must be less than 5MB", "error");
         return;
@@ -541,19 +499,15 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
     setBankDepositLoading(true);
     try {
-      // Upload proof to Supabase Storage
       const formData = new FormData();
       formData.append('file', bankDepositForm.proofFile);
       formData.append('studentId', sid);
       formData.append('amount', amt);
       
-      // Upload proof — use apiFetch base URL to work in both dev and production
       const API_BASE = import.meta.env.VITE_API_URL || '';
       const uploadResponse = await fetch(`${API_BASE}/api/payments/upload-proof`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${auth.token}`,
-        },
+        headers: getAuthHeaders(auth.token),
         body: formData
       });
       
@@ -563,7 +517,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       
       const { proofUrl } = await uploadResponse.json();
       
-      // Record payment with proof URL
       await apiFetch("/payments", {
         method: "POST",
         body: {
@@ -584,7 +537,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       setBankDepositForm({ studentId: "", amount: "", proofFile: null });
       
       const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
-      // Calculate balance AFTER this deposit
       const studentBalance = calculateLedgerBalance(s, studentDiscounts[sid] || []);
       const newBalance = Math.max(0, studentBalance.balance - amt);
       setReceipt({
@@ -604,141 +556,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     setBankDepositLoading(false);
   };
 
-  const sendWhatsAppProof = (receiptData) => {
-    if (!schoolWhatsApp) {
-      toast("Receipt prepared for WhatsApp", "info");
-      return;
-    }
-
-    const student = students.find(s => (s.id ?? s.student_id) === receiptData.studentId);
-    const studentName = student?.name || "Student";
-    
-    const message = encodeURIComponent(
-      "🏦 BANK DEPOSIT NOTIFICATION\n" +
-      "📚 School: " + (student?.className || 'N/A') + "\n" +
-      "👤 Student: " + studentName + "\n" +
-      "💰 Amount: KES " + Number(receiptData.amount).toLocaleString() + "\n" +
-      "📋 Reference: " + receiptData.reference + "\n" +
-      "📅 Date: " + receiptData.date + "\n" +
-      "📎 Proof: " + (receiptData.proofUrl ? 'View attachment' : 'No proof uploaded') + "\n" +
-      "\n✅ Please confirm and approve this bank deposit."
-    );
-
-    const cleanWhatsAppNumber = schoolWhatsApp.replace(/[^\d]/g, '');
-    const waMeLink = `https://wa.me/${cleanWhatsAppNumber}?text=${message}`;
-    window.open(waMeLink, '_blank');
-    toast("Opening WhatsApp...", "success");
-  };
-
-  const sendWhatsAppReceipt = (receiptData) => {
-    if (!schoolWhatsApp) {
-      toast("Receipt prepared for WhatsApp", "info");
-      return;
-    }
-
-    const message = encodeURIComponent(
-      "💰 PAYMENT RECEIPT\n" +
-      "📚 " + (receiptData.studentName || 'Student') + "\n" +
-      "💳 Amount: KES " + Number(receiptData.amount).toLocaleString() + "\n" +
-      "🔹 Method: " + receiptData.method + "\n" +
-      "📋 Reference: " + receiptData.reference + "\n" +
-      "📅 Date: " + receiptData.date + "\n" +
-      "\n✅ Payment received successfully!\n" +
-      "Thank you for your payment."
-    );
-
-    const cleanWhatsAppNumber = schoolWhatsApp.replace(/[^\d]/g, '');
-    const waMeLink = `https://wa.me/${cleanWhatsAppNumber}?text=${message}`;
-    window.open(waMeLink, '_blank');
-    toast("Opening WhatsApp...", "success");
-  };
-
-  const printReceipt = () => {
-    // Use school data from state (fetched from /settings/school) or fall back to school prop
-    const schoolInfo = schoolData || school || {};
-    const schoolName = schoolInfo.name || schoolInfo.school_name || "School";
-    const logoUrl = schoolInfo.logo_url || "";
-    const motto = schoolInfo.motto || schoolInfo.tagline || "";
-    const address = schoolInfo.address || "";
-    const phone = schoolInfo.phone || "";
-    const email = schoolInfo.email || "";
-    const hasContact = address || phone || email;
-
-    const html = `
-      <div class="print-document">
-        <!-- School Header with Branding -->
-        <div class="print-header">
-          <div class="print-header-content">
-            ${logoUrl ? `<div class="print-header-logo"><img src="${logoUrl}" alt="${schoolName} logo" style="max-width:60px;max-height:60px;object-fit:contain;"></div>` : ""}
-            <div class="print-header-info ${!logoUrl ? "print-header-info-full" : ""}">
-              <h1 class="print-header-school-name">${schoolName}</h1>
-              ${motto ? `<p class="print-header-motto">${motto}</p>` : ""}
-              ${hasContact ? `
-                <div class="print-header-contact">
-                  ${address ? `<span>${address}</span>` : ""}
-                  ${phone ? `<span>${phone}</span>` : ""}
-                  ${email ? `<span>${email}</span>` : ""}
-                </div>
-              ` : ""}
-            </div>
-          </div>
-          <div class="print-header-title">Payment Receipt</div>
-          <div class="print-header-divider"></div>
-        </div>
-
-        <!-- Receipt Content -->
-        <div class="receipt-content">
-          <div class="row"><span>Student</span><strong>${receipt?.studentName}</strong></div>
-          <div class="row"><span>Amount</span><strong>KES ${Number(receipt?.amount).toLocaleString()}</strong></div>
-          <div class="row"><span>Method</span><strong>${receipt?.method}</strong></div>
-          <div class="row"><span>Reference</span><strong>${receipt?.reference}</strong></div>
-          <div class="row"><span>Date</span><strong>${receipt?.date}</strong></div>
-        </div>
-
-        <div class="receipt-footer">
-          <p>Thank you for your payment.</p>
-          <p class="receipt-stamp">Official Receipt</p>
-        </div>
-
-        <style>
-          .print-document{font-family:'Segoe UI',Arial,sans-serif;padding:20px;max-width:210mm;margin:auto;color:#1f2937;background:white}
-          .print-header{margin-bottom:20px;width:100%}
-          .print-header-content{display:flex;align-items:center;gap:20px;padding-bottom:16px}
-          .print-header-logo{flex-shrink:0}
-          .print-header-logo img{max-width:60px;max-height:60px;object-fit:contain;border-radius:4px}
-          .print-header-info{flex:1;text-align:center}
-          .print-header-info-full{text-align:left}
-          .print-header-school-name{font-size:20px;font-weight:800;margin:0 0 4px 0;color:#1f2937;line-height:1.2}
-          .print-header-motto{font-size:13px;font-style:italic;color:#6b7280;margin:0 0 8px 0}
-          .print-header-contact{font-size:10px;color:#6b7280;display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
-          .print-header-info-full .print-header-contact{justify-content:flex-start}
-          .print-header-title{text-align:center;font-size:14px;font-weight:600;color:#374151;margin:12px 0;text-transform:uppercase;letter-spacing:1px}
-          .print-header-divider{height:2px;background:linear-gradient(90deg,transparent,#c9a84c,transparent);margin:12px 0}
-          .receipt-content{margin:24px 0}
-          .row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #e5e7eb;font-size:14px}
-          .row span{color:#6b7280}
-          .row strong{color:#111827;font-weight:600}
-          .receipt-footer{margin-top:40px;text-align:center}
-          .receipt-footer p{color:#6b7280;font-size:12px;margin:4px 0}
-          .receipt-stamp{margin-top:24px;padding:8px 16px;border:2px solid #c9a84c;border-radius:4px;display:inline-block;color:#c9a84c;font-weight:600;font-size:12px;text-transform:uppercase}
-          @media print{
-            .print-document{padding:0}
-            .print-header-divider{background:#999!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-            .receipt-stamp{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-            body{background:white!important;color:black!important}
-          }
-        </style>
-      </div>
-    `;
-
-    printHTML(html, { title: `Receipt - ${receipt?.studentName || "Payment"}` });
-  };
-
-  // Calculate today's collection (based on business day)
   const businessToday = getBusinessToday();
   const todayPayments = normalisedPayments.filter(p => {
     const paymentDate = p.date || p.payment_date;
-    // Only count payments after last day closed (if day was manually closed)
     if (lastDayClosed && new Date(paymentDate) <= new Date(lastDayClosed)) {
       return false;
     }
@@ -746,505 +566,566 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   });
   const todayCollection = todayPayments.reduce((s, p) => s + Number(p.amount), 0);
 
-  // Filter balances to show only students with today's activity if filterDate is 'today'
   const filteredBalances = filterDate === "today"
     ? balances.filter(b => {
-        // Show student if they have a payment today OR have outstanding balance and are active
         const hasPaymentToday = todayPayments.some(p => String(p.studentId) === String(b.studentId));
         return hasPaymentToday || (b.balance > 0);
       })
     : balances;
 
   return (
-    <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <Badge text={`Today's Collection: ${money(todayCollection)}`} tone="success" />
-        <Badge text={`Students: ${students.length}`} tone="info" />
-        {filterDate === "today" && <Badge text="Showing: Today Only" tone="warning" />}
-        <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 'auto' }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      {/* Top Stats */}
+      <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+        <Badge text={`Today's Collection: ${money(todayCollection)}`} variant="success" />
+        <Badge text={`Students: ${students.length}`} variant="primary" />
+        {filterDate === "today" && <Badge text="Showing: Today Only" variant="warning" />}
+        <span style={{ fontSize: "12px", color: "var(--color-text-muted)", marginLeft: "auto", fontWeight: 500 }}>
           Day ends at {dayEndTime} • Business day: {businessToday}
         </span>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <select style={inputStyle} value={tab} onChange={e=>setTab(e.target.value)}>
-          <option value="payments">Payments</option>
-          <option value="balances">Balances</option>
-          <option value="structure">Fee Structure</option>
-        </select>
-        <span style={{ fontSize: 12, color: C.textMuted }}>Select view mode</span>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <select style={inputStyle} value={filterClass} onChange={e=>setFilterClass(e.target.value)}>
-          <option value="all">All classes</option>
-          {ALL_CLASSES.map(c=><option key={c}>{c}</option>)}
-        </select>
-        <div style={{ display: "flex", gap: 4 }}>
-          <Btn variant={filterDate==="all"?"primary":"ghost"} size="small" onClick={()=>setFilterDate("all")}>All Time</Btn>
-          <Btn variant={filterDate==="today"?"primary":"ghost"} size="small" onClick={()=>setFilterDate("today")}>Today</Btn>
-        </div>
-        {canViewTotals && <Btn variant="ghost" onClick={()=>{
-          if (tab==="payments") csv("payments.csv",["Date","Student","Class","Amount","Type","Method","Status","Ref"],filteredPayments.map(p=>[p.date,p.studentName,p.className,p.amount,p.feeType,p.method,p.status,p.reference]));
-          if (tab==="balances") csv("balances.csv",["Student","Class","Paid","Balance"],balances.map(b=>[b.name,b.className,b.paid,b.balance]));
-          toast("CSV exported","success");
-        }}>Export CSV</Btn>}
-        {canEdit && tab==="payments" && <Btn onClick={()=>setShowPayment(true)}>+ Record Payment</Btn>}
-        {canEdit && tab==="payments" && <Btn onClick={()=>setShowRecordPaymentModal(true)}>📝 Manual Payment</Btn>}
-        {canEdit && tab==="structure" && <Btn onClick={()=>{setEditStruct(null);setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""});setShowStruct(true);}}>Set Fee Structure</Btn>}
-        {canEdit && <Btn variant="ghost" onClick={()=>setShowDayEndSettings(true)}>⚙️ Day Settings</Btn>}
-        {canEdit && <Btn variant="primary" onClick={closeDay}>🔒 Close Day</Btn>}
-      </div>
-
-      {/* Payments Tab */}
-      {tab==="payments" && (filteredPayments.length===0 ? <Msg text="No payment records." /> : (
-        <>
-          <div style={{ overflowX: "auto" }}>
-            <Table
-              headers={["Date","Student","Class","Amount","Method","Paid By","Status","Ref","Actions"]}
-              rows={rows.map(p=>[
-                p.date,
-                <span key={p.id} style={{color:C.text,fontWeight:600}}>{p.studentName}</span>,
-                p.className, money(p.amount), p.method,
-                <span key="pb" style={{color:C.textSub,fontSize:12}}>{p.paidBy||"—"}</span>,
-                <Badge key="st" text={p.status} tone={p.status==="paid"?"success":p.status==="pending"?"warning":"danger"} />,
-                <span key="ref" style={{fontSize:11,color:C.textMuted}}>{p.reference||"—"}</span>,
-                canDeletePayments && <Btn key="del" variant="danger" onClick={()=>delPayment(p.id)}>Delete</Btn>
-              ])}
+      {/* Controls Container */}
+      <Card style={{ padding: "var(--space-3)" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", alignItems: "end" }}>
+          
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+            <Select 
+              value={tab} 
+              onChange={e => setTab(e.target.value)}
+              options={[
+                { value: "payments", label: "Payments" },
+                { value: "balances", label: "Balances" },
+                { value: "structure", label: "Fee Structure" }
+              ]}
+            />
+            <Select 
+              value={filterClass} 
+              onChange={e => setFilterClass(e.target.value)}
+              options={[
+                { value: "all", label: "All classes" },
+                ...ALL_CLASSES.map(c => ({ value: c, label: c }))
+              ]}
             />
           </div>
-          <Pager page={page} pages={pages} setPage={setPage} />
-        </>
-      ))}
+
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <Button variant={filterDate==="all" ? "primary" : "ghost"} onClick={() => setFilterDate("all")}>All Time</Button>
+            <Button variant={filterDate==="today" ? "primary" : "ghost"} onClick={() => setFilterDate("today")}>Today</Button>
+          </div>
+          
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginLeft: "auto" }}>
+            {canViewTotals && <Button variant="ghost" onClick={()=>{
+              if (tab==="payments") csv("payments.csv",["Date","Student","Class","Amount","Type","Method","Status","Ref"],filteredPayments.map(p=>[p.date,p.studentName,p.className,p.amount,p.feeType,p.method,p.status,p.reference]));
+              if (tab==="balances") csv("balances.csv",["Student","Class","Paid","Balance"],balances.map(b=>[b.name,b.className,b.paid,b.balance]));
+              toast("CSV exported","success");
+            }}>Export CSV</Button>}
+            {canEdit && tab==="payments" && <Button onClick={() => setShowPayment(true)}>+ Record Payment</Button>}
+            {canEdit && tab==="payments" && <Button variant="secondary" onClick={() => setShowRecordPaymentModal(true)}>📝 Manual Payment</Button>}
+            {canEdit && tab==="structure" && <Button onClick={() => { setEditStruct(null); setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""}); setShowStruct(true); }}>Set Fee Structure</Button>}
+            {canEdit && <Button variant="ghost" onClick={() => setShowDayEndSettings(true)}>⚙️ Day Settings</Button>}
+            {canEdit && <Button variant="primary" onClick={closeDay}>🔒 Close Day</Button>}
+          </div>
+        </div>
+      </Card>
+
+      {/* Payments Tab */}
+      {tab === "payments" && (
+        filteredPayments.length === 0 ? (
+          <EmptyState icon="💳" title="No Payments" description="There are no payment records matching the selected criteria." />
+        ) : (
+          <Card style={{ padding: 0, overflow: "hidden" }}>
+            <Table
+              headers={["Date", "Student", "Class", "Amount", "Method", "Paid By", "Status", "Ref", "Actions"]}
+              data={rows.map(p => [
+                p.date,
+                <span key={p.id} style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{p.studentName}</span>,
+                p.className,
+                money(p.amount),
+                p.method,
+                <span key="pb" style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{p.paidBy || "—"}</span>,
+                <Badge key="st" text={p.status} variant={p.status==="paid" ? "success" : p.status==="pending" ? "warning" : "danger"} />,
+                <span key="ref" style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>{p.reference || "—"}</span>,
+                canDeletePayments ? <Button key="del" size="sm" variant="danger" onClick={() => delPayment(p.id)}>Delete</Button> : "—"
+              ])}
+            />
+            <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
+              <Pager page={page} pages={pages} setPage={setPage} />
+            </div>
+          </Card>
+        )
+      )}
 
       {/* Balances Tab */}
-      {tab==="balances" && (
+      {tab === "balances" && (
         <>
           {/* Bank Instructions */}
           {bankDetails && (bankDetails.bank_name || bankDetails.bank_account_number) && (
-            <div style={{ background:"#0f172a", border:"1px solid #1e3a5f", borderRadius:10, padding:16, marginBottom:16, fontSize:13, color:"#60a5fa" }}>
-              <div style={{ fontWeight:700, marginBottom:8, color:"#93c5fd" }}>🏦 Bank Deposit Instructions</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+            <Card style={{ background: "var(--color-info-muted)", borderColor: "var(--color-info-border)", marginBottom: "var(--space-4)" }}>
+              <div style={{ fontWeight: 700, marginBottom: "var(--space-2)", color: "var(--color-info)" }}>🏦 Bank Deposit Instructions</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
                 <div>
-                  <div style={{ fontSize:12, color:"#94a3b8", marginBottom:4 }}>Bank Name</div>
-                  <div style={{ fontWeight:600, color:"#e2e8f0" }}>{bankDetails.bank_name || "Not set"}</div>
+                  <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Bank Name</div>
+                  <div style={{ fontWeight: 600, color: "var(--color-info)" }}>{bankDetails.bank_name || "Not set"}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize:12, color:"#94a3b8", marginBottom:4 }}>Account Number</div>
-                  <div style={{ fontWeight:600, color:"#e2e8f0" }}>{bankDetails.bank_account_number || "Not set"}</div>
+                  <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Account Number</div>
+                  <div style={{ fontWeight: 600, color: "var(--color-info)" }}>{bankDetails.bank_account_number || "Not set"}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize:12, color:"#94a3b8", marginBottom:4 }}>Account Name</div>
-                  <div style={{ fontWeight:600, color:"#e2e8f0" }}>{bankDetails.account_name || "Not set"}</div>
+                  <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Account Name</div>
+                  <div style={{ fontWeight: 600, color: "var(--color-info)" }}>{bankDetails.account_name || "Not set"}</div>
                 </div>
                 {bankDetails.bank_branch && (
                   <div>
-                    <div style={{ fontSize:12, color:"#94a3b8", marginBottom:4 }}>Branch</div>
-                    <div style={{ fontWeight:600, color:"#e2e8f0" }}>{bankDetails.bank_branch}</div>
+                    <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Branch</div>
+                    <div style={{ fontWeight: 600, color: "var(--color-info)" }}>{bankDetails.bank_branch}</div>
                   </div>
                 )}
               </div>
-              <div style={{ fontSize:11, color:"#64748b", marginTop:8 }}>
+              <div style={{ fontSize: "11px", color: "var(--color-info)", opacity: 0.8, marginTop: "var(--space-3)" }}>
                 💡 Make deposits to this account and record them below with proof of payment
               </div>
-            </div>
+            </Card>
           )}
 
-          {filteredBalances.length===0 ? <Msg text={filterDate==="today" ? "No balances for today." : "No balances available."} /> : (
-        <>
-          {/* Class Summary Cards - Director/Superadmin only */}
-          {["director", "superadmin"].includes(auth?.role) && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 16 }}>
-              {ALL_CLASSES.map(cls => {
-                const classBalances = balances.filter(b => b.className === cls);
-                const classStudents = classBalances.length;
-                const totalOutstanding = classBalances.reduce((sum, b) => sum + b.balance, 0);
-                const totalPaid = classBalances.reduce((sum, b) => sum + b.paid, 0);
-                const totalExpected = classBalances.reduce((sum, b) => sum + b.expected, 0);
-                if (classStudents === 0) return null;
-                return (
-                  <div key={cls} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14 }}>
-                    <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>{cls}</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, color: totalOutstanding > 0 ? '#ef4444' : '#22c55e' }}>
-                      {money(totalOutstanding)}
-                    </div>
-                    <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>
-                      {classStudents} students · {money(totalPaid)} paid
-                    </div>
-                    {totalExpected > 0 && (
-                      <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
-                        Expected: {money(totalExpected)}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <div style={{ overflowX: "auto" }}>
-          <Table
-            headers={["Student","Class","Base Fee","+Transport","+Lunch","+Breakfast","+Opening",...(canViewTotals ? ["Paid"] : []),"Discount","Balance","Status","Pay"]}
-            rows={filteredBalances.map(b=>[
-              <span key={b.studentId} style={{color:C.text,fontWeight:600}}>{b.name}</span>,
-              b.className,
-              // Base fee (tuition + activity + misc)
-              <span key="base" style={{fontSize:12}}>{money(b.baseFee)}</span>,
-              // Transport fee with indicator
-              <span key="transport" style={{fontSize:12,color:b.transportFee>0?C.text:"#64748b"}}>
-                {b.transportFee>0 ? money(b.transportFee) : "—"}
-                {b.transportDirection!=='none' && <small style={{display:'block',fontSize:10,color:'#64748b'}}>{b.transportDirection.replace('_',' ')}</small>}
-              </span>,
-              // Lunch fee with indicator
-              <span key="lunch" style={{fontSize:12,color:b.lunchFee>0?C.text:"#64748b"}}>
-                {b.lunchFee>0 ? money(b.lunchFee) : "—"}
-              </span>,
-              // Breakfast fee with indicator
-              <span key="breakfast" style={{fontSize:12,color:b.breakfastFee>0?C.text:"#64748b"}}>
-                {b.breakfastFee>0 ? money(b.breakfastFee) : "—"}
-              </span>,
-              // Opening balance
-              <span key="opening" style={{fontSize:12,color:b.openingBalance>0?'#f59e0b':b.openingBalance<0?'#22c55e':'#64748b'}}>
-                {b.openingBalance!==0 ? money(Math.abs(b.openingBalance)) : "—"}
-                {b.openingBalance!==0 && <small style={{display:'block',fontSize:10}}>{b.openingBalance>0?'(owing)':'(credit)'}</small>}
-              </span>,
-              // Paid (hidden total expected) - only visible to finance/director/superadmin
-              ...(canViewTotals ? [<span key="paid" style={{color:'#22c55e'}}>{money(b.paid)}</span>] : []),
-              // Discount
-              <span key="discount" style={{fontSize:12,color:b.hasDiscount?'#22c55e':'#64748b'}}>
-                {b.hasDiscount ? (
-                  <>
-                    <span style={{fontWeight:600}}>{b.discountPercent}%</span>
-                    <small style={{display:'block',fontSize:10}}>{b.discountLabel}</small>
-                  </>
-                ) : "—"}
-              </span>,
-              // Balance
-              <span key="balance" style={{fontWeight:700,color:b.balance>0?'#ef4444':'#22c55e'}}>{money(b.balance)}</span>,
-              // Status
-              b.expected === 0
-                ? <Badge key="bdg" text="no structure" tone="info" />
-                : <Badge key="bdg" text={b.balance>0?"pending":"cleared"} tone={b.balance>0?"warning":"success"} />,
-              // Pay buttons
-              b.expected > 0 && b.balance > 0 ? (
-                <div key="pay" style={{display:"flex",flexDirection:"column",gap:6}}>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    <Btn size="small" onClick={() => openPaystack(b)}>💳 Paystack</Btn>
-                    <Btn variant="ghost" size="small" onClick={() => openMpesa(b)}>📱 Mpesa</Btn>
-                    {canEdit && (
-                      <Btn variant="primary" size="small" onClick={() => openBankDeposit(b)}>🏦 Bank Deposit</Btn>
-                    )}
-                  </div>
+          {filteredBalances.length === 0 ? (
+            <EmptyState icon="⚖️" title="No Balances" description={filterDate === "today" ? "No balances for today." : "No balances available."} />
+          ) : (
+            <>
+              {/* Class Summary Cards - Director/Superadmin only */}
+              {["director", "superadmin"].includes(auth?.role) && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+                  {ALL_CLASSES.map(cls => {
+                    const classBalances = balances.filter(b => b.className === cls);
+                    const classStudents = classBalances.length;
+                    const totalOutstanding = classBalances.reduce((sum, b) => sum + b.balance, 0);
+                    const totalPaid = classBalances.reduce((sum, b) => sum + b.paid, 0);
+                    const totalExpected = classBalances.reduce((sum, b) => sum + b.expected, 0);
+                    if (classStudents === 0) return null;
+                    return (
+                      <Card key={cls} style={{ padding: "var(--space-3)" }}>
+                        <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px", fontWeight: 600 }}>{cls}</div>
+                        <div style={{ fontSize: "20px", fontWeight: 800, color: totalOutstanding > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                          {money(totalOutstanding)}
+                        </div>
+                        <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "8px" }}>
+                          {classStudents} students · {money(totalPaid)} paid
+                        </div>
+                        {totalExpected > 0 && (
+                          <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>
+                            Expected: {money(totalExpected)}
+                          </div>
+                        )}
+                      </Card>
+                    );
+                  })}
                 </div>
-              ) : "—"
-            ])}
-          />
-          {/* Legend */}
-          <div style={{marginTop:12,fontSize:11,color:'#64748b',display:'flex',gap:16,flexWrap:'wrap'}}>
-            <span>💡 <strong>Base Fee:</strong> Tuition + Activity + Misc</span>
-            <span>🚌 <strong>Transport:</strong> 1-way (60%) or 2-way (100%)</span>
-            <span>🍽️ <strong>Lunch:</strong> Daily or termly rate</span>
-            <span>🥐 <strong>Breakfast:</strong> Daily or termly rate</span>
-            <span>📖 <strong>Opening:</strong> Balance carried forward</span>
-            <span>🎁 <strong>Discount:</strong> Sibling/Staff/Scholarship</span>
-          </div>
-        </div>
-      )}
-        </>
-      )}
+              )}
+
+              <Card style={{ padding: 0, overflow: "hidden" }}>
+                <Table
+                  headers={["Student","Class","Base Fee","+Transport","+Lunch","+Breakfast","+Opening",...(canViewTotals ? ["Paid"] : []),"Discount","Balance","Status","Pay"]}
+                  data={filteredBalances.map(b => [
+                    <span key={b.studentId} style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{b.name}</span>,
+                    b.className,
+                    <span key="base" style={{ fontSize: "13px" }}>{money(b.baseFee)}</span>,
+                    <span key="transport" style={{ fontSize: "13px", color: b.transportFee > 0 ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>
+                      {b.transportFee > 0 ? money(b.transportFee) : "—"}
+                      {b.transportDirection !== 'none' && <small style={{ display: 'block', fontSize: "10px", color: "var(--color-text-muted)" }}>{b.transportDirection.replace('_',' ')}</small>}
+                    </span>,
+                    <span key="lunch" style={{ fontSize: "13px", color: b.lunchFee > 0 ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>
+                      {b.lunchFee > 0 ? money(b.lunchFee) : "—"}
+                    </span>,
+                    <span key="breakfast" style={{ fontSize: "13px", color: b.breakfastFee > 0 ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>
+                      {b.breakfastFee > 0 ? money(b.breakfastFee) : "—"}
+                    </span>,
+                    <span key="opening" style={{ fontSize: "13px", color: b.openingBalance > 0 ? 'var(--color-warning)' : b.openingBalance < 0 ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
+                      {b.openingBalance !== 0 ? money(Math.abs(b.openingBalance)) : "—"}
+                      {b.openingBalance !== 0 && <small style={{ display: 'block', fontSize: "10px" }}>{b.openingBalance > 0 ? '(owing)' : '(credit)'}</small>}
+                    </span>,
+                    ...(canViewTotals ? [<span key="paid" style={{ color: 'var(--color-success)', fontWeight: 600 }}>{money(b.paid)}</span>] : []),
+                    <span key="discount" style={{ fontSize: "13px", color: b.hasDiscount ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
+                      {b.hasDiscount ? (
+                        <>
+                          <span style={{ fontWeight: 600 }}>{b.discountPercent}%</span>
+                          <small style={{ display: 'block', fontSize: "10px" }}>{b.discountLabel}</small>
+                        </>
+                      ) : "—"}
+                    </span>,
+                    <span key="balance" style={{ fontWeight: 700, fontSize: "15px", color: b.balance > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>{money(b.balance)}</span>,
+                    b.expected === 0
+                      ? <Badge key="bdg" text="No Structure" variant="neutral" />
+                      : <Badge key="bdg" text={b.balance > 0 ? "Pending" : "Cleared"} variant={b.balance > 0 ? "warning" : "success"} />,
+                    b.expected > 0 && b.balance > 0 ? (
+                      <div key="pay" style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+                        <Button size="sm" onClick={() => openPaystack(b)}>💳 Paystack</Button>
+                        <Button variant="secondary" size="sm" onClick={() => openMpesa(b)}>📱 Mpesa</Button>
+                        {canEdit && (
+                          <Button variant="ghost" size="sm" onClick={() => openBankDeposit(b)}>🏦 Bank</Button>
+                        )}
+                      </div>
+                    ) : "—"
+                  ])}
+                />
+              </Card>
+
+              {/* Legend */}
+              <div style={{ marginTop: "var(--space-4)", fontSize: "12px", color: "var(--color-text-muted)", display: "flex", gap: "var(--space-4)", flexWrap: "wrap", justifyContent: "center" }}>
+                <span>💡 <strong>Base Fee:</strong> Tuition + Activity + Misc</span>
+                <span>🚌 <strong>Transport:</strong> 1-way (60%) or 2-way (100%)</span>
+                <span>🍽️ <strong>Lunch:</strong> Daily or termly rate</span>
+                <span>🥐 <strong>Breakfast:</strong> Daily or termly rate</span>
+                <span>📖 <strong>Opening:</strong> Balance carried forward</span>
+                <span>🎁 <strong>Discount:</strong> Sibling/Staff/Scholarship</span>
+              </div>
+            </>
+          )}
         </>
       )}
 
       {/* Fee Structure Tab */}
-      {tab==="structure" && (normalisedStructures.length===0 ? <Msg text="No fee structures set." /> : (
-        <div style={{ overflowX: "auto" }}>
-          <Table
-            headers={["Class","Term","Tuition","Activity","Misc","Total","Actions"]}
-            rows={normalisedStructures.map(f=>[
-              <span key={f.id} style={{color:C.text,fontWeight:600}}>{f.className}</span>,
-              <span key="term" style={{color:C.textSub,fontSize:12}}>{f.term||"—"}</span>,
-              money(f.tuition), money(f.activity), money(f.misc),
-              money(Number(f.tuition)+Number(f.activity)+Number(f.misc)),
-              canEdit && <Btn key="ed" variant="ghost" onClick={()=>{setEditStruct(f);setStructForm({className:f.className,term:f.term||"Term 1",tuition:String(f.tuition),activity:String(f.activity),misc:String(f.misc)});setShowStruct(true);}}>Edit</Btn>
-            ])}
-          />
-        </div>
-      ))}
+      {tab === "structure" && (
+        normalisedStructures.length === 0 ? (
+          <EmptyState icon="📋" title="No Fee Structures" description="There are no fee structures set. Create one to begin." />
+        ) : (
+          <Card style={{ padding: 0, overflow: "hidden" }}>
+            <Table
+              headers={["Class", "Term", "Tuition", "Activity", "Misc", "Total", "Actions"]}
+              data={normalisedStructures.map(f => [
+                <span key={f.id} style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{f.className}</span>,
+                <span key="term" style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>{f.term || "—"}</span>,
+                money(f.tuition), 
+                money(f.activity), 
+                money(f.misc),
+                <strong key="total">{money(Number(f.tuition) + Number(f.activity) + Number(f.misc))}</strong>,
+                canEdit ? <Button key="ed" size="sm" variant="secondary" onClick={() => { setEditStruct(f); setStructForm({ className: f.className, term: f.term || "Term 1", tuition: String(f.tuition), activity: String(f.activity), misc: String(f.misc) }); setShowStruct(true); }}>Edit</Button> : "—"
+              ])}
+            />
+          </Card>
+        )
+      )}
 
       {/* Paystack Modal */}
-      {showPaystack && paystackTarget && (
-        <Modal title={`Pay Online — ${paystackTarget.name}`} onClose={()=>setShowPaystack(false)}>
-          <div style={{color:C.textSub,marginBottom:12,fontSize:13}}>
-            Outstanding balance: <strong style={{color:C.text}}>{money(paystackTarget.balance)}</strong>
-          </div>
-          <div style={{background:"#0f172a",border:"1px solid #1e3a5f",borderRadius:10,padding:12,marginBottom:12,fontSize:12,color:"#60a5fa"}}>
-            💳 Payment will be processed securely via <strong>Paystack</strong> — supports card, bank transfer & mobile money
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <Field label="Parent Email (for receipt)">
-              <input style={inputStyle} value={paystackForm.email} onChange={e=>setPaystackForm({...paystackForm,email:e.target.value})} placeholder="parent@email.com" />
-            </Field>
-            <Field label="Amount (KES)">
-              <input 
-                type="number" 
-                min="100" 
-                max={paystackTarget.balance} 
-                style={inputStyle} 
-                value={paystackForm.amount} 
-                onChange={e=>setPaystackForm({...paystackForm,amount:e.target.value})} 
-              />
-              {Number(paystackForm.amount) > paystackTarget.balance && (
-                <p style={{color:"red",fontSize:12,marginTop:4}}>Cannot exceed balance</p>
-              )}
-              {Number(paystackForm.amount) < 100 && (
-                <p style={{color:"red",fontSize:12,marginTop:4}}>Minimum KSh 100</p>
-              )}
-            </Field>
-          </div>
-          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:12}}>
-            <Btn variant="ghost" onClick={()=>setShowPaystack(false)}>Cancel</Btn>
-            <Btn 
-              onClick={initiatePaystack} 
-              disabled={paystackLoading || !paystackForm.email || Number(paystackForm.amount) < 100 || Number(paystackForm.amount) > paystackTarget.balance}
-            >
-              {paystackLoading ? "Opening..." : "Open Payment"}
-            </Btn>
-          </div>
-        </Modal>
-      )}
-
-      {/* Mpesa STK Push Modal */}
-      {showMpesa && mpesaTarget && (
-        <Modal title={`Mpesa Payment — ${mpesaTarget.name}`} onClose={()=>setShowMpesa(false)}>
-          <div style={{color:C.textSub,marginBottom:12,fontSize:13}}>
-            Outstanding balance: <strong style={{color:C.text}}>{money(mpesaTarget.balance)}</strong>
-          </div>
-          <div style={{background:"#052e16",border:"1px solid #16a34a",borderRadius:10,padding:12,marginBottom:12,fontSize:12,color:"#86efac"}}>
-            📱 An STK push will be sent to parent&apos;s phone. They will enter their Mpesa PIN to complete payment.
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
-            <div>
-              <div style={{fontSize:12,color:C.textMuted,marginBottom:4}}>Phone Number</div>
-              <input 
-                style={{...inputStyle,width:"100%"}} 
-                value={mpesaForm.phone}
-                onChange={e=>setMpesaForm({...mpesaForm,phone:e.target.value})}
-                placeholder="0712345678 or 254712345678" 
-              />
-            </div>
-            <div>
-              <div style={{fontSize:12,color:C.textMuted,marginBottom:4}}>Amount (KES)</div>
-              <input 
-                type="number" 
-                min="100" 
-                max={mpesaTarget.balance} 
-                style={{...inputStyle,width:"100%"}} 
-                value={mpesaForm.amount}
-                onChange={e=>setMpesaForm({...mpesaForm,amount:e.target.value})} 
-              />
-              {Number(mpesaForm.amount) > mpesaTarget.balance && (
-                <p style={{color:"red",fontSize:12,marginTop:4}}>Cannot exceed balance</p>
-              )}
-              {Number(mpesaForm.amount) < 100 && (
-                <p style={{color:"red",fontSize:12,marginTop:4}}>Minimum KSh 100</p>
-              )}
-            </div>
-          </div>
-          {mpesaStatus?.ok && (
-            <div style={{background:"#052e16",border:"1px solid #16a34a",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:13,color:"#86efac"}}>
-              ✅ STK push sent! Ask parent to check their phone and enter Mpesa PIN.
-              <div style={{marginTop:8}}>
-                <Btn variant="ghost" onClick={checkMpesaStatus}>🔄 Check Payment Status</Btn>
-              </div>
-            </div>
-          )}
-          <div style={{display:"flex",justifyContent:"flex-end",gap:8}}>
-            <Btn variant="ghost" onClick={()=>setShowMpesa(false)}>Cancel</Btn>
-            {!mpesaStatus?.ok && (
-              <Btn 
-                onClick={initiateMpesa} 
-                disabled={mpesaLoading || !mpesaForm.phone || Number(mpesaForm.amount) < 100 || Number(mpesaForm.amount) > mpesaTarget.balance}
-              >
-                {mpesaLoading ? "Sending..." : "Send STK Push"}
-              </Btn>
+      <Modal isOpen={showPaystack && !!paystackTarget} title={`Pay Online — ${paystackTarget?.name}`} onClose={() => setShowPaystack(false)} footer={
+        <>
+          <Button variant="ghost" onClick={() => setShowPaystack(false)}>Cancel</Button>
+          <Button 
+            onClick={initiatePaystack} 
+            loading={paystackLoading}
+            disabled={!paystackForm.email || Number(paystackForm.amount) < 100 || Number(paystackForm.amount) > (paystackTarget?.balance || 0)}
+          >
+            Open Payment
+          </Button>
+        </>
+      }>
+        <div style={{ color: "var(--color-text-secondary)", marginBottom: "var(--space-3)", fontSize: "14px" }}>
+          Outstanding balance: <strong style={{ color: "var(--color-text-primary)", fontSize: "18px" }}>{money(paystackTarget?.balance || 0)}</strong>
+        </div>
+        <div style={{ background: "var(--color-primary-muted)", border: "1px solid var(--color-primary-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)", marginBottom: "var(--space-4)", fontSize: "13px", color: "var(--color-primary)" }}>
+          💳 Payment will be processed securely via <strong>Paystack</strong> — supports card, bank transfer & mobile money.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+          <Input label="Parent Email (for receipt)" value={paystackForm.email} onChange={e => setPaystackForm({ ...paystackForm, email: e.target.value })} placeholder="parent@email.com" />
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <Input 
+              label="Amount (KES)"
+              type="number" 
+              value={paystackForm.amount} 
+              onChange={e => setPaystackForm({ ...paystackForm, amount: e.target.value })} 
+            />
+            {Number(paystackForm.amount) > (paystackTarget?.balance || 0) && (
+              <span style={{ color: "var(--color-danger)", fontSize: "12px", marginTop: "4px" }}>Cannot exceed balance</span>
+            )}
+            {Number(paystackForm.amount) < 100 && (
+              <span style={{ color: "var(--color-danger)", fontSize: "12px", marginTop: "4px" }}>Minimum KSh 100</span>
             )}
           </div>
-        </Modal>
-      )}
+        </div>
+      </Modal>
+
+      {/* Mpesa STK Push Modal */}
+      <Modal isOpen={showMpesa && !!mpesaTarget} title={`Mpesa Payment — ${mpesaTarget?.name}`} onClose={() => setShowMpesa(false)} footer={
+        <>
+          <Button variant="ghost" onClick={() => setShowMpesa(false)}>Cancel</Button>
+          {!mpesaStatus?.ok && (
+            <Button 
+              onClick={initiateMpesa} 
+              loading={mpesaLoading}
+              disabled={!mpesaForm.phone || Number(mpesaForm.amount) < 100 || Number(mpesaForm.amount) > (mpesaTarget?.balance || 0)}
+            >
+              Send STK Push
+            </Button>
+          )}
+        </>
+      }>
+        <div style={{ color: "var(--color-text-secondary)", marginBottom: "var(--space-3)", fontSize: "14px" }}>
+          Outstanding balance: <strong style={{ color: "var(--color-text-primary)", fontSize: "18px" }}>{money(mpesaTarget?.balance || 0)}</strong>
+        </div>
+        <div style={{ background: "var(--color-success-muted)", border: "1px solid var(--color-success-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)", marginBottom: "var(--space-4)", fontSize: "13px", color: "var(--color-success)" }}>
+          📱 An STK push will be sent to the parent's phone. They will enter their M-Pesa PIN to complete payment.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-3)" }}>
+          <Input 
+            label="Phone Number"
+            value={mpesaForm.phone}
+            onChange={e => setMpesaForm({ ...mpesaForm, phone: e.target.value })}
+            placeholder="0712345678 or 254712345678" 
+          />
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <Input 
+              label="Amount (KES)"
+              type="number" 
+              value={mpesaForm.amount}
+              onChange={e => setMpesaForm({ ...mpesaForm, amount: e.target.value })} 
+            />
+            {Number(mpesaForm.amount) > (mpesaTarget?.balance || 0) && (
+              <span style={{ color: "var(--color-danger)", fontSize: "12px", marginTop: "4px" }}>Cannot exceed balance</span>
+            )}
+            {Number(mpesaForm.amount) < 100 && (
+              <span style={{ color: "var(--color-danger)", fontSize: "12px", marginTop: "4px" }}>Minimum KSh 100</span>
+            )}
+          </div>
+        </div>
+        {mpesaStatus?.ok && (
+          <div style={{ background: "var(--color-success-muted)", border: "1px solid var(--color-success-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)", marginTop: "var(--space-3)", fontSize: "13px", color: "var(--color-success)" }}>
+            <div style={{ fontWeight: 600, marginBottom: "8px" }}>✅ STK push sent! Ask parent to check their phone.</div>
+            <Button variant="ghost" size="sm" onClick={checkMpesaStatus}>🔄 Check Payment Status</Button>
+          </div>
+        )}
+      </Modal>
 
       {/* Manual Payment Modal */}
-      {showPayment && (
-        <Modal title="Record Manual Payment" onClose={()=>setShowPayment(false)}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <Field label="Class" style={{ gridColumn: "1 / -1" }}>
-              <select style={inputStyle} value={paymentClass} onChange={e=>{ setPaymentClass(e.target.value); setPaymentForm({...paymentForm,studentId:""}); }}>
-                <option value="">-- Select class first --</option>
-                {ALL_CLASSES.map(c=><option key={c}>{c}</option>)}
-              </select>
-            </Field>
-            <Field label="Student" style={{ gridColumn: "1 / -1" }}>
-              <select style={inputStyle} value={paymentForm.studentId} onChange={e=>setPaymentForm({...paymentForm,studentId:Number(e.target.value)})} disabled={!paymentClass}>
-                <option value="">{paymentClass ? "-- Select student --" : "-- Select class first --"}</option>
-                {students.filter(s=>(s.className??s.class_name)===paymentClass).map(s=>{ 
-                  const sid=s.id??s.student_id; 
-                  const name=s.firstName?`${s.firstName} ${s.lastName}`:`${s.first_name} ${s.last_name}`; 
-                  return <option key={sid} value={sid}>{name}</option>; 
-                })}
-              </select>
-            </Field>
-            <Field label="Amount (KES)">
-              <input 
-                type="number" 
-                min="100" 
-                max={balances.find(b => b.studentId === paymentForm.studentId)?.balance || 100000} 
-                style={inputStyle} 
-                value={paymentForm.amount} 
-                onChange={e=>setPaymentForm({...paymentForm,amount:e.target.value})} 
-              />
-              {Number(paymentForm.amount) > (balances.find(b => b.studentId === paymentForm.studentId)?.balance || 0) && (
-                <p style={{color:"red",fontSize:12,marginTop:4}}>Cannot exceed outstanding balance</p>
-              )}
-              {Number(paymentForm.amount) < 100 && (
-                <p style={{color:"red",fontSize:12,marginTop:4}}>Minimum KSh 100</p>
-              )}
-            </Field>
-            <Field label="Type">
-              <select style={inputStyle} value={paymentForm.feeType} onChange={e=>setPaymentForm({...paymentForm,feeType:e.target.value})}>
-                <option value="tuition">Tuition</option>
-                <option value="activity">Activity</option>
-                <option value="misc">Misc</option>
-              </select>
-            </Field>
-            <Field label="Method">
-              <select style={inputStyle} value={paymentForm.method} onChange={e=>setPaymentForm({...paymentForm,method:e.target.value})}>
-                <option value="cash">Cash</option>
-                <option value="mpesa">Mpesa</option>
-                <option value="bank">Bank</option>
-              </select>
-            </Field>
-            <Field label="Date">
-              <input type="date" style={inputStyle} value={paymentForm.date} onChange={e=>setPaymentForm({...paymentForm,date:e.target.value})} />
-            </Field>
-            <Field label="Status">
-              <select style={inputStyle} value={paymentForm.status} onChange={e=>setPaymentForm({...paymentForm,status:e.target.value})}>
-                <option value="paid">Paid</option>
-                <option value="pending">Pending</option>
-              </select>
-            </Field>
-            <Field label="Paid By (parent/guardian/sponsor)" style={{gridColumn:"1 / -1"}}>
-              <input style={inputStyle} value={paymentForm.paidBy} onChange={e=>setPaymentForm({...paymentForm,paidBy:e.target.value})} placeholder="e.g. John Kamau (Father)" />
-            </Field>
-          </div>
-          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:10}}>
-            <Btn variant="ghost" onClick={()=>setShowPayment(false)}>Cancel</Btn>
-            <Btn 
-              disabled={Number(paymentForm.amount) <= 0 || !paymentForm.studentId || Number(paymentForm.amount) > (balances.find(b => b.studentId === paymentForm.studentId)?.balance || 0)}
-              onClick={savePayment}
-            >
-              Save
-            </Btn>
-          </div>
-        </Modal>
-      )}
-
-      {/* Fee Structure Modal */}
-      {showStruct && (
-        <Modal title={editStruct?"Edit Fee Structure":"Set Fee Structure"} onClose={()=>setShowStruct(false)}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <Field label="Class">
-              <select style={inputStyle} value={structForm.className} onChange={e=>setStructForm({...structForm,className:e.target.value})}>
-                {ALL_CLASSES.map(c=><option key={c}>{c}</option>)}
-              </select>
-            </Field>
-            <Field label="Term">
-              <select style={inputStyle} value={structForm.term||"Term 1"} onChange={e=>setStructForm({...structForm,term:e.target.value})}>
-                <option value="Term 1">Term 1</option>
-                <option value="Term 2">Term 2</option>
-                <option value="Term 3">Term 3</option>
-              </select>
-            </Field>
-            <Field label="Tuition">
-              <input type="number" style={inputStyle} value={structForm.tuition} onChange={e=>setStructForm({...structForm,tuition:e.target.value})} />
-            </Field>
-            <Field label="Activity">
-              <input type="number" style={inputStyle} value={structForm.activity} onChange={e=>setStructForm({...structForm,activity:e.target.value})} />
-            </Field>
-            <Field label="Misc">
-              <input type="number" style={inputStyle} value={structForm.misc} onChange={e=>setStructForm({...structForm,misc:e.target.value})} />
-            </Field>
-          </div>
-          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:10}}>
-            <Btn variant="ghost" onClick={()=>setShowStruct(false)}>Cancel</Btn>
-            <Btn onClick={saveStructure}>Save</Btn>
-          </div>
-        </Modal>
-      )}
-
-      {/* Receipt Modal */}
-      <PaymentReceipt
-        isOpen={showReceipt}
-        onClose={() => setShowReceipt(false)}
-        receipt={receipt}
-        school={schoolData || school}
-      />
-
-      {/* Bank Deposit Modal */}
-      {showBankDeposit && (
-        <Modal title="Record Bank Deposit" onClose={()=>setShowBankDeposit(false)}>
-          <div style={{color:C.textSub,marginBottom:12,fontSize:13}}>
-            Upload proof of bank deposit to record payment pending verification.
-          </div>
-          <div style={{background:"#0f172a",border:"1px solid #1e3a5f",borderRadius:10,padding:12,marginBottom:12,fontSize:12,color:"#60a5fa"}}>
-            📎 Attach deposit slip, receipt, or transaction confirmation. Payment will be marked as pending until approved.
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <div>
-              <div style={{fontSize:12,color:C.textMuted,marginBottom:4}}>Student</div>
-              <select style={inputStyle} value={bankDepositForm.studentId} onChange={e=>setBankDepositForm({...bankDepositForm,studentId:e.target.value})}>
-                {balances.map(b=>(
-                  <option key={b.studentId} value={b.studentId}>{b.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <div style={{fontSize:12,color:C.textMuted,marginBottom:4}}>Amount (KES)</div>
-              <input 
-                type="number" 
-                min="100" 
-                max={balances.find(b => b.studentId === bankDepositForm.studentId)?.balance || 100000} 
-                style={inputStyle} 
-                value={bankDepositForm.amount}
-                onChange={e=>setBankDepositForm({...bankDepositForm,amount:e.target.value})} 
-              />
-              {Number(bankDepositForm.amount) > (balances.find(b => b.studentId === bankDepositForm.studentId)?.balance || 0) && (
-                <p style={{color:"red",fontSize:12,marginTop:4}}>Cannot exceed outstanding balance</p>
-              )}
-              {Number(bankDepositForm.amount) < 100 && (
-                <p style={{color:"red",fontSize:12,marginTop:4}}>Minimum KSh 100</p>
-              )}
-            </div>
-          </div>
-          <div style={{marginBottom:12}}>
-            <div style={{fontSize:12,color:C.textMuted,marginBottom:4}}>Proof of Payment</div>
-            <input 
-              type="file" 
-              style={inputStyle}
-              onChange={handleFileUpload}
-              accept="image/*,.pdf"
+      <Modal isOpen={showPayment} title="Record Manual Payment" onClose={() => setShowPayment(false)} footer={
+        <>
+          <Button variant="ghost" onClick={() => setShowPayment(false)}>Cancel</Button>
+          <Button 
+            disabled={Number(paymentForm.amount) <= 0 || !paymentForm.studentId || Number(paymentForm.amount) > (balances.find(b => b.studentId === paymentForm.studentId)?.balance || 0)}
+            onClick={savePayment}
+          >
+            Save Payment
+          </Button>
+        </>
+      }>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+            <Select 
+              label="Class"
+              value={paymentClass} 
+              onChange={e => { setPaymentClass(e.target.value); setPaymentForm({ ...paymentForm, studentId: "" }); }}
+              options={[
+                { value: "", label: "-- Select class first --" },
+                ...ALL_CLASSES.map(c => ({ value: c, label: c }))
+              ]}
+            />
+            <Select 
+              label="Student"
+              value={paymentForm.studentId} 
+              onChange={e => setPaymentForm({ ...paymentForm, studentId: Number(e.target.value) })} 
+              disabled={!paymentClass}
+              options={[
+                { value: "", label: paymentClass ? "-- Select student --" : "-- Select class first --" },
+                ...students.filter(s => (s.className ?? s.class_name) === paymentClass).map(s => ({
+                  value: s.id ?? s.student_id,
+                  label: s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`
+                }))
+              ]}
             />
           </div>
-          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:12}}>
-            <Btn variant="ghost" onClick={()=>setShowBankDeposit(false)}>Cancel</Btn>
-            <Btn 
-              onClick={saveBankDeposit}
-              disabled={bankDepositLoading || !bankDepositForm.studentId || Number(bankDepositForm.amount) <= 0 || Number(bankDepositForm.amount) > (balances.find(b => b.studentId === bankDepositForm.studentId)?.balance || 0) || !bankDepositForm.proofFile}
-            >
-              {bankDepositLoading ? "Saving..." : "Save Bank Deposit"}
-            </Btn>
-          </div>
-        </Modal>
-      )}
 
-      {/* Manual Payment Modal */}
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <Input 
+              label="Amount (KES)"
+              type="number" 
+              value={paymentForm.amount} 
+              onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} 
+            />
+            {Number(paymentForm.amount) > (balances.find(b => b.studentId === paymentForm.studentId)?.balance || 0) && (
+              <span style={{ color: "var(--color-danger)", fontSize: "12px", marginTop: "4px" }}>Cannot exceed balance</span>
+            )}
+            {Number(paymentForm.amount) < 100 && (
+              <span style={{ color: "var(--color-danger)", fontSize: "12px", marginTop: "4px" }}>Minimum KSh 100</span>
+            )}
+          </div>
+
+          <Select 
+            label="Type"
+            value={paymentForm.feeType} 
+            onChange={e => setPaymentForm({ ...paymentForm, feeType: e.target.value })}
+            options={[
+              { value: "tuition", label: "Tuition" },
+              { value: "activity", label: "Activity" },
+              { value: "misc", label: "Misc" }
+            ]}
+          />
+
+          <Select 
+            label="Method"
+            value={paymentForm.method} 
+            onChange={e => setPaymentForm({ ...paymentForm, method: e.target.value })}
+            options={[
+              { value: "cash", label: "Cash" },
+              { value: "mpesa", label: "Mpesa" },
+              { value: "bank", label: "Bank" }
+            ]}
+          />
+
+          <Input 
+            label="Date"
+            type="date" 
+            value={paymentForm.date} 
+            onChange={e => setPaymentForm({ ...paymentForm, date: e.target.value })} 
+          />
+
+          <Select 
+            label="Status"
+            value={paymentForm.status} 
+            onChange={e => setPaymentForm({ ...paymentForm, status: e.target.value })}
+            options={[
+              { value: "paid", label: "Paid" },
+              { value: "pending", label: "Pending" }
+            ]}
+          />
+
+          <div style={{ gridColumn: "1 / -1" }}>
+            <Input 
+              label="Paid By (parent/guardian/sponsor)"
+              value={paymentForm.paidBy} 
+              onChange={e => setPaymentForm({ ...paymentForm, paidBy: e.target.value })} 
+              placeholder="e.g. John Kamau (Father)" 
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Fee Structure Modal */}
+      <Modal isOpen={showStruct} title={editStruct ? "Edit Fee Structure" : "Set Fee Structure"} onClose={() => setShowStruct(false)} footer={
+        <>
+          <Button variant="ghost" onClick={() => setShowStruct(false)}>Cancel</Button>
+          <Button onClick={saveStructure}>Save Structure</Button>
+        </>
+      }>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <Select 
+            label="Class"
+            value={structForm.className} 
+            onChange={e => setStructForm({ ...structForm, className: e.target.value })}
+            options={ALL_CLASSES.map(c => ({ value: c, label: c }))}
+          />
+          <Select 
+            label="Term"
+            value={structForm.term || "Term 1"} 
+            onChange={e => setStructForm({ ...structForm, term: e.target.value })}
+            options={[
+              { value: "Term 1", label: "Term 1" },
+              { value: "Term 2", label: "Term 2" },
+              { value: "Term 3", label: "Term 3" }
+            ]}
+          />
+          <Input 
+            label="Tuition Fee"
+            type="number" 
+            value={structForm.tuition} 
+            onChange={e => setStructForm({ ...structForm, tuition: e.target.value })} 
+          />
+          <Input 
+            label="Activity Fee"
+            type="number" 
+            value={structForm.activity} 
+            onChange={e => setStructForm({ ...structForm, activity: e.target.value })} 
+          />
+          <Input 
+            label="Misc Fee"
+            type="number" 
+            value={structForm.misc} 
+            onChange={e => setStructForm({ ...structForm, misc: e.target.value })} 
+          />
+        </div>
+      </Modal>
+
+      {/* Bank Deposit Modal */}
+      <Modal isOpen={showBankDeposit} title="Record Bank Deposit" onClose={() => setShowBankDeposit(false)} footer={
+        <>
+          <Button variant="ghost" onClick={() => setShowBankDeposit(false)}>Cancel</Button>
+          <Button 
+            onClick={saveBankDeposit}
+            loading={bankDepositLoading}
+            disabled={!bankDepositForm.studentId || Number(bankDepositForm.amount) <= 0 || Number(bankDepositForm.amount) > (balances.find(b => b.studentId === bankDepositForm.studentId)?.balance || 0) || !bankDepositForm.proofFile}
+          >
+            Save Bank Deposit
+          </Button>
+        </>
+      }>
+        <div style={{ color: "var(--color-text-secondary)", marginBottom: "var(--space-3)", fontSize: "14px" }}>
+          Upload proof of bank deposit to record payment pending verification.
+        </div>
+        <div style={{ background: "var(--color-info-muted)", border: "1px solid var(--color-info-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)", marginBottom: "var(--space-4)", fontSize: "13px", color: "var(--color-info)" }}>
+          📎 Attach deposit slip, receipt, or transaction confirmation. Payment will be marked as pending until approved.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <Select 
+            label="Student"
+            value={bankDepositForm.studentId} 
+            onChange={e => setBankDepositForm({ ...bankDepositForm, studentId: e.target.value })}
+            options={balances.map(b => ({ value: b.studentId, label: b.name }))}
+          />
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <Input 
+              label="Amount (KES)"
+              type="number" 
+              value={bankDepositForm.amount}
+              onChange={e => setBankDepositForm({ ...bankDepositForm, amount: e.target.value })} 
+            />
+            {Number(bankDepositForm.amount) > (balances.find(b => b.studentId === bankDepositForm.studentId)?.balance || 0) && (
+              <span style={{ color: "var(--color-danger)", fontSize: "12px", marginTop: "4px" }}>Cannot exceed balance</span>
+            )}
+          </div>
+          <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+            <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Proof of Payment</label>
+            <input 
+              type="file" 
+              onChange={handleFileUpload}
+              accept="image/*,.pdf"
+              style={{ padding: "var(--space-2) 0", color: "var(--color-text-primary)" }}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* Day End Settings Modal */}
+      <Modal isOpen={showDayEndSettings} title="Day End Settings" onClose={() => setShowDayEndSettings(false)} footer={
+        <>
+          <Button variant="ghost" onClick={() => setShowDayEndSettings(false)}>Close</Button>
+          <Button variant="danger" onClick={() => {
+            localStorage.removeItem('lastDayClosed');
+            setLastDayClosed(null);
+            toast('Day closure reset', 'success');
+          }}>Reset Day Closure</Button>
+        </>
+      }>
+        <div style={{ marginBottom: "var(--space-4)" }}>
+          <Input
+            label="Business Day End Time"
+            type="time"
+            value={dayEndTime}
+            onChange={(e) => saveDayEndTime(e.target.value)}
+          />
+          <small style={{ color: "var(--color-text-muted)", fontSize: "12px", display: 'block', marginTop: "var(--space-2)" }}>
+            After this time, "Today's Collection" will reset for the next business day.
+          </small>
+        </div>
+        
+        <div style={{ padding: "var(--space-3)", background: "var(--color-bg-surface)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
+          <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginBottom: "var(--space-2)", textTransform: "uppercase", fontWeight: 600 }}>Current Status</div>
+          <div style={{ fontSize: "14px", color: "var(--color-text-primary)", lineHeight: 1.6 }}>
+            Day ends at: <strong>{dayEndTime}</strong><br/>
+            Business date: <strong>{businessToday}</strong><br/>
+            Last closed: {lastDayClosed ? new Date(lastDayClosed).toLocaleString() : 'Never'}
+          </div>
+        </div>
+      </Modal>
+
+      {/* RecordPaymentModal Component (External) */}
       <RecordPaymentModal
         isOpen={showRecordPaymentModal}
         onClose={() => setShowRecordPaymentModal(false)}
@@ -1259,16 +1140,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           const firstName = student?.firstName || student?.first_name || "";
           const lastName = student?.lastName || student?.last_name || "";
           const studentName = `${firstName} ${lastName}`.trim() || "Student";
-
-          // Calculate current balance for this student
           const studentBalance = calculateLedgerBalance(student, studentDiscounts[response.studentId] || []);
-
-          // Format payment method nicely
-          const methodLabels = {
-            'cash': 'Cash',
-            'bank_transfer': 'Bank Transfer',
-            'mpesa_manual': 'M-Pesa Manual'
-          };
+          const methodLabels = { 'cash': 'Cash', 'bank_transfer': 'Bank Transfer', 'mpesa_manual': 'M-Pesa Manual' };
 
           setReceipt({
             studentName: studentName,
@@ -1282,43 +1155,13 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         }}
       />
 
-      {/* Day End Settings Modal */}
-      {showDayEndSettings && (
-        <Modal title="Day End Settings" onClose={()=>setShowDayEndSettings(false)}>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, color: C.textSub, marginBottom: 8 }}>
-              Business Day End Time
-            </label>
-            <input
-              type="time"
-              style={inputStyle}
-              value={dayEndTime}
-              onChange={(e) => saveDayEndTime(e.target.value)}
-            />
-            <small style={{ color: C.textMuted, fontSize: 11, display: 'block', marginTop: 4 }}>
-              After this time, "Today's Collection" will reset for the next business day.
-            </small>
-          </div>
-          
-          <div style={{ marginBottom: 16, padding: 12, background: C.card, borderRadius: 8 }}>
-            <div style={{ fontSize: 12, color: C.textSub, marginBottom: 4 }}>Current Status</div>
-            <div style={{ fontSize: 14, color: C.text }}>
-              Day ends at: <strong>{dayEndTime}</strong><br/>
-              Business date: <strong>{businessToday}</strong><br/>
-              Last closed: {lastDayClosed ? new Date(lastDayClosed).toLocaleString() : 'Never'}
-            </div>
-          </div>
-          
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Btn variant="ghost" onClick={()=>setShowDayEndSettings(false)}>Close</Btn>
-            <Btn variant="danger" onClick={()=>{
-              localStorage.removeItem('lastDayClosed');
-              setLastDayClosed(null);
-              toast('Day closure reset', 'success');
-            }}>Reset Day Closure</Btn>
-          </div>
-        </Modal>
-      )}
+      {/* Receipt Modal Component (External) */}
+      <PaymentReceipt
+        isOpen={showReceipt}
+        onClose={() => setShowReceipt(false)}
+        receipt={receipt}
+        school={schoolData || school}
+      />
     </div>
   );
 }

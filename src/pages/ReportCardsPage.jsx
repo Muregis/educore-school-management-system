@@ -1,14 +1,17 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import FeeBlock from "../components/FeeBlock";
 import PropTypes from "prop-types";
-import Btn from "../components/Btn";
-import Field from "../components/Field";
-import Badge from "../components/Badge";
-import Modal from "../components/Modal";
 import { ALL_CLASSES } from "../lib/constants";
-import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { printHTML } from "../lib/print";
+
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Modal from "../components/ui/Modal";
+import EmptyState from "../components/ui/EmptyState";
 
 export default function ReportCardsPage({ auth, school, students, canEdit, toast, feeBlocked = false, onGoFees}) {
   const [reportCards, setReportCards] = useState([]);
@@ -83,7 +86,6 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
     const { student, results, attendance, reportCard, average, branding } = fullData;
     const gradeColor = g => g === "A" ? "#22c55e" : g === "B" ? "#3b82f6" : g === "C" ? "#f59e0b" : "#ef4444";
 
-    // Use branding from backend, or fall back to school prop
     const schoolName = branding?.schoolName || school?.name || school?.school_name || "School";
     const logoUrl = branding?.logoUrl || school?.logo_url || "";
     const motto = branding?.schoolMotto || school?.motto || school?.tagline || "";
@@ -95,7 +97,6 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
 
     const html = `
       <div class="print-document">
-        <!-- School Header with Branding -->
         <div class="print-header">
           <div class="print-header-content">
             ${logoUrl ? `<div class="print-header-logo"><img src="${logoUrl}" alt="${schoolName} logo" style="max-width:60px;max-height:60px;object-fit:contain;"></div>` : ""}
@@ -115,7 +116,6 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
           <div class="print-header-divider"></div>
         </div>
 
-        <!-- Student Info -->
         <div class="info">
           <div class="info-box"><div class="info-label">Student Name</div><strong>${student.full_name}</strong></div>
           <div class="info-box"><div class="info-label">Admission No.</div><strong>${student.admission_number}</strong></div>
@@ -125,7 +125,6 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
           <div class="info-box"><div class="info-label">Attendance</div><strong>${attendance?.present||0} / ${attendance?.total||0} days</strong></div>
         </div>
 
-        <!-- Results Table -->
         <table>
           <thead><tr><th>Subject</th><th>Score</th><th>Grade</th><th>Remarks</th></tr></thead>
           <tbody>${results.map(r => `
@@ -138,11 +137,9 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
           </tbody>
         </table>
 
-        <!-- Comments -->
         ${reportCard?.class_teacher_comment ? `<div class="comment"><strong>Class Teacher Comment:</strong> ${reportCard.class_teacher_comment}</div>` : ''}
         ${reportCard?.principal_comment ? `<div class="comment"><strong>Principal Comment:</strong> ${reportCard.principal_comment}</div>` : ''}
 
-        <!-- Signature Section -->
         <div class="signature">
           <div>Class Teacher: ___________________</div>
           <div>Principal: ___________________</div>
@@ -163,7 +160,6 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
           .print-header-info-full .print-header-contact{justify-content:flex-start}
           .print-header-title{text-align:center;font-size:14px;font-weight:600;color:#374151;margin:12px 0;text-transform:uppercase;letter-spacing:1px}
           .print-header-divider{height:2px;background:linear-gradient(90deg,transparent,#c9a84c,transparent);margin:12px 0}
-          .sub{color:#666;font-size:13px;margin-bottom:20px;text-align:center}
           .info{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
           .info-box{background:#f8f8f8;padding:8px 12px;border-radius:6px}
           .info-label{font-size:10px;color:#888;margin-bottom:2px}
@@ -188,28 +184,47 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
 
 
   if (feeBlocked) return <FeeBlock onGoFees={onGoFees} pageName="Report Cards" />;
-  return (
-    <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
-        <select style={{ ...inputStyle, width: "auto" }} value={term} onChange={e => setTerm(e.target.value)}>
-          <option>Term 1</option><option>Term 2</option><option>Term 3</option>
-        </select>
-        <select style={{ ...inputStyle, width: "auto" }} value={year} onChange={e => setYear(e.target.value)}>
-          <option>2024</option><option>2025</option><option>2026</option>
-        </select>
-        <select style={{ ...inputStyle, width: "auto" }} value={filterClass} onChange={e => setFilterClass(e.target.value)}>
-          <option value="all">All classes</option>
-          {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        {canEdit && <Btn onClick={() => setShowForm(true)}>+ Add Report Card</Btn>}
-      </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      {/* Filters Container */}
+      <Card style={{ padding: "var(--space-3)" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", alignItems: "center" }}>
+          <Select 
+            value={term} 
+            onChange={e => setTerm(e.target.value)}
+            options={["Term 1", "Term 2", "Term 3"].map(t => ({ value: t, label: t }))}
+          />
+          <Select 
+            value={year} 
+            onChange={e => setYear(e.target.value)}
+            options={["2024", "2025", "2026"].map(y => ({ value: y, label: y }))}
+          />
+          <Select 
+            value={filterClass} 
+            onChange={e => setFilterClass(e.target.value)}
+            options={[
+              { value: "all", label: "All classes" },
+              ...ALL_CLASSES.map(c => ({ value: c, label: c }))
+            ]}
+          />
+          <div style={{ marginLeft: "auto" }}>
+            {canEdit && <Button onClick={() => setShowForm(true)}>+ Add Report Card</Button>}
+          </div>
+        </div>
+      </Card>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", alignItems: "start" }}>
         {/* Students list grouped by class */}
-        <div>
-          <div style={{ fontWeight: 700, color: C.text, marginBottom: 8 }}>Students by Class</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          <div style={{ fontWeight: 700, color: "var(--color-text-primary)", fontSize: "16px" }}>Students by Class</div>
           {(() => {
             const filteredStudents = filterClass === "all" ? students : students.filter(s => (s.className ?? s.class_name) === filterClass);
+            
+            if (filteredStudents.length === 0) {
+              return <EmptyState icon="👨‍🎓" title="No Students" description="No students found matching your filters." />;
+            }
+            
             const grouped = filteredStudents.reduce((acc, s) => {
               const cls = s.className ?? s.class_name ?? "No Class";
               if (!acc[cls]) acc[cls] = [];
@@ -221,32 +236,59 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
               return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
             };
             const sortedClasses = Object.keys(grouped).sort((a, b) => classOrderIndex(a) - classOrderIndex(b) || a.localeCompare(b));
+            
             return sortedClasses.map(cls => (
-              <div key={cls} style={{ marginBottom: 16 }}>
-                <div style={{ fontWeight: 700, color: C.accent, fontSize: 13, marginBottom: 6, padding: "4px 8px", background: C.accent + "15", borderRadius: 6 }}>{cls} ({grouped[cls].length})</div>
-                {grouped[cls].map(s => {
-                  const sid = s.id ?? s.student_id;
-                  const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
-                  const card = reportCards.find(r => String(r.student_id) === String(sid));
-                  return (
-                    <div key={sid} onClick={() => viewFull(sid)} style={{ background: selected === sid ? C.accent + "22" : C.card, border: `1px solid ${selected === sid ? C.accent : C.border}`, borderRadius: 8, padding: "10px 14px", marginBottom: 6, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", marginLeft: 8 }}>
-                      <div>
-                        <div style={{ fontWeight: 600, color: C.text }}>{name}</div>
-                        {card && auth.role === "admin" && (
-                          <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
-                            <button onClick={(e) => { e.stopPropagation(); approveCard(card.report_id, !card.is_approved); }} style={{ fontSize: 10, padding: "2px 6px", background: card.is_approved ? "#22c55e" : C.bg, color: card.is_approved ? "#fff" : C.text, border: "1px solid", borderRadius: 4, cursor: "pointer" }}>
-                              {card.is_approved ? "Approved" : "Approve"}
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); publishCard(card.report_id, !card.is_published); }} style={{ fontSize: 10, padding: "2px 6px", background: card.is_published ? "#3b82f6" : C.bg, color: card.is_published ? "#fff" : C.text, border: "1px solid", borderRadius: 4, cursor: "pointer", opacity: card.is_approved ? 1 : 0.5 }}>
-                              {card.is_published ? "Published" : "Publish"}
-                            </button>
-                          </div>
-                        )}
+              <div key={cls}>
+                <div style={{ fontWeight: 600, color: "var(--color-primary)", fontSize: "13px", marginBottom: "var(--space-2)", padding: "4px 8px", background: "var(--color-primary-muted)", borderRadius: "var(--radius-md)", display: "inline-block" }}>
+                  {cls} ({grouped[cls].length})
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginLeft: "var(--space-2)" }}>
+                  {grouped[cls].map(s => {
+                    const sid = s.id ?? s.student_id;
+                    const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
+                    const card = reportCards.find(r => String(r.student_id) === String(sid));
+                    const isSelected = selected === sid;
+                    
+                    return (
+                      <div 
+                        key={sid} 
+                        onClick={() => viewFull(sid)} 
+                        style={{ 
+                          background: isSelected ? "var(--color-primary-muted)" : "var(--color-bg-card)", 
+                          border: `1px solid ${isSelected ? "var(--color-primary)" : "var(--color-border)"}`, 
+                          borderRadius: "var(--radius-md)", 
+                          padding: "10px 14px", 
+                          cursor: "pointer", 
+                          display: "flex", 
+                          justifyContent: "space-between", 
+                          alignItems: "center",
+                          transition: "all 0.2s ease"
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{name}</div>
+                          {card && auth.role === "admin" && (
+                            <div style={{ display: "flex", gap: "4px", marginTop: "6px" }}>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); approveCard(card.report_id, !card.is_approved); }} 
+                                style={{ fontSize: "10px", padding: "2px 6px", background: card.is_approved ? "var(--color-success)" : "var(--color-bg-surface)", color: card.is_approved ? "#fff" : "var(--color-text-primary)", border: "1px solid " + (card.is_approved ? "var(--color-success)" : "var(--color-border)"), borderRadius: "4px", cursor: "pointer", fontWeight: 600 }}
+                              >
+                                {card.is_approved ? "Approved" : "Approve"}
+                              </button>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); publishCard(card.report_id, !card.is_published); }} 
+                                style={{ fontSize: "10px", padding: "2px 6px", background: card.is_published ? "var(--color-info)" : "var(--color-bg-surface)", color: card.is_published ? "#fff" : "var(--color-text-primary)", border: "1px solid " + (card.is_published ? "var(--color-info)" : "var(--color-border)"), borderRadius: "4px", cursor: "pointer", opacity: card.is_approved ? 1 : 0.5, fontWeight: 600 }}
+                              >
+                                {card.is_published ? "Published" : "Publish"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <Badge text={card ? (card.is_approved ? "Approved" : "Pending") : "No Card"} variant={card ? (card.is_approved ? "success" : "warning") : "neutral"} />
                       </div>
-                      <Badge text={card ? (card.is_approved ? "Approved" : "Pending") : "no card"} tone={card ? (card.is_approved ? "success" : "warning") : "danger"} />
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             ));
           })()}
@@ -254,87 +296,187 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
 
         {/* Report card preview */}
         <div>
-          {loading && <div style={{ color: C.textMuted, padding: 24 }}>Loading...</div>}
+          {loading && (
+            <Card style={{ padding: "var(--space-6)", textAlign: "center", display: "flex", justifyContent: "center" }}>
+              <div style={{ color: "var(--color-text-muted)" }}>Loading report card...</div>
+            </Card>
+          )}
+          
           {fullData && !loading && (
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <Card style={{ padding: "var(--space-4)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
                 <div>
-                  <div style={{ fontWeight: 800, color: C.text, fontSize: 16 }}>{fullData.student.full_name}</div>
-                  <div style={{ fontSize: 12, color: C.textMuted }}>{fullData.student.class_name} · {term} {year}</div>
+                  <div style={{ fontWeight: 800, color: "var(--color-text-primary)", fontSize: "18px" }}>{fullData.student.full_name}</div>
+                  <div style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>{fullData.student.class_name} · {term} {year}</div>
                 </div>
-                <Btn onClick={printCard}>🖨 Print</Btn>
+                <Button variant="secondary" onClick={printCard}>🖨 Print</Button>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-                {[["Average", `${fullData.average}%`], ["Present", `${fullData.attendance?.present||0} days`], ["Absent", `${fullData.attendance?.absent||0} days`], ["Position", fullData.reportCard?.class_position ? `${fullData.reportCard.class_position}/${fullData.reportCard.out_of||'—'}` : "—"]].map(([l,v]) => (
-                  <div key={l} style={{ background: C.bg, borderRadius: 8, padding: "8px 12px" }}>
-                    <div style={{ fontSize: 11, color: C.textMuted }}>{l}</div>
-                    <div style={{ fontWeight: 700, color: C.text }}>{v}</div>
+              
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)", marginBottom: "var(--space-4)" }}>
+                {[
+                  ["Average", `${fullData.average}%`], 
+                  ["Present", `${fullData.attendance?.present||0} days`], 
+                  ["Absent", `${fullData.attendance?.absent||0} days`], 
+                  ["Position", fullData.reportCard?.class_position ? `${fullData.reportCard.class_position}/${fullData.reportCard.out_of||'—'}` : "—"]
+                ].map(([l,v]) => (
+                  <div key={l} style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "8px 12px" }}>
+                    <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>{l}</div>
+                    <div style={{ fontWeight: 700, color: "var(--color-text-primary)", fontSize: "14px" }}>{v}</div>
                   </div>
                 ))}
               </div>
-              <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 12 }}>
-                <thead><tr>{["Subject","Score","Grade"].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", borderBottom: `1px solid ${C.border}`, fontSize: 11, color: C.textMuted }}>{h}</th>)}</tr></thead>
+              
+              <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "var(--space-4)" }}>
+                <thead>
+                  <tr>
+                    {["Subject","Score","Grade"].map(h => (
+                      <th key={h} style={{ textAlign: "left", padding: "8px 10px", borderBottom: `2px solid var(--color-border)`, fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 600 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
                 <tbody>
                   {fullData.results.map((r, i) => (
-                    <tr key={i} style={{ borderBottom: `1px solid ${C.border}` }}>
-                      <td style={{ padding: "6px 8px", color: C.text, fontSize: 13 }}>{r.subject}</td>
-                      <td style={{ padding: "6px 8px", color: C.text, fontWeight: 600 }}>{r.marks}</td>
-                      <td style={{ padding: "6px 8px" }}><Badge text={r.grade} tone={r.grade==="A"?"success":r.grade==="B"?"info":r.grade==="C"?"warning":"danger"} /></td>
+                    <tr key={i} style={{ borderBottom: `1px solid var(--color-border)` }}>
+                      <td style={{ padding: "10px", color: "var(--color-text-primary)", fontSize: "13px" }}>{r.subject}</td>
+                      <td style={{ padding: "10px", color: "var(--color-text-primary)", fontWeight: 600 }}>{r.marks}</td>
+                      <td style={{ padding: "10px" }}>
+                        <Badge text={r.grade} variant={r.grade==="A" ? "success" : r.grade==="B" ? "info" : r.grade==="C" ? "warning" : "danger"} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              
               {fullData.reportCard?.class_teacher_comment && (
-                <div style={{ background: C.bg, borderRadius: 8, padding: "8px 12px", marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 2 }}>Teacher's Comment</div>
-                  <div style={{ color: C.textSub, fontSize: 13 }}>{fullData.reportCard.class_teacher_comment}</div>
+                <div style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "12px 16px", marginBottom: "var(--space-2)" }}>
+                  <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>Teacher's Comment</div>
+                  <div style={{ color: "var(--color-text-secondary)", fontSize: "13px", fontStyle: "italic" }}>"{fullData.reportCard.class_teacher_comment}"</div>
                 </div>
               )}
-            </div>
+            </Card>
           )}
+          
           {!fullData && !loading && (
-            <div style={{ color: C.textMuted, padding: 24, textAlign: "center" }}>Select a student to view their report card</div>
+            <Card style={{ padding: "var(--space-6)" }}>
+              <EmptyState icon="📄" title="Report Card Preview" description="Select a student to view their report card" />
+            </Card>
           )}
         </div>
       </div>
 
-      {showForm && (
-        <Modal title="Add Report Card" onClose={() => setShowForm(false)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Class" style={{ gridColumn: "1 / -1" }}>
-              <select style={inputStyle} value={formClass} onChange={e => { setFormClass(e.target.value); setForm({ ...form, studentId: "" }); }}>
-                <option value="">-- Select class first --</option>
-                {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </Field>
-            <Field label="Student" style={{ gridColumn: "1 / -1" }}>
-              <select style={inputStyle} value={form.studentId} onChange={e => setForm({ ...form, studentId: e.target.value })} disabled={!formClass}>
-                <option value="">{formClass ? "-- Select student --" : "-- Select class first --"}</option>
-                {students.filter(s => (s.className ?? s.class_name) === formClass).map(s => { const id = s.id ?? s.student_id; const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`; return <option key={id} value={id}>{name}</option>; })}
-              </select>
-            </Field>
-            <Field label="Days Present"><input type="number" style={inputStyle} value={form.daysPresent} onChange={e => setForm({ ...form, daysPresent: e.target.value })} /></Field>
-            <Field label="Days Absent"><input type="number" style={inputStyle} value={form.daysAbsent} onChange={e => setForm({ ...form, daysAbsent: e.target.value })} /></Field>
-            <Field label="Class Position"><input type="number" style={inputStyle} value={form.classPosition} onChange={e => setForm({ ...form, classPosition: e.target.value })} /></Field>
-            <Field label="Out Of"><input type="number" style={inputStyle} value={form.outOf} onChange={e => setForm({ ...form, outOf: e.target.value })} /></Field>
-            <Field label="Conduct">
-              <select style={inputStyle} value={form.conduct} onChange={e => setForm({ ...form, conduct: e.target.value })}>
-                <option>Excellent</option><option>Good</option><option>Fair</option><option>Poor</option>
-              </select>
-            </Field>
-            <Field label="Class Teacher Comment" style={{ gridColumn: "1 / -1" }}>
-              <textarea style={{ ...inputStyle, height: 80, resize: "vertical" }} value={form.classTeacherComment} onChange={e => setForm({ ...form, classTeacherComment: e.target.value })} />
-            </Field>
-            <Field label="Principal Comment" style={{ gridColumn: "1 / -1" }}>
-              <textarea style={{ ...inputStyle, height: 80, resize: "vertical" }} value={form.principalComment} onChange={e => setForm({ ...form, principalComment: e.target.value })} />
-            </Field>
+      <Modal isOpen={showForm} title="Add Report Card" onClose={() => setShowForm(false)} footer={
+        <>
+          <Button variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
+          <Button onClick={save}>Save Report Card</Button>
+        </>
+      }>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+            <Select 
+              label="Class"
+              value={formClass} 
+              onChange={e => { setFormClass(e.target.value); setForm({ ...form, studentId: "" }); }}
+              options={[
+                { value: "", label: "-- Select class first --" },
+                ...ALL_CLASSES.map(c => ({ value: c, label: c }))
+              ]}
+            />
+            <Select 
+              label="Student"
+              value={form.studentId} 
+              onChange={e => setForm({ ...form, studentId: e.target.value })} 
+              disabled={!formClass}
+              options={[
+                { value: "", label: formClass ? "-- Select student --" : "-- Select class first --" },
+                ...students.filter(s => (s.className ?? s.class_name) === formClass).map(s => ({
+                  value: s.id ?? s.student_id,
+                  label: s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`
+                }))
+              ]}
+            />
           </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-            <Btn variant="ghost" onClick={() => setShowForm(false)}>Cancel</Btn>
-            <Btn onClick={save}>Save Report Card</Btn>
+
+          <Input 
+            label="Days Present"
+            type="number" 
+            value={form.daysPresent} 
+            onChange={e => setForm({ ...form, daysPresent: e.target.value })} 
+          />
+          <Input 
+            label="Days Absent"
+            type="number" 
+            value={form.daysAbsent} 
+            onChange={e => setForm({ ...form, daysAbsent: e.target.value })} 
+          />
+          
+          <Input 
+            label="Class Position"
+            type="number" 
+            value={form.classPosition} 
+            onChange={e => setForm({ ...form, classPosition: e.target.value })} 
+          />
+          <Input 
+            label="Out Of"
+            type="number" 
+            value={form.outOf} 
+            onChange={e => setForm({ ...form, outOf: e.target.value })} 
+          />
+          
+          <div style={{ gridColumn: "1 / -1" }}>
+            <Select 
+              label="Conduct"
+              value={form.conduct} 
+              onChange={e => setForm({ ...form, conduct: e.target.value })}
+              options={[
+                { value: "Excellent", label: "Excellent" },
+                { value: "Good", label: "Good" },
+                { value: "Fair", label: "Fair" },
+                { value: "Poor", label: "Poor" }
+              ]}
+            />
           </div>
-        </Modal>
-      )}
+          
+          <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+            <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Class Teacher Comment</label>
+            <textarea 
+              style={{
+                width: "100%",
+                padding: "var(--space-3)",
+                background: "var(--color-bg-base)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-md)",
+                color: "var(--color-text-primary)",
+                fontFamily: "var(--font-body)",
+                fontSize: "14px",
+                height: 80,
+                resize: "vertical"
+              }} 
+              value={form.classTeacherComment} 
+              onChange={e => setForm({ ...form, classTeacherComment: e.target.value })} 
+            />
+          </div>
+          
+          <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+            <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Principal Comment</label>
+            <textarea 
+              style={{
+                width: "100%",
+                padding: "var(--space-3)",
+                background: "var(--color-bg-base)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-md)",
+                color: "var(--color-text-primary)",
+                fontFamily: "var(--font-body)",
+                fontSize: "14px",
+                height: 80,
+                resize: "vertical"
+              }} 
+              value={form.principalComment} 
+              onChange={e => setForm({ ...form, principalComment: e.target.value })} 
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

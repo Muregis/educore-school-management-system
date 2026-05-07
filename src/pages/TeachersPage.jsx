@@ -1,14 +1,17 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
-import Btn from "../components/Btn";
-import Field from "../components/Field";
-import Badge from "../components/Badge";
-import Modal from "../components/Modal";
-import Table from "../components/Table";
-import { C, inputStyle } from "../lib/theme";
-import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
 import { apiFetch } from "../lib/api";
-import { Msg, pager, Pager } from "../components/Helpers";
+import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
+import { pager } from "../components/Helpers";
+
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Modal from "../components/ui/Modal";
+import EmptyState from "../components/ui/EmptyState";
+import Table from "../components/ui/Table";
 
 function normalise(t) {
   return {
@@ -26,6 +29,19 @@ function normalise(t) {
   };
 }
 
+function Pager({ page, pages, setPage }) {
+  if (pages <= 1) return null;
+  return (
+    <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "center", marginTop: "var(--space-3)" }}>
+      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+        style={{ padding: "4px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: page === 1 ? "default" : "pointer" }}>‹</button>
+      <span style={{ padding: "4px 10px", fontSize: "13px", color: "var(--color-text-secondary)" }}>{page} / {pages}</span>
+      <button onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}
+        style={{ padding: "4px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: page === pages ? "default" : "pointer" }}>›</button>
+    </div>
+  );
+}
+
 export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toast }) {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("all");
@@ -33,15 +49,22 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const [show, setShow] = useState(false);
   const [editId, setEditId] = useState(null);
   const [f, setF] = useState({ firstName: "", lastName: "", email: "", phone: "", staffNumber: "", tscStaffId: "", status: "active", classes: [], timetable: "", subjects: [] });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!auth?.token) return;
+    setLoading(true);
     const ac = new AbortController();
     apiFetch("/teachers", { token: auth.token, signal: ac.signal })
-      .then(data => setTeachers(data.map(normalise)))
-      .catch(e => { if (e?.code !== "EABORT") toast("Failed to fetch teachers", "error"); });
+      .then(data => { setTeachers(data.map(normalise)); setLoading(false); })
+      .catch(e => { 
+        if (e?.code !== "EABORT") {
+          toast("Failed to fetch teachers", "error");
+          setLoading(false);
+        }
+      });
     return () => ac.abort();
-  }, [auth, setTeachers]);
+  }, [auth, setTeachers, toast]);
 
   const normalised = teachers.map(t => t.first_name ? normalise(t) : t);
 
@@ -74,6 +97,9 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
             staffNumber: f.staffNumber || null,
             tscStaffId: f.tscStaffId || null,
             status: f.status,
+            classes: f.classes,
+            subjects: f.subjects,
+            timetable: f.timetable || null
           },
           token: auth?.token,
         });
@@ -89,6 +115,9 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
             staffNumber: f.staffNumber || null,
             tscStaffId: f.tscStaffId || null,
             status: f.status,
+            classes: f.classes,
+            subjects: f.subjects,
+            timetable: f.timetable || null
           },
           token: auth?.token,
         });
@@ -122,87 +151,182 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   };
 
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 8, marginBottom: 10 }}>
-        <input style={inputStyle} value={q} onChange={e => setQ(e.target.value)} placeholder="Search teacher, class, subject" />
-        <select style={inputStyle} value={status} onChange={e => setStatus(e.target.value)}>
-          <option value="all">All status</option>
-          <option value="active">active</option>
-          <option value="inactive">inactive</option>
-        </select>
-        <Btn variant="ghost" onClick={() => {
-          const headers = ["Name","Email","Phone","Staff Number","TSC/Staff ID","Status","Classes","Subjects"];
-          const rows = filtered.map(t => [`${t.firstName} ${t.lastName}`,t.email,t.phone||"",t.staffNumber||"",t.tscStaffId||"",t.status,(t.classes||[]).join("|"),(t.subjects||[]).join("|")]);
-          const content = [headers, ...rows].map(r => r.join(",")).join("\n");
-          const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([content], { type: "text/csv" })); a.download = "teachers.csv"; a.click();
-          toast("Teachers CSV exported", "success");
-        }}>Export CSV</Btn>
-        {canEdit && <Btn onClick={openAdd}>Add Teacher</Btn>}
-        {["admin","director","superadmin"].includes(auth?.role) && <Btn variant="ghost" onClick={syncToHR}>Sync to HR</Btn>}
-      </div>
-      {filtered.length === 0 ? <Msg text="No teachers found." /> : (
-        <>
-          <div style={{ overflowX: "auto" }}>
-            <Table
-              headers={["Name","Email","Phone","Staff No.","TSC/Staff ID","Classes","Subjects","Timetable","Status","Actions"]}
-              rows={rows.map(t => [
-                <span key={t.id} style={{ color: C.text, fontWeight: 600 }}>{t.firstName} {t.lastName}</span>,
-                t.email, t.phone || "-",
-                t.staffNumber || "-",
-                t.tscStaffId || "-",
-                (t.classes||[]).join(", ") || "-",
-                (t.subjects||[]).join(", ") || "-",
-                t.timetable || "-",
-                <Badge key="st" text={t.status} tone={t.status === "active" ? "success" : "danger"} />,
-                <div key="a" style={{ display: "flex", gap: 6 }}>
-                  {canEdit && <Btn variant="ghost" onClick={() => { setEditId(t.id); setF(t); setShow(true); }}>Edit</Btn>}
-                  {canEdit && <Btn variant="danger" onClick={() => del(t.id)}>Delete</Btn>}
-                </div>
-              ])}
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      {/* Filters Container */}
+      <Card style={{ padding: "var(--space-3)" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", alignItems: "center" }}>
+          <div style={{ flex: 1, minWidth: "200px" }}>
+            <Input 
+              placeholder="Search teacher, class, subject..." 
+              value={q} 
+              onChange={e => setQ(e.target.value)} 
             />
           </div>
-          <Pager page={page} pages={pages} setPage={setPage} />
-        </>
-      )}
-      {show && (
-        <Modal title={editId ? "Edit Teacher" : "Add Teacher"} onClose={() => setShow(false)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="First Name"><input style={inputStyle} value={f.firstName} onChange={e => setF({ ...f, firstName: e.target.value })} /></Field>
-            <Field label="Last Name"><input style={inputStyle} value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} /></Field>
-            <Field label="Email"><input style={inputStyle} value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></Field>
-            <Field label="Phone"><input style={inputStyle} value={f.phone||""} onChange={e => setF({ ...f, phone: e.target.value })} /></Field>
-            <Field label="Staff Number"><input style={inputStyle} value={f.staffNumber||""} onChange={e => setF({ ...f, staffNumber: e.target.value })} /></Field>
-            <Field label="TSC / Staff ID"><input style={inputStyle} value={f.tscStaffId||""} onChange={e => setF({ ...f, tscStaffId: e.target.value })} /></Field>
-            <Field label="Status"><select style={inputStyle} value={f.status} onChange={e => setF({ ...f, status: e.target.value })}><option value="active">active</option><option value="inactive">inactive</option></select></Field>
-            <Field label="Timetable"><input style={inputStyle} value={f.timetable||""} onChange={e => setF({ ...f, timetable: e.target.value })} /></Field>
+          <div style={{ width: "150px" }}>
+            <Select 
+              value={status} 
+              onChange={e => setStatus(e.target.value)}
+              options={[
+                { value: "all", label: "All status" },
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" }
+              ]}
+            />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <Button variant="secondary" onClick={() => {
+              const headers = ["Name","Email","Phone","Staff Number","TSC/Staff ID","Status","Classes","Subjects"];
+              const exportRows = filtered.map(t => [`${t.firstName} ${t.lastName}`,t.email,t.phone||"",t.staffNumber||"",t.tscStaffId||"",t.status,(t.classes||[]).join("|"),(t.subjects||[]).join("|")]);
+              const content = [headers, ...exportRows].map(r => r.join(",")).join("\n");
+              const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([content], { type: "text/csv" })); a.download = "teachers.csv"; a.click();
+              toast("Teachers CSV exported", "success");
+            }}>📤 Export CSV</Button>
+            {["admin","director","superadmin"].includes(auth?.role) && <Button variant="ghost" onClick={syncToHR}>🔄 Sync to HR</Button>}
+            {canEdit && <Button onClick={openAdd}>+ Add Teacher</Button>}
+          </div>
+        </div>
+      </Card>
+
+      {loading ? (
+        <EmptyState icon="⏳" title="Loading Teachers" description="Please wait while we load the staff directory..." />
+      ) : filtered.length === 0 ? (
+        <EmptyState icon="👨‍🏫" title="No Teachers Found" description={q || status !== "all" ? "No teachers match your search filters." : "No teachers have been added to the system yet."} />
+      ) : (
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <Table
+            headers={["Name","Email","Phone","Staff No.","TSC/Staff ID","Classes","Subjects","Timetable","Status","Actions"]}
+            data={rows.map(t => [
+              <span key={t.id} style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{t.firstName} {t.lastName}</span>,
+              <span key="email" style={{ color: "var(--color-text-secondary)" }}>{t.email}</span>,
+              <span key="phone" style={{ color: "var(--color-text-secondary)" }}>{t.phone || "-"}</span>,
+              <span key="staffNo" style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{t.staffNumber || "-"}</span>,
+              <span key="tscId" style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{t.tscStaffId || "-"}</span>,
+              <span key="classes" style={{ fontSize: "13px" }}>{(t.classes||[]).join(", ") || "-"}</span>,
+              <span key="subjects" style={{ fontSize: "13px" }}>{(t.subjects||[]).join(", ") || "-"}</span>,
+              <span key="timetable" style={{ color: "var(--color-text-secondary)" }}>{t.timetable || "-"}</span>,
+              <Badge key="st" text={t.status} variant={t.status === "active" ? "success" : "danger"} />,
+              <div key="a" style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+                {canEdit && <Button size="sm" variant="secondary" onClick={() => { setEditId(t.id); setF(t); setShow(true); }}>Edit</Button>}
+                {canEdit && <Button size="sm" variant="danger" onClick={() => del(t.id)}>Delete</Button>}
+              </div>
+            ])}
+          />
+          <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
+            <Pager page={page} pages={pages} setPage={setPage} />
+          </div>
+        </Card>
+      )}
+
+      {/* Edit/Add Modal */}
+      <Modal isOpen={show} title={editId ? "Edit Teacher" : "Add Teacher"} onClose={() => setShow(false)} footer={
+        <>
+          <Button variant="ghost" onClick={() => setShow(false)}>Cancel</Button>
+          <Button onClick={save}>Save Teacher</Button>
+        </>
+      }>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <Input 
+            label="First Name *"
+            value={f.firstName} 
+            onChange={e => setF({ ...f, firstName: e.target.value })} 
+          />
+          <Input 
+            label="Last Name *"
+            value={f.lastName} 
+            onChange={e => setF({ ...f, lastName: e.target.value })} 
+          />
+          <Input 
+            label="Email *"
+            type="email"
+            value={f.email} 
+            onChange={e => setF({ ...f, email: e.target.value })} 
+          />
+          <Input 
+            label="Phone"
+            value={f.phone || ""} 
+            onChange={e => setF({ ...f, phone: e.target.value })} 
+          />
+          <Input 
+            label="Staff Number"
+            value={f.staffNumber || ""} 
+            onChange={e => setF({ ...f, staffNumber: e.target.value })} 
+          />
+          <Input 
+            label="TSC / Staff ID"
+            value={f.tscStaffId || ""} 
+            onChange={e => setF({ ...f, tscStaffId: e.target.value })} 
+          />
+          <Select 
+            label="Status"
+            value={f.status} 
+            onChange={e => setF({ ...f, status: e.target.value })}
+            options={[
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "Inactive" }
+            ]}
+          />
+          <Input 
+            label="Timetable"
+            value={f.timetable || ""} 
+            onChange={e => setF({ ...f, timetable: e.target.value })} 
+            placeholder="e.g. 14 hours/week"
+          />
+
+          {/* Subjects and Classes Selection */}
+          <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginTop: "var(--space-2)" }}>
             <div>
-              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 6 }}>Subjects (select all that apply)</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-2)" }}>
+                Subjects <span style={{ textTransform: "none", opacity: 0.8, fontWeight: 400 }}>(select all that apply)</span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
                 {SUBJECTS.map(s => {
                   const sel = (f.subjects||[]).includes(s);
                   return (
-                    <div key={s} onClick={() => setF(prev => ({ ...prev, subjects: sel ? prev.subjects.filter(x => x !== s) : [...(prev.subjects||[]), s] }))}
-                      style={{ padding: "4px 10px", borderRadius: 20, fontSize: 12, cursor: "pointer",
-                        background: sel ? C.accent : C.card, color: sel ? "#fff" : C.textSub,
-                        border: `1px solid ${sel ? C.accent : C.border}` }}>
+                    <div 
+                      key={s} 
+                      onClick={() => setF(prev => ({ ...prev, subjects: sel ? prev.subjects.filter(x => x !== s) : [...(prev.subjects||[]), s] }))}
+                      style={{ 
+                        padding: "4px 12px", 
+                        borderRadius: "20px", 
+                        fontSize: "12px", 
+                        cursor: "pointer",
+                        fontWeight: 500,
+                        transition: "all 0.15s ease",
+                        background: sel ? "var(--color-primary)" : "var(--color-bg-surface)", 
+                        color: sel ? "#ffffff" : "var(--color-text-secondary)",
+                        border: `1px solid ${sel ? "var(--color-primary)" : "var(--color-border)"}` 
+                      }}
+                    >
                       {s}
                     </div>
                   );
                 })}
               </div>
             </div>
+
             <div>
-              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 6 }}>Classes (select all that apply)</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-2)" }}>
+                Classes <span style={{ textTransform: "none", opacity: 0.8, fontWeight: 400 }}>(select all that apply)</span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
                 {ALL_CLASSES.map(c => {
                   const sel = (f.classes||[]).includes(c);
                   return (
-                    <div key={c} onClick={() => setF(prev => ({ ...prev, classes: sel ? prev.classes.filter(x => x !== c) : [...(prev.classes||[]), c] }))}
-                      style={{ padding: "4px 10px", borderRadius: 20, fontSize: 12, cursor: "pointer",
-                        background: sel ? "#22c55e" : C.card, color: sel ? "#fff" : C.textSub,
-                        border: `1px solid ${sel ? "#22c55e" : C.border}` }}>
+                    <div 
+                      key={c} 
+                      onClick={() => setF(prev => ({ ...prev, classes: sel ? prev.classes.filter(x => x !== c) : [...(prev.classes||[]), c] }))}
+                      style={{ 
+                        padding: "4px 12px", 
+                        borderRadius: "20px", 
+                        fontSize: "12px", 
+                        cursor: "pointer",
+                        fontWeight: 500,
+                        transition: "all 0.15s ease",
+                        background: sel ? "var(--color-success)" : "var(--color-bg-surface)", 
+                        color: sel ? "#ffffff" : "var(--color-text-secondary)",
+                        border: `1px solid ${sel ? "var(--color-success)" : "var(--color-border)"}` 
+                      }}
+                    >
                       {c}
                     </div>
                   );
@@ -210,12 +334,8 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
-            <Btn variant="ghost" onClick={() => setShow(false)}>Cancel</Btn>
-            <Btn onClick={save}>Save</Btn>
-          </div>
-        </Modal>
-      )}
+        </div>
+      </Modal>
     </div>
   );
 }

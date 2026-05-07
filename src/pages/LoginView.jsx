@@ -200,6 +200,7 @@ export default function LoginView({ onLogin }) {
         role: data.user.role,
         schoolId: data.user.schoolId,
         token: data.token,
+        sessionId: data.sessionId,
         studentId: null,
       });
       setEmail("");
@@ -232,6 +233,7 @@ export default function LoginView({ onLogin }) {
         role: data.user.role,
         schoolId: data.user.schoolId,
         token: data.token,
+        sessionId: data.sessionId,
         studentId: data.user.studentId,
         admission: admission.trim(),
         feeBlocked: data.feeBlocked ?? false,
@@ -504,6 +506,5 @@ const toggleButtonStyle = {
 LoginView.propTypes = {
   onLogin: PropTypes.func.isRequired,
 };
-
 
 

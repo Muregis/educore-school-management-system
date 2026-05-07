@@ -1,17 +1,20 @@
 import { useState, useEffect, useMemo } from "react";
 import FeeBlock from "../components/FeeBlock";
 import PropTypes from "prop-types";
-import Btn from "../components/Btn";
-import Field from "../components/Field";
-import Badge from "../components/Badge";
-import Modal from "../components/Modal";
-import Table from "../components/Table";
 import QRScanner from "../components/QRScanner";
 import { ALL_CLASSES } from "../lib/constants";
-import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { parseStudentQrContent } from "../lib/qr";
-import { Pager, Msg, csv, pager } from "../components/Helpers";
+import { Pager, csv, pager } from "../components/Helpers";
+
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Modal from "../components/ui/Modal";
+import EmptyState from "../components/ui/EmptyState";
+import Table from "../components/ui/Table";
 
 // NEW: More robust normalise with multiple fallbacks
 function normalise(a) {
@@ -115,7 +118,6 @@ export default function AttendancePage({
     try {
       await apiFetch("/attendance/bulk", {
         method: "POST",
-        // OLD: body: { classId: cls, date, records: bulk },
         body: { classId: resolvedClassId, className: cls, date, records: bulk },
         token: auth?.token,
       });
@@ -223,241 +225,231 @@ export default function AttendancePage({
   }
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Summary badges */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+      <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
         <Badge 
           text={`Present: ${normalised.filter(a => a.status === "present").length}`} 
-          tone="success" 
+          variant="success" 
         />
         <Badge 
           text={`Absent: ${normalised.filter(a => a.status === "absent").length}`} 
-          tone="danger" 
+          variant="danger" 
         />
         <Badge 
           text={`Late: ${normalised.filter(a => a.status === "late").length}`} 
-          tone="warning" 
+          variant="warning" 
         />
       </div>
 
       {/* Filters and actions */}
-      <div style={{ 
-        display: "grid", 
-        gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", 
-        gap: 8, 
-        marginBottom: 10 
-      }}>
-        <select 
-          style={inputStyle} 
-          value={filterClass} 
-          onChange={e => setFilterClass(e.target.value)}
-        >
-          <option value="all">All classes</option>
-          {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
-        </select>
-        
-        <input 
-          type="date" 
-          style={inputStyle} 
-          value={filterDate} 
-          onChange={e => setFilterDate(e.target.value)} 
-        />
-        
-        <Btn 
-          variant="ghost" 
-          onClick={() => { 
-            csv(
-              "attendance.csv", 
-              ["Date","Class","Student","Status"], 
-              filtered.map(a => [a.date, a.className, a.studentName, a.status])
-            ); 
-            toast("Attendance CSV exported","success"); 
-          }}
-        >
-          Export CSV
-        </Btn>
-        
-        <Btn variant="secondary" onClick={() => setShowQRScanner(true)}>
-          📱 Scan QR
-        </Btn>
-        
-        {canEdit && (
-          <Btn onClick={() => setShowBulk(true)}>
-            Bulk Mark Class
-          </Btn>
-        )}
-      </div>
+      <Card style={{ padding: "var(--space-3)" }}>
+        <div style={{ 
+          display: "grid", 
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", 
+          gap: "var(--space-3)", 
+          alignItems: "end" 
+        }}>
+          <Select 
+            value={filterClass} 
+            onChange={e => setFilterClass(e.target.value)}
+            options={[
+              { value: "all", label: "All classes" },
+              ...ALL_CLASSES.map(c => ({ value: c, label: c }))
+            ]}
+          />
+          
+          <Input 
+            type="date" 
+            value={filterDate} 
+            onChange={e => setFilterDate(e.target.value)} 
+          />
+          
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <Button 
+              variant="ghost" 
+              onClick={() => { 
+                csv(
+                  "attendance.csv", 
+                  ["Date","Class","Student","Status"], 
+                  filtered.map(a => [a.date, a.className, a.studentName, a.status])
+                ); 
+                toast("Attendance CSV exported","success"); 
+              }}
+            >
+              Export CSV
+            </Button>
+            
+            <Button variant="secondary" onClick={() => setShowQRScanner(true)}>
+              📱 Scan QR
+            </Button>
+            
+            {canEdit && (
+              <Button variant="primary" onClick={() => setShowBulk(true)}>
+                Bulk Mark Class
+              </Button>
+            )}
+          </div>
+        </div>
+      </Card>
 
       {/* Attendance table */}
       {filtered.length === 0 ? (
-        <Msg text="No attendance records." />
+        <EmptyState icon="📅" title="No Attendance Records" description="Try selecting a different date or class." />
       ) : (
-        <>
-          <div style={{ overflowX: "auto" }}>
-            <Table
-              headers={["Date","Class","Student","Status","Actions"]}
-              rows={rows.map(a => [
-                a.date,
-                a.className,
-                <span key={a.id} style={{ color: C.text, fontWeight: 600 }}>
-                  {a.studentName}
-                </span>,
-                <Badge 
-                  key="s" 
-                  text={a.status} 
-                  tone={
-                    a.status === "present" ? "success" : 
-                    a.status === "late" ? "warning" : 
-                    "danger"
-                  } 
-                />,
-                <div key="x" style={{ display: "flex", gap: 6 }}>
-                  {canEdit && (
-                    <Btn variant="ghost" onClick={() => setEditing(a)}>
-                      Edit
-                    </Btn>
-                  )}
-                  {canEdit && (
-                    <Btn variant="danger" onClick={() => del(a.id)}>
-                      Delete
-                    </Btn>
-                  )}
-                </div>
-              ])}
-            />
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <Table
+            headers={["Date", "Class", "Student", "Status", "Actions"]}
+            data={rows.map(a => [
+              a.date,
+              a.className,
+              <span key={a.id} style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>
+                {a.studentName}
+              </span>,
+              <Badge 
+                key="s" 
+                text={a.status} 
+                variant={
+                  a.status === "present" ? "success" : 
+                  a.status === "late" ? "warning" : 
+                  "danger"
+                } 
+              />,
+              <div key="x" style={{ display: "flex", gap: "var(--space-2)" }}>
+                {canEdit && (
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(a)}>
+                    Edit
+                  </Button>
+                )}
+                {canEdit && (
+                  <Button size="sm" variant="danger" onClick={() => del(a.id)}>
+                    Delete
+                  </Button>
+                )}
+              </div>
+            ])}
+          />
+          <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
+            <Pager page={page} pages={pages} setPage={setPage} />
           </div>
-          <Pager page={page} pages={pages} setPage={setPage} />
-        </>
+        </Card>
       )}
 
       {/* Bulk marking modal */}
-      {showBulk && (
-        <Modal title="Bulk Attendance by Class" onClose={() => setShowBulk(false)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Class">
-              <select 
-                style={inputStyle} 
-                value={cls} 
-                onChange={e => setCls(e.target.value)}
-              >
-                {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
-              </select>
-            </Field>
-            <Field label="Date">
-              <input 
-                type="date" 
-                style={inputStyle} 
-                value={date} 
-                onChange={e => setDate(e.target.value)} 
-              />
-            </Field>
-          </div>
+      <Modal isOpen={showBulk} title="Bulk Attendance by Class" onClose={() => setShowBulk(false)} footer={
+        <>
+          <Button variant="ghost" onClick={() => setShowBulk(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={saveBulk}>
+            Save Class Attendance
+          </Button>
+        </>
+      }>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+          <Select 
+            label="Class"
+            value={cls} 
+            onChange={e => setCls(e.target.value)}
+            options={ALL_CLASSES.map(c => ({ value: c, label: c }))}
+          />
+          <Input 
+            label="Date"
+            type="date" 
+            value={date} 
+            onChange={e => setDate(e.target.value)} 
+          />
+        </div>
 
-          {classStudents.length === 0 ? (
-            <Msg text="No active students in this class." />
-          ) : (
-            <div style={{ 
-              maxHeight: 320, 
-              overflowY: "auto", 
-              border: `1px solid ${C.border}`, 
-              borderRadius: 10, 
-              padding: 8, 
-              marginBottom: 10 
-            }}>
-              {classStudents.map(s => {
-                const sid = s.id ?? s.student_id;
-                const idx = bulk.findIndex(b => b.studentId === sid);
-                const val = idx >= 0 ? bulk[idx].status : "present";
-                const name = s.firstName 
-                  ? `${s.firstName} ${s.lastName}` 
-                  : `${s.first_name} ${s.last_name}`;
-                
-                return (
-                  <div 
-                    key={sid} 
-                    style={{ 
-                      display: "grid", 
-                      gridTemplateColumns: "1fr 150px", 
-                      gap: 8, 
-                      alignItems: "center", 
-                      borderBottom: `1px solid ${C.border}`, 
-                      padding: "8px 4px" 
-                    }}
-                  >
-                    <div style={{ color: C.text }}>{name}</div>
-                    <select 
-                      style={inputStyle} 
-                      value={val} 
-                      onChange={e => setBulk(prev => 
-                        prev.map(x => 
-                          x.studentId === sid 
-                            ? { ...x, status: e.target.value } 
-                            : x
-                        )
-                      )}
-                    >
-                      <option value="present">present</option>
-                      <option value="absent">absent</option>
-                      <option value="late">late</option>
-                    </select>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <Btn variant="ghost" onClick={() => setShowBulk(false)}>
-              Cancel
-            </Btn>
-            <Btn onClick={saveBulk}>
-              Save Class Attendance
-            </Btn>
+        {classStudents.length === 0 ? (
+          <EmptyState icon="👩‍🎓" title="No Active Students" description="There are no active students in this class." />
+        ) : (
+          <div style={{ 
+            maxHeight: "320px", 
+            overflowY: "auto", 
+            border: "1px solid var(--color-border)", 
+            borderRadius: "var(--radius-md)", 
+            padding: "var(--space-2)", 
+            background: "var(--color-bg-base)"
+          }}>
+            {classStudents.map(s => {
+              const sid = s.id ?? s.student_id;
+              const idx = bulk.findIndex(b => b.studentId === sid);
+              const val = idx >= 0 ? bulk[idx].status : "present";
+              const name = s.firstName 
+                ? `${s.firstName} ${s.lastName}` 
+                : `${s.first_name} ${s.last_name}`;
+              
+              return (
+                <div 
+                  key={sid} 
+                  style={{ 
+                    display: "grid", 
+                    gridTemplateColumns: "1fr 150px", 
+                    gap: "var(--space-3)", 
+                    alignItems: "center", 
+                    borderBottom: "1px solid var(--color-border)", 
+                    padding: "var(--space-2) var(--space-2)" 
+                  }}
+                >
+                  <div style={{ color: "var(--color-text-primary)", fontWeight: 500, fontSize: "14px" }}>{name}</div>
+                  <Select 
+                    value={val} 
+                    onChange={e => setBulk(prev => 
+                      prev.map(x => 
+                        x.studentId === sid 
+                          ? { ...x, status: e.target.value } 
+                          : x
+                      )
+                    )}
+                    options={[
+                      { value: "present", label: "Present" },
+                      { value: "absent", label: "Absent" },
+                      { value: "late", label: "Late" }
+                    ]}
+                  />
+                </div>
+              );
+            })}
           </div>
-        </Modal>
-      )}
+        )}
+      </Modal>
 
       {/* Edit modal */}
-      {editing && (
-        <Modal title="Edit Attendance" onClose={() => setEditing(null)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Student">
-              <input style={inputStyle} value={editing.studentName} disabled />
-            </Field>
-            <Field label="Class">
-              <input style={inputStyle} value={editing.className} disabled />
-            </Field>
-            <Field label="Date">
-              <input 
-                type="date" 
-                style={inputStyle} 
-                value={editing.date} 
-                onChange={e => setEditing({ ...editing, date: e.target.value })} 
-              />
-            </Field>
-            <Field label="Status">
-              <select 
-                style={inputStyle} 
-                value={editing.status} 
-                onChange={e => setEditing({ ...editing, status: e.target.value })}
-              >
-                <option value="present">present</option>
-                <option value="absent">absent</option>
-                <option value="late">late</option>
-              </select>
-            </Field>
+      <Modal isOpen={!!editing} title="Edit Attendance" onClose={() => setEditing(null)} footer={
+        <>
+          <Button variant="ghost" onClick={() => setEditing(null)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={saveEdit}>
+            Save Changes
+          </Button>
+        </>
+      }>
+        {editing && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+            <Input label="Student" value={editing.studentName} disabled />
+            <Input label="Class" value={editing.className} disabled />
+            <Input 
+              label="Date"
+              type="date" 
+              value={editing.date} 
+              onChange={e => setEditing({ ...editing, date: e.target.value })} 
+            />
+            <Select 
+              label="Status"
+              value={editing.status} 
+              onChange={e => setEditing({ ...editing, status: e.target.value })}
+              options={[
+                { value: "present", label: "Present" },
+                { value: "absent", label: "Absent" },
+                { value: "late", label: "Late" }
+              ]}
+            />
           </div>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <Btn variant="ghost" onClick={() => setEditing(null)}>
-              Cancel
-            </Btn>
-            <Btn onClick={saveEdit}>
-              Save
-            </Btn>
-          </div>
-        </Modal>
-      )}
+        )}
+      </Modal>
+      
       {showQRScanner && (
         <QRScanner
           title="Scan Student QR for Attendance"

@@ -1,20 +1,25 @@
 import { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
-import Btn from "../components/Btn";
-import Field from "../components/Field";
-import Badge from "../components/Badge";
-import Modal from "../components/Modal";
-import Table from "../components/Table";
 import StudentIDCard from "../components/StudentIDCard";
 import QRScanner from "../components/QRScanner";
 import { ALL_CLASSES } from "../lib/constants";
-import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
 import { API_BASE, apiFetch } from "../lib/api";
+import { getAuthHeaders } from "../lib/auth";
 import { parseStudentQrContent } from "../lib/qr";
 import { printHTML } from "../lib/print";
-import { Pager, Msg } from "../components/Helpers";
+import { Pager } from "../components/Helpers";
 import { csv, pager } from "../lib/utils";
+
+// New UI Components
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Modal from "../components/ui/Modal";
+import EmptyState from "../components/ui/EmptyState";
+import Table from "../components/ui/Table";
 
 // Normalise a student row coming from the backend into the shape the UI expects
 function normalise(s) {
@@ -70,18 +75,13 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
   useEffect(() => {
     if (!auth?.token) return;
-    console.log('[DEBUG] StudentsPage: Fetching students...');
     const ac = new AbortController();
     apiFetch("/students", { token: auth.token, signal: ac.signal })
       .then(data => {
-        console.log('[DEBUG] StudentsPage: Fetched', data?.length || 0, 'students');
-        console.log('[DEBUG] StudentsPage: First student:', data?.[0]);
         const normalisedData = data.map(normalise);
-        console.log('[DEBUG] StudentsPage: Normalised first:', normalisedData?.[0]);
         setStudents(normalisedData);
       })
       .catch(e => { 
-        console.error('[DEBUG] StudentsPage: Fetch error:', e);
         if (e?.code !== "EABORT") toast("Failed to fetch students: " + (e.message || ""), "error"); 
       });
     return () => ac.abort();
@@ -93,15 +93,10 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   };
 
   const normalised = useMemo(() => {
-    console.log('[DEBUG] normalised useMemo: students count =', students?.length || 0);
-    const result = students.map(s => {
-      // Check if already has camelCase firstName (already normalised)
+    return students.map(s => {
       if (s.firstName) return s;
-      // Otherwise normalise from snake_case
       return normalise(s);
     });
-    console.log('[DEBUG] normalised result count:', result.length);
-    return result;
   }, [students]);
 
   const filtered = normalised.filter(s => {
@@ -112,14 +107,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     return searchMatch && classMatch && statusMatch;
   });
 
-  console.log('[DEBUG] filtered count:', filtered.length, 'q:', q, 'cls:', cls, 'status:', status);
-  if (filtered.length > 0) {
-    console.log('[DEBUG] first filtered student:', filtered[0]);
-    console.log('[DEBUG] first filtered keys:', Object.keys(filtered[0]));
-  }
-
   const { pages, rows } = pager(filtered, page);
-  console.log('[DEBUG] pager result - pages:', pages, 'rows count:', rows?.length);
   useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
 
   const openAdd = () => {
@@ -132,10 +120,8 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     setErr("");
     if (!f.firstName.trim() || !f.lastName.trim()) return setErr("First and last name are required.");
     
-    // Validate WhatsApp number format (Kenyan) - supports 07, 01, 254, +254 prefixes
     if (f.parentPhone) {
       const cleanPhone = f.parentPhone.replace(/[^\d+]/g, '');
-      // Accept: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, +2541xxxxxxxx
       const phoneRegex = /^(\+?254|0)[17][0-9]{8}$/;
       if (!phoneRegex.test(cleanPhone)) {
         return setErr("Invalid Kenyan phone format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx");
@@ -158,7 +144,6 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         });
         setStudents(prev => [...prev, normalise(res)]);
       }
-      // Refetch students to get updated data including opening balance
       apiFetch("/students", { token: auth.token })
         .then(data => setStudents(data.map(normalise)))
         .catch(() => {});
@@ -189,9 +174,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
       const response = await fetch(`${API_BASE}/students/upload-photo`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${auth?.token}`,
-        },
+        headers: getAuthHeaders(auth?.token),
         body: formData,
       });
 
@@ -204,7 +187,6 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       setSelectedFile(null);
       toast("Photo uploaded successfully", "success");
     } catch (error) {
-      console.error('Upload error:', error);
       toast("Failed to upload photo", "error");
     } finally {
       setUploadingPhoto(false);
@@ -214,12 +196,10 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         toast("Please select an image file", "error");
         return;
       }
-      // Validate file size (2MB limit)
       if (file.size > 2 * 1024 * 1024) {
         toast("File size must be less than 2MB", "error");
         return;
@@ -249,336 +229,321 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         toast("Student not found", "error");
       }
     } catch (err) {
-      console.error("QR scan error:", err);
       toast("Invalid QR code", "error");
     }
     setShowQRScanner(false);
   };
 
-  // Debug render
-  const debugInfo = {
-    studentsCount: students?.length || 0,
-    normalisedCount: normalised?.length || 0,
-    filteredCount: filtered?.length || 0,
-    rowsCount: rows?.length || 0,
-    pages: pages || 0,
-    page: page || 0,
-    q: q || '',
-    cls: cls || '',
-    status: status || ''
-  };
-  console.log('[DEBUG] StudentsPage render:', JSON.stringify(debugInfo));
-
   return (
-    <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <Badge text={`Total: ${filtered.length}`} tone="success" />
-        <Badge text={`Boys: ${filtered.filter(s => s.gender === "male").length}`} tone="info" />
-        <Badge text={`Girls: ${filtered.filter(s => s.gender === "female").length}`} tone="warning" />
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      {/* Top Bar Stats */}
+      <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+        <Badge text={`Total: ${filtered.length}`} variant="success" />
+        <Badge text={`Boys: ${filtered.filter(s => s.gender === "male").length}`} variant="primary" />
+        <Badge text={`Girls: ${filtered.filter(s => s.gender === "female").length}`} variant="warning" />
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 8, marginBottom: 10 }}>
-        <input style={inputStyle} value={q} onChange={e => setQ(e.target.value)} placeholder="Search students" />
-        <select style={inputStyle} value={cls} onChange={e => setCls(e.target.value)}>
-          <option value="all">All classes</option>
-          {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
-        </select>
-        <select style={inputStyle} value={status} onChange={e => setStatus(e.target.value)}>
-          <option value="all">All status</option>
-          <option value="active">active</option>
-          <option value="inactive">inactive</option>
-        </select>
-        <Btn variant="ghost" onClick={() => { csv("students.csv", ["Admission","First","Last","Class","Gender","Parent","Phone","Status"], filtered.map(s => [s.admission,s.firstName,s.lastName,s.className,s.gender,s.parentName||"",s.parentPhone||"",s.status])); toast("Students CSV exported","success"); }}>Export CSV</Btn>
-        <Btn variant="secondary" onClick={() => setShowQRScanner(true)}>📱 Scan QR</Btn>
-        {canEdit && auth.role !== "finance" && <Btn onClick={openAdd}>Add Student</Btn>}
-      </div>
-      {filtered.length === 0 ? <Msg text="No students found." /> : (
+
+      {/* Controls */}
+      <Card style={{ padding: "var(--space-3)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--space-3)", alignItems: "end" }}>
+          <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search students..." />
+          <Select 
+            value={cls} 
+            onChange={e => setCls(e.target.value)}
+            options={[
+              { value: "all", label: "All classes" },
+              ...ALL_CLASSES.map(c => ({ value: c, label: c }))
+            ]}
+          />
+          <Select 
+            value={status} 
+            onChange={e => setStatus(e.target.value)}
+            options={[
+              { value: "all", label: "All status" },
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "Inactive" }
+            ]}
+          />
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <Button variant="ghost" onClick={() => { csv("students.csv", ["Admission","First","Last","Class","Gender","Parent","Phone","Status"], filtered.map(s => [s.admission,s.firstName,s.lastName,s.className,s.gender,s.parentName||"",s.parentPhone||"",s.status])); toast("Students CSV exported","success"); }}>Export CSV</Button>
+            <Button variant="secondary" onClick={() => setShowQRScanner(true)}>📱 Scan QR</Button>
+            {canEdit && auth.role !== "finance" && <Button variant="primary" onClick={openAdd}>Add Student</Button>}
+          </div>
+        </div>
+      </Card>
+
+      {/* Table Area */}
+      {filtered.length === 0 ? (
+        <EmptyState icon="👨‍🎓" title="No Students" description="Could not find any students matching your criteria." />
+      ) : (
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <Table
+            headers={["Student", "Admission", "Class", "Parent", "Status", "Actions"]}
+            data={rows.map(s => [
+              <div key={s.id}>
+                <div style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{s.firstName} {s.lastName}</div>
+                <div style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>{s.dob || "-"}</div>
+              </div>,
+              s.admission,
+              s.className,
+              `${s.parentName || "-"} ${s.parentPhone ? `(${s.parentPhone})` : ""}`,
+              <Badge key="b" text={s.status} variant={s.status === "active" ? "success" : "danger"} />,
+              <div key="a" style={{ display: "flex", gap: "var(--space-2)" }}>
+                <Button size="sm" variant="ghost" onClick={() => setProfile(s)}>Profile</Button>
+                <Button size="sm" variant="ghost" onClick={() => setIdCardStudent(s)}>🪪 ID</Button>
+                {canEdit && auth.role !== "finance" && <Button size="sm" variant="secondary" onClick={() => { setEditId(s.id); setF(s); setShow(true); }}>Edit</Button>}
+                {canEdit && auth.role !== "finance" && <Button size="sm" variant="danger" onClick={() => del(s.id)}>Delete</Button>}
+              </div>
+            ])}
+          />
+          <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
+            <Pager page={page} pages={pages} setPage={setPage} />
+          </div>
+        </Card>
+      )}
+
+      {/* Edit/Add Modal */}
+      <Modal isOpen={show} title={editId ? "Edit Student" : "Add Student"} onClose={() => setShow(false)} maxWidth="800px" footer={
         <>
-          <div style={{ overflowX: "auto" }}>
-            <Table
-              headers={["Student","Admission","Class","Parent","Status","Actions"]}
-              rows={rows.map(s => [
-                <div key={s.id}><div style={{ color: C.text, fontWeight: 600 }}>{s.firstName} {s.lastName}</div><div style={{ fontSize: 11, color: C.textMuted }}>{s.dob || "-"}</div></div>,
-                s.admission, s.className,
-                `${s.parentName || "-"} ${s.parentPhone ? `(${s.parentPhone})` : ""}`,
-                <Badge key="b" text={s.status} tone={s.status === "active" ? "success" : "danger"} />,
-                <div key="a" style={{ display: "flex", gap: 6 }}>
-                  <Btn variant="ghost" onClick={() => setProfile(s)}>Profile</Btn>
-                  <Btn variant="ghost" onClick={() => setIdCardStudent(s)}>🪪 ID Card</Btn>
-                  {canEdit && auth.role !== "finance" && <Btn variant="ghost" onClick={() => { setEditId(s.id); setF(s); setShow(true); }}>Edit</Btn>}
-                  {canEdit && auth.role !== "finance" && <Btn variant="danger" onClick={() => del(s.id)}>Delete</Btn>}
-                </div>
-              ])}
+          <Button variant="ghost" onClick={() => setShow(false)}>Cancel</Button>
+          <Button variant="primary" onClick={save}>Save Changes</Button>
+        </>
+      }>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <Input label="First Name" value={f.firstName} onChange={e => setF({ ...f, firstName: e.target.value })} />
+          <Input label="Last Name" value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} />
+          <Input label="Admission" value={f.admission || ""} onChange={e => setF({ ...f, admission: e.target.value })} />
+          
+          <Select label="Class" value={f.className} onChange={e => setF({ ...f, className: e.target.value })} options={ALL_CLASSES.map(c => ({ value: c, label: c }))} />
+          <Select label="Gender" value={f.gender} onChange={e => setF({ ...f, gender: e.target.value })} options={[{value:"female", label:"Female"}, {value:"male", label:"Male"}]} />
+          <Select label="Status" value={f.status} onChange={e => setF({ ...f, status: e.target.value })} options={[{value:"active", label:"Active"}, {value:"inactive", label:"Inactive"}]} />
+          
+          <Input label="Parent Name" value={f.parentName || ""} onChange={e => setF({ ...f, parentName: e.target.value })} />
+          <Input label="Parent WhatsApp" value={f.parentPhone || ""} onChange={e => setF({ ...f, parentPhone: e.target.value })} placeholder="07xxxxxxxx" />
+          <Input label="Date of Birth" type="date" value={f.dob || ""} onChange={e => setF({ ...f, dob: e.target.value })} />
+          <Input label="NEMIS Number" value={f.nemisNumber || ""} onChange={e => setF({ ...f, nemisNumber: e.target.value.toUpperCase() })} placeholder="e.g. NEM12345678" />
+          
+          <Select label="Blood Group" value={f.bloodGroup || ""} onChange={e => setF({ ...f, bloodGroup: e.target.value })} options={[{value:"", label:"-- Select --"}, {value:"A+", label:"A+"}, {value:"A-", label:"A-"}, {value:"B+", label:"B+"}, {value:"B-", label:"B-"}, {value:"O+", label:"O+"}, {value:"O-", label:"O-"}, {value:"AB+", label:"AB+"}, {value:"AB-", label:"AB-"}]} />
+          <Input label="Allergies" value={f.allergies || ""} onChange={e => setF({ ...f, allergies: e.target.value })} placeholder="e.g. Peanuts" />
+          
+          <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+            <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Medical Conditions</label>
+            <textarea 
+              style={{
+                width: '100%',
+                background: 'var(--color-bg-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                padding: 'var(--space-2) var(--space-3)',
+                color: 'var(--color-text-primary)',
+                fontFamily: 'var(--font-body)',
+                fontSize: '14px',
+                outline: 'none',
+                minHeight: '60px',
+                resize: 'vertical'
+              }} 
+              value={f.medicalConditions || ""} 
+              onChange={e => setF({ ...f, medicalConditions: e.target.value })} 
+              placeholder="Any medical conditions or special needs" 
             />
           </div>
-          <Pager page={page} pages={pages} setPage={setPage} />
-        </>
-      )}
-      {show && (
-        <Modal title={editId ? "Edit Student" : "Add Student"} onClose={() => setShow(false)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="First Name"><input style={inputStyle} value={f.firstName} onChange={e => setF({ ...f, firstName: e.target.value })} /></Field>
-            <Field label="Last Name"><input style={inputStyle} value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} /></Field>
-            <Field label="Admission"><input style={inputStyle} value={f.admission || ""} onChange={e => setF({ ...f, admission: e.target.value })} /></Field>
-            <Field label="Class"><select style={inputStyle} value={f.className} onChange={e => setF({ ...f, className: e.target.value })}>{ALL_CLASSES.map(c => <option key={c}>{c}</option>)}</select></Field>
-            <Field label="Gender"><select style={inputStyle} value={f.gender} onChange={e => setF({ ...f, gender: e.target.value })}><option value="female">female</option><option value="male">male</option></select></Field>
-            <Field label="Status"><select style={inputStyle} value={f.status} onChange={e => setF({ ...f, status: e.target.value })}><option value="active">active</option><option value="inactive">inactive</option></select></Field>
-            <Field label="Parent"><input style={inputStyle} value={f.parentName || ""} onChange={e => setF({ ...f, parentName: e.target.value })} /></Field>
-            <Field label="Parent WhatsApp"><input style={inputStyle} value={f.parentPhone || ""} onChange={e => setF({ ...f, parentPhone: e.target.value })} placeholder="07xxxxxxxx, 01xxxxxxxx, 2547..." /></Field>
-            <Field label="Date of Birth"><input type="date" style={inputStyle} value={f.dob || ""} onChange={e => setF({ ...f, dob: e.target.value })} /></Field>
-            <Field label="NEMIS Number"><input style={inputStyle} value={f.nemisNumber || ""} onChange={e => setF({ ...f, nemisNumber: e.target.value.toUpperCase() })} placeholder="e.g. NEM12345678" /></Field>
-            <Field label="Blood Group">
-              <select style={inputStyle} value={f.bloodGroup || ""} onChange={e => setF({ ...f, bloodGroup: e.target.value })}>
-                <option value="">-- Select --</option>
-                <option value="A+">A+</option>
-                <option value="A-">A-</option>
-                <option value="B+">B+</option>
-                <option value="B-">B-</option>
-                <option value="O+">O+</option>
-                <option value="O-">O-</option>
-                <option value="AB+">AB+</option>
-                <option value="AB-">AB-</option>
-              </select>
-            </Field>
-            <Field label="Allergies"><input style={inputStyle} value={f.allergies || ""} onChange={e => setF({ ...f, allergies: e.target.value })} placeholder="e.g. Peanuts, Penicillin" /></Field>
-            <Field label="Medical Conditions" style={{ gridColumn: "1 / -1" }}>
-              <textarea style={{ ...inputStyle, height: 60, resize: "vertical" }} value={f.medicalConditions || ""} onChange={e => setF({ ...f, medicalConditions: e.target.value })} placeholder="Any medical conditions or special needs" />
-            </Field>
-            <Field label="Emergency Contact"><input style={inputStyle} value={f.emergencyContactName || ""} onChange={e => setF({ ...f, emergencyContactName: e.target.value })} placeholder="Name" /></Field>
-            <Field label="Emergency Phone"><input style={inputStyle} value={f.emergencyContactPhone || ""} onChange={e => setF({ ...f, emergencyContactPhone: e.target.value })} placeholder="07xxxxxxxx" /></Field>
-            <Field label="Relationship"><input style={inputStyle} value={f.emergencyContactRelationship || ""} onChange={e => setF({ ...f, emergencyContactRelationship: e.target.value })} placeholder="e.g. Parent, Guardian" /></Field>
-            
-            {/* Financial Settings */}
-            <Field label="Transport" style={{ gridColumn: "1 / -1" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <select 
-                  style={inputStyle} 
-                  value={f.transport_direction || "none"} 
-                  onChange={e => setF({ ...f, transport_direction: e.target.value })}
-                >
-                  <option value="none">No Transport</option>
-                  <option value="one_way">One Way (60% fee)</option>
-                  <option value="two_way">Two Way (100% fee)</option>
-                </select>
-                <input 
-                  style={inputStyle} 
-                  type="number"
-                  value={f.transport_base_fee || ""} 
-                  onChange={e => setF({ ...f, transport_base_fee: e.target.value })} 
-                  placeholder="Base transport fee (KES)"
-                  disabled={f.transport_direction === "none"}
-                />
-              </div>
-            </Field>
-            
-            <Field label="Lunch Program" style={{ gridColumn: "1 / -1" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                  <input 
-                    type="checkbox" 
-                    checked={f.lunch_enabled || false}
-                    onChange={e => setF({ ...f, lunch_enabled: e.target.checked })}
-                  />
-                  <span>Enrolled in lunch program</span>
-                </label>
-              </div>
-              {f.lunch_enabled && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                  <select
-                    style={inputStyle}
-                    value={f.lunch_billing_type || 'daily'}
-                    onChange={e => setF({ ...f, lunch_billing_type: e.target.value })}
-                  >
-                    <option value="daily">Daily Rate</option>
-                    <option value="termly">Termly Rate</option>
-                  </select>
-                  <input 
-                    style={inputStyle} 
-                    type="number"
-                    value={f.lunch_daily_rate || ""} 
-                    onChange={e => setF({ ...f, lunch_daily_rate: e.target.value })} 
-                    placeholder={f.lunch_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"}
-                  />
-                  {f.lunch_billing_type !== 'termly' && (
-                    <input 
-                      style={inputStyle} 
-                      type="number"
-                      value={f.lunch_days || 66} 
-                      onChange={e => setF({ ...f, lunch_days: e.target.value })} 
-                      placeholder="School days"
-                    />
-                  )}
-                </div>
-              )}
-            </Field>
 
-            <Field label="Breakfast Program" style={{ gridColumn: "1 / -1" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                  <input 
-                    type="checkbox" 
-                    checked={f.breakfast_enabled || false}
-                    onChange={e => setF({ ...f, breakfast_enabled: e.target.checked })}
-                  />
-                  <span>Enrolled in breakfast program</span>
-                </label>
-              </div>
-              {f.breakfast_enabled && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                  <select
-                    style={inputStyle}
-                    value={f.breakfast_billing_type || 'daily'}
-                    onChange={e => setF({ ...f, breakfast_billing_type: e.target.value })}
-                  >
-                    <option value="daily">Daily Rate</option>
-                    <option value="termly">Termly Rate</option>
-                  </select>
-                  <input 
-                    style={inputStyle} 
-                    type="number"
-                    value={f.breakfast_daily_rate || ""} 
-                    onChange={e => setF({ ...f, breakfast_daily_rate: e.target.value })} 
-                    placeholder={f.breakfast_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"}
-                  />
-                  {f.breakfast_billing_type !== 'termly' && (
-                    <input 
-                      style={inputStyle} 
-                      type="number"
-                      value={f.breakfast_days || 66} 
-                      onChange={e => setF({ ...f, breakfast_days: e.target.value })} 
-                      placeholder="School days"
-                    />
-                  )}
-                </div>
-              )}
-            </Field>
+          <Input label="Emergency Contact" value={f.emergencyContactName || ""} onChange={e => setF({ ...f, emergencyContactName: e.target.value })} placeholder="Name" />
+          <Input label="Emergency Phone" value={f.emergencyContactPhone || ""} onChange={e => setF({ ...f, emergencyContactPhone: e.target.value })} placeholder="07xxxxxxxx" />
+          <Input label="Relationship" value={f.emergencyContactRelationship || ""} onChange={e => setF({ ...f, emergencyContactRelationship: e.target.value })} placeholder="e.g. Parent, Guardian" />
+          
+          {/* Transport */}
+          <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Transport Settings</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+              <Select value={f.transport_direction || "none"} onChange={e => setF({ ...f, transport_direction: e.target.value })} options={[
+                { value: "none", label: "No Transport" },
+                { value: "one_way", label: "One Way (60% fee)" },
+                { value: "two_way", label: "Two Way (100% fee)" }
+              ]} />
+              <Input type="number" value={f.transport_base_fee || ""} onChange={e => setF({ ...f, transport_base_fee: e.target.value })} placeholder="Base transport fee (KES)" disabled={f.transport_direction === "none"} />
+            </div>
+          </div>
 
-            <Field label="Fee Discount" style={{ gridColumn: "1 / -1" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, alignItems: "start" }}>
-                <select
-                  style={inputStyle}
-                  value={f.discount_type || ""}
-                  onChange={e => setF({ ...f, discount_type: e.target.value })}
-                >
-                  <option value="">No Discount</option>
-                  <option value="sibling_2nd">2nd Sibling</option>
-                  <option value="sibling_3rd">3rd Sibling</option>
-                  <option value="sibling_4th_plus">4th+ Sibling</option>
-                  <option value="staff_child">Staff Child</option>
-                  <option value="scholarship">Scholarship</option>
-                  <option value="bursary">Bursary</option>
-                  <option value="other">Other</option>
-                </select>
-                <input
-                  style={inputStyle}
-                  type="number"
-                  min="0"
-                  max={f.discount_is_percentage ? 100 : 999999}
-                  value={f.discount_value || ""}
-                  onChange={e => setF({ ...f, discount_value: e.target.value })}
-                  placeholder={f.discount_is_percentage ? "Discount %" : "Amount (KES)"}
-                  disabled={!f.discount_type}
-                />
-                <select
-                  style={inputStyle}
-                  value={f.discount_is_percentage ? "percentage" : "amount"}
-                  onChange={e => setF({ ...f, discount_is_percentage: e.target.value === "percentage" })}
-                  disabled={!f.discount_type}
-                >
-                  <option value="percentage">Percentage (%)</option>
-                  <option value="amount">Fixed Amount (KES)</option>
-                </select>
+          {/* Lunch */}
+          <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Lunch Program</div>
+            <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer", marginBottom: "var(--space-3)", color: "var(--color-text-primary)", fontSize: "14px" }}>
+              <input type="checkbox" checked={f.lunch_enabled || false} onChange={e => setF({ ...f, lunch_enabled: e.target.checked })} style={{ width: "16px", height: "16px", cursor: "pointer" }} />
+              <span>Enrolled in lunch program</span>
+            </label>
+            {f.lunch_enabled && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
+                <Select value={f.lunch_billing_type || 'daily'} onChange={e => setF({ ...f, lunch_billing_type: e.target.value })} options={[{value:"daily", label:"Daily Rate"}, {value:"termly", label:"Termly Rate"}]} />
+                <Input type="number" value={f.lunch_daily_rate || ""} onChange={e => setF({ ...f, lunch_daily_rate: e.target.value })} placeholder={f.lunch_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
+                {f.lunch_billing_type !== 'termly' && (
+                  <Input type="number" value={f.lunch_days || 66} onChange={e => setF({ ...f, lunch_days: e.target.value })} placeholder="School days" />
+                )}
               </div>
-              {f.discount_type && (
-                <small style={{ color: C.textMuted, fontSize: 11, display: "block", marginTop: 4 }}>
-                  Discount applies to base tuition fee only. Transport, lunch, and breakfast are not discounted.
-                </small>
-              )}
-            </Field>
+            )}
+          </div>
 
-            <Field label="Opening Balance (KES)" style={{ gridColumn: "1 / -1" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
-                <input 
-                  style={inputStyle} 
-                  type="number"
-                  value={f.opening_balance || ""} 
-                  onChange={e => setF({ ...f, opening_balance: e.target.value })} 
-                  placeholder="Amount carried forward from previous term"
-                />
-                <select 
-                  style={{ ...inputStyle, width: "120px" }}
-                  value={f.opening_balance_type || "owing"} 
-                  onChange={e => setF({ ...f, opening_balance_type: e.target.value })}
-                >
-                  <option value="owing">Student Owes</option>
-                  <option value="credit">Credit (Prepaid)</option>
-                </select>
+          {/* Breakfast */}
+          <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Breakfast Program</div>
+            <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer", marginBottom: "var(--space-3)", color: "var(--color-text-primary)", fontSize: "14px" }}>
+              <input type="checkbox" checked={f.breakfast_enabled || false} onChange={e => setF({ ...f, breakfast_enabled: e.target.checked })} style={{ width: "16px", height: "16px", cursor: "pointer" }} />
+              <span>Enrolled in breakfast program</span>
+            </label>
+            {f.breakfast_enabled && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
+                <Select value={f.breakfast_billing_type || 'daily'} onChange={e => setF({ ...f, breakfast_billing_type: e.target.value })} options={[{value:"daily", label:"Daily Rate"}, {value:"termly", label:"Termly Rate"}]} />
+                <Input type="number" value={f.breakfast_daily_rate || ""} onChange={e => setF({ ...f, breakfast_daily_rate: e.target.value })} placeholder={f.breakfast_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
+                {f.breakfast_billing_type !== 'termly' && (
+                  <Input type="number" value={f.breakfast_days || 66} onChange={e => setF({ ...f, breakfast_days: e.target.value })} placeholder="School days" />
+                )}
               </div>
-              <small style={{ color: C.textMuted, fontSize: 11 }}>
-                Opening balance is added to the student's total expected fees
+            )}
+          </div>
+
+          {/* Fee Discount */}
+          <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Fee Discount</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)", alignItems: "start" }}>
+              <Select value={f.discount_type || ""} onChange={e => setF({ ...f, discount_type: e.target.value })} options={[
+                { value: "", label: "No Discount" },
+                { value: "sibling_2nd", label: "2nd Sibling" },
+                { value: "sibling_3rd", label: "3rd Sibling" },
+                { value: "sibling_4th_plus", label: "4th+ Sibling" },
+                { value: "staff_child", label: "Staff Child" },
+                { value: "scholarship", label: "Scholarship" },
+                { value: "bursary", label: "Bursary" },
+                { value: "other", label: "Other" }
+              ]} />
+              <Input type="number" value={f.discount_value || ""} onChange={e => setF({ ...f, discount_value: e.target.value })} placeholder={f.discount_is_percentage ? "Discount %" : "Amount (KES)"} disabled={!f.discount_type} />
+              <Select value={f.discount_is_percentage ? "percentage" : "amount"} onChange={e => setF({ ...f, discount_is_percentage: e.target.value === "percentage" })} disabled={!f.discount_type} options={[
+                { value: "percentage", label: "Percentage (%)" },
+                { value: "amount", label: "Fixed Amount (KES)" }
+              ]} />
+            </div>
+            {f.discount_type && (
+              <small style={{ color: "var(--color-warning)", fontSize: "11px", display: "block", marginTop: "var(--space-2)" }}>
+                Discount applies to base tuition fee only. Transport, lunch, and breakfast are not discounted.
               </small>
-            </Field>
+            )}
+          </div>
+
+          {/* Opening Balance */}
+          <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Opening Balance (KES)</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "var(--space-3)" }}>
+              <Input type="number" value={f.opening_balance || ""} onChange={e => setF({ ...f, opening_balance: e.target.value })} placeholder="Amount carried forward" />
+              <Select style={{ width: "160px" }} value={f.opening_balance_type || "owing"} onChange={e => setF({ ...f, opening_balance_type: e.target.value })} options={[
+                { value: "owing", label: "Student Owes" },
+                { value: "credit", label: "Credit (Prepaid)" }
+              ]} />
+            </div>
+            <small style={{ color: "var(--color-text-muted)", fontSize: "11px", display: "block", marginTop: "var(--space-2)" }}>
+              Opening balance is added to the student's total expected fees
+            </small>
+          </div>
+
+          {/* Photo */}
+          <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Student Photo</div>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+              <input type="file" accept="image/*" onChange={handleFileSelect} style={{ flex: 1, color: "var(--color-text-primary)" }} />
+              {f.photoUrl && (
+                <img src={f.photoUrl} alt="Student photo" style={{ width: 50, height: 50, objectFit: "cover", borderRadius: "var(--radius-sm)", boxShadow: "var(--shadow-card)" }} />
+              )}
+              {selectedFile && editId && (
+                <Button onClick={() => uploadPhoto(editId)} loading={uploadingPhoto}>
+                  Upload
+                </Button>
+              )}
+            </div>
+            <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "var(--space-2)" }}>
+              Upload a photo for the student ID card (max 2MB, JPG/PNG only)
+            </div>
+          </div>
+        </div>
+        {err && <div style={{ color: "var(--color-danger)", background: "var(--color-danger-muted)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", marginTop: "var(--space-4)", fontSize: "14px", borderLeft: "4px solid var(--color-danger)" }}>{err}</div>}
+      </Modal>
+
+      {/* Profile Modal */}
+      <Modal isOpen={!!profile} title="Student Profile" onClose={() => setProfile(null)} footer={
+        <>
+          <Button variant="ghost" onClick={() => { setProfile(null); setIdCardStudent(profile); }}>🪪 View ID Card</Button>
+          <Button variant="primary" onClick={() => { 
+            const rowsHtml = results.filter(r => (r.studentId ?? r.student_id) === profile.id).map(r => `<li>${r.subject}: ${r.marks}/${r.total || r.total_marks} (${r.grade})</li>`).join(""); 
+            const html = `<h2>${profile.firstName} ${profile.lastName}</h2><p>${profile.admission}</p><ul>${rowsHtml||"<li>No results</li>"}</ul>`;
+            printHTML(html, { title: `Report - ${profile.firstName} ${profile.lastName}` });
+          }}>Export Report (Print/PDF)</Button>
+        </>
+      }>
+        {profile && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", marginBottom: "var(--space-2)" }}>
+              {profile.photoUrl ? (
+                <img src={profile.photoUrl} alt="" style={{ width: 80, height: 80, borderRadius: "var(--radius-md)", objectFit: "cover", boxShadow: "var(--shadow-card)" }} />
+              ) : (
+                <div style={{ width: 80, height: 80, borderRadius: "var(--radius-md)", background: "var(--color-primary-muted)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary)", fontSize: "24px", fontWeight: "bold" }}>
+                  {profile.firstName[0]}{profile.lastName[0]}
+                </div>
+              )}
+              <div>
+                <div style={{ color: "var(--color-text-primary)", fontWeight: 800, fontSize: "24px", fontFamily: "var(--font-heading)" }}>{profile.firstName} {profile.lastName}</div>
+                <div style={{ color: "var(--color-text-secondary)", fontSize: "14px", marginTop: "4px" }}>{profile.admission} • {profile.className}</div>
+              </div>
+            </div>
             
-            <Field label="Photo" style={{ gridColumn: "1 / -1" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  style={{ flex: 1 }}
-                />
-                {f.photoUrl && (
-                  <img
-                    src={f.photoUrl}
-                    alt="Student photo"
-                    style={{ width: 50, height: 50, objectFit: "cover", borderRadius: 4 }}
-                  />
-                )}
-                {selectedFile && editId && (
-                  <Btn
-                    onClick={() => uploadPhoto(editId)}
-                    disabled={uploadingPhoto}
-                    style={{ whiteSpace: "nowrap" }}
-                  >
-                    {uploadingPhoto ? "Uploading..." : "Upload"}
-                  </Btn>
-                )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
+              <div style={{ background: "var(--color-bg-base)", padding: "var(--space-3)", borderRadius: "var(--radius-md)" }}>
+                <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: 700, marginBottom: "4px" }}>Personal Info</div>
+                <div style={{ color: "var(--color-text-primary)", fontSize: "13px", lineHeight: "1.6" }}>
+                  {profile.dob && <div><strong>DOB:</strong> {new Date(profile.dob).toLocaleDateString()}</div>}
+                  {profile.nemisNumber && <div><strong>NEMIS:</strong> {profile.nemisNumber}</div>}
+                  {profile.bloodGroup && <div><strong>Blood Group:</strong> {profile.bloodGroup}</div>}
+                  {profile.allergies && <div style={{ color: "var(--color-warning)" }}>⚠️ <strong>Allergies:</strong> {profile.allergies}</div>}
+                  {profile.medicalConditions && <div><strong>Medical:</strong> {profile.medicalConditions}</div>}
+                </div>
               </div>
-              <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
-                Upload a photo for the student ID card (max 2MB, JPG/PNG only)
+
+              <div style={{ background: "var(--color-bg-base)", padding: "var(--space-3)", borderRadius: "var(--radius-md)" }}>
+                <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: 700, marginBottom: "4px" }}>Contact Info</div>
+                <div style={{ color: "var(--color-text-primary)", fontSize: "13px", lineHeight: "1.6" }}>
+                  <div><strong>Parent:</strong> {profile.parentName}</div>
+                  <div><strong>Phone:</strong> {profile.parentPhone || "-"}</div>
+                  {profile.emergencyContactName && (
+                    <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid var(--color-border)" }}>
+                      <strong style={{ color: "var(--color-danger)" }}>Emergency:</strong><br/>
+                      {profile.emergencyContactName} ({profile.emergencyContactRelationship})<br/>
+                      {profile.emergencyContactPhone || "-"}
+                    </div>
+                  )}
+                </div>
               </div>
-            </Field>
+            </div>
+
+            <div style={{ background: "var(--color-bg-base)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: 700 }}>Financial Status</div>
+                <div style={{ color: "var(--color-text-primary)", fontSize: "14px", marginTop: "4px" }}>
+                  Expected: {money(expected(profile.className))}
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: 700 }}>Paid Amount</div>
+                <div style={{ color: "var(--color-success)", fontWeight: 700, fontSize: "18px", marginTop: "4px" }}>
+                  {money(payments.filter(p => (p.studentId ?? p.student_id) === profile.id && p.status === "paid").reduce((s, p) => s + Number(p.amount), 0))}
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ background: "var(--color-bg-base)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: "13px", color: "var(--color-text-primary)", fontWeight: 600 }}>Results Recorded</div>
+              <Badge text={results.filter(r => (r.studentId ?? r.student_id) === profile.id).length.toString()} variant="primary" />
+            </div>
           </div>
-          {err && <Msg text={err} tone="error" />}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <Btn variant="ghost" onClick={() => setShow(false)}>Cancel</Btn>
-            <Btn onClick={save}>Save</Btn>
-          </div>
-        </Modal>
-      )}
-      {profile && (
-        <Modal title="Student Profile" onClose={() => setProfile(null)}>
-          <div style={{ color: C.text, fontWeight: 700, fontSize: 17 }}>{profile.firstName} {profile.lastName}</div>
-          <div style={{ color: C.textSub, marginBottom: 8 }}>{profile.admission} | {profile.className}</div>
-          {profile.dob && <div style={{ color: C.textSub, marginBottom: 8 }}>Date of Birth: {new Date(profile.dob).toLocaleDateString()}</div>}
-          {profile.nemisNumber && <div style={{ color: C.textSub, marginBottom: 8 }}>NEMIS: {profile.nemisNumber}</div>}
-          {profile.bloodGroup && <div style={{ color: C.textSub, marginBottom: 8 }}>Blood Group: {profile.bloodGroup}</div>}
-          {profile.allergies && <div style={{ color: C.textSub, marginBottom: 8 }}>⚠️ Allergies: {profile.allergies}</div>}
-          {profile.medicalConditions && <div style={{ color: C.textSub, marginBottom: 8 }}>Medical: {profile.medicalConditions}</div>}
-          {profile.emergencyContactName && <div style={{ color: C.textSub, marginBottom: 8 }}>Emergency: {profile.emergencyContactName} ({profile.emergencyContactPhone || "-"}) - {profile.emergencyContactRelationship}</div>}
-          <div style={{ color: C.textSub, marginBottom: 8 }}>Parent: {profile.parentName} ({profile.parentPhone || "-"})</div>
-          <div style={{ color: C.textSub, marginBottom: 8 }}>Expected Fees: {money(expected(profile.className))}</div>
-          <div style={{ color: C.textSub, marginBottom: 8 }}>Paid: {money(payments.filter(p => (p.studentId ?? p.student_id) === profile.id && p.status === "paid").reduce((s, p) => s + Number(p.amount), 0))}</div>
-          <div style={{ color: C.textSub, marginBottom: 14 }}>Results: {results.filter(r => (r.studentId ?? r.student_id) === profile.id).length}</div>
-          <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
-            <Btn onClick={() => { setProfile(null); setIdCardStudent(profile); }}>🪪 View ID Card</Btn>
-            <Btn onClick={() => { 
-              const rowsHtml = results.filter(r => (r.studentId ?? r.student_id) === profile.id).map(r => `<li>${r.subject}: ${r.marks}/${r.total || r.total_marks} (${r.grade})</li>`).join(""); 
-              const html = `<h2>${profile.firstName} ${profile.lastName}</h2><p>${profile.admission}</p><ul>${rowsHtml||"<li>No results</li>"}</ul>`;
-              printHTML(html, { title: `Report - ${profile.firstName} ${profile.lastName}` });
-            }}>Export Report (Print/PDF)</Btn>
-          </div>
-        </Modal>
-      )}
+        )}
+      </Modal>
+
+      {/* ID Card / Scanner */}
       {idCardStudent && (
         <StudentIDCard 
           student={idCardStudent} 

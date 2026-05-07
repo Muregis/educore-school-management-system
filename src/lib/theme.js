@@ -1,66 +1,67 @@
 export const C = {
   // Backgrounds
-  bg:         "#060A12",
-  surface:    "#0B1120",
-  card:       "#0F1929",
-  cardHover:  "#131F31",
+  bg: "var(--color-bg-base)",
+  surface: "var(--color-bg-surface)",
+  card: "var(--color-bg-card)",
+  cardHover: "var(--color-bg-hover)",
 
   // Borders
-  border:     "#1A2A42",
-  borderHover:"#2A3F60",
+  border: "var(--color-border)",
+  borderHover: "var(--color-border-strong)",
 
-  // Accent - Blue
-  accent:     "#3B82F6",
-  accentDim:  "#1D3461",
-  accentGlow: "rgba(59,130,246,0.10)",
-  accentHover:"#2563EB",
+  // Accent
+  accent: "var(--color-primary)",
+  accentDim: "var(--color-primary-muted)",
+  accentGlow: "var(--color-primary-muted)",
+  accentHover: "var(--color-primary-hover)",
 
   // Semantic colors
-  teal:       "#14B8A6",
-  tealDim:    "rgba(20,184,166,0.12)",
-  amber:      "#F59E0B",
-  amberDim:   "rgba(245,158,11,0.12)",
-  rose:       "#F43F5E",
-  roseDim:    "rgba(244,63,94,0.12)",
-  green:      "#22C55E",
-  greenDim:   "rgba(34,197,94,0.12)",
-  purple:     "#A855F7",
-  purpleDim:  "rgba(168,85,247,0.12)",
-  sky:        "#38BDF8",
-  skyDim:     "rgba(56,189,248,0.12)",
+  teal: "var(--color-teal)",
+  tealDim: "rgba(13,148,136,0.12)",
+  amber: "var(--color-amber)",
+  amberDim: "var(--color-warning-muted)",
+  rose: "var(--color-rose)",
+  roseDim: "var(--color-danger-muted)",
+  green: "var(--color-green)",
+  greenDim: "var(--color-success-muted)",
+  purple: "var(--color-purple)",
+  purpleDim: "rgba(124,58,237,0.12)",
+  sky: "var(--color-sky)",
+  skyDim: "var(--color-info-muted)",
 
   // Text
-  text:       "#E2EAF8",
-  textSub:    "#7A92B8",
-  textMuted:  "#3D5070",
+  text: "var(--color-text-primary)",
+  textSub: "var(--color-text-secondary)",
+  textMuted: "var(--color-text-muted)",
 };
 
 export const inputStyle = {
-  width:        "100%",
-  background:   C.card,
-  border:       `1px solid ${C.border}`,
-  borderRadius: 10,
-  padding:      "10px 13px",
-  color:        C.text,
-  fontSize:     14,
-  boxSizing:    "border-box",
-  outline:      "none",
-  transition:   "border-color 0.15s",
+  width: "100%",
+  background: C.card,
+  border: `1px solid ${C.border}`,
+  borderRadius: "var(--radius-md)",
+  padding: "11px 13px",
+  color: C.text,
+  fontSize: 14,
+  boxSizing: "border-box",
+  outline: "none",
+  transition: "border-color var(--transition-fast), box-shadow var(--transition-fast)",
 };
 
 export const cardStyle = {
-  background:   C.card,
-  border:       `1px solid ${C.border}`,
-  borderRadius: 14,
-  padding:      "18px 20px",
+  background: C.card,
+  border: `1px solid ${C.border}`,
+  borderRadius: "var(--radius-lg)",
+  padding: "var(--space-5)",
+  boxShadow: "var(--shadow-sm)",
 };
 
 export const labelStyle = {
-  fontSize:      11,
-  fontWeight:    700,
-  color:         C.textMuted,
+  fontSize: 11,
+  fontWeight: 800,
+  color: C.textMuted,
   textTransform: "uppercase",
-  letterSpacing: "0.08em",
-  marginBottom:  5,
-  display:       "block",
+  letterSpacing: "0.06em",
+  marginBottom: 5,
+  display: "block",
 };

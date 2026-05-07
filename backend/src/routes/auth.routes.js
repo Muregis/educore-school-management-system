@@ -5,11 +5,14 @@ import { authLogin } from "../services/auth.service.js";
 import { supabase } from "../config/supabaseClient.js";
 import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
+import { validateSession, createUserSession } from "../middleware/session.js";
 import { authRateLimit } from "../middleware/rateLimit.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { logAuthFailure } from "../helpers/security.logger.js";
 import { generateSupabaseJWT } from "../helpers/supabase-jwt.js";
 import { logTenantContext, logTenantQuery } from "../helpers/tenant-debug.logger.js";
+import { requireRoles } from "../middleware/roles.js";
+import { pgPool } from "../config/pg.js";
 
 const router = Router();
 
@@ -207,7 +210,7 @@ router.get("/school-info/:id", authRateLimit, async (req, res) => {
 });
 
 // Diagnostic route to check current session context
-router.get("/me", authRequired, (req, res) => {
+router.get("/me", authRequired, validateSession, (req, res) => {
   res.json({
     user: req.user,
     timestamp: new Date().toISOString(),
@@ -257,9 +260,11 @@ router.post("/login", authRateLimit, async (req, res, next) => {
       const token = jwt.sign(userPayload, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
 
       logActivity(req, { action: "auth.superadmin_login", description: "Superadmin login" });
+      const sessionId = await createUserSession(req, userPayload.user_id);
 
       return res.json({
         token,
+        sessionId,
         supabaseToken: null, // Superadmin doesn't need Supabase token
         user: { 
           userId: "superadmin", 
@@ -342,12 +347,14 @@ router.post("/login", authRateLimit, async (req, res, next) => {
 
     req.user = userPayload;
     logActivity(req, { action: "auth.login", description: `${role} login: ${name}` });
+    const sessionId = await createUserSession(req, user.user_id);
 
     // Hide branch info from parents/students - they see unified school
     const isParentOrStudent = role === "parent" || role === "student";
     
     res.json({
       token,
+      sessionId,
       supabaseToken,
       user: { 
         userId: user.user_id, 
@@ -622,6 +629,7 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
 
     req.user = { user_id: user.user_id, school_id: resolvedSchoolId, role, name };
     logActivity(req, { action: "auth.portal_login", description: `${role} login: ${name}` });
+    const sessionId = await createUserSession(req, user.user_id);
 
     // Check if defaulter blocking is enabled by admin
     let feeBlocked = false;
@@ -653,6 +661,7 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
 
     res.json({
       token,
+      sessionId,
       supabaseToken,
       feeBlocked,
       user: {
@@ -670,6 +679,75 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
   }
 });
 
-router.get("/me", authRequired, (req, res) => res.json({ user: req.user }));
+router.post("/logout", authRequired, validateSession, async (req, res, next) => {
+  try {
+    await pgPool.query(
+      "UPDATE user_sessions SET is_active = false WHERE session_id = $1",
+      [req.headers["x-session-id"]]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/sessions", authRequired, validateSession, requireRoles("director"), async (_req, res, next) => {
+  try {
+    const result = await pgPool.query(`
+      SELECT
+        us.session_id, us.user_agent, us.ip_address,
+        us.last_active, us.expires_at, us.created_at,
+        u.user_id, u.full_name, u.role, u.email
+      FROM user_sessions us
+      JOIN users u ON u.user_id = us.user_id
+      WHERE us.is_active = true
+        AND us.expires_at > NOW()
+      ORDER BY us.last_active DESC
+    `);
+
+    res.json(result.rows.map(row => {
+      const [firstName, ...rest] = String(row.full_name || "").trim().split(/\s+/).filter(Boolean);
+      return {
+        session_id: row.session_id,
+        user_agent: row.user_agent,
+        ip_address: row.ip_address,
+        last_active: row.last_active,
+        expires_at: row.expires_at,
+        created_at: row.created_at,
+        user_id: row.user_id,
+        first_name: firstName || "",
+        last_name: rest.join(" "),
+        role: row.role,
+        email: row.email,
+      };
+    }));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete("/sessions/:sessionId", authRequired, validateSession, requireRoles("director"), async (req, res, next) => {
+  try {
+    const result = await pgPool.query(
+      "UPDATE user_sessions SET is_active = false WHERE session_id = $1 RETURNING user_id",
+      [req.params.sessionId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    res.json({
+      success: true,
+      message: Number(result.rows[0].user_id) === Number(req.user.user_id || req.user.userId)
+        ? "Your current session revoked. Logging out..."
+        : "Session revoked successfully",
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/me", authRequired, validateSession, (req, res) => res.json({ user: req.user }));
 
 export default router;

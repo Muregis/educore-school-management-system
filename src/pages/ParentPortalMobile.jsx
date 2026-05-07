@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import MobileHeader from '../components/MobileHeader';
 import MobileNav from '../components/MobileNav';
-import { C } from '../lib/theme';
 import { money } from '../lib/utils';
 
 export default function ParentPortalMobile({

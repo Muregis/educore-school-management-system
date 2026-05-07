@@ -1,14 +1,16 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
-import Btn from "../components/Btn";
-import Field from "../components/Field";
-import Badge from "../components/Badge";
-import Modal from "../components/Modal";
-import Table from "../components/Table";
-import { C, inputStyle } from "../lib/theme";
-import { genId } from "../lib/utils";
 import { apiFetch } from "../lib/api";
-import { Pager, Msg } from "../components/Helpers";
+import { Pager } from "../components/Helpers";
+
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Modal from "../components/ui/Modal";
+import Table from "../components/ui/Table";
+import EmptyState from "../components/ui/EmptyState";
 
 export default function UpdateRequestsPage({ auth, students, pendingUpdates, setPendingUpdates, toast }) {
   const [show, setShow] = useState(false);
@@ -209,29 +211,6 @@ export default function UpdateRequestsPage({ auth, students, pendingUpdates, set
     }
   };
 
-  const getStatusBadge = (status) => {
-    const colors = {
-      pending: { bg: "#F59E0B18", border: "#F59E0B44", text: "#F59E0B" },
-      approved: { bg: "#10B98118", border: "#10B98144", text: "#10B981" },
-      rejected: { bg: "#EF444418", border: "#EF444444", text: "#EF4444" }
-    };
-    const color = colors[status] || colors.pending;
-    return (
-      <Badge
-        style={{
-          background: color.bg,
-          border: `1px solid ${color.border}`,
-          color: color.text,
-          textTransform: "capitalize",
-          fontSize: 11,
-          fontWeight: 600
-        }}
-      >
-        {status}
-      </Badge>
-    );
-  };
-
   const getFieldName = (field) => {
     const names = {
       parentPhone: "Parent Phone",
@@ -246,178 +225,182 @@ export default function UpdateRequestsPage({ auth, students, pendingUpdates, set
     return names[field] || field;
   };
 
-  const columns = [
-    { header: "Student", key: "student", render: (row) => {
-      const student = students.find(s => (s.id ?? s.student_id) === row.studentId);
-      return student ? `${student.firstName ?? student.first_name} ${student.lastName ?? student.last_name}` : "Unknown";
-    }},
-    { header: "Field", key: "field", render: (row) => getFieldName(row.field) },
-    { header: "Old Value", key: "oldValue", render: (row) => row.oldValue || "-" },
-    { header: "New Value", key: "newValue", render: (row) => row.newValue },
-    { header: "Reason", key: "reason", render: (row) => row.reason },
-    { header: "Status", key: "status", render: (row) => getStatusBadge(row.status) },
-    { header: "Date", key: "createdAt", render: (row) => new Date(row.createdAt).toLocaleDateString() },
-  ];
-
+  const headers = ["Student", "Field", "Old Value", "New Value", "Reason", "Status", "Date"];
   if (isAdmin) {
-    columns.push({
-      header: "Actions", 
-      key: "actions", 
-      render: (row) => (
-        <div style={{ display: "flex", gap: 4 }}>
-          {row.status === "pending" && (
-            <>
-              <Btn
-                size="xs"
-                onClick={() => approveRequest(row.id)}
-                style={{ background: "#10B981", border: "#10B981", padding: "4px 8px", fontSize: 11 }}
-              >
-                Approve
-              </Btn>
-              <Btn
-                size="xs"
-                onClick={() => {
-                  const reason = prompt("Please provide reason for rejection:");
-                  if (reason) rejectRequest(row.id, reason);
-                }}
-                style={{ background: "#EF4444", border: "#EF4444", padding: "4px 8px", fontSize: 11 }}
-              >
-                Reject
-              </Btn>
-            </>
-          )}
-        </div>
-      )
-    });
+    headers.push("Actions");
   }
 
   return (
-    <div style={{ padding: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-3)" }}>
         <div>
-          <h2 style={{ margin: 0, color: C.text, fontSize: 24 }}>
+          <h2 style={{ margin: 0, color: "var(--color-text-primary)", fontSize: "24px" }}>
             {isAdmin ? "Student Update Requests" : "My Update Requests"}
           </h2>
-          <p style={{ margin: "4px 0 0", color: C.textMuted, fontSize: 14 }}>
+          <p style={{ margin: "4px 0 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
             {isAdmin ? "Review and approve parent update requests" : "Request updates to your child's information"}
           </p>
         </div>
         {isParent && (
-          <Btn onClick={openRequest} icon="+" style={{ background: C.accent, border: C.accent }}>
-            New Request
-          </Btn>
+          <Button onClick={openRequest}>
+            + New Request
+          </Button>
         )}
       </div>
 
-      {/* Filters */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        <Field
-          type="search"
-          placeholder="Search requests..."
-          value={q}
-          onChange={setQ}
-          style={{ width: 200, ...inputStyle }}
-        />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ padding: "8px 12px", border: `1px solid ${C.border}`, borderRadius: 6, background: C.surface, color: C.text }}
-        >
-          <option value="all">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-        </select>
-      </div>
+      <Card style={{ padding: "var(--space-3)" }}>
+        <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: "200px" }}>
+            <Input
+              placeholder="Search requests..."
+              value={q}
+              onChange={e => setQ(e.target.value)}
+            />
+          </div>
+          <div style={{ width: "200px" }}>
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              options={[
+                { value: "all", label: "All Status" },
+                { value: "pending", label: "Pending" },
+                { value: "approved", label: "Approved" },
+                { value: "rejected", label: "Rejected" }
+              ]}
+            />
+          </div>
+        </div>
+      </Card>
 
-      {/* Table */}
       {rows.length === 0 ? (
-        <Msg
-          icon={isAdmin ? " clipboard-check" : " edit"}
+        <EmptyState
+          icon={isAdmin ? "📋" : "📝"}
           title={isAdmin ? "No Update Requests" : "No Requests Found"}
-          desc={isAdmin ? "No parent update requests have been submitted yet." : "You haven't submitted any update requests yet."}
+          description={isAdmin ? "No parent update requests have been submitted yet." : "You haven't submitted any update requests yet."}
         />
       ) : (
-        <>
-          <Table columns={columns} rows={rows} />
-          <Pager page={page} pages={pages} setPage={setPage} />
-        </>
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <Table 
+            headers={headers} 
+            data={rows.map(row => {
+              const student = students.find(s => (s.id ?? s.student_id) === row.studentId);
+              const name = student ? `${student.firstName ?? student.first_name} ${student.lastName ?? student.last_name}` : "Unknown";
+              
+              const tableRow = [
+                <span key="name" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{name}</span>,
+                <span key="field" style={{ color: "var(--color-text-secondary)" }}>{getFieldName(row.field)}</span>,
+                <span key="old" style={{ color: "var(--color-text-muted)" }}>{row.oldValue || "-"}</span>,
+                <span key="new" style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>{row.newValue}</span>,
+                <span key="reason" style={{ color: "var(--color-text-secondary)" }}>{row.reason}</span>,
+                <Badge 
+                  key="status" 
+                  text={row.status} 
+                  variant={row.status === "approved" ? "success" : row.status === "rejected" ? "danger" : "warning"} 
+                />,
+                <span key="date" style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>{new Date(row.createdAt).toLocaleDateString()}</span>
+              ];
+              
+              if (isAdmin) {
+                tableRow.push(
+                  <div key="actions" style={{ display: "flex", gap: "var(--space-1)" }}>
+                    {row.status === "pending" && (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => approveRequest(row.id)}
+                          style={{ background: "var(--color-success)", color: "#ffffff", borderColor: "var(--color-success)" }}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            const reason = prompt("Please provide reason for rejection:");
+                            if (reason) rejectRequest(row.id, reason);
+                          }}
+                          style={{ background: "var(--color-danger)", color: "#ffffff", borderColor: "var(--color-danger)" }}
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                );
+              }
+              
+              return tableRow;
+            })} 
+          />
+          <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
+            <Pager page={page} pages={pages} setPage={setPage} />
+          </div>
+        </Card>
       )}
 
-      {/* Request Modal */}
       {show && (
         <Modal
-          show={show}
-          onHide={() => setShow(false)}
+          isOpen={show}
+          onClose={() => setShow(false)}
           title="Request Information Update"
           footer={
             <>
-              <Btn onClick={() => setShow(false)} style={{ background: C.border, border: C.border }}>
+              <Button variant="ghost" onClick={() => setShow(false)}>
                 Cancel
-              </Btn>
-              <Btn onClick={saveRequest} style={{ background: C.accent, border: C.accent }}>
+              </Button>
+              <Button onClick={saveRequest}>
                 Submit Request
-              </Btn>
+              </Button>
             </>
           }
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {err && <div style={{ color: C.rose, fontSize: 13, padding: 8, background: "#FEE2E2", borderRadius: 6, border: "1px solid #FECACA" }}>{err}</div>}
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+            {err && <div style={{ color: "var(--color-danger)", fontSize: "13px", padding: "8px", background: "color-mix(in srgb, var(--color-danger) 15%, transparent)", borderRadius: "var(--radius-md)", border: "1px solid color-mix(in srgb, var(--color-danger) 30%, transparent)" }}>{err}</div>}
             
-            <div>
-              <label style={{ display: "block", marginBottom: 4, fontSize: 13, fontWeight: 600, color: C.text }}>Student</label>
-              <select
-                value={f.studentId}
-                onChange={(e) => setF({ ...f, studentId: e.target.value })}
-                style={{ width: "100%", padding: "8px 12px", border: `1px solid ${C.border}`, borderRadius: 6, background: C.surface, color: C.text }}
-              >
-                <option value="">Select Student</option>
-                {myChildren.map(child => (
-                  <option key={child.id ?? child.student_id} value={child.id ?? child.student_id}>
-                    {child.firstName ?? child.first_name} {child.lastName ?? child.last_name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              label="Student *"
+              value={f.studentId}
+              onChange={(e) => setF({ ...f, studentId: e.target.value })}
+              options={[
+                { value: "", label: "Select Student" },
+                ...myChildren.map(child => ({
+                  value: child.id ?? child.student_id,
+                  label: `${child.firstName ?? child.first_name} ${child.lastName ?? child.last_name}`
+                }))
+              ]}
+            />
 
-            <div>
-              <label style={{ display: "block", marginBottom: 4, fontSize: 13, fontWeight: 600, color: C.text }}>Field to Update</label>
-              <select
-                value={f.field}
-                onChange={(e) => setF({ ...f, field: e.target.value })}
-                style={{ width: "100%", padding: "8px 12px", border: `1px solid ${C.border}`, borderRadius: 6, background: C.surface, color: C.text }}
-              >
-                <option value="">Select Field</option>
-                <option value="parentPhone">Parent Phone Number</option>
-                <option value="parentName">Parent Name</option>
-                <option value="emergencyContactName">Emergency Contact Name</option>
-                <option value="emergencyContactPhone">Emergency Contact Phone</option>
-                <option value="emergencyContactRelationship">Emergency Contact Relationship</option>
-                <option value="medicalConditions">Medical Conditions</option>
-                <option value="allergies">Allergies</option>
-                <option value="bloodGroup">Blood Group</option>
-              </select>
-            </div>
+            <Select
+              label="Field to Update *"
+              value={f.field}
+              onChange={(e) => setF({ ...f, field: e.target.value })}
+              options={[
+                { value: "", label: "Select Field" },
+                { value: "parentPhone", label: "Parent Phone Number" },
+                { value: "parentName", label: "Parent Name" },
+                { value: "emergencyContactName", label: "Emergency Contact Name" },
+                { value: "emergencyContactPhone", label: "Emergency Contact Phone" },
+                { value: "emergencyContactRelationship", label: "Emergency Contact Relationship" },
+                { value: "medicalConditions", label: "Medical Conditions" },
+                { value: "allergies", label: "Allergies" },
+                { value: "bloodGroup", label: "Blood Group" }
+              ]}
+            />
 
-            <div>
-              <label style={{ display: "block", marginBottom: 4, fontSize: 13, fontWeight: 600, color: C.text }}>New Value</label>
-              <input
-                type="text"
-                value={f.newValue}
-                onChange={(e) => setF({ ...f, newValue: e.target.value })}
-                placeholder="Enter new value"
-                style={{ width: "100%", padding: "8px 12px", border: `1px solid ${C.border}`, borderRadius: 6, background: C.surface, color: C.text }}
-              />
-            </div>
+            <Input
+              label="New Value *"
+              value={f.newValue}
+              onChange={(e) => setF({ ...f, newValue: e.target.value })}
+              placeholder="Enter new value"
+            />
 
-            <div>
-              <label style={{ display: "block", marginBottom: 4, fontSize: 13, fontWeight: 600, color: C.text }}>Reason for Update</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+              <label style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Reason for Update *</label>
               <textarea
                 value={f.reason}
                 onChange={(e) => setF({ ...f, reason: e.target.value })}
                 placeholder="Please explain why this update is needed..."
                 rows={3}
-                style={{ width: "100%", padding: "8px 12px", border: `1px solid ${C.border}`, borderRadius: 6, background: C.surface, color: C.text, resize: "vertical" }}
+                style={{ width: "100%", padding: "var(--space-3)", background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", color: "var(--color-text-primary)", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }}
               />
             </div>
           </div>

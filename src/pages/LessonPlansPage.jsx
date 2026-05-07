@@ -1,40 +1,39 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
-import { C } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
 
+import Card from "../components/ui/Card";
+import Button from "../components/ui/Button";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Table from "../components/ui/Table";
+import EmptyState from "../components/ui/EmptyState";
+
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const inp = {
-  background: C.card, border: `1px solid ${C.border}`, borderRadius: 8,
-  color: C.text, padding: "8px 12px", fontSize: 13, width: "100%",
-  boxSizing: "border-box",
+  background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)",
+  color: "var(--color-text-primary)", padding: "10px 14px", fontSize: "14px", width: "100%",
+  boxSizing: "border-box", transition: "border-color 0.2s ease, box-shadow 0.2s ease",
 };
+
 const Lbl = ({ children }) => (
-  <label style={{ display: "block", fontSize: 11, fontWeight: 700,
-    color: C.textMuted, marginBottom: 5, textTransform: "uppercase",
-    letterSpacing: "0.06em" }}>{children}</label>
+  <label style={{ display: "block", fontSize: "12px", fontWeight: 600,
+    color: "var(--color-text-secondary)", marginBottom: "var(--space-1)" }}>{children}</label>
 );
 Lbl.propTypes = { children: PropTypes.node };
 
-const STATUS_COLOR = {
-  draft:    { bg:"#1a1a2e", border:"#3d3d6b", text:"#8888cc" },
-  pending:  { bg:"#1c1400", border:"#a16207", text:"#facc15" },
-  approved: { bg:"#052e16", border:"#166534", text:"#4ade80" },
-  rejected: { bg:"#1c0505", border:"#991b1b", text:"#f87171" },
+const StatusBadge = ({ status }) => {
+  const map = {
+    draft:    { variant: "default", label: "Draft" },
+    pending:  { variant: "warning", label: "Pending" },
+    approved: { variant: "success", label: "Approved" },
+    rejected: { variant: "danger", label: "Rejected" },
+  };
+  const s = map[status] || map.draft;
+  return <Badge text={s.label} variant={s.variant} />;
 };
-
-const Badge = ({ status }) => {
-  const s = STATUS_COLOR[status] || STATUS_COLOR.draft;
-  return (
-    <span style={{ background: s.bg, border: `1px solid ${s.border}`,
-      color: s.text, borderRadius: 20, padding: "2px 10px",
-      fontSize: 11, fontWeight: 700, textTransform: "capitalize" }}>
-      {status.replace("_", " ")}
-    </span>
-  );
-};
-Badge.propTypes = { status: PropTypes.string };
+StatusBadge.propTypes = { status: PropTypes.string };
 
 // ── Plan list ─────────────────────────────────────────────────────────────────
 function PlanList({ auth, onNew, onOpen }) {
@@ -52,7 +51,7 @@ function PlanList({ auth, onNew, onOpen }) {
       .catch(e => { setPlans([]); setErr(e?.message || "Failed to load lesson plans"); setLoading(false); });
   }, [auth, typeFilter]);
 
-  useEffect(load, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const empty = !loading && plans.length === 0;
 
@@ -60,100 +59,76 @@ function PlanList({ auth, onNew, onOpen }) {
     <div>
       {/* Header */}
       <div style={{ display:"flex", justifyContent:"space-between",
-        alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:10 }}>
-        <div style={{ display:"flex", gap:8 }}>
+        alignItems:"center", marginBottom: "var(--space-4)", flexWrap:"wrap", gap: "var(--space-2)" }}>
+        <div style={{ display:"flex", gap: "var(--space-2)", background: "var(--color-bg-base)", padding: "var(--space-1)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
           {[["all","All"],["lesson_plan","Lesson Plans"],["scheme","Schemes of Work"]].map(([v,l]) => (
-            <button key={v} onClick={() => setTypeFilter(v)} style={{
-              padding:"6px 14px", borderRadius:8, fontSize:12, fontWeight:700,
-              cursor:"pointer",
-              background: typeFilter===v ? C.accent : C.card,
-              color: typeFilter===v ? "#fff" : C.textMuted,
-              border: `1px solid ${typeFilter===v ? C.accent : C.border}`,
-            }}>{l}</button>
+            <Button 
+              key={v} 
+              variant={typeFilter === v ? "primary" : "ghost"} 
+              size="sm"
+              onClick={() => setTypeFilter(v)}
+            >
+              {l}
+            </Button>
           ))}
         </div>
-        <div style={{ display:"flex", gap:8 }}>
-          <button onClick={() => onNew("lesson_plan")} style={{
-            background:C.accent, color:"#fff", border:"none", borderRadius:8,
-            padding:"8px 16px", fontWeight:700, fontSize:13, cursor:"pointer",
-          }}>+ Lesson Plan</button>
-          <button onClick={() => onNew("scheme")} style={{
-            background:"#6366f1", color:"#fff", border:"none", borderRadius:8,
-            padding:"8px 16px", fontWeight:700, fontSize:13, cursor:"pointer",
-          }}>+ Scheme of Work</button>
+        <div style={{ display:"flex", gap: "var(--space-2)" }}>
+          <Button onClick={() => onNew("lesson_plan")} variant="primary">
+            + Lesson Plan
+          </Button>
+          <Button onClick={() => onNew("scheme")} style={{ background: "var(--color-info)", borderColor: "var(--color-info)" }}>
+            + Scheme of Work
+          </Button>
         </div>
       </div>
 
-      {loading && <div style={{ color:C.textMuted, padding:32 }}>Loading…</div>}
+      {loading && <div style={{ color: "var(--color-text-muted)", padding: "32px", textAlign: "center" }}>Loading…</div>}
 
       {!loading && err && (
-        <div style={{ background:"#1c0505", border:"1px solid #991b1b", borderRadius:12, padding:12, color:"#fca5a5", fontSize:13, marginBottom:12 }}>
-          {err}
-        </div>
+        <Card style={{ padding: "var(--space-3)", marginBottom: "var(--space-3)", background: "color-mix(in srgb, var(--color-danger) 10%, transparent)", borderColor: "var(--color-danger)" }}>
+          <div style={{ color: "var(--color-danger)", fontSize: "14px", fontWeight: 500 }}>{err}</div>
+        </Card>
       )}
 
-      {empty && (
-        <div style={{ background:C.card, border:`1px solid ${C.border}`,
-          borderRadius:16, padding:60, textAlign:"center" }}>
-          <div style={{ fontSize:40, marginBottom:12 }}>📝</div>
-          <div style={{ fontWeight:700, color:C.text, marginBottom:8 }}>No documents yet</div>
-          <div style={{ color:C.textMuted, fontSize:13, marginBottom:20 }}>
-            Create a lesson plan or scheme of work using the AI generator
-          </div>
-          <button onClick={() => onNew("lesson_plan")} style={{
-            background:C.accent, color:"#fff", border:"none", borderRadius:8,
-            padding:"9px 24px", fontWeight:700, fontSize:13, cursor:"pointer",
-          }}>Generate with AI</button>
-        </div>
+      {empty && !err && (
+        <Card style={{ padding: "60px var(--space-4)" }}>
+          <EmptyState 
+            icon="📝" 
+            title="No documents yet" 
+            description="Create a lesson plan or scheme of work using the AI generator"
+            action={<Button onClick={() => onNew("lesson_plan")}>Generate with AI</Button>}
+          />
+        </Card>
       )}
 
       {!loading && plans.length > 0 && (
-        <div style={{ background:C.card, border:`1px solid ${C.border}`,
-          borderRadius:12, overflow:"hidden" }}>
-          <table style={{ width:"100%", borderCollapse:"collapse" }}>
-            <thead>
-              <tr>
-                {["Type","Subject","Class","Term / Week","Topic","Status","Date"].map(h => (
-                  <th key={h} style={{ textAlign:"left", padding:"10px 14px",
-                    borderBottom:`1px solid ${C.border}`, color:C.textMuted,
-                    fontSize:11, fontWeight:700, textTransform:"uppercase" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {plans.map(p => (
-                <tr key={p.plan_id}
-                  onClick={() => onOpen(p)}
-                  style={{ borderBottom:`1px solid ${C.border}`, cursor:"pointer",
-                    transition:"background 0.1s" }}
-                  onMouseEnter={e => e.currentTarget.style.background = C.accentGlow}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <td style={{ padding:"10px 14px" }}>
-                    <span style={{ fontSize:11, fontWeight:700,
-                      color: p.type==="scheme" ? "#6366f1" : C.accent,
-                      background: p.type==="scheme" ? "#1e1b4b" : C.accentGlow,
-                      borderRadius:6, padding:"2px 8px" }}>
-                      {p.type === "scheme" ? "Scheme" : "Lesson"}
-                    </span>
-                  </td>
-                  <td style={{ padding:"10px 14px", color:C.text, fontWeight:600 }}>{p.subject}</td>
-                  <td style={{ padding:"10px 14px", color:C.textSub }}>{p.class_name}</td>
-                  <td style={{ padding:"10px 14px", color:C.textSub, fontSize:12 }}>
-                    {p.term}{p.week ? ` · Wk ${p.week}` : ""}
-                  </td>
-                  <td style={{ padding:"10px 14px", color:C.text, maxWidth:200,
-                    overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                    {p.topic}
-                  </td>
-                  <td style={{ padding:"10px 14px" }}><Badge status={p.status} /></td>
-                  <td style={{ padding:"10px 14px", color:C.textMuted, fontSize:12 }}>
-                    {new Date(p.updated_at).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Card>
+          <Table 
+            headers={["Type", "Subject", "Class", "Term / Week", "Topic", "Status", "Date"]}
+            data={plans.map(p => [
+              <span key="type" style={{ fontSize: "12px", fontWeight: 700,
+                color: p.type === "scheme" ? "var(--color-info)" : "var(--color-primary)",
+                background: p.type === "scheme" ? "color-mix(in srgb, var(--color-info) 10%, transparent)" : "color-mix(in srgb, var(--color-primary) 10%, transparent)",
+                borderRadius: "var(--radius-sm)", padding: "2px 8px" }}>
+                {p.type === "scheme" ? "Scheme" : "Lesson"}
+              </span>,
+              <span key="sub" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{p.subject}</span>,
+              <span key="cls" style={{ color: "var(--color-text-secondary)" }}>{p.class_name}</span>,
+              <span key="term" style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>
+                {p.term}{p.week ? ` · Wk ${p.week}` : ""}
+              </span>,
+              <span key="topic" style={{ color: "var(--color-text-primary)", maxWidth: 200, display: "block",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {p.topic}
+              </span>,
+              <StatusBadge key="status" status={p.status} />,
+              <span key="date" style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>
+                {new Date(p.updated_at).toLocaleDateString()}
+              </span>
+            ])}
+            onRowClick={(idx) => onOpen(plans[idx])}
+          />
+        </Card>
       )}
     </div>
   );
@@ -180,11 +155,9 @@ function PlanEditor({ auth, toast, editPlan, type: initType, onBack, onSaved }) 
   const [uploading, setUploading]     = useState(false);
   const [rejectionNote, setRejNote]   = useState(editPlan?.admin_feedback || "");
 
-  const f = key => ({
-    value: form[key],
-    onChange: e => setForm(p => ({ ...p, [key]: e.target.value })),
-    style: inp,
-  });
+  const handleSelectChange = (e, key) => {
+    setForm(p => ({ ...p, [key]: e.target.value }));
+  };
 
   const generate = async () => {
     if (!form.subject || !form.class_name || !form.topic)
@@ -229,7 +202,6 @@ function PlanEditor({ auth, toast, editPlan, type: initType, onBack, onSaved }) 
     setUploading(true);
     try {
       const importedText = await file.text();
-      // OLD: Teachers could only type or generate content manually.
       setContent(importedText);
       toast(`Imported ${file.name}`, "success");
     } catch (e) {
@@ -269,19 +241,17 @@ function PlanEditor({ auth, toast, editPlan, type: initType, onBack, onSaved }) 
   return (
     <div>
       {/* Back */}
-      <button onClick={onBack} style={{ background:"transparent",
-        border:`1px solid ${C.border}`, borderRadius:8, color:C.textMuted,
-        cursor:"pointer", padding:"6px 14px", fontSize:13, marginBottom:20 }}>
+      <Button variant="ghost" size="sm" onClick={onBack} style={{ marginBottom: "var(--space-4)" }}>
         ← Back
-      </button>
+      </Button>
 
-      <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:24 }}>
-        <div style={{ fontSize:26 }}>{planType === "scheme" ? "📅" : "📝"}</div>
+      <div style={{ display:"flex", alignItems:"center", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+        <div style={{ fontSize: "32px" }}>{planType === "scheme" ? "📅" : "📝"}</div>
         <div>
-          <h2 style={{ margin:0, color:C.text, fontSize:18 }}>
+          <h2 style={{ margin: 0, color: "var(--color-text-primary)", fontSize: "20px", fontWeight: 700 }}>
             {isEdit ? "Edit" : "New"} {planType === "scheme" ? "Scheme of Work" : "Lesson Plan"}
           </h2>
-          <div style={{ color:C.textMuted, fontSize:12, marginTop:2 }}>
+          <div style={{ color: "var(--color-text-secondary)", fontSize: "14px", marginTop: "var(--space-1)" }}>
             Fill the details below, then click <strong>Generate with AI</strong> for a CBC-compliant draft
           </div>
         </div>
@@ -289,100 +259,97 @@ function PlanEditor({ auth, toast, editPlan, type: initType, onBack, onSaved }) 
 
       {/* Rejection notice */}
       {isRejected && rejectionNote && (
-        <div style={{ background:"#1c0505", border:"1px solid #991b1b",
-          borderRadius:12, padding:16, marginBottom:20 }}>
-          <div style={{ color:"#f87171", fontWeight:700, marginBottom:6 }}>
+        <Card style={{ background: "color-mix(in srgb, var(--color-danger) 10%, transparent)", borderColor: "var(--color-danger)", padding: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+          <div style={{ color: "var(--color-danger)", fontWeight: 700, marginBottom: "var(--space-1)" }}>
             ❌ Rejected by Admin
           </div>
-          <div style={{ color:"#fca5a5", fontSize:13 }}>{rejectionNote}</div>
-          <div style={{ color:"#f87171", fontSize:12, marginTop:8 }}>
+          <div style={{ color: "var(--color-text-primary)", fontSize: "14px" }}>{rejectionNote}</div>
+          <div style={{ color: "var(--color-danger)", fontSize: "13px", marginTop: "var(--space-2)" }}>
             Edit the content below and resubmit.
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Form fields */}
-      <div style={{ background:C.card, border:`1px solid ${C.border}`,
-        borderRadius:12, padding:20, marginBottom:20 }}>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:14 }}>
-          <div><Lbl>Subject *</Lbl>
-            <select {...f("subject")} style={inp}>
-              <option value="">Select subject…</option>
-              {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+      <Card style={{ padding: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-3)" }}>
+          <div>
+            <Select 
+              label="Subject *" 
+              value={form.subject} 
+              onChange={e => handleSelectChange(e, "subject")}
+              options={[{ value: "", label: "Select subject…" }, ...SUBJECTS.map(s => ({ value: s, label: s }))]}
+            />
           </div>
-          <div><Lbl>Class *</Lbl>
-            <select {...f("class_name")} style={inp}>
-              <option value="">Select class…</option>
-              {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+          <div>
+            <Select 
+              label="Class *" 
+              value={form.class_name} 
+              onChange={e => handleSelectChange(e, "class_name")}
+              options={[{ value: "", label: "Select class…" }, ...ALL_CLASSES.map(c => ({ value: c, label: c }))]}
+            />
           </div>
-          <div><Lbl>Term</Lbl>
-            <select {...f("term")} style={inp}>
-              {["Term 1","Term 2","Term 3"].map(t => <option key={t}>{t}</option>)}
-            </select>
+          <div>
+            <Select 
+              label="Term" 
+              value={form.term} 
+              onChange={e => handleSelectChange(e, "term")}
+              options={["Term 1", "Term 2", "Term 3"].map(t => ({ value: t, label: t }))}
+            />
           </div>
           {planType === "lesson_plan" && <>
-            <div><Lbl>Topic *</Lbl><input {...f("topic")} placeholder="e.g. Fractions" /></div>
-            <div><Lbl>Duration</Lbl><input {...f("duration")} placeholder="e.g. 40 minutes" /></div>
-            <div><Lbl>Week</Lbl><input {...f("week")} placeholder="e.g. 3" /></div>
+            <div><Lbl>Topic *</Lbl><input value={form.topic} onChange={e => setForm(p => ({ ...p, topic: e.target.value }))} style={inp} placeholder="e.g. Fractions" /></div>
+            <div><Lbl>Duration</Lbl><input value={form.duration} onChange={e => setForm(p => ({ ...p, duration: e.target.value }))} style={inp} placeholder="e.g. 40 minutes" /></div>
+            <div><Lbl>Week</Lbl><input value={form.week} onChange={e => setForm(p => ({ ...p, week: e.target.value }))} style={inp} placeholder="e.g. 3" /></div>
           </>}
           {planType === "scheme" && (
-            <div style={{ gridColumn:"1/-1" }}>
+            <div style={{ gridColumn: "1/-1" }}>
               <Lbl>Description / Focus (optional)</Lbl>
-              <input {...f("topic")} placeholder="e.g. Number concepts and operations" />
+              <input value={form.topic} onChange={e => setForm(p => ({ ...p, topic: e.target.value }))} style={inp} placeholder="e.g. Number concepts and operations" />
             </div>
           )}
         </div>
 
-        <div style={{ marginTop:14 }}>
+        <div style={{ marginTop: "var(--space-4)" }}>
           <Lbl>Extra details for AI (optional)</Lbl>
           <textarea
             value={aiNotes}
             onChange={e => setAiNotes(e.target.value)}
             placeholder="Paste your answers/requirements here (e.g. Strand, Sub-strand, Learning outcomes, Activities, Resources, Assessment)."
-            style={{ ...inp, height: 90, resize: "vertical", fontSize: 12, lineHeight: 1.6 }}
+            style={{ ...inp, height: 90, resize: "vertical", fontSize: "14px", lineHeight: 1.6 }}
           />
         </div>
 
-        <div style={{ marginTop:16 }}>
-          <button onClick={generate} disabled={generating} style={{
-            background: `linear-gradient(135deg, ${C.accent}, #6366f1)`,
-            color:"#fff", border:"none", borderRadius:9,
-            padding:"10px 28px", fontWeight:800, fontSize:14,
-            cursor: generating ? "not-allowed" : "pointer",
-            opacity: generating ? 0.7 : 1,
-          }}>
+        <div style={{ marginTop: "var(--space-4)", display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <Button onClick={generate} disabled={generating} size="lg" style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-info))", border: "none" }}>
             {generating ? "⏳ Generating…" : "✨ Generate with AI"}
-          </button>
-          <span style={{ fontSize:11, color:C.textMuted, marginLeft:12 }}>
+          </Button>
+          <span style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>
             Uses KICD CBC framework
           </span>
         </div>
 
-        <div style={{ marginTop:14 }}>
+        <div style={{ marginTop: "var(--space-4)", borderTop: "1px solid var(--color-border)", paddingTop: "var(--space-4)" }}>
           <Lbl>Import Existing File</Lbl>
           <input
             type="file"
             accept=".txt,.md,.csv,text/plain,text/markdown,text/csv"
             onChange={importFile}
-            style={{ ...inp, padding: "10px 12px" }}
+            style={{ ...inp, padding: "8px 12px", background: "var(--color-bg-surface)" }}
           />
-          <div style={{ fontSize:11, color:C.textMuted, marginTop:6 }}>
+          <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "var(--space-1)" }}>
             Upload a text-based lesson plan or scheme file and review it before saving.
             {uploading ? " Importing file..." : ""}
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Content editor */}
-      <div style={{ background:C.card, border:`1px solid ${C.border}`,
-        borderRadius:12, padding:20, marginBottom:20 }}>
-        <div style={{ display:"flex", justifyContent:"space-between",
-          alignItems:"center", marginBottom:10 }}>
+      <Card style={{ padding: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
           <Lbl>Content (edit before submitting)</Lbl>
           {content && (
-            <span style={{ fontSize:11, color:C.textMuted }}>
+            <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
               {content.length.toLocaleString()} chars
             </span>
           )}
@@ -393,27 +360,18 @@ function PlanEditor({ auth, toast, editPlan, type: initType, onBack, onSaved }) 
           placeholder={generating
             ? "Generating CBC-compliant draft…"
             : "Click 'Generate with AI' above, or type your lesson plan here…"}
-          style={{ ...inp, height:420, resize:"vertical", fontFamily:"'Courier New', monospace",
-            fontSize:12, lineHeight:1.8 }}
+          style={{ ...inp, height: 420, resize: "vertical", fontFamily: "var(--font-mono)", fontSize: "13px", lineHeight: 1.8 }}
         />
-      </div>
+      </Card>
 
       {/* Action buttons */}
-      <div style={{ display:"flex", gap:10 }}>
-        <button onClick={() => save("draft")} disabled={saving || !content.trim()} style={{
-          background:C.card, border:`1px solid ${C.border}`, color:C.textSub,
-          borderRadius:8, padding:"9px 20px", fontWeight:700, fontSize:13,
-          cursor:"pointer",
-        }}>
+      <div style={{ display: "flex", gap: "var(--space-3)" }}>
+        <Button onClick={() => save("draft")} disabled={saving || !content.trim()} variant="secondary">
           💾 Save Draft
-        </button>
-        <button onClick={() => save("pending")} disabled={saving || !content.trim()} style={{
-          background:C.accent, color:"#fff", border:"none", borderRadius:8,
-          padding:"9px 24px", fontWeight:700, fontSize:13, cursor:"pointer",
-          opacity: (!content.trim() || saving) ? 0.6 : 1,
-        }}>
+        </Button>
+        <Button onClick={() => save("pending")} disabled={saving || !content.trim()} variant="primary">
           {saving ? "Submitting…" : "📤 Submit for Approval"}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -429,54 +387,47 @@ function PlanViewer({ plan, onBack, onEdit }) {
   const canEdit = ["draft","rejected"].includes(plan.status);
   return (
     <div>
-      <button onClick={onBack} style={{ background:"transparent",
-        border:`1px solid ${C.border}`, borderRadius:8, color:C.textMuted,
-        cursor:"pointer", padding:"6px 14px", fontSize:13, marginBottom:20 }}>
+      <Button variant="ghost" size="sm" onClick={onBack} style={{ marginBottom: "var(--space-4)" }}>
         ← Back
-      </button>
+      </Button>
 
-      <div style={{ display:"flex", justifyContent:"space-between",
-        alignItems:"flex-start", marginBottom:20, flexWrap:"wrap", gap:10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--space-4)", flexWrap: "wrap", gap: "var(--space-2)" }}>
         <div>
-          <h2 style={{ margin:0, color:C.text, fontSize:18 }}>
+          <h2 style={{ margin: 0, color: "var(--color-text-primary)", fontSize: "20px", fontWeight: 700 }}>
             {plan.type === "scheme" ? "📅 Scheme of Work" : "📝 Lesson Plan"}
           </h2>
-          <div style={{ color:C.textMuted, fontSize:12, marginTop:4 }}>
+          <div style={{ color: "var(--color-text-secondary)", fontSize: "14px", marginTop: "var(--space-1)" }}>
             {plan.subject} · {plan.class_name} · {plan.term}
             {plan.week ? ` · Week ${plan.week}` : ""}
           </div>
         </div>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <Badge status={plan.status} />
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <StatusBadge status={plan.status} />
           {canEdit && (
-            <button onClick={onEdit} style={{
-              background:C.accent, color:"#fff", border:"none", borderRadius:8,
-              padding:"7px 16px", fontWeight:700, fontSize:13, cursor:"pointer",
-            }}>✏️ Edit</button>
+            <Button onClick={onEdit} variant="primary" size="sm">
+              ✏️ Edit
+            </Button>
           )}
         </div>
       </div>
 
       {/* Admin feedback */}
       {plan.status === "rejected" && plan.admin_feedback && (
-        <div style={{ background:"#1c0505", border:"1px solid #991b1b",
-          borderRadius:12, padding:16, marginBottom:20 }}>
-          <div style={{ color:"#f87171", fontWeight:700, marginBottom:6 }}>
+        <Card style={{ background: "color-mix(in srgb, var(--color-danger) 10%, transparent)", borderColor: "var(--color-danger)", padding: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+          <div style={{ color: "var(--color-danger)", fontWeight: 700, marginBottom: "var(--space-1)" }}>
             ❌ Admin Feedback
           </div>
-          <div style={{ color:"#fca5a5", fontSize:13 }}>{plan.admin_feedback}</div>
-        </div>
+          <div style={{ color: "var(--color-text-primary)", fontSize: "14px" }}>{plan.admin_feedback}</div>
+        </Card>
       )}
 
       {/* Content */}
-      <div style={{ background:C.card, border:`1px solid ${C.border}`,
-        borderRadius:12, padding:24 }}>
-        <pre style={{ color:C.text, fontSize:13, lineHeight:1.9,
-          whiteSpace:"pre-wrap", fontFamily:"'Segoe UI', Arial, sans-serif",
-          margin:0 }}>
+      <Card style={{ padding: "var(--space-4)" }}>
+        <pre style={{ color: "var(--color-text-primary)", fontSize: "14px", lineHeight: 1.8,
+          whiteSpace: "pre-wrap", fontFamily: "var(--font-sans)", margin: 0 }}>
           {plan.content}
         </pre>
-      </div>
+      </Card>
     </div>
   );
 }
@@ -517,7 +468,7 @@ export default function LessonPlansPage({ auth, toast }) {
           onBack={goBack} onSaved={onSaved} />
       )}
       {view === "view" && opening && !selected && (
-        <div style={{ color: C.textMuted, padding: 40 }}>Loading plan…</div>
+        <div style={{ color: "var(--color-text-muted)", padding: "40px", textAlign: "center" }}>Loading plan…</div>
       )}
       {view === "view" && selected && (
         <PlanViewer plan={selected} onBack={goBack} onEdit={openEdit} />

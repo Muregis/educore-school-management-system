@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
-import Btn from "../components/Btn";
-import Field from "../components/Field";
-import Badge from "../components/Badge";
-import Modal from "../components/Modal";
-import Table from "../components/Table";
-import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
-import { Pager, Msg, pager } from "../components/Helpers";
+import { pager } from "../components/Helpers";
 import { csv } from "../lib/utils";
+
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Modal from "../components/ui/Modal";
+import EmptyState from "../components/ui/EmptyState";
+import Table from "../components/ui/Table";
 
 const CATEGORIES = ["Languages", "Sciences", "Humanities", "Technical", "Creative", "Other"];
 
@@ -25,6 +28,19 @@ function normaliseSubject(s) {
     isActive: s.is_active ?? s.isActive ?? true,
     createdAt: s.created_at ?? s.createdAt,
   };
+}
+
+function Pager({ page, pages, setPage }) {
+  if (pages <= 1) return null;
+  return (
+    <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "center", marginTop: "var(--space-3)" }}>
+      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+        style={{ padding: "4px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: page === 1 ? "default" : "pointer" }}>‹</button>
+      <span style={{ padding: "4px 10px", fontSize: "13px", color: "var(--color-text-secondary)" }}>{page} / {pages}</span>
+      <button onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}
+        style={{ padding: "4px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: page === pages ? "default" : "pointer" }}>›</button>
+    </div>
+  );
 }
 
 export default function SubjectsPage({ auth, toast, canEdit = true }) {
@@ -99,12 +115,6 @@ export default function SubjectsPage({ auth, toast, canEdit = true }) {
     setEditingId(null);
   };
 
-  // Open add modal
-  const openAdd = () => {
-    resetForm();
-    setShowModal(true);
-  };
-
   // Open edit modal
   const openEdit = (subject) => {
     setForm({
@@ -147,7 +157,6 @@ export default function SubjectsPage({ auth, toast, canEdit = true }) {
         });
         setSubjects(prev => prev.map(s => s.id === editingId ? { ...s, ...form, id: editingId } : s));
         toast("Subject updated", "success");
-        // Refetch to ensure consistency
         await loadSubjects();
       } else {
         const res = await apiFetch("/subjects", {
@@ -163,7 +172,6 @@ export default function SubjectsPage({ auth, toast, canEdit = true }) {
           },
           token: auth?.token,
         });
-        // Ensure ID is properly set from various possible response formats
         const newSubject = normaliseSubject({
           ...res,
           subject_id: res.subject_id || res.id,
@@ -173,7 +181,6 @@ export default function SubjectsPage({ auth, toast, canEdit = true }) {
         });
         setSubjects(prev => [...prev, newSubject]);
         toast("Subject created", "success");
-        // Force refetch to ensure consistency
         await loadSubjects();
       }
       setShowModal(false);
@@ -191,7 +198,6 @@ export default function SubjectsPage({ auth, toast, canEdit = true }) {
       await apiFetch(`/subjects/${id}`, { method: "DELETE", token: auth?.token });
       setSubjects(prev => prev.filter(s => s.id !== id));
       toast("Subject deleted", "success");
-      // Refetch to ensure consistency
       await loadSubjects();
     } catch (err) {
       toast(err.message || "Delete failed", "error");
@@ -228,111 +234,158 @@ export default function SubjectsPage({ auth, toast, canEdit = true }) {
     toast("Subjects CSV exported", "success");
   };
 
-  // Unique categories from data
   const categories = useMemo(() => [...new Set(subjects.map(s => s.category).filter(Boolean))], [subjects]);
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Stats */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <Badge text={`Total: ${subjects.length}`} tone="info" />
-        <Badge text={`Active: ${subjects.filter(s => s.isActive).length}`} tone="success" />
-        <Badge text={`Categories: ${categories.length}`} tone="warning" />
+      <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+        <Badge text={`Total: ${subjects.length}`} variant="info" />
+        <Badge text={`Active: ${subjects.filter(s => s.isActive).length}`} variant="success" />
+        <Badge text={`Categories: ${categories.length}`} variant="warning" />
       </div>
 
       {/* Operations */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, marginBottom: 12 }}>
-        <h4 style={{ margin: "0 0 12px", color: C.text, fontSize: 16 }}>Operations</h4>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <Btn variant="ghost" onClick={exportCSV}>📤 Export CSV</Btn>
+      <Card style={{ padding: "var(--space-3)" }}>
+        <h4 style={{ margin: "0 0 var(--space-2)", color: "var(--color-text-primary)", fontSize: "16px", fontWeight: 600 }}>Operations</h4>
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+          <Button variant="secondary" onClick={exportCSV}>📤 Export CSV</Button>
         </div>
-      </div>
+      </Card>
 
-      {/* Actions & Filters - matching Library layout */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
-        <input 
-          type="text" 
-          placeholder="Search subjects..." 
-          style={inputStyle} 
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <select style={inputStyle} value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
-          <option value="all">All Categories</option>
-          {categories.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <div style={{ flex: 1 }} />
-        {canEdit && <Btn variant="ghost" onClick={seedDefaults}>⚡ Load Defaults</Btn>}
-        {canEdit && <Btn onClick={() => { resetForm(); setShowModal(true); }}>+ Add Subject</Btn>}
-      </div>
+      {/* Actions & Filters */}
+      <Card style={{ padding: "var(--space-3)" }}>
+        <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "end" }}>
+          <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", flex: 1 }}>
+            <div style={{ minWidth: "200px" }}>
+              <Input 
+                placeholder="Search subjects..." 
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+            <div style={{ minWidth: "180px" }}>
+              <Select 
+                value={filterCategory} 
+                onChange={e => setFilterCategory(e.target.value)}
+                options={[
+                  { value: "all", label: "All Categories" },
+                  ...categories.map(c => ({ value: c, label: c }))
+                ]}
+              />
+            </div>
+          </div>
+          
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            {canEdit && <Button variant="secondary" onClick={seedDefaults}>⚡ Load Defaults</Button>}
+            {canEdit && <Button onClick={() => { resetForm(); setShowModal(true); }}>+ Add Subject</Button>}
+          </div>
+        </div>
+      </Card>
 
       {/* Table */}
       {loading ? (
-        <Msg text="Loading subjects..." />
+        <EmptyState icon="⏳" title="Loading Subjects" description="Please wait while we load the curriculum..." />
       ) : filtered.length === 0 ? (
-        <Msg text={search || filterCategory !== "all" ? "No subjects match your filters" : "No subjects yet. Add your first subject!"} />
+        <EmptyState icon="📚" title="No Subjects Found" description={search || filterCategory !== "all" ? "No subjects match your current filters." : "No subjects yet. Add your first subject!"} />
       ) : (
-        <>
-          <div style={{ overflowX: "auto" }}>
-            <Table
-              headers={["Name", "Code", "Category", "Grading", "Status", "Actions"]}
-              rows={rows.map(s => [
-                <span key="n" style={{ fontWeight: 600, color: C.text }}>{s.name}</span>,
-                s.code || "-",
-                <Badge key="c" text={s.category} tone="info" />,
-                `${s.passMarks}/${s.maxMarks}`,
-                <Badge key="s" text={s.isActive ? "Active" : "Inactive"} tone={s.isActive ? "success" : "danger"} />,
-                <div key="a" style={{ display: "flex", gap: 6 }}>
-                  {canEdit && <Btn variant="ghost" onClick={() => openEdit(s)}>Edit</Btn>}
-                  {canEdit && <Btn variant="danger" onClick={() => del(s.id)}>Delete</Btn>}
-                </div>,
-              ])}
-            />
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <Table
+            headers={["Name", "Code", "Category", "Grading", "Status", "Actions"]}
+            data={rows.map(s => [
+              <span key="n" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{s.name}</span>,
+              <span key="code" style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{s.code || "-"}</span>,
+              <Badge key="c" text={s.category} variant="info" />,
+              <span key="grading" style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>{s.passMarks}/{s.maxMarks}</span>,
+              <Badge key="s" text={s.isActive ? "Active" : "Inactive"} variant={s.isActive ? "success" : "neutral"} />,
+              <div key="a" style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                {canEdit && <Button size="sm" variant="secondary" onClick={() => openEdit(s)}>Edit</Button>}
+                {canEdit && <Button size="sm" variant="danger" onClick={() => del(s.id)}>Delete</Button>}
+              </div>,
+            ])}
+          />
+          <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
+            <Pager page={page} pages={pages} setPage={setPage} />
           </div>
-          <Pager page={page} pages={pages} setPage={setPage} />
-        </>
+        </Card>
       )}
 
       {/* Modal */}
-      {showModal && (
-        <Modal title={editingId ? "Edit Subject" : "Add Subject"} onClose={() => { setShowModal(false); resetForm(); }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label="Subject Name *">
-              <input style={inputStyle} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Mathematics" />
-            </Field>
-            <Field label="Subject Code">
-              <input style={inputStyle} value={form.code} onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="e.g. MAT" />
-            </Field>
-            <Field label="Category">
-              <select style={inputStyle} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </Field>
-            <Field label="Status">
-              <select style={inputStyle} value={form.isActive} onChange={e => setForm({ ...form, isActive: e.target.value === "true" })}>
-                <option value="true">Active</option>
-                <option value="false">Inactive</option>
-              </select>
-            </Field>
-            <Field label="Pass Marks">
-              <input type="number" style={inputStyle} value={form.passMarks} onChange={e => setForm({ ...form, passMarks: e.target.value })} min="0" max="100" />
-            </Field>
-            <Field label="Max Marks">
-              <input type="number" style={inputStyle} value={form.maxMarks} onChange={e => setForm({ ...form, maxMarks: e.target.value })} min="1" max="500" />
-            </Field>
-            <Field label="Description" style={{ gridColumn: "1 / -1" }}>
-              <input style={inputStyle} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Brief description of the subject" />
-            </Field>
-            <Field label="Applicable Classes" style={{ gridColumn: "1 / -1" }}>
-              <input style={inputStyle} value={form.classLevels} onChange={e => setForm({ ...form, classLevels: e.target.value })} placeholder="e.g. Grade 1,Grade 2,Grade 3 (leave empty for all classes)" />
-            </Field>
+      <Modal isOpen={showModal} title={editingId ? "Edit Subject" : "Add Subject"} onClose={() => { setShowModal(false); resetForm(); }} footer={
+        <>
+          <Button variant="ghost" onClick={() => { setShowModal(false); resetForm(); }}>Cancel</Button>
+          <Button onClick={save} loading={saving}>{editingId ? "Save Changes" : "Create Subject"}</Button>
+        </>
+      }>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <Input 
+            label="Subject Name *"
+            value={form.name} 
+            onChange={e => setForm({ ...form, name: e.target.value })} 
+            placeholder="e.g. Mathematics" 
+          />
+          
+          <Input 
+            label="Subject Code"
+            value={form.code} 
+            onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })} 
+            placeholder="e.g. MAT" 
+          />
+          
+          <Select 
+            label="Category"
+            value={form.category} 
+            onChange={e => setForm({ ...form, category: e.target.value })}
+            options={CATEGORIES.map(c => ({ value: c, label: c }))}
+          />
+          
+          <Select 
+            label="Status"
+            value={form.isActive ? "true" : "false"} 
+            onChange={e => setForm({ ...form, isActive: e.target.value === "true" })}
+            options={[
+              { value: "true", label: "Active" },
+              { value: "false", label: "Inactive" }
+            ]}
+          />
+          
+          <Input 
+            label="Pass Marks"
+            type="number" 
+            value={form.passMarks} 
+            onChange={e => setForm({ ...form, passMarks: e.target.value })} 
+            min="0" 
+            max="100" 
+          />
+          
+          <Input 
+            label="Max Marks"
+            type="number" 
+            value={form.maxMarks} 
+            onChange={e => setForm({ ...form, maxMarks: e.target.value })} 
+            min="1" 
+            max="500" 
+          />
+          
+          <div style={{ gridColumn: "1 / -1" }}>
+            <Input 
+              label="Description"
+              value={form.description} 
+              onChange={e => setForm({ ...form, description: e.target.value })} 
+              placeholder="Brief description of the subject" 
+            />
           </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-            <Btn variant="ghost" onClick={() => { setShowModal(false); resetForm(); }}>Cancel</Btn>
-            <Btn onClick={save} loading={saving}>{editingId ? "Save Changes" : "Create Subject"}</Btn>
+          
+          <div style={{ gridColumn: "1 / -1" }}>
+            <Input 
+              label="Applicable Classes"
+              value={form.classLevels} 
+              onChange={e => setForm({ ...form, classLevels: e.target.value })} 
+              placeholder="e.g. Grade 1,Grade 2,Grade 3 (leave empty for all classes)" 
+            />
           </div>
-        </Modal>
-      )}
+        </div>
+      </Modal>
     </div>
   );
 }

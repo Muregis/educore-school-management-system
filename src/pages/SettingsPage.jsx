@@ -1,29 +1,19 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
-import { C } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import AdminSettings from "./AdminSettings";
 import ErrorButton from "../components/ErrorButton";
 
-// ── Shared input style ────────────────────────────────────────────────────────
-const inp = {
-  background: C.card, border: `1px solid ${C.border}`, borderRadius: 8,
-  color: C.text, padding: "8px 12px", fontSize: 13, width: "100%",
-  boxSizing: "border-box",
-};
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Table from "../components/ui/Table";
 
 function normalizeColor(value, fallback) {
   return /^#[0-9a-fA-F]{6}$/.test(String(value || "").trim()) ? value : fallback;
 }
-
-const Lbl = ({ children }) => (
-  <label style={{ display: "block", fontSize: 11, fontWeight: 700,
-    color: C.textMuted, marginBottom: 5, textTransform: "uppercase",
-    letterSpacing: "0.06em" }}>
-    {children}
-  </label>
-);
-Lbl.propTypes = { children: PropTypes.node };
 
 // ── School Info Tab ───────────────────────────────────────────────────────────
 function SchoolTab({ school, setSchool, toast, auth }) {
@@ -121,95 +111,108 @@ function SchoolTab({ school, setSchool, toast, auth }) {
     setSaving(false);
   };
 
-  const f = (key) => ({
-    value: form[key] || "",
-    onChange: (e) => setForm((p) => ({ ...p, [key]: e.target.value })),
-    style: inp,
-  });
-
   return (
-    <div style={{ maxWidth: 560 }}>
-      <div style={{ marginBottom: 18, padding: 16, borderRadius: 12, background: `${form.primary_color || C.accent}16`, border: `1px solid ${C.border}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+    <Card style={{ padding: "var(--space-4)" }}>
+      <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", borderRadius: "var(--radius-lg)", background: `color-mix(in srgb, ${form.primary_color || "var(--color-primary)"} 15%, transparent)`, border: `1px solid var(--color-border)` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
           {form.logo_url ? (
-            <img src={form.logo_url} alt="School logo" style={{ width: 52, height: 52, borderRadius: 12, objectFit: "cover", border: `1px solid ${C.border}` }} />
+            <img src={form.logo_url} alt="School logo" style={{ width: 64, height: 64, borderRadius: "var(--radius-md)", objectFit: "cover", border: `1px solid var(--color-border)`, background: "var(--color-bg-surface)" }} />
           ) : (
-            <div style={{ width: 52, height: 52, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${normalizeColor(form.primary_color, C.accent)}, ${normalizeColor(form.secondary_color, "#6366F1")})`, color: "#fff", fontWeight: 800, fontSize: 20 }}>
+            <div style={{ width: 64, height: 64, borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${normalizeColor(form.primary_color, "var(--color-primary)")}, ${normalizeColor(form.secondary_color, "var(--color-info)")})`, color: "#fff", fontWeight: 800, fontSize: "28px" }}>
               {String(form.name || "E").charAt(0).toUpperCase()}
             </div>
           )}
           <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: C.text }}>{form.name || "Your school"}</div>
-            <div style={{ fontSize: 12, color: C.textMuted }}>{form.tagline || form.motto || "Personalized school experience"}</div>
+            <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--color-text-primary)", marginBottom: "4px" }}>{form.name || "Your school"}</div>
+            <div style={{ fontSize: "14px", color: "var(--color-text-secondary)" }}>{form.tagline || form.motto || "Personalized school experience"}</div>
           </div>
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-        <div><Lbl>School Name</Lbl><input {...f("name")} /></div>
-        <div><Lbl>County / Location</Lbl><input {...f("county")} /></div>
-        <div><Lbl>Phone</Lbl><input {...f("phone")} /></div>
-        <div><Lbl>WhatsApp Business Number</Lbl><input {...f("whatsapp_business_number")} placeholder="2547xxxxxxxx" /></div>
-        <div><Lbl>Email</Lbl><input {...f("email")} type="email" /></div>
-        <div><Lbl>Current Term</Lbl>
-          <select {...f("term")} style={inp}>
-            {["Term 1", "Term 2", "Term 3"].map(t => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
-        </div>
-        <div><Lbl>Academic Year</Lbl><input {...f("year")} /></div>
-        <div><Lbl>Established Year</Lbl><input {...f("established_year")} placeholder="e.g. 2014" /></div>
-        <div><Lbl>School Type</Lbl>
-          <select {...f("school_type")} style={inp}>
-            <option value="">Select type</option>
-            <option value="private">Private</option>
-            <option value="public">Public</option>
-            <option value="international">International</option>
-          </select>
-        </div>
-        <div><Lbl>Curriculum</Lbl>
-          <select {...f("curriculum")} style={inp}>
-            <option value="">Select curriculum</option>
-            <option value="cbc">CBC</option>
-            <option value="844">8-4-4</option>
-            <option value="igcse">IGCSE</option>
-            <option value="ib">IB</option>
-          </select>
+      
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+        <Input label="School Name" value={form.name || ""} onChange={e => setForm(p => ({...p, name: e.target.value}))} />
+        <Input label="County / Location" value={form.county || ""} onChange={e => setForm(p => ({...p, county: e.target.value}))} />
+        <Input label="Phone" value={form.phone || ""} onChange={e => setForm(p => ({...p, phone: e.target.value}))} />
+        <Input label="WhatsApp Business Number" value={form.whatsapp_business_number || ""} onChange={e => setForm(p => ({...p, whatsapp_business_number: e.target.value}))} placeholder="2547xxxxxxxx" />
+        <Input label="Email" type="email" value={form.email || ""} onChange={e => setForm(p => ({...p, email: e.target.value}))} />
+        <Select 
+          label="Current Term" 
+          value={form.term || ""} 
+          onChange={e => setForm(p => ({...p, term: e.target.value}))}
+          options={[
+            { value: "Term 1", label: "Term 1" },
+            { value: "Term 2", label: "Term 2" },
+            { value: "Term 3", label: "Term 3" }
+          ]}
+        />
+        <Input label="Academic Year" value={form.year || ""} onChange={e => setForm(p => ({...p, year: e.target.value}))} />
+        <Input label="Established Year" value={form.established_year || ""} onChange={e => setForm(p => ({...p, established_year: e.target.value}))} placeholder="e.g. 2014" />
+        <Select 
+          label="School Type" 
+          value={form.school_type || ""} 
+          onChange={e => setForm(p => ({...p, school_type: e.target.value}))}
+          options={[
+            { value: "", label: "Select type" },
+            { value: "private", label: "Private" },
+            { value: "public", label: "Public" },
+            { value: "international", label: "International" }
+          ]}
+        />
+        <Select 
+          label="Curriculum" 
+          value={form.curriculum || ""} 
+          onChange={e => setForm(p => ({...p, curriculum: e.target.value}))}
+          options={[
+            { value: "", label: "Select curriculum" },
+            { value: "cbc", label: "CBC" },
+            { value: "844", label: "8-4-4" },
+            { value: "igcse", label: "IGCSE" },
+            { value: "ib", label: "IB" }
+          ]}
+        />
+        
+        <div style={{ gridColumn: "1 / -1" }}>
+          <Input label="Postal Address" value={form.address || ""} onChange={e => setForm(p => ({...p, address: e.target.value}))} />
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
-          <Lbl>Postal Address</Lbl><input {...f("address")} />
+          <Input label="School Motto" value={form.motto || ""} onChange={e => setForm(p => ({...p, motto: e.target.value}))} />
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
-          <Lbl>School Motto</Lbl><input {...f("motto")} />
+          <Input label="Login Tagline" value={form.tagline || ""} onChange={e => setForm(p => ({...p, tagline: e.target.value}))} placeholder="Shown on the login page" />
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
-          <Lbl>Login Tagline</Lbl><input {...f("tagline")} placeholder="Shown on the login page" />
+          <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: "var(--space-1)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Hero Message</label>
+          <textarea 
+            value={form.hero_message || ""} 
+            onChange={e => setForm(p => ({...p, hero_message: e.target.value}))} 
+            rows={3} 
+            style={{ width: "100%", padding: "var(--space-3)", background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", color: "var(--color-text-primary)", fontFamily: "inherit", fontSize: "14px", resize: "vertical", boxSizing: "border-box" }} 
+            placeholder="Short welcome message for your login page" 
+          />
         </div>
+        
         <div style={{ gridColumn: "1 / -1" }}>
-          <Lbl>Hero Message</Lbl><textarea {...f("hero_message")} rows={3} style={{ ...inp, resize: "vertical" }} placeholder="Short welcome message for your login page" />
-        </div>
-        <div style={{ gridColumn: "1 / -1" }}>
-          <Lbl>School Logo</Lbl>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: "var(--space-2)", textTransform: "uppercase", letterSpacing: "0.05em" }}>School Logo</label>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
             <label style={{ 
               display: "flex", 
               alignItems: "center", 
               justifyContent: "center",
               width: 80, 
               height: 80, 
-              borderRadius: 12, 
-              border: `2px dashed ${C.border}`,
+              borderRadius: "var(--radius-md)", 
+              border: `2px dashed var(--color-border)`,
               cursor: "pointer",
-              background: C.bg,
+              background: "var(--color-bg-base)",
               overflow: "hidden",
               flexShrink: 0,
             }}>
               {logoUploading ? (
-                <span style={{ color: C.textSub, fontSize: 12 }}>Uploading...</span>
+                <span style={{ color: "var(--color-text-secondary)", fontSize: "12px", fontWeight: 500 }}>Uploading...</span>
               ) : form.logo_url ? (
                 <img src={form.logo_url} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
-                <span style={{ fontSize: 24, color: C.textMuted }}>+</span>
+                <span style={{ fontSize: "24px", color: "var(--color-text-muted)" }}>+</span>
               )}
               <input 
                 type="file" 
@@ -223,27 +226,32 @@ function SchoolTab({ school, setSchool, toast, auth }) {
                 type="file" 
                 accept="image/*" 
                 onChange={handleLogoUpload}
-                style={{ ...inp, padding: "6px 12px" }}
+                style={{ width: "100%", padding: "8px", background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", color: "var(--color-text-primary)", boxSizing: "border-box" }}
               />
-              <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
+              <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "var(--space-2)" }}>
                 Click to upload. Use PNG or JPG. Max 2MB.
               </div>
             </div>
           </div>
         </div>
-        <div><Lbl>Primary Color</Lbl><input {...f("primary_color")} value={normalizeColor(form.primary_color, C.accent)} type="color" style={{ ...inp, padding: 4, height: 42 }} /></div>
-        <div><Lbl>Secondary Color</Lbl><input {...f("secondary_color")} value={normalizeColor(form.secondary_color, "#6366F1")} type="color" style={{ ...inp, padding: 4, height: 42 }} /></div>
-        <div><Lbl>Administrator Name</Lbl><input {...f("admin_name")} placeholder="e.g. Jane Wanjiku" /></div>
-        <div><Lbl>Administrator Title</Lbl><input {...f("admin_title")} placeholder="e.g. School Principal" /></div>
+        
+        <div>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: "var(--space-1)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Primary Color</label>
+          <input value={normalizeColor(form.primary_color, "var(--color-primary)")} onChange={e => setForm(p => ({...p, primary_color: e.target.value}))} type="color" style={{ width: "100%", height: "42px", padding: "4px", background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", cursor: "pointer", boxSizing: "border-box" }} />
+        </div>
+        <div>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: "var(--space-1)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Secondary Color</label>
+          <input value={normalizeColor(form.secondary_color, "var(--color-info)")} onChange={e => setForm(p => ({...p, secondary_color: e.target.value}))} type="color" style={{ width: "100%", height: "42px", padding: "4px", background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", cursor: "pointer", boxSizing: "border-box" }} />
+        </div>
+        
+        <Input label="Administrator Name" value={form.admin_name || ""} onChange={e => setForm(p => ({...p, admin_name: e.target.value}))} placeholder="e.g. Jane Wanjiku" />
+        <Input label="Administrator Title" value={form.admin_title || ""} onChange={e => setForm(p => ({...p, admin_title: e.target.value}))} placeholder="e.g. School Principal" />
       </div>
-      <button onClick={save} disabled={saving} style={{
-        background: C.accent, color: "#fff", border: "none", borderRadius: 9,
-        padding: "9px 28px", fontWeight: 700, fontSize: 14, cursor: saving ? "not-allowed" : "pointer",
-        opacity: saving ? 0.7 : 1,
-      }}>
-        {saving ? "Saving…" : "Save Changes"}
-      </button>
-    </div>
+      
+      <Button onClick={save} disabled={saving} style={{ padding: "10px 24px", fontSize: "15px" }}>
+        {saving ? "Saving…" : "Save School Information"}
+      </Button>
+    </Card>
   );
 }
 SchoolTab.propTypes = { school: PropTypes.object, setSchool: PropTypes.func, toast: PropTypes.func, auth: PropTypes.object };
@@ -296,99 +304,60 @@ function UsersTab({ auth, toast }) {
     }
   };
 
-  const roleColors = {
-    admin: "#3B82F6", teacher: "#14B8A6", finance: "#F59E0B",
-    hr: "#A855F7", librarian: "#22C55E",
-  };
-
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div style={{ fontSize: 13, color: C.textMuted }}>{users.length} staff accounts</div>
-        <button onClick={() => setShowForm(v => !v)} style={{
-          background: C.accent, color: "#fff", border: "none", borderRadius: 8,
-          padding: "7px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer",
-        }}>
-          {showForm ? "Cancel" : "+ New User"}
-        </button>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      <Card style={{ padding: "var(--space-3)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--color-text-secondary)" }}>{users.length} staff accounts</div>
+          <Button variant={showForm ? "secondary" : "primary"} onClick={() => setShowForm(v => !v)}>
+            {showForm ? "Cancel" : "+ New User"}
+          </Button>
+        </div>
+      </Card>
 
       {showForm && (
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
-          padding: 20, marginBottom: 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-            <div><Lbl>Full Name</Lbl>
-              <input style={inp} value={form.full_name}
-                onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} /></div>
-            <div><Lbl>Email</Lbl>
-              <input style={inp} type="email" value={form.email}
-                onChange={e => setForm(p => ({ ...p, email: e.target.value }))} /></div>
-            <div><Lbl>Role</Lbl>
-              <select style={inp} value={form.role}
-                onChange={e => setForm(p => ({ ...p, role: e.target.value }))}>
-                {["teacher","finance","hr","librarian","admin"].map(r =>
-                  <option key={r}>{r}</option>)}
-              </select></div>
-            <div><Lbl>Password</Lbl>
-              <input style={inp} type="password" value={form.password}
-                onChange={e => setForm(p => ({ ...p, password: e.target.value }))} /></div>
+        <Card style={{ padding: "var(--space-4)", background: "var(--color-bg-base)", border: "1px solid var(--color-primary-muted)" }}>
+          <h3 style={{ margin: "0 0 var(--space-4) 0", fontSize: "16px", color: "var(--color-text-primary)" }}>Create New Account</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+            <Input label="Full Name" value={form.full_name} onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} />
+            <Input label="Email" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
+            <Select 
+              label="Role" 
+              value={form.role} 
+              onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
+              options={[
+                { value: "teacher", label: "Teacher" },
+                { value: "finance", label: "Finance" },
+                { value: "hr", label: "HR" },
+                { value: "librarian", label: "Librarian" },
+                { value: "admin", label: "Admin" }
+              ]}
+            />
+            <Input label="Password" type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} />
           </div>
-          <button onClick={save} disabled={saving} style={{
-            background: C.accent, color: "#fff", border: "none", borderRadius: 8,
-            padding: "8px 24px", fontWeight: 700, fontSize: 13, cursor: "pointer",
-          }}>{saving ? "Creating…" : "Create User"}</button>
-        </div>
+          <Button onClick={save} disabled={saving}>{saving ? "Creating…" : "Create User"}</Button>
+        </Card>
       )}
 
       {loading ? (
-        <div style={{ color: C.textMuted, padding: 24 }}>Loading users…</div>
+        <div style={{ color: "var(--color-text-muted)", padding: "var(--space-4)", textAlign: "center" }}>Loading users…</div>
       ) : (
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                {["Name", "Email", "Role", "Status", "Action"].map(h => (
-                  <th key={h} style={{ textAlign: "left", padding: "10px 14px",
-                    borderBottom: `1px solid ${C.border}`, color: C.textMuted,
-                    fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(u => (
-                <tr key={u.user_id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                  <td style={{ padding: "10px 14px", color: C.text, fontWeight: 600 }}>{u.full_name}</td>
-                  <td style={{ padding: "10px 14px", color: C.textSub, fontSize: 12 }}>{u.email}</td>
-                  <td style={{ padding: "10px 14px" }}>
-                    <span style={{ background: `${roleColors[u.role] || C.accent}22`,
-                      border: `1px solid ${roleColors[u.role] || C.accent}44`,
-                      color: roleColors[u.role] || C.accent,
-                      borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700,
-                      textTransform: "capitalize" }}>{u.role}</span>
-                  </td>
-                  <td style={{ padding: "10px 14px" }}>
-                    <span style={{
-                      color: u.status === "active" ? "#4ade80" : "#f87171",
-                      fontSize: 12, fontWeight: 600,
-                    }}>{u.status}</span>
-                  </td>
-                  <td style={{ padding: "10px 14px" }}>
-                    {u.role !== "admin" && (
-                      <button onClick={() => toggleStatus(u)} style={{
-                        background: "transparent",
-                        border: `1px solid ${C.border}`,
-                        borderRadius: 7, color: C.textMuted,
-                        cursor: "pointer", padding: "4px 12px", fontSize: 12,
-                      }}>
-                        {u.status === "active" ? "Deactivate" : "Activate"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <Table
+            headers={["Name", "Email", "Role", "Status", "Action"]}
+            data={users.map(u => [
+              <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{u.full_name}</span>,
+              <span key="email" style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>{u.email}</span>,
+              <Badge key="role" text={u.role} variant={u.role === "admin" ? "primary" : u.role === "finance" ? "warning" : u.role === "hr" ? "danger" : u.role === "librarian" ? "success" : "info"} />,
+              <Badge key="status" text={u.status} variant={u.status === "active" ? "success" : "danger"} />,
+              u.role !== "admin" ? (
+                <Button key="action" size="sm" variant="secondary" onClick={() => toggleStatus(u)}>
+                  {u.status === "active" ? "Deactivate" : "Activate"}
+                </Button>
+              ) : <span key="action"></span>
+            ])}
+          />
+        </Card>
       )}
     </div>
   );
@@ -412,39 +381,40 @@ export default function SettingsPage({ auth, school, setSchool, users, setUsers,
   void users; void setUsers;
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Tab bar */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 24, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", paddingBottom: "var(--space-3)", borderBottom: "1px solid var(--color-border)" }}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: "8px 18px", borderRadius: 9, fontSize: 13, fontWeight: 700,
-            cursor: "pointer",
-            background: tab === t.id ? C.accent : C.card,
-            color: tab === t.id ? "#fff" : C.textMuted,
-            border: `1px solid ${tab === t.id ? C.accent : C.border}`,
-          }}>
+          <Button 
+            key={t.id} 
+            variant={tab === t.id ? "primary" : "secondary"} 
+            onClick={() => setTab(t.id)}
+            style={{ fontWeight: 600 }}
+          >
             {t.label}
-          </button>
+          </Button>
         ))}
       </div>
 
       {/* Tab content */}
-      {tab === "school" && (
-        <SchoolTab school={school} setSchool={setSchool} toast={toast} auth={auth} />
-      )}
-      {tab === "users" && (
-        <UsersTab auth={auth} toast={toast} />
-      )}
-      {(tab === "activity" || tab === "backups") && (
-        <AdminSettings auth={auth} initialTab={tab} />
-      )}
-      {tab === "dev" && (
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20 }}>
-          <h3 style={{ margin: "0 0 16px 0", color: C.text }}>Developer Tools</h3>
-          <p style={{ color: C.textMuted, marginBottom: 16 }}>Use these tools to test error tracking and debugging features.</p>
-          <ErrorButton />
-        </div>
-      )}
+      <div style={{ marginTop: "var(--space-2)" }}>
+        {tab === "school" && (
+          <SchoolTab school={school} setSchool={setSchool} toast={toast} auth={auth} />
+        )}
+        {tab === "users" && (
+          <UsersTab auth={auth} toast={toast} />
+        )}
+        {(tab === "activity" || tab === "backups") && (
+          <AdminSettings auth={auth} initialTab={tab} />
+        )}
+        {tab === "dev" && (
+          <Card style={{ padding: "var(--space-4)" }}>
+            <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Developer Tools</h3>
+            <p style={{ color: "var(--color-text-secondary)", marginBottom: "var(--space-4)" }}>Use these tools to test error tracking and debugging features.</p>
+            <ErrorButton />
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

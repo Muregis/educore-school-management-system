@@ -737,7 +737,7 @@ export function ClassPromotionChain({ auth }) {
     try {
       setLoading(true);
       const res = await apiFetch('/classes/promotion-chain', { 
-        token: sessionStorage.getItem("token") || localStorage.getItem("token") 
+        token: sessionStorage.getItem("token") 
       });
       setClasses(res.data || res || []);
     } catch (err) {
@@ -752,7 +752,7 @@ export function ClassPromotionChain({ auth }) {
     try {
       await apiFetch(`/classes/${classId}/promotion`, {
         method: 'PUT',
-        token: sessionStorage.getItem("token") || localStorage.getItem("token"),
+        token: sessionStorage.getItem("token"),
         body: { nextClassName }
       });
       loadClasses();

@@ -1,4 +1,6 @@
 // simple wrapper for calling backend API with optional auth token
+import { clearSession, getAuthHeaders, getSession } from "./auth.js";
+
 const DEFAULT_PROD_API_BASE = "https://educore-school-management-system.onrender.com/api";
 const DEFAULT_LOCAL_API_BASE = "http://localhost:10000/api";
 
@@ -23,29 +25,8 @@ export async function apiFetch(
   if (body != null) {
     headers["Content-Type"] = "application/json";
   }
-  // OLD: if (token) {
-  // OLD:   headers["Authorization"] = `Bearer ${token}`;
-  // OLD: }
-  const resolvedToken = token || sessionStorage.getItem("token") || null;
-  if (resolvedToken) {
-    headers["Authorization"] = `Bearer ${resolvedToken}`;
-    
-    // Support director context switching
-    const authString = sessionStorage.getItem("educore.auth");
-    if (authString) {
-      try {
-        const auth = JSON.parse(authString);
-        const role = (auth.role || "").toLowerCase();
-        if ((role === 'director' || role === 'superadmin') && auth.schoolId) {
-          headers["X-School-Id"] = auth.schoolId;
-        }
-      } catch (e) {
-        // ignore parse error
-      }
-    }
-  }
+  Object.assign(headers, getAuthHeaders(token));
 
-  const controller = new AbortController();
   let timedOut = false;
   
   // Retry loop for timeout/network errors
@@ -75,6 +56,12 @@ export async function apiFetch(
         const text = await res.text();
         let err;
         try { err = JSON.parse(text); } catch { err = { message: text }; }
+        if (res.status === 401 && getSession()) {
+          clearSession();
+          if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+            window.location.href = "/login";
+          }
+        }
         const e = new Error(err.message || res.statusText);
         e.status = res.status;
         throw e;

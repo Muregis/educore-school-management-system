@@ -1,12 +1,15 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
+
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
 
 const PLANS = [
   {
     id: "starter",
     name: "Starter",
     price: 35,
-    color: "#64748b",
+    color: "var(--color-text-secondary)",
     features: [
       "Student records",
       "Attendance tracking", 
@@ -20,7 +23,7 @@ const PLANS = [
     id: "standard", 
     name: "Standard",
     price: 50,
-    color: "#1a56db",
+    color: "var(--color-primary)",
     popular: true,
     features: [
       "Everything in Starter",
@@ -38,7 +41,7 @@ const PLANS = [
     id: "premium",
     name: "Premium", 
     price: 85,
-    color: "#7c3aed",
+    color: "var(--color-warning)",
     features: [
       "Everything in Standard",
       "AI lesson plan generator",
@@ -102,23 +105,28 @@ export default function UpgradePage({ auth, toast }) {
   };
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: 20 }}>
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>
+    <div style={{ maxWidth: "900px", margin: "0 auto", padding: "var(--space-2)" }}>
+      <div style={{ textAlign: "center", marginBottom: "var(--space-5)" }}>
+        <h2 style={{ fontSize: "28px", fontWeight: 700, marginBottom: "var(--space-2)", color: "var(--color-text-primary)", letterSpacing: "-0.02em" }}>
           Choose your plan
         </h2>
-        <p style={{ color: "#64748b", marginBottom: 20 }}>
+        <p style={{ color: "var(--color-text-secondary)", marginBottom: "var(--space-4)", fontSize: "16px" }}>
           Per student · Per month · Cancel anytime
         </p>
         
-        <div style={{ display: "inline-flex", background: "#f1f5f9", borderRadius: 10, padding: 4 }}>
+        <div style={{ display: "inline-flex", background: "var(--color-bg-base)", borderRadius: "var(--radius-lg)", padding: "var(--space-1)", border: "1px solid var(--color-border)" }}>
           {["monthly", "annual"].map(cycle => (
             <button key={cycle} onClick={() => setBilling(cycle)} style={{
-              padding: "8px 20px", borderRadius: 8, border: "none",
-              background: billing === cycle ? "#fff" : "transparent",
-              fontWeight: billing === cycle ? 700 : 400,
-              cursor: "pointer", fontSize: 13,
-              boxShadow: billing === cycle ? "0 1px 4px rgba(0,0,0,0.1)" : "none"
+              padding: "10px 24px", 
+              borderRadius: "var(--radius-md)", 
+              border: "none",
+              background: billing === cycle ? "var(--color-bg-surface)" : "transparent",
+              color: billing === cycle ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+              fontWeight: billing === cycle ? 600 : 500,
+              cursor: "pointer", 
+              fontSize: "14px",
+              boxShadow: billing === cycle ? "0 2px 8px rgba(0,0,0,0.08)" : "none",
+              transition: "all 0.2s ease"
             }}>
               {cycle === "monthly" ? "Monthly" : "Annual (2 months free)"}
             </button>
@@ -126,81 +134,107 @@ export default function UpgradePage({ auth, toast }) {
         </div>
       </div>
 
-      <div style={{ background: "#f8fafc", borderRadius: 12, padding: 20, marginBottom: 28, textAlign: "center" }}>
-        <div style={{ fontSize: 14, color: "#64748b", marginBottom: 8 }}>
-          How many students?
+      <Card style={{ padding: "var(--space-4)", marginBottom: "var(--space-5)", textAlign: "center", background: "color-mix(in srgb, var(--color-primary) 5%, transparent)", border: "1px solid color-mix(in srgb, var(--color-primary) 20%, transparent)" }}>
+        <div style={{ fontSize: "15px", color: "var(--color-text-secondary)", marginBottom: "var(--space-2)", fontWeight: 500 }}>
+          How many students are enrolled?
         </div>
-        <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 12 }}>
-          {students} students
+        <div style={{ fontSize: "32px", fontWeight: 800, marginBottom: "var(--space-3)", color: "var(--color-primary)", letterSpacing: "-0.02em" }}>
+          {students.toLocaleString()} students
         </div>
         <input type="range" min={50} max={2000} step={50}
           value={students} onChange={e => setStudents(Number(e.target.value))}
-          style={{ width: "100%", maxWidth: 400 }}
+          style={{ width: "100%", maxWidth: "500px", accentColor: "var(--color-primary)", height: "6px" }}
         />
-        <div style={{ display: "flex", justifyContent: "space-between", maxWidth: 400, margin: "4px auto 0", fontSize: 12, color: "#94a3b8" }}>
-          <span>50</span><span>2,000</span>
+        <div style={{ display: "flex", justifyContent: "space-between", maxWidth: "500px", margin: "8px auto 0", fontSize: "13px", color: "var(--color-text-muted)", fontWeight: 500 }}>
+          <span>50</span><span>2,000+</span>
         </div>
-      </div>
+      </Card>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "var(--space-4)", alignItems: "start" }}>
         {PLANS.map(plan => (
-          <div key={plan.id} style={{
-            background: "#fff",
-            border: `2px solid ${plan.popular ? plan.color : "#e2e8f0"}`,
-            borderRadius: 16, padding: 24, position: "relative"
+          <Card key={plan.id} style={{
+            padding: "var(--space-4)", 
+            position: "relative",
+            border: `2px solid ${plan.popular ? plan.color : "var(--color-border)"}`,
+            transform: plan.popular ? "translateY(-8px)" : "none",
+            boxShadow: plan.popular ? "0 20px 40px rgba(0,0,0,0.08)" : "none",
+            transition: "all 0.3s ease"
           }}>
             {plan.popular && (
               <div style={{
-                position: "absolute", top: -12, left: "50%",
+                position: "absolute", top: -14, left: "50%",
                 transform: "translateX(-50%)",
                 background: plan.color, color: "#fff",
-                fontSize: 11, fontWeight: 700,
-                padding: "3px 14px", borderRadius: 99
+                fontSize: "12px", fontWeight: 700,
+                padding: "4px 16px", borderRadius: "20px",
+                textTransform: "uppercase", letterSpacing: "0.05em",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.15)"
               }}>
                 Most Popular
               </div>
             )}
 
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{plan.name}</div>
-            <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>
+            <div style={{ fontSize: "20px", fontWeight: 700, marginBottom: "var(--space-1)", color: "var(--color-text-primary)" }}>{plan.name}</div>
+            <div style={{ fontSize: "14px", color: "var(--color-text-secondary)", marginBottom: "var(--space-4)", fontWeight: 500 }}>
               KES {plan.price}/student/month
             </div>
 
-            <div style={{ fontSize: 26, fontWeight: 800, color: plan.color, marginBottom: 4 }}>
+            <div style={{ fontSize: "36px", fontWeight: 800, color: plan.popular ? plan.color : "var(--color-text-primary)", marginBottom: "var(--space-1)", letterSpacing: "-0.03em" }}>
               KES {getPrice(plan.price).toLocaleString()}
             </div>
-            <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 20 }}>
+            <div style={{ fontSize: "13px", color: "var(--color-text-muted)", marginBottom: "var(--space-4)", fontWeight: 500 }}>
               per {billing === "annual" ? "year" : "month"} for {students} students
             </div>
 
-            <button onClick={() => handleUpgrade(plan.id)}
+            <Button 
+              onClick={() => handleUpgrade(plan.id)}
               disabled={loading || plan.id === currentPlan}
+              variant={plan.popular ? "primary" : "secondary"}
               style={{
-                width: "100%", padding: "10px 0", borderRadius: 8,
-                border: "none", cursor: plan.id === currentPlan ? "default" : "pointer",
-                background: plan.id === currentPlan ? "#e2e8f0" : plan.color,
-                color: plan.id === currentPlan ? "#94a3b8" : "#fff",
-                fontWeight: 700, fontSize: 14, marginBottom: 20
-              }}>
-              {plan.id === currentPlan ? "Current plan" : 
-               loading ? "Upgrading..." : `Upgrade to ${plan.name}`}
-            </button>
+                width: "100%", 
+                padding: "12px 0", 
+                marginBottom: "var(--space-4)",
+                fontSize: "15px",
+                background: plan.id === currentPlan ? "var(--color-bg-base)" : (plan.popular ? plan.color : undefined),
+                color: plan.id === currentPlan ? "var(--color-text-muted)" : undefined,
+                borderColor: plan.id === currentPlan ? "var(--color-border)" : (plan.popular ? plan.color : undefined),
+                boxShadow: plan.popular && plan.id !== currentPlan ? `0 8px 20px color-mix(in srgb, ${plan.color} 30%, transparent)` : undefined
+              }}
+            >
+              {plan.id === currentPlan ? "Current Plan" : 
+               loading ? "Processing..." : `Upgrade to ${plan.name}`}
+            </Button>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", paddingTop: "var(--space-4)", borderTop: "1px solid var(--color-border)" }}>
               {plan.features.map((f, i) => (
-                <div key={i} style={{ display: "flex", gap: 8, fontSize: 13 }}>
-                  <span style={{ color: plan.color, fontWeight: 700 }}>+</span>
-                  <span>{f}</span>
+                <div key={i} style={{ display: "flex", gap: "10px", fontSize: "14px", color: "var(--color-text-primary)", alignItems: "flex-start" }}>
+                  <span style={{ color: plan.color, fontWeight: 700, fontSize: "16px", lineHeight: 1 }}>✓</span>
+                  <span style={{ lineHeight: 1.4 }}>{f}</span>
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 
-      <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 12, padding: 16, marginTop: 24, fontSize: 13 }}>
-        <strong>One-time onboarding fee applies:</strong> KES 20,000 (small) · KES 30,000 (medium) · KES 40,000+ (large). 
-        Covers setup, data migration, and staff training.
+      <div style={{ 
+        background: "color-mix(in srgb, var(--color-warning) 10%, transparent)", 
+        border: "1px solid color-mix(in srgb, var(--color-warning) 30%, transparent)", 
+        borderRadius: "var(--radius-lg)", 
+        padding: "var(--space-3)", 
+        marginTop: "var(--space-5)", 
+        fontSize: "14px",
+        color: "var(--color-text-primary)",
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--space-3)"
+      }}>
+        <div style={{ fontSize: "24px" }}>💡</div>
+        <div>
+          <strong style={{ color: "var(--color-text-primary)" }}>One-time onboarding fee applies:</strong> KES 20,000 (small) · KES 30,000 (medium) · KES 40,000+ (large). 
+          <br/>
+          <span style={{ color: "var(--color-text-secondary)" }}>Covers dedicated account manager setup, data migration, and comprehensive staff training.</span>
+        </div>
       </div>
 
     </div>

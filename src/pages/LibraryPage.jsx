@@ -1,17 +1,18 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
-import Btn from "../components/Btn";
-import Field from "../components/Field";
-import Badge from "../components/Badge";
-import Table from "../components/Table";
-import Modal from "../components/Modal";
-import { Pager, Msg } from "../components/Helpers";
-import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { csv } from "../lib/utils";
+import { pager } from "../components/Helpers";
 
-const PAGE_SIZE = 12;
-const pager = (arr, p) => ({ pages: Math.max(1, Math.ceil(arr.length / PAGE_SIZE)), rows: arr.slice((p - 1) * PAGE_SIZE, p * PAGE_SIZE) });
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Modal from "../components/ui/Modal";
+import EmptyState from "../components/ui/EmptyState";
+import Table from "../components/ui/Table";
+
 const today = () => new Date().toISOString().slice(0, 10);
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
 
@@ -19,6 +20,19 @@ const BLANK_BOOK = { title: "", author: "", category: "General", isbn: "", quant
 const BLANK_BORROW = { borrowerId: "", borrowerType: "student", bookId: "", dueDate: addDays(today(), 14), notes: "" };
 
 const CATEGORIES = ["General","Mathematics","Sciences","Languages","History","Religion","Arts","Reference","Stationery"];
+
+function Pager({ page, pages, setPage }) {
+  if (pages <= 1) return null;
+  return (
+    <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "center", marginTop: "var(--space-3)" }}>
+      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+        style={{ padding: "4px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: page === 1 ? "default" : "pointer" }}>‹</button>
+      <span style={{ padding: "4px 10px", fontSize: "13px", color: "var(--color-text-secondary)" }}>{page} / {pages}</span>
+      <button onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}
+        style={{ padding: "4px 10px", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)", background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", cursor: page === pages ? "default" : "pointer" }}>›</button>
+    </div>
+  );
+}
 
 export default function LibraryPage({ auth, students = [], teachers = [], toast }) {
   const [tab, setTab]           = useState("books");
@@ -204,88 +218,90 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
     return diff === 1 ? "1 day" : `${diff} days`;
   };
 
-  const TABS = [
-    { id: "books",   label: "📚 Books & Stationery" },
-    { id: "borrows", label: "🔄 Borrowed Items" },
-    { id: "overdue", label: `⚠️ Overdue (${overdue})` },
-  ];
-
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Stats bar */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "var(--space-3)" }}>
         {[
-          { label: "Total Items", value: totalBooks, color: "#3b82f6" },
-          { label: "Available",   value: totalAvailable, color: "#22c55e" },
-          { label: "Checked Out", value: totalOut,       color: "#f59e0b" },
-          { label: "Active Borrows", value: activeBorrows, color: "#8b5cf6" },
-          { label: "Overdue",     value: overdue,        color: "#ef4444" },
+          { label: "Total Items", value: totalBooks, color: "var(--color-info)" },
+          { label: "Available",   value: totalAvailable, color: "var(--color-success)" },
+          { label: "Checked Out", value: totalOut,       color: "var(--color-warning)" },
+          { label: "Active Borrows", value: activeBorrows, color: "var(--color-primary)" },
+          { label: "Overdue",     value: overdue,        color: "var(--color-danger)" },
         ].map(s => (
-          <div key={s.label} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 16px", minWidth: 110 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: C.textMuted }}>{s.label}</div>
+          <Card key={s.label} style={{ padding: "var(--space-3)" }}>
+            <div style={{ fontSize: "24px", fontWeight: 800, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "4px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Tabs & Operations Container */}
+      <Card style={{ padding: "var(--space-3)" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", paddingBottom: "var(--space-3)", borderBottom: "1px solid var(--color-border)" }}>
+            <Button variant={tab === "books" ? "primary" : "secondary"} onClick={() => setTab("books")}>📚 Books & Stationery</Button>
+            <Button variant={tab === "borrows" ? "primary" : "secondary"} onClick={() => setTab("borrows")}>🔄 Borrowed Items</Button>
+            <Button variant={tab === "overdue" ? "primary" : "secondary"} onClick={() => setTab("overdue")}>⚠️ Overdue ({overdue})</Button>
+            
+            <div style={{ flex: 1 }} />
+            
+            {tab === "books" && <Button variant="ghost" onClick={exportBooks}>📤 Export Books CSV</Button>}
+            {(tab === "borrows" || tab === "overdue") && <Button variant="ghost" onClick={exportBorrows}>📤 Export {tab === "overdue" ? "Overdue" : "Borrows"} CSV</Button>}
           </div>
-        ))}
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 14, borderBottom: `1px solid ${C.border}`, paddingBottom: 8 }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: tab === t.id ? 700 : 400, background: tab === t.id ? C.accent : "transparent", color: tab === t.id ? "#fff" : C.textSub, fontSize: 13 }}>{t.label}</button>
-        ))}
-        <div style={{ flex: 1 }} />
-        {isLibrarian && tab === "books" && <Btn onClick={() => { setEditBook(null); setFb(BLANK_BOOK); setErr(""); setShowBook(true); }}>+ Add Book</Btn>}
-        {isLibrarian && tab === "borrows" && <Btn onClick={() => { setFw(BLANK_BORROW); setErr(""); setShowBorrow(true); }}>+ Issue Book</Btn>}
-      </div>
-
-      {/* Operations */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, marginBottom: 16 }}>
-        <h4 style={{ margin: "0 0 12px", color: C.text, fontSize: 16 }}>Operations</h4>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          {tab === "books" && <Btn variant="ghost" onClick={exportBooks}>📤 Export Books CSV</Btn>}
-          {(tab === "borrows" || tab === "overdue") && <Btn variant="ghost" onClick={exportBorrows}>📤 Export {tab === "overdue" ? "Overdue" : "Borrows"} CSV</Btn>}
+          
+          <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "center" }}>
+            {tab === "books" && (
+              <>
+                <div style={{ flex: 2, minWidth: "200px" }}>
+                  <Input placeholder="Search title, author, ISBN..." value={search} onChange={e => setSearch(e.target.value)} />
+                </div>
+                <div style={{ flex: 1, minWidth: "150px" }}>
+                  <Select value={catFilter} onChange={e => setCatFilter(e.target.value)} options={[{value: "all", label: "All Categories"}, ...CATEGORIES.map(c => ({value: c, label: c}))]} />
+                </div>
+              </>
+            )}
+            
+            <div style={{ flex: 1 }} />
+            
+            {isLibrarian && tab === "books" && <Button onClick={() => { setEditBook(null); setFb(BLANK_BOOK); setErr(""); setShowBook(true); }}>+ Add Book</Button>}
+            {isLibrarian && tab === "borrows" && <Button onClick={() => { setFw(BLANK_BORROW); setErr(""); setShowBorrow(true); }}>+ Issue Book</Button>}
+          </div>
         </div>
-      </div>
+      </Card>
 
-      {loading && <Msg text="Loading library..." />}
+      {loading && <EmptyState icon="⏳" title="Loading Library" description="Please wait while we fetch library data..." />}
 
       {/* Books tab */}
       {!loading && tab === "books" && (
         <>
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <input style={{ ...inputStyle, flex: 2 }} placeholder="Search title, author, ISBN..." value={search} onChange={e => setSearch(e.target.value)} />
-            <select style={{ ...inputStyle, flex: 1 }} value={catFilter} onChange={e => setCatFilter(e.target.value)}>
-              <option value="all">All Categories</option>
-              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-            </select>
-          </div>
-          {filteredBooks.length === 0 ? <Msg text="No books found." /> : (
-            <>
-              <div style={{ overflowX: "auto" }}>
-                <Table
-                  headers={["Title", "Author", "Category", "ISBN", "Total", "Available", "Out", ""]}
-                  rows={bkRows.map(b => {
-                    const out = Number(b.quantity_total) - Number(b.quantity_available);
-                    return [
-                      <span key="t" style={{ fontWeight: 600, color: C.text }}>{b.title}</span>,
-                      b.author,
-                      <Badge key="c" text={b.category} tone="info" />,
-                      <span key="i" style={{ color: C.textMuted, fontSize: 12 }}>{b.isbn || "-"}</span>,
-                      b.quantity_total,
-                      <span key="a" style={{ color: Number(b.quantity_available) > 0 ? "#22c55e" : "#ef4444", fontWeight: 700 }}>{b.quantity_available}</span>,
-                      <span key="o" style={{ color: out > 0 ? "#f59e0b" : C.textMuted }}>{out}</span>,
-                      isLibrarian ? (
-                        <div key="x" style={{ display: "flex", gap: 4 }}>
-                          <Btn size="xs" variant="ghost" onClick={() => { setEditBook(b); setFb({ title: b.title, author: b.author, category: b.category, isbn: b.isbn || "", quantityTotal: b.quantity_total }); setErr(""); setShowBook(true); }}>Edit</Btn>
-                          <Btn size="xs" onClick={() => { setFw({ ...BLANK_BORROW, bookId: String(b.book_id) }); setErr(""); setShowBorrow(true); }} disabled={Number(b.quantity_available) < 1}>Issue</Btn>
-                        </div>
-                      ) : null,
-                    ];
-                  })}
-                />
+          {filteredBooks.length === 0 ? <EmptyState icon="📚" title="No Books Found" description="No books match your current search criteria." /> : (
+            <Card style={{ padding: 0, overflow: "hidden" }}>
+              <Table
+                headers={["Title", "Author", "Category", "ISBN", "Total", "Available", "Out", "Actions"]}
+                data={bkRows.map(b => {
+                  const out = Number(b.quantity_total) - Number(b.quantity_available);
+                  return [
+                    <span key="t" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{b.title}</span>,
+                    <span key="author" style={{ color: "var(--color-text-secondary)" }}>{b.author}</span>,
+                    <Badge key="c" text={b.category} variant="info" />,
+                    <span key="i" style={{ color: "var(--color-text-muted)", fontSize: "12px", fontFamily: "var(--font-mono)" }}>{b.isbn || "-"}</span>,
+                    <span key="total" style={{ color: "var(--color-text-secondary)" }}>{b.quantity_total}</span>,
+                    <span key="a" style={{ color: Number(b.quantity_available) > 0 ? "var(--color-success)" : "var(--color-danger)", fontWeight: 700 }}>{b.quantity_available}</span>,
+                    <span key="o" style={{ color: out > 0 ? "var(--color-warning)" : "var(--color-text-muted)" }}>{out}</span>,
+                    isLibrarian ? (
+                      <div key="x" style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+                        <Button size="sm" variant="secondary" onClick={() => { setEditBook(b); setFb({ title: b.title, author: b.author, category: b.category, isbn: b.isbn || "", quantityTotal: b.quantity_total }); setErr(""); setShowBook(true); }}>Edit</Button>
+                        <Button size="sm" onClick={() => { setFw({ ...BLANK_BORROW, bookId: String(b.book_id) }); setErr(""); setShowBorrow(true); }} disabled={Number(b.quantity_available) < 1}>Issue</Button>
+                      </div>
+                    ) : <span key="none"></span>,
+                  ];
+                })}
+              />
+              <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
+                <Pager page={page} pages={bkPages} setPage={setPage} />
               </div>
-              <Pager page={page} pages={bkPages} setPage={setPage} />
-            </>
+            </Card>
           )}
         </>
       )}
@@ -293,28 +309,28 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
       {/* Borrows tab */}
       {!loading && tab === "borrows" && (
         <>
-          {borrows.filter(b => b.status === "borrowed").length === 0 ? <Msg text="No active borrows." /> : (
-            <>
-              <div style={{ overflowX: "auto" }}>
-                <Table
-                  headers={["Book", "Borrower", "Type", "Issued", "Due", "Days Out", "Status", ""]}
-                  rows={brRows.filter(b => b.status === "borrowed").map(b => {
-                    const isOverdue = b.due_date < today();
-                    return [
-                      <span key="t" style={{ fontWeight: 600, color: C.text }}>{b.book_title}</span>,
-                      borrowerName(b),
-                      <Badge key="bt" text={b.borrower_type} tone="info" />,
-                      b.borrow_date?.slice(0,10),
-                      <span key="d" style={{ color: isOverdue ? "#ef4444" : C.text, fontWeight: isOverdue ? 700 : 400 }}>{b.due_date?.slice(0,10)}</span>,
-                      <span key="do" style={{ color: isOverdue ? "#ef4444" : C.textSub }}>{daysOut(b.borrow_date)}</span>,
-                      <Badge key="s" text={isOverdue ? "OVERDUE" : "Active"} tone={isOverdue ? "danger" : "success"} />,
-                      isLibrarian ? <Btn key="r" size="xs" onClick={() => returnBook(b.borrow_id)}>Return ✓</Btn> : null,
-                    ];
-                  })}
-                />
+          {borrows.filter(b => b.status === "borrowed").length === 0 ? <EmptyState icon="📖" title="No Active Borrows" description="There are no books currently checked out." /> : (
+            <Card style={{ padding: 0, overflow: "hidden" }}>
+              <Table
+                headers={["Book", "Borrower", "Type", "Issued", "Due", "Days Out", "Status", "Actions"]}
+                data={brRows.filter(b => b.status === "borrowed").map(b => {
+                  const isOverdue = b.due_date < today();
+                  return [
+                    <span key="t" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{b.book_title}</span>,
+                    <span key="name" style={{ color: "var(--color-text-secondary)" }}>{borrowerName(b)}</span>,
+                    <Badge key="bt" text={b.borrower_type} variant="info" />,
+                    <span key="issued" style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>{b.borrow_date?.slice(0,10)}</span>,
+                    <span key="d" style={{ color: isOverdue ? "var(--color-danger)" : "var(--color-text-primary)", fontWeight: isOverdue ? 700 : 500, fontSize: "13px" }}>{b.due_date?.slice(0,10)}</span>,
+                    <span key="do" style={{ color: isOverdue ? "var(--color-danger)" : "var(--color-text-secondary)" }}>{daysOut(b.borrow_date)}</span>,
+                    <Badge key="s" text={isOverdue ? "OVERDUE" : "Active"} variant={isOverdue ? "danger" : "success"} />,
+                    isLibrarian ? <Button key="r" size="sm" variant="secondary" onClick={() => returnBook(b.borrow_id)}>Return ✓</Button> : <span key="none"></span>,
+                  ];
+                })}
+              />
+              <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
+                <Pager page={bPage} pages={brPages} setPage={setBPage} />
               </div>
-              <Pager page={bPage} pages={brPages} setPage={setBPage} />
-            </>
+            </Card>
           )}
         </>
       )}
@@ -322,102 +338,147 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
       {/* Overdue tab */}
       {!loading && tab === "overdue" && (
         <>
-          {overdue === 0 ? <Msg text="No overdue items. 🎉" /> : (
-            <div style={{ overflowX: "auto" }}>
+          {overdue === 0 ? <EmptyState icon="🎉" title="No Overdue Items" description="All checked out items are currently within their due dates." /> : (
+            <Card style={{ padding: 0, overflow: "hidden" }}>
               <Table
-                headers={["Book", "Borrower", "Type", "Due Date", "Days Overdue", ""]}
-                rows={borrows.filter(b => b.status === "borrowed" && b.due_date < today()).map(b => {
+                headers={["Book", "Borrower", "Type", "Due Date", "Days Overdue", "Actions"]}
+                data={borrows.filter(b => b.status === "borrowed" && b.due_date < today()).map(b => {
                   const daysLate = Math.floor((new Date() - new Date(b.due_date)) / 86400000);
                   return [
-                    <span key="t" style={{ fontWeight: 600, color: C.text }}>{b.book_title}</span>,
-                    borrowerName(b),
-                    <Badge key="bt" text={b.borrower_type} tone="info" />,
-                    <span key="d" style={{ color: "#ef4444", fontWeight: 700 }}>{b.due_date?.slice(0,10)}</span>,
-                    <span key="dl" style={{ color: "#ef4444", fontWeight: 700 }}>{daysLate} days</span>,
-                    isLibrarian ? <Btn key="r" size="xs" onClick={() => returnBook(b.borrow_id)}>Return ✓</Btn> : null,
+                    <span key="t" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{b.book_title}</span>,
+                    <span key="name" style={{ color: "var(--color-text-secondary)" }}>{borrowerName(b)}</span>,
+                    <Badge key="bt" text={b.borrower_type} variant="info" />,
+                    <span key="d" style={{ color: "var(--color-danger)", fontWeight: 700, fontSize: "13px" }}>{b.due_date?.slice(0,10)}</span>,
+                    <span key="dl" style={{ color: "var(--color-danger)", fontWeight: 700 }}>{daysLate} days</span>,
+                    isLibrarian ? <Button key="r" size="sm" variant="secondary" onClick={() => returnBook(b.borrow_id)}>Return ✓</Button> : <span key="none"></span>,
                   ];
                 })}
               />
-            </div>
+            </Card>
           )}
         </>
       )}
 
       {/* Add/Edit Book Modal */}
       {showBook && (
-        <Modal title={editBook ? "Edit Book / Item" : "Add Book / Stationery"} onClose={() => setShowBook(false)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Title / Item Name">
-              <input style={inputStyle} value={fb.title} onChange={e => setFb({ ...fb, title: e.target.value })} placeholder="e.g. Oxford English Grade 7" />
-            </Field>
-            <Field label="Author / Brand">
-              <input style={inputStyle} value={fb.author} onChange={e => setFb({ ...fb, author: e.target.value })} placeholder="e.g. Oxford Press" />
-            </Field>
-            <Field label="Category">
-              <select style={inputStyle} value={fb.category} onChange={e => setFb({ ...fb, category: e.target.value })}>
-                {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-              </select>
-            </Field>
-            <Field label="ISBN / Code">
-              <input style={inputStyle} value={fb.isbn} onChange={e => setFb({ ...fb, isbn: e.target.value })} placeholder="Optional" />
-            </Field>
-            <Field label="Total Quantity">
-              <input type="number" min="1" style={inputStyle} value={fb.quantityTotal} onChange={e => setFb({ ...fb, quantityTotal: e.target.value })} />
-            </Field>
+        <Modal title={editBook ? "Edit Book / Item" : "Add Book / Stationery"} onClose={() => setShowBook(false)} footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowBook(false)}>Cancel</Button>
+            <Button onClick={saveBook}>{editBook ? "Update Book" : "Add Book"}</Button>
+          </>
+        }>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+            <Input 
+              label="Title / Item Name *"
+              value={fb.title} 
+              onChange={e => setFb({ ...fb, title: e.target.value })} 
+              placeholder="e.g. Oxford English Grade 7" 
+            />
+            
+            <Input 
+              label="Author / Brand *"
+              value={fb.author} 
+              onChange={e => setFb({ ...fb, author: e.target.value })} 
+              placeholder="e.g. Oxford Press" 
+            />
+            
+            <Select 
+              label="Category"
+              value={fb.category} 
+              onChange={e => setFb({ ...fb, category: e.target.value })}
+              options={CATEGORIES.map(c => ({ value: c, label: c }))}
+            />
+            
+            <Input 
+              label="ISBN / Code"
+              value={fb.isbn} 
+              onChange={e => setFb({ ...fb, isbn: e.target.value })} 
+              placeholder="Optional" 
+            />
+            
+            <Input 
+              label="Total Quantity"
+              type="number" 
+              min="1" 
+              value={fb.quantityTotal} 
+              onChange={e => setFb({ ...fb, quantityTotal: e.target.value })} 
+            />
           </div>
-          {err && <Msg text={err} tone="error" />}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-            <Btn variant="ghost" onClick={() => setShowBook(false)}>Cancel</Btn>
-            <Btn onClick={saveBook}>{editBook ? "Update" : "Add"}</Btn>
-          </div>
+          {err && <div style={{ color: "var(--color-danger)", fontSize: "12px", margin: "12px 0 0 0", fontWeight: 500 }}>{err}</div>}
         </Modal>
       )}
 
       {/* Issue Book Modal */}
       {showBorrow && (
-        <Modal title="Issue Book / Item" onClose={() => setShowBorrow(false)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Borrower Type">
-              <select style={inputStyle} value={fw.borrowerType} onChange={e => setFw({ ...fw, borrowerType: e.target.value, borrowerId: "" })}>
-                <option value="student">Student</option>
-                <option value="staff">Staff / Teacher</option>
-              </select>
-            </Field>
-            <Field label={fw.borrowerType === "student" ? "Select Student" : "Select Staff"}>
-              <select style={inputStyle} value={fw.borrowerId} onChange={e => setFw({ ...fw, borrowerId: e.target.value })}>
-                <option value="">-- Select --</option>
-                {fw.borrowerType === "student"
-                  ? students.filter(s => s.status === "active").map(s => {
-                      const sid = s.student_id ?? s.id;
-                      return <option key={sid} value={sid}>{s.first_name ?? s.firstName} {s.last_name ?? s.lastName} — {s.admission_number ?? s.admission}</option>;
-                    })
-                  : teachers.map(t => {
-                      const tid = t.teacher_id ?? t.id;
-                      return <option key={tid} value={tid}>{t.first_name ?? t.firstName} {t.last_name ?? t.lastName}</option>;
-                    })
-                }
-              </select>
-            </Field>
-            <Field label="Book / Item">
-              <select style={inputStyle} value={fw.bookId} onChange={e => setFw({ ...fw, bookId: e.target.value })}>
-                <option value="">-- Select book --</option>
-                {books.filter(b => Number(b.quantity_available) > 0).map(b => (
-                  <option key={b.book_id} value={b.book_id}>{b.title} ({b.quantity_available} available)</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Due Date">
-              <input type="date" style={inputStyle} value={fw.dueDate} min={today()} onChange={e => setFw({ ...fw, dueDate: e.target.value })} />
-            </Field>
-            <Field label="Notes (optional)">
-              <input style={inputStyle} value={fw.notes} onChange={e => setFw({ ...fw, notes: e.target.value })} placeholder="Any notes..." />
-            </Field>
+        <Modal title="Issue Book / Item" onClose={() => setShowBorrow(false)} footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowBorrow(false)}>Cancel</Button>
+            <Button onClick={issueBorrow}>Issue Book</Button>
+          </>
+        }>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+            <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+              <Select 
+                label="Borrower Type"
+                value={fw.borrowerType} 
+                onChange={e => setFw({ ...fw, borrowerType: e.target.value, borrowerId: "" })}
+                options={[
+                  { value: "student", label: "Student" },
+                  { value: "staff", label: "Staff / Teacher" }
+                ]}
+              />
+              
+              <Select 
+                label={fw.borrowerType === "student" ? "Select Student *" : "Select Staff *"}
+                value={fw.borrowerId} 
+                onChange={e => setFw({ ...fw, borrowerId: e.target.value })}
+                options={[
+                  { value: "", label: "-- Select --" },
+                  ...(fw.borrowerType === "student"
+                    ? students.filter(s => s.status === "active").map(s => {
+                        const sid = s.student_id ?? s.id;
+                        return { value: sid, label: `${s.first_name ?? s.firstName} ${s.last_name ?? s.lastName} — ${s.admission_number ?? s.admission}` };
+                      })
+                    : teachers.map(t => {
+                        const tid = t.teacher_id ?? t.id;
+                        return { value: tid, label: `${t.first_name ?? t.firstName} ${t.last_name ?? t.lastName}` };
+                      })
+                  )
+                ]}
+              />
+            </div>
+            
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Select 
+                label="Book / Item *"
+                value={fw.bookId} 
+                onChange={e => setFw({ ...fw, bookId: e.target.value })}
+                options={[
+                  { value: "", label: "-- Select book --" },
+                  ...books.filter(b => Number(b.quantity_available) > 0).map(b => ({
+                    value: b.book_id,
+                    label: `${b.title} (${b.quantity_available} available)`
+                  }))
+                ]}
+              />
+            </div>
+            
+            <Input 
+              label="Due Date"
+              type="date" 
+              value={fw.dueDate} 
+              min={today()} 
+              onChange={e => setFw({ ...fw, dueDate: e.target.value })} 
+            />
+            
+            <Input 
+              label="Notes (optional)"
+              value={fw.notes} 
+              onChange={e => setFw({ ...fw, notes: e.target.value })} 
+              placeholder="Any notes..." 
+            />
           </div>
-          {err && <Msg text={err} tone="error" />}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-            <Btn variant="ghost" onClick={() => setShowBorrow(false)}>Cancel</Btn>
-            <Btn onClick={issueBorrow}>Issue Book</Btn>
-          </div>
+          {err && <div style={{ color: "var(--color-danger)", fontSize: "12px", margin: "12px 0 0 0", fontWeight: 500 }}>{err}</div>}
         </Modal>
       )}
     </div>

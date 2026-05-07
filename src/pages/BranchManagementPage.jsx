@@ -7,8 +7,6 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
 
-const API_URL = import.meta.env.VITE_API_URL || "";
-
 export default function BranchManagementPage({ auth, toast }) {
   const [branches, setBranches] = useState([]);
   const [allSchools, setAllSchools] = useState([]);
@@ -36,13 +34,7 @@ export default function BranchManagementPage({ auth, toast }) {
     
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/branches/my-branches`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      if (!response.ok) throw new Error("Failed to fetch");
-      
-      const data = await response.json();
+      const data = await apiFetch("/branches/my-branches", { token });
       
       if (data.canManageAll && data.allSchools) {
         // Director view - all schools
@@ -88,22 +80,14 @@ export default function BranchManagementPage({ auth, toast }) {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/branches`, {
+      await apiFetch("/branches", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
+        token,
+        body: {
           ...formData,
           parent_school_id: parseInt(parentId)
-        })
+        },
       });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Failed to create branch");
-      }
 
       toast?.("Branch created successfully", "success");
       setShowCreateModal(false);

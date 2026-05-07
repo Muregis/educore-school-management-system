@@ -57,6 +57,7 @@ import discountsRoutes         from "./routes/discounts.routes.js";  // NEW: Fee
 // import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }         from "./middleware/error.js";
 import { authRequired }         from "./middleware/auth.js";
+import { validateSession }      from "./middleware/session.js";
 import { tenantContext, tenantSecurityCheck } from "./middleware/tenantContext.js";
 import { logTenantContext }     from "./helpers/tenant-debug.logger.js";
 
@@ -106,8 +107,9 @@ app.use(apiRateLimit); // Apply rate limiting to all API routes
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/public", publicRoutes);
-app.use("/api/parent", parentRoutes);
+app.use("/api/parent", authRequired, validateSession, parentRoutes);
 app.use("/api", authRequired);
+app.use("/api", validateSession);
 app.use("/api", tenantContext);
 app.use("/api", tenantSecurityCheck);
 app.use("/api", (req, _res, next) => {

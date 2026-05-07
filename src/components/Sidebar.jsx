@@ -1,73 +1,83 @@
 import PropTypes from "prop-types";
 import { useEffect, useMemo, useState } from "react";
-import { C } from "../lib/theme";
 
 const NAVIGATION_GROUPS = [
   {
     id: "dashboard",
     label: "Dashboard",
-    icon: "\u{1F4CA}",
+    icon: "D",
     items: []
   },
   {
     id: "core",
-    label: "CORE",
-    subtitle: "Daily Use",
+    label: "CORE • DAILY USE",
     items: [
-      { id: "students", label: "Students", icon: "\u{1F468}\u200D\u{1F393}" },
-      { id: "attendance", label: "Attendance", icon: "\u2714" },
-      { id: "grades", label: "Grades", icon: "\u{1F4DD}" },
-      { id: "fees", label: "Fees", icon: "\u{1F4B0}" },
-      { id: "mpesa-reconcile", label: "M-Pesa Reconcile", icon: "\u{1F4F1}" }
+      { id: "students", label: "Students", icon: "S" },
+      { id: "attendance", label: "Attendance", icon: "P" },
+      { id: "grades", label: "Grades", icon: "G" },
+      { id: "fees", label: "Fees", icon: "F" },
+      { id: "mpesa-reconcile", label: "M-Pesa Reconcile", icon: "M" }
     ]
   },
   {
     id: "operations",
-    label: "OPERATIONS",
-    subtitle: "Weekly Use",
+    label: "OPERATIONS • WEEKLY USE",
     items: [
-      { id: "reportcards", label: "Report Cards", icon: "\u{1F4CB}" },
-      { id: "admissions", label: "Admissions", icon: "\u{1F6AA}" },
-      { id: "bulk-import", label: "Import/Export", icon: "\u{1F4C1}" },
-      { id: "timetable", label: "Timetable", icon: "\u23F0" },
-      { id: "discipline", label: "Discipline", icon: "\u2696\uFE0F" },
-      { id: "communication", label: "Communication", icon: "\u{1F4AC}" }
+      { id: "reportcards", label: "Report Cards", icon: "R" },
+      { id: "admissions", label: "Admissions", icon: "A" },
+      { id: "bulk-import", label: "Import/Export", icon: "I" },
+      { id: "timetable", label: "Timetable", icon: "K" },
+      { id: "discipline", label: "Discipline", icon: "D" },
+      { id: "communication", label: "Communication", icon: "C" }
     ]
   },
   {
     id: "management",
     label: "MANAGEMENT",
     items: [
-      { id: "staff", label: "Staff", icon: "\u{1F468}\u200D\u{1F3EB}" },
-      { id: "hr", label: "HR", icon: "\u{1F9D1}" },
-      { id: "library", label: "Library", icon: "\u{1F4DA}" },
-      { id: "transport", label: "Transport", icon: "\u{1F68C}" },
-      { id: "lessonplans", label: "Lesson Plans", icon: "\u{1F4DD}" },
-      { id: "pendingplans", label: "Pending Plans", icon: "\u23F3" }
+      { id: "teachers", label: "Teachers", icon: "T" },
+      { id: "staff", label: "Staff", icon: "S" },
+      { id: "hr", label: "HR", icon: "H" },
+      { id: "library", label: "Library", icon: "L" },
+      { id: "transport", label: "Transport", icon: "T" },
+      { id: "exams", label: "Exams", icon: "E" },
+      { id: "announcements", label: "Announcements", icon: "N" },
+      { id: "messaging", label: "Messaging", icon: "M" },
+      { id: "subjects", label: "Subjects", icon: "B" },
+      { id: "invoices", label: "Invoices", icon: "I" },
+      { id: "medical", label: "Medical", icon: "M" },
+      { id: "lessonplans", label: "Lesson Plans", icon: "L" },
+      { id: "pendingplans", label: "Pending Plans", icon: "Q" }
     ]
   },
   {
     id: "system",
-    label: "SYSTEM",
-    subtitle: "Admin Only",
+    label: "SYSTEM • ADMIN ONLY",
+    systemOnly: true,
     items: [
-      { id: "reports", label: "Reports", icon: "\u{1F4CA}" },
-      { id: "analytics", label: "Analytics", icon: "\u{1F4C8}" },
-      { id: "accounts", label: "Accounts", icon: "\u{1F465}" },
-      { id: "settings", label: "Settings", icon: "\u2699\uFE0F" }
+      { id: "reports", label: "Reports", icon: "R" },
+      { id: "analytics", label: "Analytics", icon: "A" },
+      { id: "accounts", label: "Accounts", icon: "A" },
+      { id: "settings", label: "Settings", icon: "S" },
+      { id: "branch-management", label: "Branches", icon: "B" },
+      { id: "admin-permissions", label: "Admin Permissions", icon: "P" },
+      { id: "upgrade", label: "Upgrade Plan", icon: "U" }
     ]
   }
 ];
 
-const ROLE_COLORS = {
-  admin: "#ef4444",
-  teacher: "#3b82f6",
-  finance: "#10b981",
-  hr: "#f59e0b",
-  librarian: "#8b5cf6",
-  director: "#8b5cf6", // Restored director color
-  parent: "#ec4899",
-  student: "#06b6d4"
+const getRoleColor = (role) => {
+  const roleColors = {
+    admin: "var(--color-role-admin, #3B82F6)",
+    teacher: "var(--color-role-teacher, #06B6D4)", 
+    finance: "var(--color-role-finance, #10B981)",
+    hr: "var(--color-role-hr, #8B5CF6)",
+    librarian: "var(--color-role-librarian, #F59E0B)",
+    director: "var(--color-role-director, var(--color-primary))",
+    parent: "var(--color-role-parent, #F43F5E)",
+    student: "var(--color-role-student, #EC4899)"
+  };
+  return roleColors[role] || "var(--color-primary)";
 };
 
 function findGroupForPage(pageId) {
@@ -94,28 +104,30 @@ const Sidebar = ({
   allowedPages = []
 }) => {
   const [openGroup, setOpenGroup] = useState(() => findGroupForPage(page));
-  const roleColor = auth?.role ? ROLE_COLORS[auth.role] || C.accent : C.accent;
-  const isParent = auth?.role === "parent";
+  const [hoveredNav, setHoveredNav] = useState(null);
   
-  // Role-based navigation filtering
+  const roleColor = getRoleColor(auth?.role);
+  const isParent = auth?.role === "parent";
+  const isDirector = auth?.role === "director";
+  const isSuperadmin = auth?.role === "superadmin";
+
+  // ROLE FILTERING LOGIC
   const ROLE_NAV_LIMITS = {
-    admin: ["dashboard", "students", "attendance", "grades", "fees", "reportcards", "admissions", "communication", "timetable", "library", "transport", "discipline", "mpesa-reconcile"],
-    director: null, // null = all access
-    superadmin: null, // null = all access
-    teacher: ["dashboard", "grades", "attendance", "timetable", "lessonplans"],
-    finance: ["dashboard", "fees", "invoices", "mpesa-reconcile", "reportcards"],
-    hr: ["dashboard", "hr", "staff"],
-    librarian: ["dashboard", "library"],
-    parent: ["dashboard", "grades", "fees", "attendance", "communication"],
-    student: ["dashboard", "grades", "attendance", "timetable", "library"],
+    admin: ["dashboard", "students", "teachers", "subjects", "attendance", "grades", "fees", "invoices", "reportcards", "discipline", "transport", "communication", "messaging", "timetable", "library", "lessonplans", "announcements", "exams", "admissions", "hr", "medical", "bulk-import"],
+    director: null, 
+    superadmin: null, 
+    teacher: ["dashboard", "subjects", "attendance", "grades", "reportcards", "discipline", "timetable", "communication", "messaging", "library", "analysis", "lessonplans", "announcements", "exams"],
+    finance: ["dashboard", "fees", "mpesa-reconcile", "invoices", "announcements", "upgrade"],
+    hr: ["dashboard", "hr", "staff", "announcements", "upgrade"],
+    librarian: ["dashboard", "library", "announcements"],
+    parent: ["dashboard", "grades", "fees", "attendance", "communication", "announcements"],
+    student: ["dashboard", "grades", "attendance", "reportcards", "library", "announcements"],
   };
 
-  // Filter navigation groups based on role and allowed pages
   const filteredGroups = useMemo(() => {
     const roleLimit = ROLE_NAV_LIMITS[auth?.role];
     let groups = NAVIGATION_GROUPS;
 
-    // Apply role-based filtering if limits exist for this role
     if (roleLimit) {
       groups = groups.map(group => ({
         ...group,
@@ -123,7 +135,11 @@ const Sidebar = ({
       })).filter(group => group.id === "dashboard" || group.items.length > 0);
     }
 
-    // Apply additional allowedPages filtering if provided
+    // Hide SYSTEM section for non-director roles
+    if (!isDirector && !isSuperadmin) {
+      groups = groups.filter(group => !group.systemOnly);
+    }
+
     if (allowedPages.length) {
       groups = groups.map(group => ({
         ...group,
@@ -132,7 +148,7 @@ const Sidebar = ({
     }
 
     return groups;
-  }, [allowedPages, auth?.role]);
+  }, [allowedPages, auth?.role, isDirector, isSuperadmin]);
 
   useEffect(() => {
     setOpenGroup(findGroupForPage(page));
@@ -148,92 +164,112 @@ const Sidebar = ({
     setOpenGroup((currentGroup) => (currentGroup === groupId ? null : groupId));
   };
 
-  const renderNavItem = (item, isActive = false) => (
-    <button
-      key={item.id}
-      onClick={() => handleNavClick(item.id)}
-      title={collapsed ? item.label : ""}
-      style={{
-        width: "100%",
-        textAlign: "left",
-        marginBottom: 2,
-        border: `1px solid ${isActive ? C.accentDim : "transparent"}`,
-        borderRadius: 8,
-        padding: collapsed ? "8px 0" : "8px 12px",
-        background: isActive ? C.accentGlow : "transparent",
-        color: isActive ? C.accent : C.textSub,
-        cursor: "pointer",
-        fontSize: 13,
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        justifyContent: collapsed ? "center" : "flex-start",
-        transition: "all 0.15s ease",
-        fontWeight: isActive ? 600 : 400,
-      }}
-    >
-      <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
-      {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
-      {!collapsed && isActive && (
-        <span
-          style={{
-            width: 6,
-            height: 6,
-            borderRadius: "50%",
-            background: C.accent,
-            flexShrink: 0
-          }}
-        />
-      )}
-    </button>
-  );
+  const renderNavItem = (item, isActive = false) => {
+    const isHovered = hoveredNav === item.id;
+    return (
+      <button
+        key={item.id}
+        onClick={() => handleNavClick(item.id)}
+        onMouseEnter={() => setHoveredNav(item.id)}
+        onMouseLeave={() => setHoveredNav(null)}
+        title={collapsed ? item.label : ""}
+        style={{
+          width: "100%",
+          textAlign: "left",
+          marginBottom: "var(--space-1)",
+          borderRadius: "var(--radius-md)",
+          padding: collapsed ? "var(--space-3) 0" : "var(--space-2) var(--space-3)",
+          background: isActive ? "var(--color-primary-muted)" : (isHovered ? "var(--color-bg-hover)" : "transparent"),
+          color: isActive ? "var(--color-primary)" : (isHovered ? "var(--color-text-primary)" : "var(--color-text-secondary)"),
+          cursor: "pointer",
+          fontSize: "var(--text-sm)",
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-3)",
+          justifyContent: collapsed ? "center" : "flex-start",
+          transition: "all var(--transition-base)",
+          fontWeight: isActive ? "600" : "500",
+          border: "none",
+          position: "relative",
+          overflow: "hidden"
+        }}
+      >
+        {isActive && !collapsed && (
+          <div style={{
+            position: 'absolute',
+            left: 0,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            height: '60%',
+            width: '4px',
+            background: 'var(--color-primary)',
+            borderRadius: '0 var(--radius-sm) var(--radius-sm) 0',
+            boxShadow: 'var(--shadow-glow)'
+          }} />
+        )}
+        <span style={{ 
+          fontSize: collapsed ? "20px" : "18px", 
+          flexShrink: 0,
+          transform: isHovered ? "scale(1.1)" : "scale(1)",
+          transition: "transform var(--transition-fast)"
+        }}>
+          {item.icon}
+        </span>
+        {!collapsed && <span style={{ flex: 1, fontFamily: 'var(--font-body)' }}>{item.label}</span>}
+      </button>
+    );
+  };
 
   const renderGroup = (group) => {
     if (group.id === "dashboard") {
-      return renderNavItem(group, page === "dashboard");
+      return (
+        <div key="dashboard" style={{ padding: "0 var(--space-2)", marginBottom: "var(--space-2)" }}>
+          {renderNavItem(group, page === "dashboard")}
+        </div>
+      );
     }
 
     const isOpen = openGroup === group.id;
     const hasActiveItem = group.items.some((item) => page === item.id);
 
     return (
-      <div key={group.id} style={{ marginBottom: collapsed ? 12 : 16 }}>
+      <div key={group.id} style={{ marginBottom: collapsed ? "var(--space-2)" : "var(--space-4)", padding: "0 var(--space-2)" }}>
         {!collapsed && (
           <button
             onClick={() => handleGroupClick(group.id)}
             style={{
               width: "100%",
               textAlign: "left",
-              padding: "4px 12px 6px",
+              padding: "var(--space-2) var(--space-3)",
               background: "transparent",
               border: "none",
               cursor: "pointer",
-              fontSize: 10,
-              fontWeight: 700,
-              color: hasActiveItem ? C.accent : C.textMuted,
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-              borderBottom: `1px solid ${C.border}`,
-              marginBottom: 8,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              transition: "all 0.15s ease"
+              transition: "all var(--transition-fast)",
+              marginBottom: "var(--space-1)",
+              borderRadius: "var(--radius-md)"
             }}
           >
             <div>
-              {group.label}
-              {group.subtitle && (
-                <span style={{ fontWeight: 400, marginLeft: 6 }}>
-                  {"\u2022"} {group.subtitle}
-                </span>
-              )}
+              <span style={{ 
+                fontSize: "11px", 
+                fontWeight: "700", 
+                color: hasActiveItem ? "var(--color-primary)" : "var(--color-text-muted)", 
+                textTransform: "uppercase", 
+                letterSpacing: "0.1em",
+                fontFamily: "var(--font-heading)"
+              }}>
+                {group.label}
+              </span>
             </div>
             <span
               style={{
-                fontSize: 12,
+                fontSize: "10px",
+                color: "var(--color-text-muted)",
                 transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
-                transition: "transform 0.15s ease"
+                transition: "transform var(--transition-base)"
               }}
             >
               {"\u25B6"}
@@ -243,10 +279,10 @@ const Sidebar = ({
         {(!collapsed || isOpen) && (
           <div
             style={{
-              padding: "0 4px",
-              maxHeight: isOpen ? "500px" : "0",
+              maxHeight: isOpen ? "800px" : "0",
+              opacity: isOpen ? 1 : 0,
               overflow: "hidden",
-              transition: "max-height 0.3s ease"
+              transition: "all 300ms cubic-bezier(0.4, 0, 0.2, 1)"
             }}
           >
             {group.items.map((item) => renderNavItem(item, page === item.id))}
@@ -257,15 +293,18 @@ const Sidebar = ({
   };
 
   return (
-    <>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--color-bg-surface)" }}>
+      {/* Brand Header */}
       <div
         style={{
-          padding: "16px 12px",
-          borderBottom: `1px solid ${C.border}`,
+          padding: "var(--space-4)",
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          minHeight: 64
+          gap: "var(--space-3)",
+          minHeight: "72px",
+          borderBottom: "1px solid var(--color-border)",
+          background: "var(--color-bg-base)",
+          position: "relative"
         }}
       >
         {school.logo_url ? (
@@ -273,131 +312,147 @@ const Sidebar = ({
             src={school.logo_url}
             alt="Logo"
             style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
+              width: "38px",
+              height: "38px",
+              borderRadius: "var(--radius-md)",
               objectFit: "cover",
-              flexShrink: 0
+              flexShrink: 0,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.3)"
             }}
           />
         ) : (
           <div
             style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
+              width: "38px",
+              height: "38px",
+              borderRadius: "var(--radius-md)",
               flexShrink: 0,
-              background: `linear-gradient(135deg, ${C.accent}, #6366f1)`,
+              background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontWeight: 900,
-              fontSize: 16,
-              color: "#fff",
-              letterSpacing: -1
+              fontWeight: "800",
+              fontSize: "20px",
+              color: "#ffffff",
+              boxShadow: "var(--shadow-glow-primary)"
             }}
           >
             E
           </div>
         )}
+        
         {!collapsed && (
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
-                fontWeight: 800,
-                fontSize: 15,
-                color: C.text,
-                lineHeight: 1.1
+                fontWeight: "800",
+                fontSize: "18px",
+                color: "var(--color-text-primary)",
+                fontFamily: "var(--font-heading)",
+                letterSpacing: "-0.02em",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis"
               }}
             >
               EduCore
             </div>
             <div
               style={{
-                fontSize: 10,
-                color: C.textMuted,
-                marginTop: 2
+                fontSize: "11px",
+                color: "var(--color-text-muted)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                fontWeight: "500"
               }}
             >
-              {school.name}
+              {school.name || "School Portal"}
             </div>
           </div>
         )}
+
         {isMobile ? (
           <button
             onClick={() => setDrawerOpen(false)}
             style={{
-              marginLeft: "auto",
-              background: "transparent",
-              border: `1px solid ${C.border}`,
-              borderRadius: 7,
-              color: C.textMuted,
+              background: "var(--color-bg-card)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-sm)",
+              color: "var(--color-text-secondary)",
               cursor: "pointer",
-              padding: "3px 8px",
-              fontSize: 14
+              padding: "4px 8px",
+              fontSize: "14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginLeft: "auto"
             }}
           >
-            {"\u2715"}
+            ✕
           </button>
         ) : (
           <button
-            onClick={() => setSideCollapsed((v) => !v)}
+            onClick={() => setSideCollapsed(!collapsed)}
             style={{
-              marginLeft: "auto",
-              background: "transparent",
-              border: `1px solid ${C.border}`,
-              borderRadius: 7,
-              color: C.textMuted,
+              position: "absolute",
+              right: "-12px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: "var(--color-bg-card)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "50%",
+              width: "24px",
+              height: "24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--color-text-secondary)",
               cursor: "pointer",
-              padding: "3px 7px",
-              fontSize: 12,
-              flexShrink: 0
+              boxShadow: "var(--shadow-card)",
+              zIndex: 10,
+              fontSize: "10px",
+              transition: "all var(--transition-fast)"
             }}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {collapsed ? "\u25B6" : "\u25C0"}
+            {collapsed ? "▶" : "◀"}
           </button>
         )}
       </div>
 
+      {/* Parent Switcher */}
       {!collapsed && isParent && myChildren.length > 0 && (
         <div
           style={{
-            padding: "8px 12px",
-            borderBottom: `1px solid ${C.border}`,
-            background: C.bg
+            padding: "var(--space-3)",
+            borderBottom: "1px solid var(--color-border)",
+            background: "var(--color-bg-base)"
           }}
         >
-          <div
-            style={{
-              fontSize: 10,
-              color: C.textMuted,
-              marginBottom: 4,
-              textTransform: "uppercase",
-              letterSpacing: 1
-            }}
-          >
-            Viewing child
+          <div style={{ fontSize: "10px", color: "var(--color-text-muted)", marginBottom: "var(--space-2)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: "700" }}>
+            Viewing Child
           </div>
           {myChildren.length === 1 ? (
-            <div
-              style={{
-                fontSize: 13,
-                color: C.text,
-                fontWeight: 600
-              }}
-            >
-              {activeChild?.firstName} {activeChild?.lastName}
+            <div style={{ fontSize: "14px", color: "var(--color-text-primary)", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}>
+              <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: "var(--color-primary-muted)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary)", fontSize: "10px", fontWeight: "bold" }}>
+                {(activeChild?.firstName || activeChild?.first_name || "S")[0]}
+              </div>
+              {activeChild?.firstName || activeChild?.first_name} {activeChild?.lastName || activeChild?.last_name}
             </div>
           ) : (
             <select
               style={{
                 width: "100%",
-                background: C.card,
-                color: C.text,
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                padding: "5px 8px",
-                fontSize: 13
+                background: "var(--color-bg-card)",
+                color: "var(--color-text-primary)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-md)",
+                padding: "8px 12px",
+                fontSize: "13px",
+                outline: "none",
+                cursor: "pointer",
+                fontFamily: "var(--font-body)"
               }}
               value={linkedStudentId || ""}
               onChange={(e) => {
@@ -423,111 +478,105 @@ const Sidebar = ({
         </div>
       )}
 
+      {/* Navigation List */}
       <nav
         style={{
           flex: 1,
           overflowY: "auto",
-          padding: "12px 8px",
-          minHeight: 0
+          padding: "var(--space-4) 0",
+          minHeight: 0,
+          background: "var(--color-bg-surface)"
         }}
       >
         {filteredGroups.map(renderGroup)}
       </nav>
 
+      {/* User Profile / Logout */}
       <div
         style={{
-          padding: "10px 8px",
-          borderTop: `1px solid ${C.border}`,
+          padding: "var(--space-4)",
+          borderTop: "1px solid var(--color-border)",
+          background: "var(--color-bg-base)",
           flexShrink: 0
         }}
       >
         {!collapsed ? (
           <div
             style={{
-              background: C.card,
-              borderRadius: 10,
-              padding: "10px 12px",
-              border: `1px solid ${C.border}`,
-              marginBottom: 8
+              background: "var(--color-bg-card)",
+              borderRadius: "var(--radius-lg)",
+              padding: "var(--space-3)",
+              border: "1px solid var(--color-border)",
+              marginBottom: "var(--space-3)",
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--space-3)",
+              boxShadow: "var(--shadow-card)"
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  background: `${roleColor}22`,
-                  border: `1px solid ${roleColor}44`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: 800,
-                  fontSize: 14,
-                  color: roleColor,
-                  flexShrink: 0
-                }}
-              >
-                {auth?.role === "superadmin" ? "A"
-                  : auth?.role === "director" ? "D"
-                    : auth?.role === "teacher" ? "T"
-                      : auth?.role === "finance" ? "F"
-                        : auth?.role === "hr" ? "H"
-                          : auth?.role === "librarian" ? "L"
-                            : auth?.role === "parent" ? "P"
-                              : auth?.role === "student" ? "S" : "?"}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: C.text,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis"
-                  }}
-                >
-                  {auth?.name}
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: roleColor,
-                    textTransform: "capitalize",
-                    fontWeight: 600
-                  }}
-                >
-                  {auth?.role}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
             <div
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
+                width: "36px",
+                height: "36px",
+                borderRadius: "var(--radius-md)",
                 background: `${roleColor}22`,
                 border: `1px solid ${roleColor}44`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontWeight: 800,
-                fontSize: 14,
+                fontWeight: "700",
+                fontSize: "14px",
+                color: roleColor,
+                flexShrink: 0
+              }}
+            >
+              {auth?.role === "superadmin" ? "A" : auth?.role === "director" ? "D" : auth?.role === "teacher" ? "T" : auth?.role === "finance" ? "F" : auth?.role === "hr" ? "H" : auth?.role === "librarian" ? "L" : auth?.role === "parent" ? "P" : auth?.role === "student" ? "S" : "?"}
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  color: "var(--color-text-primary)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  fontFamily: "var(--font-body)"
+                }}
+              >
+                {auth?.name}
+              </div>
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: roleColor,
+                  textTransform: "capitalize",
+                  fontWeight: "600",
+                  letterSpacing: "0.02em"
+                }}
+              >
+                {auth?.role === "director" ? "Main Director" : auth?.role}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: "var(--space-3)" }}>
+            <div
+              style={{
+                width: "36px",
+                height: "36px",
+                borderRadius: "var(--radius-md)",
+                background: `${roleColor}22`,
+                border: `1px solid ${roleColor}44`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: "700",
+                fontSize: "14px",
                 color: roleColor
               }}
             >
-              {auth?.role === "superadmin" ? "A"
-                : auth?.role === "director" ? "D"
-                  : auth?.role === "teacher" ? "T"
-                    : auth?.role === "finance" ? "F"
-                      : auth?.role === "hr" ? "H"
-                        : auth?.role === "librarian" ? "L"
-                          : auth?.role === "parent" ? "P"
-                            : auth?.role === "student" ? "S" : "?"}
+              {auth?.role === "superadmin" ? "A" : auth?.role === "director" ? "D" : auth?.role === "teacher" ? "T" : auth?.role === "finance" ? "F" : auth?.role === "hr" ? "H" : auth?.role === "librarian" ? "L" : auth?.role === "parent" ? "P" : auth?.role === "student" ? "S" : "?"}
             </div>
           </div>
         )}
@@ -535,25 +584,34 @@ const Sidebar = ({
           onClick={handleLogout}
           style={{
             width: "100%",
-            padding: collapsed ? "7px 0" : "7px 12px",
-            borderRadius: 8,
-            background: "transparent",
-            border: `1px solid ${C.border}`,
-            color: C.textSub,
+            padding: collapsed ? "var(--space-2) 0" : "var(--space-2) var(--space-4)",
+            borderRadius: "var(--radius-md)",
+            background: "var(--color-danger-muted)",
+            border: "1px solid transparent",
+            color: "var(--color-danger)",
             cursor: "pointer",
-            fontSize: 12,
+            fontSize: "13px",
             display: "flex",
             alignItems: "center",
             justifyContent: collapsed ? "center" : "flex-start",
-            gap: 7,
+            gap: "var(--space-2)",
+            fontWeight: "600",
+            transition: "all var(--transition-fast)"
           }}
-          title="Logout"
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'var(--color-danger)';
+            e.currentTarget.style.color = '#fff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'var(--color-danger-muted)';
+            e.currentTarget.style.color = 'var(--color-danger)';
+          }}
         >
-          <span>{"\u21D0"}</span>
+          <span style={{ fontSize: "16px" }}>{"\u23FB"}</span>
           {!collapsed && <span>Logout</span>}
         </button>
       </div>
-    </>
+    </div>
   );
 };
 
