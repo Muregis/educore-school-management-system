@@ -323,9 +323,9 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
     if (normalizedAdmissionNumber) {
       const { data: existing } = await supabase
         .from('students')
-        .select('student_id')
+        .select('student_id', 'admission_number')
         .eq('school_id', schoolId)
-        .ilike('admission_number', normalizedAdmissionNumber)
+        .eq('admission_number', normalizedAdmissionNumber)
         .neq('student_id', req.params.id)
         .eq('is_deleted', false)
         .limit(1);
@@ -384,24 +384,37 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
     // Update portal account emails if admission number changed
     if (normalizedAdmissionNumber) {
       try {
-        await supabase
+        // First check if user accounts exist before updating
+        const { data: existingUsers } = await supabase
           .from('users')
-          .update({ 
-            email: `${normalizedAdmissionNumber.toLowerCase()}.student@portal`,
-            full_name: `${firstName} ${lastName}`
-          })
+          .select('user_id', 'email')
           .eq('student_id', req.params.id)
-          .eq('school_id', schoolId)
-          .eq('role', 'student');
+          .eq('school_id', schoolId);
         
-        await supabase
-          .from('users')
-          .update({ 
-            email: `${normalizedAdmissionNumber.toLowerCase()}.parent@portal`
-          })
-          .eq('student_id', req.params.id)
-          .eq('school_id', schoolId)
-          .eq('role', 'parent');
+        if (existingUsers && existingUsers.length > 0) {
+          // Update existing accounts
+          const studentAccount = existingUsers.find(u => u.role === 'student');
+          const parentAccount = existingUsers.find(u => u.role === 'parent');
+          
+          if (studentAccount) {
+            await supabase
+              .from('users')
+              .update({ 
+                email: `${normalizedAdmissionNumber.toLowerCase()}.student@portal`,
+                full_name: `${firstName} ${lastName}`
+              })
+              .eq('user_id', studentAccount.user_id);
+          }
+          
+          if (parentAccount) {
+            await supabase
+              .from('users')
+              .update({ 
+                email: `${normalizedAdmissionNumber.toLowerCase()}.parent@portal`
+              })
+              .eq('user_id', parentAccount.user_id);
+          }
+        }
       } catch (userUpdateErr) {
         console.log('[WARN] Failed to update portal accounts:', userUpdateErr);
         // Don't fail the whole request if user update fails
