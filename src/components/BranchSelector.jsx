@@ -165,18 +165,33 @@ export function BranchSelector({ className = "", style = {}, token }) {
           fontSize: "13px",
           fontWeight: 600,
           transition: "all var(--transition-fast)",
-          whiteSpace: "nowrap"
+          whiteSpace: "nowrap",
+          minWidth: "200px",
+          justifyContent: "space-between"
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "var(--color-bg-hover)";
+          e.currentTarget.style.borderColor = "var(--color-primary)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "var(--color-bg-card)";
+          e.currentTarget.style.borderColor = "var(--color-border)";
         }}
       >
         <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ color: "var(--color-primary)" }}>🏢</span>
-          <span>{currentSchoolName}</span>
+          <span style={{ color: "var(--color-primary)", fontSize: "14px" }}>🏢</span>
+          <span style={{ 
+            color: "var(--color-text-primary)",
+            fontWeight: 600,
+            fontSize: "13px"
+          }}>{currentSchoolName}</span>
         </span>
         <span style={{
           fontSize: 10,
           color: "var(--color-text-muted)",
           transform: isOpen ? "rotate(180deg)" : "none",
-          transition: "transform var(--transition-fast)"
+          transition: "transform var(--transition-fast)",
+          flexShrink: 0
         }}>▼</span>
       </button>
 
@@ -197,9 +212,11 @@ export function BranchSelector({ className = "", style = {}, token }) {
               background: "var(--color-bg-surface)",
               border: "1px solid var(--color-border)",
               borderRadius: "var(--radius-lg)",
-              boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+              boxShadow: "0 10px 25px rgba(0,0,0,0.5)",
               zIndex: 1001,
-              overflow: "hidden"
+              overflow: "hidden",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)"
             }}
           >
             <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border)", background: "var(--color-bg-card)" }}>
@@ -233,7 +250,19 @@ export function BranchSelector({ className = "", style = {}, token }) {
                         borderLeft: `4px solid ${isActive ? "var(--color-primary)" : "transparent"}`,
                         color: "var(--color-text-primary)",
                         cursor: "pointer",
-                        transition: "background var(--transition-fast)"
+                        transition: "all var(--transition-fast)",
+                        fontSize: "14px",
+                        fontWeight: 500
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.background = "var(--color-bg-hover)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.background = "transparent";
+                        }
                       }}
                     >
                       <div style={{ fontWeight: 600, fontSize: 14 }}>
@@ -269,7 +298,20 @@ export function BranchSelector({ className = "", style = {}, token }) {
                         border: "none",
                         borderLeft: `4px solid ${currentSchoolId === parentSchool.school_id ? "var(--color-primary)" : "transparent"}`,
                         color: "var(--color-text-primary)",
-                        cursor: "pointer"
+                        cursor: "pointer",
+                        transition: "all var(--transition-fast)",
+                        fontSize: "14px",
+                        fontWeight: 500
+                      }}
+                      onMouseEnter={(e) => {
+                        if (currentSchoolId !== parentSchool.school_id) {
+                          e.currentTarget.style.background = "var(--color-bg-hover)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (currentSchoolId !== parentSchool.school_id) {
+                          e.currentTarget.style.background = "transparent";
+                        }
                       }}
                     >
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{parentSchool.name}</div>
@@ -292,7 +334,20 @@ export function BranchSelector({ className = "", style = {}, token }) {
                           border: "none",
                           borderLeft: `4px solid ${isActive ? "var(--color-primary)" : "transparent"}`,
                           color: "var(--color-text-primary)",
-                          cursor: "pointer"
+                          cursor: "pointer",
+                          transition: "all var(--transition-fast)",
+                          fontSize: "14px",
+                          fontWeight: 500
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = "var(--color-bg-hover)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = "transparent";
+                          }
                         }}
                       >
                         <div style={{ fontWeight: 600, fontSize: 14 }}>{branch.name}</div>
