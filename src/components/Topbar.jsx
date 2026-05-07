@@ -1,5 +1,5 @@
 import PropTypes from "prop-types";
-import { BranchSelector } from "./BranchSelector";
+import BranchSelector from "./BranchSelector";
 
 const ROLE_COLORS = {
   admin: "#3B82F6",
@@ -139,11 +139,11 @@ export default function Topbar({
                   : `${school.name} · ${school.term} ${school.year}`}
               </div>
             )}
+            </div>
           </div>
-         </div>
-       )}
+        </div>
 
-       {/* Right Section */}
+        {/* Right Section */}
        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
          {/* Branch Selector for admin/director/superadmin */}
          {!isMobile && ["admin","director","superadmin"].includes(auth?.role) && (
