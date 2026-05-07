@@ -5,7 +5,7 @@ import { authLogin } from "../services/auth.service.js";
 import { supabase } from "../config/supabaseClient.js";
 import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
-import { validateSession, createUserSession } from "../middleware/session.js";
+import { validateSession, createUserSession, revokeUserSession } from "../middleware/session.js";
 import { authRateLimit } from "../middleware/rateLimit.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { logAuthFailure } from "../helpers/security.logger.js";
@@ -681,10 +681,7 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
 
 router.post("/logout", authRequired, validateSession, async (req, res, next) => {
   try {
-    await pgPool.query(
-      "UPDATE user_sessions SET is_active = false WHERE session_id = $1",
-      [req.headers["x-session-id"]]
-    );
+    await revokeUserSession(req.headers["x-session-id"], req.user?.user_id || req.user?.userId || null);
     res.json({ success: true });
   } catch (err) {
     next(err);
@@ -728,18 +725,14 @@ router.get("/sessions", authRequired, validateSession, requireRoles("director"),
 
 router.delete("/sessions/:sessionId", authRequired, validateSession, requireRoles("director"), async (req, res, next) => {
   try {
-    const result = await pgPool.query(
-      "UPDATE user_sessions SET is_active = false WHERE session_id = $1 RETURNING user_id",
-      [req.params.sessionId]
-    );
-
-    if (result.rowCount === 0) {
+    const result = await revokeUserSession(req.params.sessionId);
+    if (!result.revoked) {
       return res.status(404).json({ message: "Session not found" });
     }
 
     res.json({
       success: true,
-      message: Number(result.rows[0].user_id) === Number(req.user.user_id || req.user.userId)
+      message: Number(result.user_id) === Number(req.user.user_id || req.user.userId)
         ? "Your current session revoked. Logging out..."
         : "Session revoked successfully",
     });
