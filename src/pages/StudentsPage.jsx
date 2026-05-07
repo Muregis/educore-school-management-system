@@ -120,6 +120,19 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     setErr("");
     if (!f.firstName.trim() || !f.lastName.trim()) return setErr("First and last name are required.");
     
+    // Validate admission number uniqueness
+    if (f.admission && f.admission.trim()) {
+      const cleanAdmission = f.admission.trim();
+      // Check if admission number already exists in current students list (excluding current student)
+      const existingStudent = students.find(s => 
+        (s.admission === cleanAdmission || s.admission_number === cleanAdmission) && 
+        s.id !== editId && s.student_id !== editId
+      );
+      if (existingStudent) {
+        return setErr(`Admission number "${cleanAdmission}" already exists. Please use a different admission number.`);
+      }
+    }
+    
     if (f.parentPhone) {
       const cleanPhone = f.parentPhone.replace(/[^\d+]/g, '');
       const phoneRegex = /^(\+?254|0)[17][0-9]{8}$/;
@@ -150,7 +163,15 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       setShow(false);
       toast("Student saved", "success");
     } catch (err) {
-      setErr(err.message || "Save failed");
+      // Handle duplicate admission number error specifically
+      if (err.message?.includes("Admission number already exists") || 
+          err.message?.includes("duplicate key") ||
+          err.message?.includes("23505") ||
+          err.message?.includes("ER_DUP_ENTRY")) {
+        setErr(`Admission number "${f.admission}" already exists in this school. Please use a different admission number.`);
+      } else {
+        setErr(err.message || "Save failed");
+      }
     }
   };
 
