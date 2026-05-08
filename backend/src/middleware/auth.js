@@ -120,8 +120,9 @@ export function authRequired(req, res, next) {
     // Allow superadmin/director to bypass school_id requirement (they have access to all schools)
     if (isSystemAdmin) {
       // NEW: Support header-based context switching for directors
-      const headerSchoolId = req.headers["x-active-school-id"] || req.headers["x-school-id"] || req.headers["x-effective-school-id"];
-      const effectiveSchoolId = headerSchoolId ? Number(headerSchoolId) : (payload.school_id || payload.schoolId || null);
+      const effectiveSchoolId = headerSchoolId 
+  ? Number(headerSchoolId) 
+  : Number(payload.school_id || payload.schoolId); // ← always use token's school_id as default
 
       // Force the role to the highest available permission for system admins
       const effectiveRole = isSuperadminToken ? 'superadmin' : 'director';
