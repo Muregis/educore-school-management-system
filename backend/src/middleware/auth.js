@@ -121,8 +121,8 @@ export function authRequired(req, res, next) {
     if (isSystemAdmin) {
       // NEW: Support header-based context switching for directors
       const effectiveSchoolId = headerSchoolId 
-  ? Number(headerSchoolId) 
-  : Number(payload.school_id || payload.schoolId); // ← always use token's school_id as default
+      ? Number(headerSchoolId) 
+      : (payload.school_id || payload.schoolId || null);
 
       // Force the role to the highest available permission for system admins
       const effectiveRole = isSuperadminToken ? 'superadmin' : 'director';
