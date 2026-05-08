@@ -85,11 +85,9 @@ export function authRequired(req, res, next) {
       });
     }
 
-    const payloadRole = (payload.role || "").toLowerCase();
     const isSuperadminToken = (payload.email === SUPERADMIN_EMAIL) || (payloadRole === 'superadmin');
     const isDirectorToken = payloadRole === 'director';
-    const isSystemAdmin = isSuperadminToken || isDirectorToken;
-    
+    const isSystemAdmin = isSuperadminToken; // ← only superadmin bypasses school_id
     // DEBUG: Log role detection
     console.log('[AUTH DEBUG] Role detection:', {
       isSuperadminToken,
@@ -117,12 +115,45 @@ export function authRequired(req, res, next) {
       });
     }
 
-    // Allow superadmin/director to bypass school_id requirement (they have access to all schools)
-    if (isSystemAdmin) {
-      // NEW: Support header-based context switching for directors
-      const effectiveSchoolId = headerSchoolId 
-      ? Number(headerSchoolId) 
-      : (payload.school_id || payload.schoolId || null);
+// Director — scoped to their own school, full permissions
+if (isDirectorToken) {
+  const headerSchoolId = req.headers["x-active-school-id"] || req.headers["x-school-id"];
+  const allowedSwitch = payload.email === SUPERADMIN_EMAIL && headerSchoolId;
+  const effectiveSchoolId = allowedSwitch
+    ? Number(headerSchoolId)
+    : Number(payload.school_id);
+
+  req.user = {
+    ...payload,
+    user_id: payload.user_id || payload.userId,
+    userId: payload.user_id || payload.userId,
+    role: 'director',
+    school_id: effectiveSchoolId,
+    schoolId: effectiveSchoolId,
+    isSuperadmin: false,
+    isDirector: true,
+    originalSchoolId: Number(payload.school_id),
+    tokenRole: payload.role
+  };
+  return next();
+}
+
+// Superadmin only — full system access, no school restriction
+if (isSystemAdmin) {
+  req.user = {
+    ...payload,
+    user_id: payload.user_id || payload.userId,
+    userId: payload.user_id || payload.userId,
+    role: 'superadmin',
+    school_id: null,
+    schoolId: null,
+    isSuperadmin: true,
+    isDirector: false,
+    originalSchoolId: null,
+    tokenRole: payload.role
+  };
+  return next();
+}
 
       // Force the role to the highest available permission for system admins
       const effectiveRole = isSuperadminToken ? 'superadmin' : 'director';
