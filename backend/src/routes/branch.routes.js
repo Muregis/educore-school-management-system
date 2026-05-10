@@ -106,24 +106,26 @@ router.get("/my-branches", authRequired, async (req, res) => {
       });
     }
     
-    // Director/Superadmin sees ALL schools (bypass school_id check)
-    if (role === "director" || role === "superadmin") {
-      const { data: allSchools, error } = await supabase
-        .from("schools")
-        .select("school_id, name, code, is_branch, parent_school_id, branch_code, email, phone, address, county, subscription_status")
-        .eq("is_deleted", false)
-        .order("school_id", { ascending: true });
-      
-      if (error) throw error;
-      
-      return res.json({
-        role: role,
-        allSchools: allSchools || [],
-        totalSchools: allSchools?.length || 0,
-        canManageAll: true
-      });
-    }
-    
+// Director sees only their own school + its branches
+if (role === "director" || role === "superadmin") {
+  const { schoolId } = req.user;
+
+  const { data: allSchools, error } = await supabase
+    .from("schools")
+    .select("school_id, name, code, is_branch, parent_school_id, branch_code, email, phone, address, county, subscription_status")
+    .or(`school_id.eq.${school_id},parent_school_id.eq.${school_id}`)
+    .eq("is_deleted", false)
+    .order("school_id", { ascending: true });
+
+  if (error) throw error;
+
+  return res.json({
+    role: role,
+    allSchools: allSchools || [],
+    totalSchools: allSchools?.length || 0,
+    canManageAll: true
+  });
+}
     // Regular users need school context
     if (!school_id) {
       return res.status(400).json({ error: "No school context" });
