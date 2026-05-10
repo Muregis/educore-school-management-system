@@ -145,6 +145,18 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
       return;
     }
 
+    // Directors switch between branches of their school using branch switching endpoint
+    if (isDirector) {
+      try {
+        await switchBranch(branchId);
+      } catch (err) {
+        alert("Failed to switch: " + err.message);
+      }
+      setIsOpen(false);
+      return;
+    }
+
+    // Non-directors use regular branch switching
     try {
       await switchBranch(branchId);
     } catch (err) {
@@ -246,8 +258,8 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
 
             <div style={{ maxHeight: 320, overflowY: "auto" }}>
               {isDirector ? (
-                [currentBranch].map((school) => {
-                  const isActive = currentSchoolId === school.school_id;
+                branches.map((branch) => {
+                  const isActive = currentSchoolId === branch.school_id;
                   return (
                     <button
                       key={school.school_id}
