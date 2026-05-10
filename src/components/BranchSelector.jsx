@@ -27,11 +27,18 @@ export function useBranches(token, onSwitch) {
         setAllSchools(data.allSchools || []);
         setIsDirector(true);
         setCanAccessBranches(true);
-      } else {
+      } else if (data.school && data.branches) {
         setBranches(data.branches || []);
         setCurrentBranch(data.school);
         setParentSchool(data.parent_school);
         setIsDirector(false);
+        setCanAccessBranches(data.is_branch || (data.branches?.length > 0));
+      } else {
+        // Director response - single school with branches
+        setBranches(data.branches || []);
+        setCurrentBranch(data.school);
+        setParentSchool(data.parent_school);
+        setIsDirector(true);
         setCanAccessBranches(data.is_branch || (data.branches?.length > 0));
       }
       setError(null);
@@ -120,7 +127,7 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
     return null;
   }
 
-  if (!isDirector && branches.length === 0) {
+  if (branches.length === 0 && !isDirector && !allSchools.length) {
     return null;
   }
 
@@ -146,8 +153,10 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
     setIsOpen(false);
   };
 
-  const currentSchoolName = isDirector
+  const currentSchoolName = isDirector && allSchools.length > 0
     ? (allSchools.find(s => s.school_id === currentSchoolId)?.name || "All Schools")
+    : isDirector && currentBranch
+    ? currentBranch.name
     : formatBranchName(currentBranch);
 
   return (
@@ -237,7 +246,7 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
 
             <div style={{ maxHeight: 320, overflowY: "auto" }}>
               {isDirector ? (
-                allSchools.map((school) => {
+                [currentBranch].map((school) => {
                   const isActive = currentSchoolId === school.school_id;
                   return (
                     <button

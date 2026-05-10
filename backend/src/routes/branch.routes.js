@@ -110,20 +110,30 @@ router.get("/my-branches", authRequired, async (req, res) => {
 if (role === "director" || role === "superadmin") {
   const { schoolId } = req.user;
 
-  const { data: allSchools, error } = await supabase
+  // Get only their school, not all schools
+  const { data: schoolData, error } = await supabase
     .from("schools")
     .select("school_id, name, code, is_branch, parent_school_id, branch_code, email, phone, address, county, subscription_status")
-    .or(`school_id.eq.${school_id},parent_school_id.eq.${school_id}`)
+    .eq("school_id", schoolId)
     .eq("is_deleted", false)
-    .order("school_id", { ascending: true });
+    .maybeSingle();
 
   if (error) throw error;
 
+  // Get branches for their school only
+  const schoolWithBranches = await getSchoolWithBranches(schoolId);
+  
+  if (!schoolWithBranches) {
+    return res.status(404).json({ error: "School not found" });
+  }
+
   return res.json({
     role: role,
-    allSchools: allSchools || [],
-    totalSchools: allSchools?.length || 0,
-    canManageAll: true
+    school: schoolWithBranches,
+    branches: schoolWithBranches.branches || [],
+    is_branch: schoolWithBranches.is_branch,
+    parent_school: schoolWithBranches.parent_school || null,
+    sibling_branches: schoolWithBranches.sibling_branches || []
   });
 }
     // Regular users need school context
