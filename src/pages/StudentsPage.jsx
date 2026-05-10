@@ -54,7 +54,7 @@ function normalise(s) {
     breakfast_daily_rate: s.breakfast_daily_rate ?? 0,
     breakfast_days: s.breakfast_days ?? 66,
     breakfast_billing_type: s.breakfast_billing_type ?? "daily",
-    discount_type: s.discount_type ?? "",
+    discount_type: s.discount_type ?? null,
     discount_value: s.discount_value ?? 0,
     discount_is_percentage: s.discount_is_percentage ?? true,
   };
@@ -412,16 +412,25 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
                 <Button size="sm" variant="ghost" onClick={() => setProfile(s)}>Profile</Button>
                 <Button size="sm" variant="ghost" onClick={() => setIdCardStudent(s)}>🪪 ID</Button>
                 {canEdit && auth.role !== "finance" && <Button size="sm" variant="secondary" onClick={() => { 
+                  console.log('=== EDIT BUTTON CLICKED ===');
+                  console.log('Student data from list:', JSON.stringify(s, null, 2));
                   setEditId(s.id); 
+                  
                   // Fetch fresh student data to ensure all fee fields are present
                   apiFetch(`/students/${s.id}`, { token: auth.token })
                     .then(fresh => {
-                      setF(normalise(fresh));
+                      console.log('Fresh student data from API:', JSON.stringify(fresh, null, 2));
+                      const normalisedData = normalise(fresh);
+                      console.log('Normalised data for form:', JSON.stringify(normalisedData, null, 2));
+                      setF(normalisedData);
                       setShow(true);
                     })
-                    .catch(() => {
-                      // Fallback to list data if fetch fails
-                      setF(s); 
+                    .catch(err => {
+                      console.error('Failed to fetch fresh student data, using list data:', err);
+                      console.log('Fallback to list data (before normalise):', JSON.stringify(s, null, 2));
+                      const normalisedListData = normalise(s);
+                      console.log('Normalised list data for form:', JSON.stringify(normalisedListData, null, 2));
+                      setF(normalisedListData); 
                       setShow(true);
                     });
                 }}>Edit</Button>}
@@ -494,7 +503,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
                 { value: "one_way", label: "One Way (60% fee)" },
                 { value: "two_way", label: "Two Way (100% fee)" }
               ]} />
-              <Input type="number" value={f.transport_base_fee || ""} onChange={e => setF({ ...f, transport_base_fee: e.target.value })} placeholder="Base transport fee (KES)" disabled={f.transport_direction === "none"} />
+              <Input type="number" value={f.transport_base_fee || ""} onChange={e => setF({ ...f, transport_base_fee: e.target.value ? parseFloat(e.target.value) || 0 : 0 })} placeholder="Base transport fee (KES)" disabled={f.transport_direction === "none"} />
             </div>
           </div>
 
@@ -508,9 +517,9 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
             {f.lunch_enabled && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
                 <Select value={f.lunch_billing_type || 'daily'} onChange={e => setF({ ...f, lunch_billing_type: e.target.value })} options={[{value:"daily", label:"Daily Rate"}, {value:"termly", label:"Termly Rate"}]} />
-                <Input type="number" value={f.lunch_daily_rate || ""} onChange={e => setF({ ...f, lunch_daily_rate: e.target.value })} placeholder={f.lunch_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
+                <Input type="number" value={f.lunch_daily_rate || ""} onChange={e => setF({ ...f, lunch_daily_rate: e.target.value ? parseFloat(e.target.value) || 0 : 0 })} placeholder={f.lunch_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
                 {f.lunch_billing_type !== 'termly' && (
-                  <Input type="number" value={f.lunch_days || 66} onChange={e => setF({ ...f, lunch_days: e.target.value })} placeholder="School days" />
+                  <Input type="number" value={f.lunch_days || 66} onChange={e => setF({ ...f, lunch_days: e.target.value ? parseInt(e.target.value) || 66 : 66 })} placeholder="School days" />
                 )}
               </div>
             )}
@@ -526,9 +535,9 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
             {f.breakfast_enabled && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
                 <Select value={f.breakfast_billing_type || 'daily'} onChange={e => setF({ ...f, breakfast_billing_type: e.target.value })} options={[{value:"daily", label:"Daily Rate"}, {value:"termly", label:"Termly Rate"}]} />
-                <Input type="number" value={f.breakfast_daily_rate || ""} onChange={e => setF({ ...f, breakfast_daily_rate: e.target.value })} placeholder={f.breakfast_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
+                <Input type="number" value={f.breakfast_daily_rate || ""} onChange={e => setF({ ...f, breakfast_daily_rate: e.target.value ? parseFloat(e.target.value) || 0 : 0 })} placeholder={f.breakfast_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
                 {f.breakfast_billing_type !== 'termly' && (
-                  <Input type="number" value={f.breakfast_days || 66} onChange={e => setF({ ...f, breakfast_days: e.target.value })} placeholder="School days" />
+                  <Input type="number" value={f.breakfast_days || 66} onChange={e => setF({ ...f, breakfast_days: e.target.value ? parseInt(e.target.value) || 66 : 66 })} placeholder="School days" />
                 )}
               </div>
             )}
@@ -548,7 +557,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
                 { value: "bursary", label: "Bursary" },
                 { value: "other", label: "Other" }
               ]} />
-              <Input type="number" value={f.discount_value || ""} onChange={e => setF({ ...f, discount_value: e.target.value })} placeholder={f.discount_is_percentage ? "Discount %" : "Amount (KES)"} disabled={!f.discount_type} />
+              <Input type="number" value={f.discount_value || ""} onChange={e => setF({ ...f, discount_value: e.target.value ? parseFloat(e.target.value) || 0 : 0 })} placeholder={f.discount_is_percentage ? "Discount %" : "Amount (KES)"} disabled={!f.discount_type} />
               <Select value={f.discount_is_percentage ? "percentage" : "amount"} onChange={e => setF({ ...f, discount_is_percentage: e.target.value === "percentage" })} disabled={!f.discount_type} options={[
                 { value: "percentage", label: "Percentage (%)" },
                 { value: "amount", label: "Fixed Amount (KES)" }
@@ -565,7 +574,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
             <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Opening Balance (KES)</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "var(--space-3)" }}>
-              <Input type="number" value={f.opening_balance || ""} onChange={e => setF({ ...f, opening_balance: e.target.value })} placeholder="Amount carried forward" />
+              <Input type="number" value={f.opening_balance || ""} onChange={e => setF({ ...f, opening_balance: e.target.value ? parseFloat(e.target.value) || 0 : 0 })} placeholder="Amount carried forward" />
               <Select style={{ width: "160px" }} value={f.opening_balance_type || "owing"} onChange={e => setF({ ...f, opening_balance_type: e.target.value })} options={[
                 { value: "owing", label: "Student Owes" },
                 { value: "credit", label: "Credit (Prepaid)" }
