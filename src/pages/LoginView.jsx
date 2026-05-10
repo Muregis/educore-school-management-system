@@ -431,6 +431,10 @@ export default function LoginView({ onLogin }) {
 
               {mode === "staff" ? (
                 <form onSubmit={submitStaff} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
+                  {/* Hidden fields to trick browser autofill */}
+                  <input type="text" name="fake_username" style={{ display: 'none' }} autoComplete="off" />
+                  <input type="password" name="fake_password" style={{ display: 'none' }} autoComplete="off" />
+                  
                   <label style={labelStyle}>
                     <span style={labelTextStyle}>Email address</span>
                     <input 
@@ -443,8 +447,19 @@ export default function LoginView({ onLogin }) {
                       spellCheck={false}
                       autoCapitalize="off"
                       autoCorrect="off"
+                      data-lpignore="true"
+                      data-form-type="other"
                       placeholder="you@school.ac.ke" 
-                      style={fieldStyle} 
+                      style={fieldStyle}
+                      onFocus={(e) => {
+                        e.target.autocomplete = 'off';
+                        e.target.value = '';
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value !== email) {
+                          setEmail(e.target.value);
+                        }
+                      }}
                     />
                   </label>
                   <label style={labelStyle}>
@@ -460,8 +475,19 @@ export default function LoginView({ onLogin }) {
                         spellCheck={false}
                         autoCapitalize="off"
                         autoCorrect="off"
+                        data-lpignore="true"
+                        data-form-type="other"
                         placeholder="Enter password" 
-                        style={{ ...fieldStyle, paddingRight: 52 }} 
+                        style={{ ...fieldStyle, paddingRight: 52 }}
+                        onFocus={(e) => {
+                          e.target.autocomplete = 'off';
+                          e.target.value = '';
+                        }}
+                        onBlur={(e) => {
+                          if (e.target.value !== password) {
+                            setPassword(e.target.value);
+                          }
+                        }}
                       />
                       <button type="button" onClick={() => setShowPassword(prev => !prev)} style={toggleButtonStyle}>{showPassword ? "Hide" : "Show"}</button>
                     </div>
@@ -470,6 +496,10 @@ export default function LoginView({ onLogin }) {
                 </form>
               ) : (
                 <form onSubmit={submitPortal} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
+                  {/* Hidden fields to trick browser autofill */}
+                  <input type="text" name="fake_username_portal" style={{ display: 'none' }} autoComplete="off" />
+                  <input type="password" name="fake_password_portal" style={{ display: 'none' }} autoComplete="off" />
+                  
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                     {[
                       { id: "parent", label: "Parent" },
@@ -507,8 +537,19 @@ export default function LoginView({ onLogin }) {
                       spellCheck={false}
                       autoCapitalize="off"
                       autoCorrect="off"
+                      data-lpignore="true"
+                      data-form-type="other"
                       placeholder="e.g. ADM-2020-001" 
-                      style={fieldStyle} 
+                      style={fieldStyle}
+                      onFocus={(e) => {
+                        e.target.autocomplete = 'off';
+                        e.target.value = '';
+                      }}
+                      onBlur={(e) => {
+                        if (e.target.value !== admission) {
+                          setAdmission(e.target.value);
+                        }
+                      }}
                     />
                   </label>
                   <label style={labelStyle}>
@@ -524,8 +565,19 @@ export default function LoginView({ onLogin }) {
                         spellCheck={false}
                         autoCapitalize="off"
                         autoCorrect="off"
+                        data-lpignore="true"
+                        data-form-type="other"
                         placeholder="Enter password" 
-                        style={{ ...fieldStyle, paddingRight: 52 }} 
+                        style={{ ...fieldStyle, paddingRight: 52 }}
+                        onFocus={(e) => {
+                          e.target.autocomplete = 'off';
+                          e.target.value = '';
+                        }}
+                        onBlur={(e) => {
+                          if (e.target.value !== password) {
+                            setPassword(e.target.value);
+                          }
+                        }}
                       />
                       <button type="button" onClick={() => setShowPassword(prev => !prev)} style={toggleButtonStyle}>{showPassword ? "Hide" : "Show"}</button>
                     </div>
