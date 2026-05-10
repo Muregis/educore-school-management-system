@@ -119,8 +119,6 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   };
 
   const save = async () => {
-    console.log('SAVE CALLED — editId:', editId);
-    console.log('FORM STATE f:', JSON.stringify(f, null, 2));
     setErr("");
     if (!f.firstName.trim() || !f.lastName.trim()) return setErr("First and last name are required.");
     
@@ -176,25 +174,6 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   });
 
   // PATCH — fee/balance fields separately, no admission number
-  console.log('PATCH /fees payload:', {
-    opening_balance: parseFloat(f.opening_balance) || 0,
-    opening_balance_type: f.opening_balance_type || "owing",
-    transport_direction: f.transport_direction || "none",
-    transport_base_fee: parseFloat(f.transport_base_fee) || 0,
-    lunch_enabled: Boolean(f.lunch_enabled),
-    lunch_daily_rate: parseFloat(f.lunch_daily_rate) || 0,
-    lunch_days: parseInt(f.lunch_days) || 66,
-    lunch_billing_type: f.lunch_billing_type || "daily",
-    breakfast_enabled: Boolean(f.breakfast_enabled),
-    breakfast_daily_rate: parseFloat(f.breakfast_daily_rate) || 0,
-    breakfast_days: parseInt(f.breakfast_days) || 66,
-    breakfast_billing_type: f.breakfast_billing_type || "daily",
-    discount_type: f.discount_type || null,
-    discount_value: parseFloat(f.discount_value) || 0,
-    discount_is_percentage: f.discount_is_percentage !== false,
-  });
-  
-  try {
     await apiFetch(`/students/${editId}/fees`, {
     method: "PATCH",
     body: {
@@ -216,10 +195,6 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   },
   token: auth?.token,
 });
-  } catch (feeErr) {
-    console.error('PATCH /fees failed:', feeErr);
-    toast('Warning: Basic info saved but fee settings failed: ' + feeErr.message, 'warning');
-  }
 
   setStudents(prev => prev.map(s =>
     (s.id === editId || s.student_id === editId)
@@ -388,20 +363,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
               <div key="a" style={{ display: "flex", gap: "var(--space-2)" }}>
                 <Button size="sm" variant="ghost" onClick={() => setProfile(s)}>Profile</Button>
                 <Button size="sm" variant="ghost" onClick={() => setIdCardStudent(s)}>🪪 ID</Button>
-                {canEdit && auth.role !== "finance" && <Button size="sm" variant="secondary" onClick={() => { 
-                  setEditId(s.id); 
-                  // Fetch fresh student data to ensure all fee fields are present
-                  apiFetch(`/students/${s.id}`, { token: auth.token })
-                    .then(fresh => {
-                      setF(normalise(fresh));
-                      setShow(true);
-                    })
-                    .catch(() => {
-                      // Fallback to list data if fetch fails
-                      setF(s); 
-                      setShow(true);
-                    });
-                }}>Edit</Button>}
+                {canEdit && auth.role !== "finance" && <Button size="sm" variant="secondary" onClick={() => { setEditId(s.id); setF(s); setShow(true); }}>Edit</Button>}
                 {canEdit && auth.role !== "finance" && <Button size="sm" variant="danger" onClick={() => del(s.id)}>Delete</Button>}
               </div>
             ])}

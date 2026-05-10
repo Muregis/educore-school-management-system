@@ -118,13 +118,6 @@ export default function LoginView({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [manualSchool, setManualSchool] = useState(() => Boolean(getInitialSchoolId()));
 
-  // Clear form fields on component mount to prevent credential persistence
-  useEffect(() => {
-    setEmail("");
-    setPassword("");
-    setAdmission("");
-  }, []);
-
   const activeIdentifier = mode === "staff" ? email : admission;
   const schoolOptions = branding.schoolOptions || [];
 
@@ -380,12 +373,12 @@ export default function LoginView({ onLogin }) {
                 <form onSubmit={submitStaff} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   <label style={labelStyle}>
                     <span style={labelTextStyle}>Email address</span>
-                    <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="new-password" placeholder="you@school.ac.ke" style={fieldStyle} />
+                    <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" placeholder="you@school.ac.ke" style={fieldStyle} />
                   </label>
                   <label style={labelStyle}>
                     <span style={labelTextStyle}>Password</span>
                     <div style={{ position: "relative" }}>
-                      <input value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="Enter password" style={{ ...fieldStyle, paddingRight: 52 }} />
+                      <input value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Enter password" style={{ ...fieldStyle, paddingRight: 52 }} />
                       <button type="button" onClick={() => setShowPassword(prev => !prev)} style={toggleButtonStyle}>{showPassword ? "Hide" : "Show"}</button>
                     </div>
                   </label>
@@ -421,12 +414,12 @@ export default function LoginView({ onLogin }) {
                   </div>
                   <label style={labelStyle}>
                     <span style={labelTextStyle}>Admission number</span>
-                    <input value={admission} onChange={(e) => setAdmission(e.target.value)} autoComplete="new-password" placeholder="e.g. ADM-2020-001" style={fieldStyle} />
+                    <input value={admission} onChange={(e) => setAdmission(e.target.value)} autoComplete="username" placeholder="e.g. ADM-2020-001" style={fieldStyle} />
                   </label>
                   <label style={labelStyle}>
                     <span style={labelTextStyle}>Password</span>
                     <div style={{ position: "relative" }}>
-                      <input value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="Enter password" style={{ ...fieldStyle, paddingRight: 52 }} />
+                      <input value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Enter password" style={{ ...fieldStyle, paddingRight: 52 }} />
                       <button type="button" onClick={() => setShowPassword(prev => !prev)} style={toggleButtonStyle}>{showPassword ? "Hide" : "Show"}</button>
                     </div>
                   </label>
