@@ -73,7 +73,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: 0, opening_balance_type: "owing", transport_direction: "none", transport_base_fee: 0, lunch_enabled: false, lunch_daily_rate: 0, lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: 0, breakfast_days: 66, breakfast_billing_type: "daily", discount_type: null, discount_value: 0, discount_is_percentage: true });
+  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", transport_direction: "none", transport_base_fee: "", lunch_enabled: false, lunch_daily_rate: "", lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: 66, breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -114,7 +114,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
   const openAdd = () => {
     setEditId(null); setErr("");
-    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: 0, opening_balance_type: "owing", transport_direction: "none", transport_base_fee: 0, lunch_enabled: false, lunch_daily_rate: 0, lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: 0, breakfast_days: 66, breakfast_billing_type: "daily", discount_type: null, discount_value: 0, discount_is_percentage: true });
+    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", transport_direction: "none", transport_base_fee: "", lunch_enabled: false, lunch_daily_rate: "", lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: 66, breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
     setShow(true);
   };
 
@@ -212,25 +212,26 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         console.log('Token exists:', !!auth?.token);
         
         try {
+          console.log('Making PATCH call to:', `/students/${editId}/fees`);
           const patchResponse = await apiFetch(`/students/${editId}/fees`, {
             method: "PATCH",
             body: patchPayload,
             token: auth?.token,
           });
           console.log('PATCH /fees SUCCESS:', patchResponse);
+          toast('Student fee settings updated successfully', 'success');
         } catch (feeErr) {
           console.error('=== PATCH /fees FAILED ===');
           console.error('Error:', feeErr);
           console.error('Error message:', feeErr.message);
           console.error('Error status:', feeErr.status);
-          toast('Warning: Basic info saved but fee settings failed: ' + feeErr.message, 'warning');
-          // Still update local state with basic info but don't refresh full list
-          setStudents(prev => prev.map(s =>
-            (s.id === editId || s.student_id === editId)
-              ? { ...normalise(s), ...f, id: editId }
-              : s
-          ));
-          setShow(false);
+          console.error('Full error object:', JSON.stringify(feeErr, null, 2));
+          
+          // Show detailed error to user
+          const errorMsg = `Fee settings failed: ${feeErr.message || 'Unknown error'} (Status: ${feeErr.status || 'N/A'})`;
+          toast(errorMsg, 'error');
+          
+          // Don't close modal on fee error - let user try again
           return;
         }
 
@@ -261,6 +262,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           .catch(() => {});
         setShow(false);
         toast("Student saved", "success");
+      }
     } catch (err) {
       // Handle duplicate admission number error specifically
       if (err.message?.includes("Admission number already exists") || 
@@ -448,7 +450,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       <Modal isOpen={show} title={editId ? "Edit Student" : "Add Student"} onClose={() => setShow(false)} maxWidth="800px" footer={
         <>
           <Button variant="ghost" onClick={() => setShow(false)}>Cancel</Button>
-          <Button variant="primary" onClick={save}>Save Changes</Button>
+          <Button variant="primary" onClick={save}>{editId ? "Update Student" : "Save Student"}</Button>
         </>
       }>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>

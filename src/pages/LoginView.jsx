@@ -178,15 +178,21 @@ export default function LoginView({ onLogin }) {
         setPassword("");
         setAdmission("");
         
-        // Clear any autofilled values
-        setTimeout(() => {
+        // Clear any autofilled values aggressively
+        const clearAutofill = () => {
           const inputs = document.querySelectorAll('input[type="email"], input[type="password"], input[type="text"]');
           inputs.forEach(input => {
-            if (input.value && (input.type === 'password' || input.type === 'email')) {
+            if (input.type === 'password' || input.type === 'email') {
               input.value = '';
+              input.setAttribute('autocomplete', 'new-password');
             }
           });
-        }, 100);
+        };
+        
+        clearAutofill();
+        setTimeout(clearAutofill, 100);
+        setTimeout(clearAutofill, 500);
+        setTimeout(clearAutofill, 1000);
       }
     };
 
@@ -475,7 +481,7 @@ export default function LoginView({ onLogin }) {
                       value={email} 
                       onChange={(e) => setEmail(e.target.value)} 
                       type="email" 
-                      autoComplete="off" 
+                      autoComplete="new-password"
                       name={`email_${randomFieldSuffix}`}
                       readOnly={false}
                       spellCheck={false}
@@ -486,7 +492,7 @@ export default function LoginView({ onLogin }) {
                       placeholder="you@school.ac.ke" 
                       style={fieldStyle}
                       onFocus={(e) => {
-                        e.target.autocomplete = 'off';
+                        e.target.autocomplete = 'new-password';
                         e.target.value = '';
                       }}
                       onBlur={(e) => {
@@ -503,7 +509,7 @@ export default function LoginView({ onLogin }) {
                         value={password} 
                         onChange={(e) => setPassword(e.target.value)} 
                         type={showPassword ? "text" : "password"} 
-                        autoComplete="off" 
+                        autoComplete="new-password"
                         name={`password_staff_${randomFieldSuffix}`}
                         readOnly={false}
                         spellCheck={false}
@@ -514,7 +520,7 @@ export default function LoginView({ onLogin }) {
                         placeholder="Enter password" 
                         style={{ ...fieldStyle, paddingRight: 52 }}
                         onFocus={(e) => {
-                          e.target.autocomplete = 'off';
+                          e.target.autocomplete = 'new-password';
                           e.target.value = '';
                         }}
                         onBlur={(e) => {
@@ -565,7 +571,7 @@ export default function LoginView({ onLogin }) {
                     <input 
                       value={admission} 
                       onChange={(e) => setAdmission(e.target.value)} 
-                      autoComplete="off" 
+                      autoComplete="new-password"
                       name={`admission_${randomFieldSuffix}`}
                       readOnly={false}
                       spellCheck={false}
@@ -576,7 +582,7 @@ export default function LoginView({ onLogin }) {
                       placeholder="e.g. ADM-2020-001" 
                       style={fieldStyle}
                       onFocus={(e) => {
-                        e.target.autocomplete = 'off';
+                        e.target.autocomplete = 'new-password';
                         e.target.value = '';
                       }}
                       onBlur={(e) => {
@@ -593,7 +599,7 @@ export default function LoginView({ onLogin }) {
                         value={password} 
                         onChange={(e) => setPassword(e.target.value)} 
                         type={showPassword ? "text" : "password"} 
-                        autoComplete="off" 
+                        autoComplete="new-password"
                         name={`password_portal_${randomFieldSuffix}`}
                         readOnly={false}
                         spellCheck={false}
@@ -604,7 +610,7 @@ export default function LoginView({ onLogin }) {
                         placeholder="Enter password" 
                         style={{ ...fieldStyle, paddingRight: 52 }}
                         onFocus={(e) => {
-                          e.target.autocomplete = 'off';
+                          e.target.autocomplete = 'new-password';
                           e.target.value = '';
                         }}
                         onBlur={(e) => {
