@@ -174,27 +174,27 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   });
 
   // PATCH — fee/balance fields separately, no admission number
-  await apiFetch(`/students/${editId}/fees`, {
+    await apiFetch(`/students/${editId}/fees`, {
     method: "PATCH",
     body: {
-      opening_balance: f.opening_balance || 0,
-      opening_balance_type: f.opening_balance_type || "owing",
-      transport_direction: f.transport_direction || "none",
-      transport_base_fee: f.transport_base_fee || 0,
-      lunch_enabled: f.lunch_enabled || false,
-      lunch_daily_rate: f.lunch_daily_rate || 0,
-      lunch_days: f.lunch_days || 66,
-      lunch_billing_type: f.lunch_billing_type || "daily",
-      breakfast_enabled: f.breakfast_enabled || false,
-      breakfast_daily_rate: f.breakfast_daily_rate || 0,
-      breakfast_days: f.breakfast_days || 66,
-      breakfast_billing_type: f.breakfast_billing_type || "daily",
-      discount_type: f.discount_type || null,
-      discount_value: f.discount_value ? Number(f.discount_value) : 0,
-      discount_is_percentage: f.discount_is_percentage,
-    },
-    token: auth?.token,
-  });
+    opening_balance: parseFloat(f.opening_balance) || 0,
+    opening_balance_type: f.opening_balance_type || "owing",
+    transport_direction: f.transport_direction || "none",
+    transport_base_fee: parseFloat(f.transport_base_fee) || 0,
+    lunch_enabled: Boolean(f.lunch_enabled),
+    lunch_daily_rate: parseFloat(f.lunch_daily_rate) || 0,
+    lunch_days: parseInt(f.lunch_days) || 66,
+    lunch_billing_type: f.lunch_billing_type || "daily",
+    breakfast_enabled: Boolean(f.breakfast_enabled),
+    breakfast_daily_rate: parseFloat(f.breakfast_daily_rate) || 0,
+    breakfast_days: parseInt(f.breakfast_days) || 66,
+    breakfast_billing_type: f.breakfast_billing_type || "daily",
+    discount_type: f.discount_type || null,
+    discount_value: parseFloat(f.discount_value) || 0,
+    discount_is_percentage: f.discount_is_percentage !== false,
+  },
+  token: auth?.token,
+});
 
   setStudents(prev => prev.map(s =>
     (s.id === editId || s.student_id === editId)
