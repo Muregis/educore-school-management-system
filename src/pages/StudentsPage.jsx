@@ -73,7 +73,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", lunch_enabled: false, lunch_daily_rate: "", lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: 66, breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
+  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: 0, opening_balance_type: "owing", transport_direction: "none", transport_base_fee: 0, lunch_enabled: false, lunch_daily_rate: 0, lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: 0, breakfast_days: 66, breakfast_billing_type: "daily", discount_type: null, discount_value: 0, discount_is_percentage: true });
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -114,13 +114,25 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
   const openAdd = () => {
     setEditId(null); setErr("");
-    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", lunch_enabled: false, lunch_daily_rate: "", lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: 66, breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
+    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: 0, opening_balance_type: "owing", transport_direction: "none", transport_base_fee: 0, lunch_enabled: false, lunch_daily_rate: 0, lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: 0, breakfast_days: 66, breakfast_billing_type: "daily", discount_type: null, discount_value: 0, discount_is_percentage: true });
     setShow(true);
   };
 
   const save = async () => {
-    console.log('SAVE CALLED — editId:', editId);
+    console.log('=== SAVE STARTED ===');
+    console.log('editId:', editId);
     console.log('FORM STATE f:', JSON.stringify(f, null, 2));
+    console.log('Fee fields specifically:');
+    console.log('- opening_balance:', f.opening_balance, typeof f.opening_balance);
+    console.log('- transport_direction:', f.transport_direction, typeof f.transport_direction);
+    console.log('- transport_base_fee:', f.transport_base_fee, typeof f.transport_base_fee);
+    console.log('- lunch_enabled:', f.lunch_enabled, typeof f.lunch_enabled);
+    console.log('- lunch_daily_rate:', f.lunch_daily_rate, typeof f.lunch_daily_rate);
+    console.log('- breakfast_enabled:', f.breakfast_enabled, typeof f.breakfast_enabled);
+    console.log('- breakfast_daily_rate:', f.breakfast_daily_rate, typeof f.breakfast_daily_rate);
+    console.log('- discount_type:', f.discount_type, typeof f.discount_type);
+    console.log('- discount_value:', f.discount_value, typeof f.discount_value);
+    console.log('=== END DEBUG ===');
     setErr("");
     if (!f.firstName.trim() || !f.lastName.trim()) return setErr("First and last name are required.");
     
@@ -176,7 +188,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         });
 
         // PATCH — fee/balance fields separately, no admission number
-        console.log('PATCH /fees payload:', {
+        const patchPayload = {
           opening_balance: parseFloat(f.opening_balance) || 0,
           opening_balance_type: f.opening_balance_type || "owing",
           transport_direction: f.transport_direction || "none",
@@ -192,32 +204,25 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           discount_type: f.discount_type || null,
           discount_value: parseFloat(f.discount_value) || 0,
           discount_is_percentage: f.discount_is_percentage !== false,
-        });
+        };
+        
+        console.log('=== PATCH /fees CALL ===');
+        console.log('URL:', `/students/${editId}/fees`);
+        console.log('Payload:', JSON.stringify(patchPayload, null, 2));
+        console.log('Token exists:', !!auth?.token);
         
         try {
-          await apiFetch(`/students/${editId}/fees`, {
+          const patchResponse = await apiFetch(`/students/${editId}/fees`, {
             method: "PATCH",
-            body: {
-              opening_balance: parseFloat(f.opening_balance) || 0,
-              opening_balance_type: f.opening_balance_type || "owing",
-              transport_direction: f.transport_direction || "none",
-              transport_base_fee: parseFloat(f.transport_base_fee) || 0,
-              lunch_enabled: Boolean(f.lunch_enabled),
-              lunch_daily_rate: parseFloat(f.lunch_daily_rate) || 0,
-              lunch_days: parseInt(f.lunch_days) || 66,
-              lunch_billing_type: f.lunch_billing_type || "daily",
-              breakfast_enabled: Boolean(f.breakfast_enabled),
-              breakfast_daily_rate: parseFloat(f.breakfast_daily_rate) || 0,
-              breakfast_days: parseInt(f.breakfast_days) || 66,
-              breakfast_billing_type: f.breakfast_billing_type || "daily",
-              discount_type: f.discount_type || null,
-              discount_value: parseFloat(f.discount_value) || 0,
-              discount_is_percentage: f.discount_is_percentage !== false,
-            },
+            body: patchPayload,
             token: auth?.token,
           });
+          console.log('PATCH /fees SUCCESS:', patchResponse);
         } catch (feeErr) {
-          console.error('PATCH /fees failed:', feeErr);
+          console.error('=== PATCH /fees FAILED ===');
+          console.error('Error:', feeErr);
+          console.error('Error message:', feeErr.message);
+          console.error('Error status:', feeErr.status);
           toast('Warning: Basic info saved but fee settings failed: ' + feeErr.message, 'warning');
           // Still update local state with basic info but don't refresh full list
           setStudents(prev => prev.map(s =>
