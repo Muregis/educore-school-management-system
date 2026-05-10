@@ -10,7 +10,7 @@ import multer from "multer";
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 2 * 1024 * 1024, // 2MB limit for photos
+    fileSize: 2 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
@@ -34,12 +34,10 @@ function normalizeDateInput(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
 
-  // Accept ISO dates directly.
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
     return raw;
   }
 
-  // Accept common spreadsheet exports like 14/09/2010 or 14-09-2010.
   const match = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
   if (match) {
     const [, dayStr, monthStr, yearStr] = match;
@@ -62,7 +60,7 @@ function normalizeDateInput(value) {
   });
 }
 
-// ─── GET / — list all students for this school ────────────────────────────────
+// ─── GET / ────────────────────────────────────────────────────────────────────
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -76,12 +74,11 @@ router.get("/", async (req, res, next) => {
       .order('first_name');
 
     if (error) throw error;
-    console.log('[DEBUG] GET students first row:', rows?.[0]);
     res.json(rows || []);
   } catch (err) { next(err); }
 });
 
-// ─── GET /:id — single student ────────────────────────────────────────────────
+// ─── GET /:id ─────────────────────────────────────────────────────────────────
 router.get("/:id", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -100,7 +97,7 @@ router.get("/:id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── POST / — admit new student ───────────────────────────────────────────────
+// ─── POST / ───────────────────────────────────────────────────────────────────
 router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -112,8 +109,6 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
       email = null, address = null, photoUrl = null,
       admissionDate = null, status = "active"
     } = req.body;
-    
-    console.log('[DEBUG] POST /students req.body:', req.body);
 
     const normalizedAdmissionNumber = admissionNumber ? normalizeAdmissionNumber(admissionNumber) : null;
     const normalizedDateOfBirth = normalizeDateInput(dateOfBirth);
@@ -124,21 +119,19 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
     if (!firstName || !lastName || !gender)
       return res.status(400).json({ message: "firstName, lastName, gender are required" });
 
-    // Kenyan phone number validation (supports: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, +2541xxxxxxxx)
     const phoneRegex = /^(\+?254|0)[17][0-9]{8}$/;
     if (normalizedPhone && !phoneRegex.test(normalizedPhone)) {
-      return res.status(400).json({ 
-        message: "Invalid Kenyan phone number format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx" 
-      });
-    }
-    
-    if (normalizedParentPhone && !phoneRegex.test(normalizedParentPhone)) {
-      return res.status(400).json({ 
-        message: "Invalid Kenyan parent phone number format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx" 
+      return res.status(400).json({
+        message: "Invalid Kenyan phone number format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx"
       });
     }
 
-    // Resolve classId from className if not provided
+    if (normalizedParentPhone && !phoneRegex.test(normalizedParentPhone)) {
+      return res.status(400).json({
+        message: "Invalid Kenyan parent phone number format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx"
+      });
+    }
+
     let resolvedClassId = classId;
     const resolvedClassName = className || null;
     if (className && !classId) {
@@ -151,12 +144,10 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
           .maybeSingle();
         if (cls) resolvedClassId = cls.class_id;
       } catch (clsErr) {
-        // Class lookup failed, but we can still save with null class_id
-        console.log('[DEBUG] Class lookup failed for:', className, '- saving with null class_id');
+        console.log('[DEBUG] Class lookup failed for:', className);
       }
     }
 
-    // Generate admission number if not provided
     let finalAdmissionNumber = normalizedAdmissionNumber;
     if (!finalAdmissionNumber) {
       const year = new Date().getFullYear();
@@ -167,12 +158,11 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
         .eq('is_deleted', false);
       finalAdmissionNumber = `${year}-${String((count || 0) + 1).padStart(4, '0')}`;
     } else {
-      // Check for duplicate only if admission number was provided
       const { data: existing } = await supabase
         .from('students')
         .select('student_id')
         .eq('school_id', schoolId)
-        .eq('admission_number', finalAdmissionNumber)
+        .ilike('admission_number', finalAdmissionNumber)
         .eq('is_deleted', false)
         .limit(1);
       if (existing?.length) {
@@ -180,8 +170,6 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
       }
     }
 
-    console.log('[DEBUG] Inserting student with class_name:', resolvedClassName, 'parent_name:', parentName, 'parent_phone:', parentPhone);
-    
     const { data: result, error } = await supabase
       .from('students')
       .insert({
@@ -200,7 +188,7 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
         parent_name: parentName,
         parent_phone: normalizedParentPhone,
         blood_group: bloodGroup,
-        allergies: allergies,
+        allergies,
         medical_conditions: medicalConditions,
         emergency_contact_name: emergencyContactName,
         emergency_contact_phone: emergencyContactPhone,
@@ -213,27 +201,11 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
       .single();
 
     if (error) throw error;
-    console.log('[DEBUG] Insert result:', result);
     const studentId = result.student_id;
 
-      // Auto-create portal accounts (login: admissionNumber, pass: admissionNumber)
-      try {
-        const hash = await bcrypt.hash(finalAdmissionNumber, 10);
-        const parentDisplayName = parentName?.trim() || `Parent of ${firstName} ${lastName}`;
-        // OLD: await supabase
-        // OLD:   .from('users')
-        // OLD:   .upsert({
-      // OLD:     {
-      // OLD:       school_id: schoolId,
-      // OLD:       student_id: studentId,
-      // OLD:       full_name: `${firstName} ${lastName}`,
-      // OLD:       email: admissionNumber,
-      // OLD:       password_hash: hash,
-      // OLD:       role: 'student',
-      // OLD:       status: 'active',
-      // OLD:     },
-      // OLD:     { onConflict: 'school_id,student_id' }
-      // OLD:   );
+    try {
+      const hash = await bcrypt.hash(finalAdmissionNumber, 10);
+      const parentDisplayName = parentName?.trim() || `Parent of ${firstName} ${lastName}`;
       await supabase
         .from('users')
         .insert([
@@ -258,7 +230,6 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
         ]);
     } catch { /* ignore if account already exists */ }
 
-    // Return the full new student row so frontend can update state correctly
     const { data: newRow, error: fetchError } = await supabase
       .from('students')
       .select('*')
@@ -266,9 +237,8 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
       .eq('school_id', schoolId)
       .limit(1)
       .single();
-    
+
     if (fetchError) console.log('[DEBUG] Fetch error:', fetchError);
-    console.log('[DEBUG] Returning newRow:', newRow);
 
     logActivity(req, { action: "student.create", entity: "student", entityId: studentId, description: `Student admitted: ${firstName} ${lastName}` });
     res.status(201).json(newRow);
@@ -282,29 +252,36 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
   }
 });
 
-// ─── PUT /:id — update student ────────────────────────────────────────────────
+// ─── PUT /:id ─────────────────────────────────────────────────────────────────
 router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), async (req, res, next) => {
   try {
-    console.log('[DEBUG] PUT /students/:id called with ID:', req.params.id);
-    console.log('[DEBUG] Request body:', req.body);
-    
     const { schoolId } = req.user;
     const {
-      admissionNumber, firstName, lastName, gender, className, classId,
+      firstName, lastName, gender, className, classId,
       dateOfBirth, nemisNumber, phone, parentName, parentPhone,
-      bloodGroup, allergies, medicalConditions, emergencyContactName, emergencyContactPhone, emergencyContactRelationship,
+      bloodGroup, allergies, medicalConditions,
+      emergencyContactName, emergencyContactPhone, emergencyContactRelationship,
       email, address, photoUrl, status,
-      openingBalance, openingBalanceType,
-      lunchEnabled, lunchDailyRate, lunchDays, lunchBillingType,
-      breakfastEnabled, breakfastDailyRate, breakfastDays, breakfastBillingType,
-      discountType, discountValue, discountIsPercentage,
-      transportDirection, transportBaseFee, transport_direction, transport_base_fee
     } = req.body;
 
     const normalizedDateOfBirth = normalizeDateInput(dateOfBirth);
     const normalizedPhone = normalizePhoneNumber(phone);
     const normalizedParentPhone = normalizePhoneNumber(parentPhone);
 
+    // Verify student exists and belongs to this school
+    const { data: currentStudent, error: currentError } = await supabase
+      .from('students')
+      .select('student_id, admission_number')
+      .eq('student_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (currentError || !currentStudent) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    // Resolve classId from className
     let resolvedClassId = classId || null;
     if (className && !classId) {
       try {
@@ -316,141 +293,34 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
           .maybeSingle();
         if (cls) resolvedClassId = cls.class_id;
       } catch (clsErr) {
-        // Class lookup failed, but we can still update with null class_id
-        console.log('[DEBUG] Class lookup failed for:', className, '- updating with null class_id');
+        console.log('[DEBUG] Class lookup failed for:', className);
       }
     }
 
-    const normalizedAdmissionNumber = admissionNumber ? normalizeAdmissionNumber(admissionNumber) : null;
-
-    // Check for duplicate if admission number is being changed
-    // First, get the current student's admission number
-    const { data: currentStudent, error: currentError } = await supabase
-      .from('students')
-      .select('admission_number')
-      .eq('student_id', req.params.id)
-      .eq('school_id', schoolId)
-      .eq('is_deleted', false)
-      .single();
-
-    if (currentError) {
-      console.log('[ERROR] Failed to fetch current student:', currentError);
-      return res.status(500).json({ message: "Database error fetching student" });
-    }
-
-    if (!currentStudent) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    // Only check for duplicates if admission number is being changed
-    const currentAdmissionNumber = normalizeAdmissionNumber(currentStudent.admission_number);
-    console.log('[DEBUG] Admission check:', {
-      currentAdmissionNumber,
-      normalizedAdmissionNumber,
-      areDifferent: normalizedAdmissionNumber !== currentAdmissionNumber
-    });
-    
-    if (normalizedAdmissionNumber && normalizedAdmissionNumber !== currentAdmissionNumber) {
-      console.log('[DEBUG] Checking for duplicates...');
-      const { data: existing, error: existingError } = await supabase
-        .from('students')
-        .select('student_id, admission_number')
-        .eq('school_id', schoolId)
-        .ilike('admission_number', normalizedAdmissionNumber)
-        .eq('is_deleted', false)
-        .neq('student_id', req.params.id)
-        .limit(1);
-      
-      console.log('[DEBUG] Duplicate query result:', { existing, existingError });
-      
-      if (existingError) {
-        console.log('[ERROR] Failed to check duplicate admission number:', existingError);
-        return res.status(500).json({ message: "Database error checking duplicate" });
-      }
-      
-      if (existing?.length) {
-        console.log('[DEBUG] Duplicate found:', existing);
-        return res.status(409).json({ message: `Admission number "${normalizedAdmissionNumber}" already exists` });
-      }
-    }
-
-    console.log('[DEBUG] About to update student with data:', {
-        ...(normalizedAdmissionNumber && { admission_number: normalizedAdmissionNumber }),
-        first_name: firstName,
-        last_name: lastName,
-        gender,
-        class_id: resolvedClassId,
-        class_name: className || null,
-        date_of_birth: normalizedDateOfBirth,
-        nemis_number: nemisNumber || null,
-        phone: normalizedPhone,
-        email: email || null,
-        address: address || null,
-        parent_name: parentName || null,
-        parent_phone: normalizedParentPhone,
-        blood_group: bloodGroup || null,
-        allergies: allergies || null,
-        medical_conditions: medicalConditions || null,
-        emergency_contact_name: emergencyContactName || null,
-        emergency_contact_phone: emergencyContactPhone || null,
-        emergency_contact_relationship: emergencyContactRelationship || null,
-        photo_url: photoUrl || null,
-        status: status || 'active',
-        opening_balance: openingBalance !== undefined ? parseFloat(openingBalance) || 0 : undefined,
-        opening_balance_type: openingBalanceType || 'owing',
-        lunch_enabled: lunchEnabled || false,
-        lunch_daily_rate: lunchDailyRate !== undefined ? parseFloat(lunchDailyRate) || 0 : undefined,
-        lunch_days: lunchDays !== undefined ? parseInt(lunchDays) || 66 : undefined,
-        lunch_billing_type: lunchBillingType || 'daily',
-        breakfast_enabled: breakfastEnabled || false,
-        breakfast_daily_rate: breakfastDailyRate !== undefined ? parseFloat(breakfastDailyRate) || 0 : undefined,
-        breakfast_days: breakfastDays !== undefined ? parseInt(breakfastDays) || 66 : undefined,
-        breakfast_billing_type: breakfastBillingType || 'daily',
-        discount_type: discountType || null,
-        discount_value: discountValue !== undefined ? parseFloat(discountValue) || 0 : undefined,
-        discount_is_percentage: discountIsPercentage !== undefined ? Boolean(discountIsPercentage) : true,
-      });
-
-    // Create minimal update object with only fields that definitely exist
+    // Build update object — admission number is NEVER changed from edit form
     const updateData = {
       first_name: firstName,
       last_name: lastName,
       gender,
+      class_id: resolvedClassId,
       class_name: className || null,
       date_of_birth: normalizedDateOfBirth,
+      nemis_number: nemisNumber || null,
       phone: normalizedPhone,
+      email: email || null,
+      address: address || null,
       parent_name: parentName || null,
       parent_phone: normalizedParentPhone,
+      blood_group: bloodGroup || null,
+      allergies: allergies || null,
+      medical_conditions: medicalConditions || null,
+      emergency_contact_name: emergencyContactName || null,
+      emergency_contact_phone: emergencyContactPhone || null,
+      emergency_contact_relationship: emergencyContactRelationship || null,
+      photo_url: photoUrl || null,
       status: status || 'active',
+      updated_at: new Date().toISOString(),
     };
-
-    const optionalUpdates = {};
-    if ("openingBalance" in req.body) optionalUpdates.opening_balance = parseFloat(openingBalance) || 0;
-    if ("openingBalanceType" in req.body) optionalUpdates.opening_balance_type = openingBalanceType || "owing";
-    if ("lunchEnabled" in req.body) optionalUpdates.lunch_enabled = Boolean(lunchEnabled);
-    if ("lunchDailyRate" in req.body) optionalUpdates.lunch_daily_rate = parseFloat(lunchDailyRate) || 0;
-    if ("lunchDays" in req.body) optionalUpdates.lunch_days = parseInt(lunchDays, 10) || 66;
-    if ("lunchBillingType" in req.body) optionalUpdates.lunch_billing_type = lunchBillingType || "daily";
-    if ("breakfastEnabled" in req.body) optionalUpdates.breakfast_enabled = Boolean(breakfastEnabled);
-    if ("breakfastDailyRate" in req.body) optionalUpdates.breakfast_daily_rate = parseFloat(breakfastDailyRate) || 0;
-    if ("breakfastDays" in req.body) optionalUpdates.breakfast_days = parseInt(breakfastDays, 10) || 66;
-    if ("breakfastBillingType" in req.body) optionalUpdates.breakfast_billing_type = breakfastBillingType || "daily";
-    if ("discountType" in req.body) optionalUpdates.discount_type = discountType || null;
-    if ("discountValue" in req.body) optionalUpdates.discount_value = parseFloat(discountValue) || 0;
-    if ("discountIsPercentage" in req.body) optionalUpdates.discount_is_percentage = Boolean(discountIsPercentage);
-    if ("transportDirection" in req.body || "transport_direction" in req.body) optionalUpdates.transport_direction = transportDirection || transport_direction || "none";
-    if ("transportBaseFee" in req.body || "transport_base_fee" in req.body) optionalUpdates.transport_base_fee = parseFloat(transportBaseFee ?? transport_base_fee) || 0;
-
-    Object.entries(optionalUpdates).forEach(([key, value]) => {
-      if (value !== undefined) updateData[key] = value;
-    });
-
-    // Only add admission number if it's being changed
-    if (normalizedAdmissionNumber) {
-      updateData.admission_number = normalizedAdmissionNumber;
-    }
-
-    console.log('[DEBUG] Minimal update data:', updateData);
 
     const { data: updated, error } = await supabase
       .from('students')
@@ -461,57 +331,8 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
       .select('student_id')
       .single();
 
-    console.log('[DEBUG] Update result:', { updated, error });
-
-    if (error) {
-      console.log('[ERROR] Database update error:', error);
-      // Handle duplicate constraint violation specifically
-      if (error.code === '23505' && error.message?.includes('admission_number')) {
-        return res.status(409).json({ message: `Admission number "${normalizedAdmissionNumber || admissionNumber || ""}" already exists` });
-      }
-      throw error;
-    }
+    if (error) throw error;
     if (!updated) return res.status(404).json({ message: "Student not found" });
-
-    // Update portal account emails if admission number changed
-    if (normalizedAdmissionNumber) {
-      try {
-        // First check if user accounts exist before updating
-        const { data: existingUsers } = await supabase
-          .from('users')
-          .select('user_id', 'email', 'role')
-          .eq('student_id', req.params.id)
-          .eq('school_id', schoolId);
-        
-        if (existingUsers && existingUsers.length > 0) {
-          // Update existing accounts
-          const studentAccount = existingUsers.find(u => u.role === 'student');
-          const parentAccount = existingUsers.find(u => u.role === 'parent');
-          
-          if (studentAccount) {
-            await supabase
-              .from('users')
-              .update({ 
-                email: `${normalizedAdmissionNumber.toLowerCase()}.student@portal`,
-                full_name: `${firstName} ${lastName}`
-              })
-              .eq('user_id', studentAccount.user_id);
-          }
-          
-          if (parentAccount) {
-            await supabase
-              .from('users')
-              .update({ 
-                email: `${normalizedAdmissionNumber.toLowerCase()}.parent@portal`
-              })
-              .eq('user_id', parentAccount.user_id);
-          }
-        }
-      } catch (userUpdateErr) {
-        console.log('[WARN] Failed to update portal accounts:', userUpdateErr);
-        // Don't fail the whole request if user update fails
-      }
-    }
 
     logActivity(req, { action: "student.update", entity: "student", entityId: req.params.id, description: `Student updated: ${firstName} ${lastName}` });
     res.json({ updated: true });
@@ -523,7 +344,7 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
   }
 });
 
-// ─── DELETE /:id — soft delete student ───────────────────────────────────────
+// ─── DELETE /:id ──────────────────────────────────────────────────────────────
 router.delete("/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -544,7 +365,7 @@ router.delete("/:id", requireRoles("admin", "director", "superadmin"), async (re
   } catch (err) { next(err); }
 });
 
-// ─── POST /upload-photo — upload student photo ─────────────────────────────
+// ─── POST /upload-photo ───────────────────────────────────────────────────────
 router.post("/upload-photo", requireRoles("admin", "teacher", "director", "superadmin"), upload.single('file'), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -554,12 +375,10 @@ router.post("/upload-photo", requireRoles("admin", "teacher", "director", "super
     }
 
     const { studentId } = req.body;
-
     if (!studentId) {
       return res.status(400).json({ message: "Student ID is required" });
     }
 
-    // Verify student belongs to this school
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('student_id, first_name, last_name')
@@ -577,7 +396,7 @@ router.post("/upload-photo", requireRoles("admin", "teacher", "director", "super
     const fileExt = file.originalname.split('.').pop();
     const filename = `student-photo-${studentId}-${timestamp}.${fileExt}`;
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('student-photos')
       .upload(filename, file.buffer, {
         contentType: file.mimetype,
@@ -590,7 +409,6 @@ router.post("/upload-photo", requireRoles("admin", "teacher", "director", "super
       .from('student-photos')
       .getPublicUrl(filename);
 
-    // Update student's photo_url
     const { error: updateError } = await supabase
       .from('students')
       .update({ photo_url: publicUrl })
@@ -606,40 +424,25 @@ router.post("/upload-photo", requireRoles("admin", "teacher", "director", "super
       description: `Photo uploaded for student ${student.first_name} ${student.last_name}`
     });
 
-    res.json({
-      photoUrl: publicUrl,
-      filename: filename
-    });
-
-  } catch (err) {
-    next(err);
-  }
+    res.json({ photoUrl: publicUrl, filename });
+  } catch (err) { next(err); }
 });
 
-// ─── PATCH /:id/fees — update student fees/balance ─────────────────────────
+// ─── PATCH /:id/fees ──────────────────────────────────────────────────────────
 router.patch("/:id/fees", requireRoles("admin", "finance", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const {
-      outstanding_balance,
-      transport_fee,
-      lunch_fee,
-      breakfast_fee,
-      opening_balance,
-      opening_balance_type,
-      transport_direction,
-      transport_base_fee,
-      lunch_enabled,
-      lunch_daily_rate,
-      lunch_days,
-      lunch_billing_type,
-      breakfast_enabled,
-      breakfast_daily_rate,
-      breakfast_days,
-      breakfast_billing_type
+      outstanding_balance, transport_fee, lunch_fee, breakfast_fee,
+      opening_balance, opening_balance_type,
+      transport_direction, transport_base_fee,
+      lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type,
+      breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type,
+      discount_type, discount_value, discount_is_percentage,
     } = req.body;
 
     const updateData = { updated_at: new Date().toISOString() };
+
     if (outstanding_balance !== undefined) updateData.outstanding_balance = parseFloat(outstanding_balance) || 0;
     if (transport_fee !== undefined) updateData.transport_fee = parseFloat(transport_fee) || 0;
     if (lunch_fee !== undefined) updateData.lunch_fee = parseFloat(lunch_fee) || 0;
@@ -656,6 +459,9 @@ router.patch("/:id/fees", requireRoles("admin", "finance", "director", "superadm
     if (breakfast_daily_rate !== undefined) updateData.breakfast_daily_rate = parseFloat(breakfast_daily_rate) || 0;
     if (breakfast_days !== undefined) updateData.breakfast_days = parseInt(breakfast_days, 10) || 66;
     if (breakfast_billing_type !== undefined) updateData.breakfast_billing_type = breakfast_billing_type || "daily";
+    if (discount_type !== undefined) updateData.discount_type = discount_type || null;
+    if (discount_value !== undefined) updateData.discount_value = parseFloat(discount_value) || 0;
+    if (discount_is_percentage !== undefined) updateData.discount_is_percentage = Boolean(discount_is_percentage);
 
     const { data, error } = await supabase
       .from("students")
@@ -667,6 +473,8 @@ router.patch("/:id/fees", requireRoles("admin", "finance", "director", "superadm
       .single();
 
     if (error) throw error;
+    if (!data) return res.status(404).json({ message: "Student not found" });
+
     res.json({ success: true, student_id: data.student_id });
   } catch (err) { next(err); }
 });
