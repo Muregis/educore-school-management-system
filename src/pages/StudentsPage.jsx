@@ -144,13 +144,63 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     
     try {
       if (editId) {
-        await apiFetch(`/students/${editId}`, {
-          method: "PUT",
-          body: { admissionNumber: f.admission || null, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null, openingBalance: f.opening_balance, openingBalanceType: f.opening_balance_type, transportDirection: f.transport_direction || "none", transportBaseFee: f.transport_base_fee || 0, lunchEnabled: f.lunch_enabled, lunchDailyRate: f.lunch_daily_rate, lunchDays: f.lunch_days, lunchBillingType: f.lunch_billing_type, breakfastEnabled: f.breakfast_enabled, breakfastDailyRate: f.breakfast_daily_rate, breakfastDays: f.breakfast_days, breakfastBillingType: f.breakfast_billing_type, discountType: f.discount_type || null, discountValue: f.discount_value ? Number(f.discount_value) : 0, discountIsPercentage: f.discount_is_percentage },
-          token: auth?.token,
-        });
-        setStudents(prev => prev.map(s => (s.id === editId || s.student_id === editId) ? { ...normalise(s), ...f, id: editId } : s));
-      } else {
+  // PUT — personal info only, no fee fields
+  await apiFetch(`/students/${editId}`, {
+    method: "PUT",
+    body: {
+      admissionNumber: f.admission || null,
+      firstName: f.firstName,
+      lastName: f.lastName,
+      gender: f.gender,
+      className: f.className || null,
+      classId: null,
+      dateOfBirth: f.dob || null,
+      nemisNumber: f.nemisNumber || null,
+      bloodGroup: f.bloodGroup || null,
+      allergies: f.allergies || null,
+      medicalConditions: f.medicalConditions || null,
+      emergencyContactName: f.emergencyContactName || null,
+      emergencyContactPhone: f.emergencyContactPhone || null,
+      emergencyContactRelationship: f.emergencyContactRelationship || null,
+      phone: f.parentPhone || null,
+      email: null,
+      address: null,
+      photoUrl: f.photoUrl || null,
+      status: f.status,
+      parentName: f.parentName || null,
+      parentPhone: f.parentPhone || null,
+    },
+    token: auth?.token,
+  });
+
+  // PATCH — fee/balance fields separately, no admission number
+  await apiFetch(`/students/${editId}/fees`, {
+    method: "PATCH",
+    body: {
+      opening_balance: f.opening_balance || 0,
+      opening_balance_type: f.opening_balance_type || "owing",
+      transport_direction: f.transport_direction || "none",
+      transport_base_fee: f.transport_base_fee || 0,
+      lunch_enabled: f.lunch_enabled || false,
+      lunch_daily_rate: f.lunch_daily_rate || 0,
+      lunch_days: f.lunch_days || 66,
+      lunch_billing_type: f.lunch_billing_type || "daily",
+      breakfast_enabled: f.breakfast_enabled || false,
+      breakfast_daily_rate: f.breakfast_daily_rate || 0,
+      breakfast_days: f.breakfast_days || 66,
+      breakfast_billing_type: f.breakfast_billing_type || "daily",
+      discount_type: f.discount_type || null,
+      discount_value: f.discount_value ? Number(f.discount_value) : 0,
+      discount_is_percentage: f.discount_is_percentage,
+    },
+    token: auth?.token,
+  });
+
+  setStudents(prev => prev.map(s =>
+    (s.id === editId || s.student_id === editId)
+      ? { ...normalise(s), ...f, id: editId }
+      : s
+  )); else {
         const res = await apiFetch(`/students`, {
           method: "POST",
           body: { admissionNumber: f.admission || `ADM-${Date.now()}`, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
