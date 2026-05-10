@@ -219,25 +219,42 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   } catch (feeErr) {
     console.error('PATCH /fees failed:', feeErr);
     toast('Warning: Basic info saved but fee settings failed: ' + feeErr.message, 'warning');
+    // Still update local state with basic info but don't refresh full list
+    setStudents(prev => prev.map(s =>
+      (s.id === editId || s.student_id === editId)
+        ? { ...normalise(s), ...f, id: editId }
+        : s
+    ));
+    setShow(false);
+    return;
   }
 
+  // Only update local state and show success if both PUT and PATCH succeeded
   setStudents(prev => prev.map(s =>
     (s.id === editId || s.student_id === editId)
       ? { ...normalise(s), ...f, id: editId }
       : s
-  )); else {
+  ));
+  
+  // Refresh full list to ensure we have latest data from backend
+  apiFetch("/students", { token: auth.token })
+    .then(data => setStudents(data.map(normalise)))
+    .catch(() => {});
+  setShow(false);
+  toast("Student saved", "success"); else {
         const res = await apiFetch(`/students`, {
           method: "POST",
           body: { admissionNumber: f.admission || `ADM-${Date.now()}`, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
           token: auth?.token,
         });
         setStudents(prev => [...prev, normalise(res)]);
-      }
-      apiFetch("/students", { token: auth.token })
-        .then(data => setStudents(data.map(normalise)))
-        .catch(() => {});
-      setShow(false);
-      toast("Student saved", "success");
+        
+        // Refresh full list for new student
+        apiFetch("/students", { token: auth.token })
+          .then(data => setStudents(data.map(normalise)))
+          .catch(() => {});
+        setShow(false);
+        toast("Student saved", "success");
     } catch (err) {
       // Handle duplicate admission number error specifically
       if (err.message?.includes("Admission number already exists") || 

@@ -118,11 +118,64 @@ export default function LoginView({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [manualSchool, setManualSchool] = useState(() => Boolean(getInitialSchoolId()));
 
-  // Clear form fields on component mount to prevent credential persistence
+  // Clear form fields on component mount and add multiple layers of credential prevention
   useEffect(() => {
     setEmail("");
     setPassword("");
     setAdmission("");
+    
+    // Clear any stored credentials aggressively
+    if (typeof window !== "undefined") {
+      // Clear localStorage items that might contain credentials
+      localStorage.removeItem('educore.auth');
+      localStorage.removeItem('educore.remember');
+      localStorage.removeItem('educore.activeSchool');
+      
+      // Clear sessionStorage
+      sessionStorage.clear();
+      
+      // Clear any form data that browser might have stored
+      const forms = document.querySelectorAll('form');
+      forms.forEach(form => form.reset());
+      
+      // Clear autocomplete values aggressively
+      const inputs = document.querySelectorAll('input[type="email"], input[type="password"]');
+      inputs.forEach(input => {
+        input.value = '';
+        input.autocomplete = 'off';
+      });
+    }
+  }, []);
+  
+  // Generate random form field names to prevent browser recognition
+  const [randomFieldSuffix] = useState(() => Math.random().toString(36).substring(2, 15));
+
+  // Additional cleanup that runs whenever page becomes visible/active
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Clear credentials when page becomes visible again
+        setEmail("");
+        setPassword("");
+        setAdmission("");
+        
+        // Clear any autofilled values
+        setTimeout(() => {
+          const inputs = document.querySelectorAll('input[type="email"], input[type="password"], input[type="text"]');
+          inputs.forEach(input => {
+            if (input.value && (input.type === 'password' || input.type === 'email')) {
+              input.value = '';
+            }
+          });
+        }, 100);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const activeIdentifier = mode === "staff" ? email : admission;
@@ -377,22 +430,46 @@ export default function LoginView({ onLogin }) {
               ) : null}
 
               {mode === "staff" ? (
-                <form onSubmit={submitStaff} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <form onSubmit={submitStaff} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
                   <label style={labelStyle}>
                     <span style={labelTextStyle}>Email address</span>
-                    <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="new-password" placeholder="you@school.ac.ke" style={fieldStyle} />
+                    <input 
+                      value={email} 
+                      onChange={(e) => setEmail(e.target.value)} 
+                      type="email" 
+                      autoComplete="off" 
+                      name={`email_${randomFieldSuffix}`}
+                      readOnly={false}
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      placeholder="you@school.ac.ke" 
+                      style={fieldStyle} 
+                    />
                   </label>
                   <label style={labelStyle}>
                     <span style={labelTextStyle}>Password</span>
                     <div style={{ position: "relative" }}>
-                      <input value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="Enter password" style={{ ...fieldStyle, paddingRight: 52 }} />
+                      <input 
+                        value={password} 
+                        onChange={(e) => setPassword(e.target.value)} 
+                        type={showPassword ? "text" : "password"} 
+                        autoComplete="off" 
+                        name={`password_staff_${randomFieldSuffix}`}
+                        readOnly={false}
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        placeholder="Enter password" 
+                        style={{ ...fieldStyle, paddingRight: 52 }} 
+                      />
                       <button type="button" onClick={() => setShowPassword(prev => !prev)} style={toggleButtonStyle}>{showPassword ? "Hide" : "Show"}</button>
                     </div>
                   </label>
                   <SubmitButton loading={loading} text="Sign In" />
                 </form>
               ) : (
-                <form onSubmit={submitPortal} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <form onSubmit={submitPortal} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                     {[
                       { id: "parent", label: "Parent" },
@@ -421,12 +498,35 @@ export default function LoginView({ onLogin }) {
                   </div>
                   <label style={labelStyle}>
                     <span style={labelTextStyle}>Admission number</span>
-                    <input value={admission} onChange={(e) => setAdmission(e.target.value)} autoComplete="new-password" placeholder="e.g. ADM-2020-001" style={fieldStyle} />
+                    <input 
+                      value={admission} 
+                      onChange={(e) => setAdmission(e.target.value)} 
+                      autoComplete="off" 
+                      name={`admission_${randomFieldSuffix}`}
+                      readOnly={false}
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      placeholder="e.g. ADM-2020-001" 
+                      style={fieldStyle} 
+                    />
                   </label>
                   <label style={labelStyle}>
                     <span style={labelTextStyle}>Password</span>
                     <div style={{ position: "relative" }}>
-                      <input value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="Enter password" style={{ ...fieldStyle, paddingRight: 52 }} />
+                      <input 
+                        value={password} 
+                        onChange={(e) => setPassword(e.target.value)} 
+                        type={showPassword ? "text" : "password"} 
+                        autoComplete="off" 
+                        name={`password_portal_${randomFieldSuffix}`}
+                        readOnly={false}
+                        spellCheck={false}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        placeholder="Enter password" 
+                        style={{ ...fieldStyle, paddingRight: 52 }} 
+                      />
                       <button type="button" onClick={() => setShowPassword(prev => !prev)} style={toggleButtonStyle}>{showPassword ? "Hide" : "Show"}</button>
                     </div>
                   </label>

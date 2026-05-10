@@ -109,5 +109,40 @@ export function logout() {
   }
 
   clearSession();
+  
+  // Aggressive credential clearing on logout
+  if (typeof window !== "undefined") {
+    // Clear additional localStorage items that might contain credentials
+    localStorage.removeItem('educore.auth');
+    localStorage.removeItem('educore.remember');
+    localStorage.removeItem('educore.activeSchool');
+    localStorage.removeItem('educore.session');
+    localStorage.removeItem('educore.legacy.auth');
+    localStorage.removeItem('token');
+    
+    // Clear all sessionStorage
+    sessionStorage.clear();
+    
+    // Clear any form data that browser might have stored
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => form.reset());
+    
+    // Clear autocomplete values aggressively
+    const inputs = document.querySelectorAll('input[type="email"], input[type="password"], input[type="text"]');
+    inputs.forEach(input => {
+      input.value = '';
+      input.autocomplete = 'off';
+    });
+    
+    // Try to clear browser's password manager suggestions
+    try {
+      if (navigator.credentials && navigator.credentials.preventSilentAccess) {
+        navigator.credentials.preventSilentAccess();
+      }
+    } catch (e) {
+      // Ignore if credentials API is not available
+    }
+  }
+  
   window.location.href = "/login";
 }
