@@ -107,21 +107,15 @@ router.get("/my-branches", authRequired, async (req, res) => {
     }
     
 // Director sees only their own school + its branches
-if (role === "director" || role === "superadmin") {
-  const { schoolId } = req.user;
+if (role === "director") {
+  const { school_id } = req.user;
 
-  // Get only their school, not all schools
-  const { data: schoolData, error } = await supabase
-    .from("schools")
-    .select("school_id, name, code, is_branch, parent_school_id, branch_code, email, phone, address, county, subscription_status")
-    .eq("school_id", schoolId)
-    .eq("is_deleted", false)
-    .maybeSingle();
-
-  if (error) throw error;
+  if (!school_id) {
+    return res.status(400).json({ error: "Director must have a school context" });
+  }
 
   // Get branches for their school only
-  const schoolWithBranches = await getSchoolWithBranches(schoolId);
+  const schoolWithBranches = await getSchoolWithBranches(school_id);
   
   if (!schoolWithBranches) {
     return res.status(404).json({ error: "School not found" });
@@ -135,6 +129,43 @@ if (role === "director" || role === "superadmin") {
     parent_school: schoolWithBranches.parent_school || null,
     sibling_branches: schoolWithBranches.sibling_branches || []
   });
+}
+
+// Superadmin can see all schools (for admin purposes)
+if (role === "superadmin") {
+  const { school_id } = req.user;
+  
+  // If superadmin has a school context, show that school + branches
+  if (school_id) {
+    const schoolWithBranches = await getSchoolWithBranches(school_id);
+    if (!schoolWithBranches) {
+      return res.status(404).json({ error: "School not found" });
+    }
+
+    return res.json({
+      role: role,
+      school: schoolWithBranches,
+      branches: schoolWithBranches.branches || [],
+      is_branch: schoolWithBranches.is_branch,
+      parent_school: schoolWithBranches.parent_school || null,
+      sibling_branches: schoolWithBranches.sibling_branches || []
+    });
+  } else {
+    // Superadmin without context gets a list of all schools to choose from
+    const { data: allSchools, error } = await supabase
+      .from("schools")
+      .select("school_id, name, code, is_branch, parent_school_id, branch_code")
+      .eq("is_deleted", false)
+      .order("name", { ascending: true });
+
+    if (error) throw error;
+
+    return res.json({
+      role: role,
+      allSchools: allSchools || [],
+      canManageAll: true
+    });
+  }
 }
     // Regular users need school context
     if (!school_id) {
@@ -177,8 +208,25 @@ router.get("/:schoolId", authRequired, async (req, res) => {
       return res.status(403).json({ error: "Unauthorized" });
     }
     
-    // Superadmin and director can view any school
-    if (role === "superadmin" || role === "director") {
+    // Superadmin can view any school, but director only their accessible schools
+    if (role === "superadmin") {
+      const schoolWithBranches = await getSchoolWithBranches(Number(schoolId));
+      if (!schoolWithBranches) {
+        return res.status(404).json({ error: "School not found" });
+      }
+      return res.json(schoolWithBranches);
+    }
+    
+    if (role === "director") {
+      // Director can only view schools in their accessible list
+      const accessibleIds = await getAccessibleSchoolIds(user_id, userSchoolId);
+      if (!accessibleIds.includes(Number(schoolId))) {
+        return res.status(403).json({ 
+          error: "You don't have access to this school",
+          accessibleSchools: accessibleIds
+        });
+      }
+      
       const schoolWithBranches = await getSchoolWithBranches(Number(schoolId));
       if (!schoolWithBranches) {
         return res.status(404).json({ error: "School not found" });
@@ -334,14 +382,19 @@ router.put("/switch/:branchId", authRequired, async (req, res) => {
       });
     }
     
-    // Get accessible schools. Directors/superadmins may not have a current school
-    // in their token, so the service resolves their full school list from user role.
+    // Get accessible schools based on user role and current context
     const accessibleIds = await getAccessibleSchoolIds(user_id, currentSchoolId);
     
     if (!accessibleIds.includes(targetSchoolId)) {
       return res.status(403).json({ 
-        error: "You don't have access to this branch",
-        accessibleBranches: accessibleIds
+        error: "You don't have access to this school",
+        accessibleBranches: accessibleIds,
+        debug: {
+          userRole: role,
+          currentSchoolId,
+          targetSchoolId,
+          accessibleIds
+        }
       });
     }
     

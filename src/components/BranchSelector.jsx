@@ -127,7 +127,7 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
     return null;
   }
 
-  if (branches.length === 0 && !isDirector && !allSchools.length) {
+  if (branches.length === 0 && !isDirector && !currentBranch) {
     return null;
   }
 
@@ -165,10 +165,9 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
     setIsOpen(false);
   };
 
-  const currentSchoolName = isDirector && allSchools.length > 0
-    ? (allSchools.find(s => s.school_id === currentSchoolId)?.name || "All Schools")
-    : isDirector && currentBranch
-    ? currentBranch.name
+  const currentSchoolName = isDirector && currentBranch
+    ? (currentBranch.school_id === currentSchoolId ? currentBranch.name : 
+       branches.find(b => b.school_id === currentSchoolId)?.name || currentBranch.name)
     : formatBranchName(currentBranch);
 
   return (
@@ -258,20 +257,20 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
 
             <div style={{ maxHeight: 320, overflowY: "auto" }}>
               {isDirector ? (
-                branches.map((branch) => {
-                  const isActive = currentSchoolId === branch.school_id;
-                  return (
+                <>
+                  {/* Show main school first */}
+                  {currentBranch && (
                     <button
-                      key={school.school_id}
+                      key={currentBranch.school_id}
                       className="school-list-item"
-                      onClick={() => handleSwitch(school.school_id)}
+                      onClick={() => handleSwitch(currentBranch.school_id)}
                       style={{
                         width: "100%",
                         textAlign: "left",
                         padding: "12px 16px",
-                        background: isActive ? "var(--color-primary-muted)" : "transparent",
+                        background: currentSchoolId === currentBranch.school_id ? "var(--color-primary-muted)" : "transparent",
                         border: "none",
-                        borderLeft: `4px solid ${isActive ? "var(--color-primary)" : "transparent"}`,
+                        borderLeft: `4px solid ${currentSchoolId === currentBranch.school_id ? "var(--color-primary)" : "transparent"}`,
                         color: "var(--color-text-primary)",
                         cursor: "pointer",
                         transition: "all var(--transition-fast)",
@@ -279,38 +278,91 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
                         fontWeight: 500
                       }}
                       onMouseEnter={(e) => {
-                        if (!isActive) {
+                        if (currentSchoolId !== currentBranch.school_id) {
                           e.currentTarget.style.background = "var(--color-bg-hover)";
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (!isActive) {
+                        if (currentSchoolId !== currentBranch.school_id) {
                           e.currentTarget.style.background = "transparent";
                         }
                       }}
                     >
                       <div style={{ fontWeight: 600, fontSize: 14 }}>
-                        {school.name}
-                        {isActive && (
+                        {currentBranch.name}
+                        {currentSchoolId === currentBranch.school_id && (
                           <span style={{ float: "right", color: "var(--color-primary)", fontWeight: 800 }}>✓</span>
                         )}
-                        {school.is_branch && (
-                          <span style={{
-                            marginLeft: 8,
-                            fontSize: 10,
-                            background: "var(--color-border)",
-                            padding: "2px 6px",
-                            borderRadius: 4,
-                            color: "var(--color-text-muted)"
-                          }}>Branch</span>
-                        )}
+                        <span style={{
+                          marginLeft: 8,
+                          fontSize: 10,
+                          background: "var(--color-primary)",
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          color: "white"
+                        }}>Main</span>
                       </div>
                       <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>
-                        ID: {school.school_id} {school.branch_code && ` • ${school.branch_code}`}
+                        ID: {currentBranch.school_id} {currentBranch.code && ` • ${currentBranch.code}`}
                       </div>
                     </button>
-                  );
-                })
+                  )}
+                  
+                  {/* Show branches */}
+                  {branches.map((branch) => {
+                    const isActive = currentSchoolId === branch.school_id;
+                    return (
+                      <button
+                        key={branch.school_id}
+                        className="school-list-item"
+                        onClick={() => handleSwitch(branch.school_id)}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "12px 16px",
+                          background: isActive ? "var(--color-primary-muted)" : "transparent",
+                          border: "none",
+                          borderLeft: `4px solid ${isActive ? "var(--color-primary)" : "transparent"}`,
+                          color: "var(--color-text-primary)",
+                          cursor: "pointer",
+                          transition: "all var(--transition-fast)",
+                          fontSize: "14px",
+                          fontWeight: 500
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = "var(--color-bg-hover)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = "transparent";
+                          }
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>
+                          {branch.name}
+                          {isActive && (
+                            <span style={{ float: "right", color: "var(--color-primary)", fontWeight: 800 }}>✓</span>
+                          )}
+                          {branch.is_branch && (
+                            <span style={{
+                              marginLeft: 8,
+                              fontSize: 10,
+                              background: "var(--color-border)",
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                              color: "var(--color-text-muted)"
+                            }}>Branch</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>
+                          ID: {branch.school_id} {branch.branch_code && ` • ${branch.branch_code}`}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </>
               ) : (
                 <>
                   {parentSchool && (

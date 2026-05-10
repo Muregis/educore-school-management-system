@@ -80,9 +80,20 @@ export async function canAccessBranches(userId, schoolId) {
   
   if (error || !user) return false;
   
-  // Director/Superadmin can access ALL schools
-  if (user.role === "director" || user.role === "superadmin") {
+  // Superadmin can access ALL schools, Director only their own school branches
+  if (user.role === "superadmin") {
     return true;
+  }
+  
+  if (user.role === "director") {
+    // Director can access branches if their school has branches or is a branch
+    const schoolWithBranches = await getSchoolWithBranches(schoolId);
+    if (!schoolWithBranches) return false;
+    
+    const hasBranches = (schoolWithBranches.branches?.length > 0) || 
+                        (schoolWithBranches.parent_school_id);
+    
+    return hasBranches;
   }
   
   // Admin, finance can access their school's branches
@@ -116,8 +127,8 @@ export async function getAccessibleSchoolIds(userId, schoolId) {
   
   if (error || !user) return schoolId ? [schoolId] : [];
   
-  // Director/Superadmin can access ALL schools
-  if (user.role === "director" || user.role === "superadmin") {
+  // Superadmin can access ALL schools, but Director only their own school + branches
+  if (user.role === "superadmin") {
     const { data: allSchools, error: schoolsError } = await supabase
       .from("schools")
       .select("school_id")
@@ -125,6 +136,27 @@ export async function getAccessibleSchoolIds(userId, schoolId) {
     
     if (schoolsError) return schoolId ? [schoolId] : [];
     return allSchools?.map(s => s.school_id) || (schoolId ? [schoolId] : []);
+  }
+  
+  // Director can only access their own school and its branches
+  if (user.role === "director") {
+    if (!schoolId) return []; // Director must have a school context
+    
+    const school = await getSchoolWithBranches(schoolId);
+    if (!school) return [schoolId];
+    
+    const ids = [schoolId];
+    
+    if (school.is_branch && school.parent_school_id) {
+      // If director is at a branch, include parent and sibling branches
+      ids.push(school.parent_school_id);
+      school.sibling_branches?.forEach(b => ids.push(b.school_id));
+    } else if (school.branches?.length > 0) {
+      // If director is at main school, include all branches
+      school.branches.forEach(b => ids.push(b.school_id));
+    }
+    
+    return [...new Set(ids)]; // Remove duplicates
   }
 
   if (!schoolId) return [];
