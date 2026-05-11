@@ -116,34 +116,54 @@ async function resolveSchoolCandidates({ loginId, role = "staff" }) {
   const trimmedLoginId = String(loginId).trim();
   let schools = [];
 
-  if (role === "staff") {
-    const { data: users, error } = await supabase
-      .from("users")
-      .select("school_id, schools:school_id(school_id, name, code, email, phone, address, county, country)")
-      .ilike("email", trimmedLoginId)
-      .eq("is_deleted", false);
-    if (error) throw error;
-    schools = users?.map(user => user.schools).filter(Boolean) || [];
-  } else {
-    const { data: students, error } = await supabase
-      .from("students")
-      .select("school_id, schools:school_id(school_id, name, code, email, phone, address, county, country)")
-      .ilike("admission_number", trimmedLoginId)
-      .eq("is_deleted", false);
-    if (error) throw error;
-    schools = students?.map(student => student.schools).filter(Boolean) || [];
-  }
-
-  const uniqueSchools = [];
-  const seen = new Set();
-  for (const school of schools) {
-    if (school?.school_id && !seen.has(school.school_id)) {
-      seen.add(school.school_id);
-      uniqueSchools.push(await buildSchoolBranding(school));
+  try {
+    if (role === "staff") {
+      const { data: users, error } = await supabase
+        .from("users")
+        .select("school_id, schools:school_id(school_id, name, code, email, phone, address, county, country)")
+        .ilike("email", trimmedLoginId)
+        .eq("is_deleted", false);
+      if (error) throw error;
+      schools = users?.map(user => user.schools).filter(Boolean) || [];
+    } else {
+      const { data: students, error } = await supabase
+        .from("students")
+        .select("school_id, schools:school_id(school_id, name, code, email, phone, address, county, country)")
+        .ilike("admission_number", trimmedLoginId)
+        .eq("is_deleted", false);
+      if (error) throw error;
+      schools = students?.map(student => student.schools).filter(Boolean) || [];
     }
-  }
 
-  return uniqueSchools;
+    const uniqueSchools = [];
+    const seen = new Set();
+    for (const school of schools) {
+      if (school?.school_id && !seen.has(school.school_id)) {
+        seen.add(school.school_id);
+        try {
+          const schoolBranding = await buildSchoolBranding(school);
+          uniqueSchools.push(schoolBranding);
+        } catch (brandingError) {
+          console.error("Failed to build school branding:", brandingError);
+          // Still add the school even if branding fails
+          uniqueSchools.push({
+            school_id: school.school_id,
+            name: school.name || "Unknown School",
+            tagline: DEFAULT_SCHOOL_BRANDING.tagline,
+            location: DEFAULT_SCHOOL_BRANDING.location,
+            primary_color: DEFAULT_SCHOOL_BRANDING.primary_color,
+            secondary_color: DEFAULT_SCHOOL_BRANDING.secondary_color,
+            notFound: false,
+          });
+        }
+      }
+    }
+
+    return uniqueSchools;
+  } catch (error) {
+    console.error("Error resolving school candidates:", error);
+    return [];
+  }
 }
 
 router.get("/lookup-school", authRateLimit, async (req, res) => {
@@ -163,44 +183,73 @@ router.get("/resolve-school", authRateLimit, async (req, res) => {
     const { hostname = "", loginId = "", selectedSchoolId = "", role = "staff" } = req.query;
     const numericSchoolId = selectedSchoolId ? Number(selectedSchoolId) : null;
 
+    // Validate selected school ID if provided
     if (numericSchoolId && !Number.isNaN(numericSchoolId) && loginId) {
-      // Validate that the user actually belongs to the selected school
-      const userSchools = await resolveSchoolCandidates({ loginId, role });
-      const userSchoolIds = userSchools.map(school => school.school_id);
-      
-      if (userSchoolIds.includes(numericSchoolId)) {
-        const matchedSchool = await findSchoolById(numericSchoolId);
-        if (matchedSchool) return res.json(await buildSchoolBranding(matchedSchool));
+      try {
+        // Validate that the user actually belongs to the selected school
+        const userSchools = await resolveSchoolCandidates({ loginId, role });
+        const userSchoolIds = userSchools.map(school => school.school_id);
+        
+        if (userSchoolIds.includes(numericSchoolId)) {
+          const matchedSchool = await findSchoolById(numericSchoolId);
+          if (matchedSchool) {
+            return res.json(await buildSchoolBranding(matchedSchool));
+          }
+        }
+      } catch (validationError) {
+        console.error("Error validating school selection:", validationError);
+        // Continue with normal flow if validation fails
       }
-      // If user doesn't belong to selected school, continue with normal flow
     }
 
+    // Try subdomain-based resolution first
     const subdomain = getHostSubdomain(hostname);
     if (subdomain) {
-      const { data: schools, error } = await supabase
-        .from("schools")
-        .select("school_id, name, code, email, phone, address, county, country")
-        .eq("is_deleted", false);
-      if (error) throw error;
+      try {
+        const { data: schools, error } = await supabase
+          .from("schools")
+          .select("school_id, name, code, email, phone, address, county, country")
+          .eq("is_deleted", false);
+        if (error) throw error;
 
-      const matchedSchool = (schools || []).find(school =>
-        String(school.code || "").toLowerCase() === subdomain ||
-        slugifySchoolName(school.name) === subdomain
-      );
+        const matchedSchool = (schools || []).find(school =>
+          String(school.code || "").toLowerCase() === subdomain ||
+          slugifySchoolName(school.name) === subdomain
+        );
 
-      if (matchedSchool) {
-        return res.json(await buildSchoolBranding(matchedSchool));
+        if (matchedSchool) {
+          return res.json(await buildSchoolBranding(matchedSchool));
+        }
+      } catch (subdomainError) {
+        console.error("Error resolving school by subdomain:", subdomainError);
+        // Continue with other resolution methods
       }
     }
 
+    // Try login-based resolution
     if (loginId) {
-      const schools = await resolveSchoolCandidates({ loginId, role });
-      if (schools.length === 1) return res.json(schools[0]);
-      if (schools.length > 1) return res.json({ ...DEFAULT_SCHOOL_BRANDING, schoolOptions: schools, ambiguous: true });
+      try {
+        const schools = await resolveSchoolCandidates({ loginId, role });
+        if (schools.length === 1) {
+          return res.json(schools[0]);
+        }
+        if (schools.length > 1) {
+          return res.json({ 
+            ...DEFAULT_SCHOOL_BRANDING, 
+            schoolOptions: schools, 
+            ambiguous: true 
+          });
+        }
+      } catch (loginError) {
+        console.error("Error resolving schools by login:", loginError);
+        // Continue to default response
+      }
     }
 
+    // Return default branding if no school found
     return res.json({ ...DEFAULT_SCHOOL_BRANDING });
-  } catch (_err) {
+  } catch (error) {
+    console.error("Error in resolve-school endpoint:", error);
     return res.status(500).json({ message: "Error resolving school branding" });
   }
 });
@@ -242,8 +291,18 @@ router.post("/login", authRateLimit, async (req, res, next) => {
   try {
     const { email, password, schoolId } = req.body;
     logTenantContext("auth.login.request", req, { email, schoolId });
+    
+    // Enhanced validation
     if (!email || !password) {
-      return res.status(400).json({ message: "email and password are required" });
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+    
+    if (!email.includes('@') || email.length < 5) {
+      return res.status(400).json({ message: "Valid email address is required" });
+    }
+    
+    if (password.length < 1) {
+      return res.status(400).json({ message: "Password is required" });
     }
 
     const trimmedEmail = email.trim().toLowerCase();
@@ -272,7 +331,7 @@ router.post("/login", authRateLimit, async (req, res, next) => {
       return res.json({
         token,
         sessionId,
-        supabaseToken: null, // Superadmin doesn't need Supabase token
+        supabaseToken: null,
         user: { 
           userId: "superadmin", 
           schoolId: null, 
@@ -285,14 +344,14 @@ router.post("/login", authRateLimit, async (req, res, next) => {
 
     let normalizedSchoolId = schoolId != null && schoolId !== "" ? Number(schoolId) : null;
     if (normalizedSchoolId != null && Number.isNaN(normalizedSchoolId)) {
-      return res.status(400).json({ message: "schoolId must be numeric when provided" });
+      return res.status(400).json({ message: "School ID must be numeric when provided" });
     }
 
     if (normalizedSchoolId == null) {
       const { data: candidates, error } = await supabase
         .from("users")
         .select("school_id")
-        .ilike("email", email.trim())
+        .ilike("email", trimmedEmail)
         .eq("is_deleted", false);
       logTenantQuery("auth.login.school_lookup", { table: "users", email, schoolId: null });
       if (error) throw error;
@@ -302,19 +361,23 @@ router.post("/login", authRateLimit, async (req, res, next) => {
         return res.status(404).json({ message: "We couldn't find your school for that email. Please enter the school ID or contact admin." });
       }
       if (unique.length > 1) {
-        return res.status(400).json({ message: "Multiple schools matched this email. Please choose your school ID to continue.", schoolOptions: unique });
+        return res.status(400).json({ 
+          message: "Multiple schools matched this email. Please choose your school ID to continue.", 
+          schoolOptions: unique 
+        });
       }
       normalizedSchoolId = unique[0];
     }
 
     const authResult = await authLogin(email, password, normalizedSchoolId);
     if (!authResult) {
-      logAuthFailure(req, { email, reason: "User not found", schoolId });
+      logAuthFailure(req, { email, reason: "User not found or invalid credentials", schoolId: normalizedSchoolId });
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const { user } = authResult;
     if (user.status !== "active") {
+      logAuthFailure(req, { email, reason: "Account inactive", schoolId: normalizedSchoolId });
       return res.status(403).json({ message: "Account inactive" });
     }
 
@@ -330,12 +393,16 @@ router.post("/login", authRateLimit, async (req, res, next) => {
       console.error("Failed to generate Supabase JWT:", error.message);
     }
 
-    // NEW: Fetch school with branch info
-    const { data: schoolData } = await supabase
+    // Fetch school with branch info
+    const { data: schoolData, error: schoolError } = await supabase
       .from("schools")
       .select("plan, plan_expires_at, is_branch, parent_school_id, branch_code")
       .eq("school_id", normalizedSchoolId)
       .single();
+      
+    if (schoolError && schoolError.code !== 'PGRST116') {
+      console.error("School data fetch error:", schoolError);
+    }
 
     let schoolPlan = schoolData?.plan || "starter";
 
@@ -344,10 +411,14 @@ router.post("/login", authRateLimit, async (req, res, next) => {
       const expiresAt = new Date(schoolData.plan_expires_at);
       const now = new Date();
       if (expiresAt < now && schoolPlan !== 'starter') {
-        await supabase
-          .from('schools')
-          .update({ plan: 'starter' })
-          .eq('school_id', normalizedSchoolId);
+        try {
+          await supabase
+            .from('schools')
+            .update({ plan: 'starter' })
+            .eq('school_id', normalizedSchoolId);
+        } catch (updateError) {
+          console.error("Failed to update expired plan:", updateError);
+        }
         schoolPlan = 'starter';
       }
     }
@@ -356,7 +427,7 @@ router.post("/login", authRateLimit, async (req, res, next) => {
     logActivity(req, { action: "auth.login", description: `${role} login: ${name}` });
     const sessionId = await createUserSession(req, user.user_id);
 
-    // Hide branch info from parents/students - they see unified school
+    // Hide branch info from parents/students
     const isParentOrStudent = role === "parent" || role === "student";
     
     res.json({
@@ -370,13 +441,13 @@ router.post("/login", authRateLimit, async (req, res, next) => {
         name, 
         email: user.email, 
         plan: schoolPlan,
-        // Branch info: HIDDEN from parents, visible to staff
         isBranch: isParentOrStudent ? false : (schoolData?.is_branch || false),
         parentSchoolId: isParentOrStudent ? null : (schoolData?.parent_school_id || null),
         branchCode: isParentOrStudent ? null : (schoolData?.branch_code || null)
       },
     });
   } catch (err) {
+    console.error("Login error:", err);
     next(err);
   }
 });
@@ -385,8 +456,22 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
   try {
     const { admissionNumber, password, schoolId = null, schoolCode: providedSchoolCode = null, role = "parent" } = req.body;
     logTenantContext("auth.portal_login.request", req, { admissionNumber, schoolId, schoolCode: providedSchoolCode, role });
+    
+    // Enhanced validation
     if (!admissionNumber || !password) {
-      return res.status(400).json({ message: "admissionNumber and password are required" });
+      return res.status(400).json({ message: "Admission number and password are required" });
+    }
+    
+    if (admissionNumber.trim().length < 2) {
+      return res.status(400).json({ message: "Valid admission number is required" });
+    }
+    
+    if (password.length < 1) {
+      return res.status(400).json({ message: "Password is required" });
+    }
+    
+    if (!["parent", "student"].includes(role)) {
+      return res.status(400).json({ message: "Role must be either 'parent' or 'student'" });
     }
 
     const trimmedAdmissionNumber = admissionNumber.trim().toLowerCase();
@@ -412,21 +497,26 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       }
     }
     
+    if (normalizedSchoolId != null && Number.isNaN(normalizedSchoolId)) {
+      return res.status(400).json({ message: "School ID must be numeric when provided" });
+    }
+
     // Fetch school code for unique portal account naming
     let schoolCode = providedSchoolCode;
     if (normalizedSchoolId && !schoolCode) {
-      const { data: schoolData } = await supabase
+      const { data: schoolData, error: schoolError } = await supabase
         .from("schools")
         .select("code")
         .eq("school_id", normalizedSchoolId)
         .single();
+      
+      if (schoolError && schoolError.code !== 'PGRST116') {
+        console.error("School code fetch error:", schoolError);
+      }
       schoolCode = schoolData?.code;
     }
-    if (normalizedSchoolId != null && Number.isNaN(normalizedSchoolId)) {
-      return res.status(400).json({ message: "schoolId must be numeric when provided" });
-    }
-
-    // Build portal email with school code for uniqueness: adm001.schoolcode.parent@portal
+    
+    // Build portal email with school code for uniqueness
     const portalEmail = schoolCode 
       ? `${trimmedAdmissionNumber.toLowerCase()}.${schoolCode.toLowerCase()}.${role}@portal`
       : `${trimmedAdmissionNumber.toLowerCase()}.${role}@portal`;
@@ -446,6 +536,7 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       admissionNumber: trimmedAdmissionNumber,
       schoolId: normalizedSchoolId,
     });
+    
     const { data: matchedStudents, error: studentLookupError } = await studentLookup;
     if (studentLookupError) throw studentLookupError;
 
@@ -471,11 +562,13 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       .eq("student_id", student.student_id)
       .eq("is_deleted", false)
       .limit(10);
+      
     logTenantQuery("auth.portal_login.user_lookup", {
       table: "users",
       schoolId: resolvedSchoolId,
       studentId: student.student_id,
     });
+    
     if (userError) throw userError;
 
     let user = (matchedUsers || []).find(candidate =>
@@ -517,11 +610,15 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
             : await bcrypt.hash(password, 10);
 
         // Fetch school code for unique email
-        const { data: schoolData } = await supabase
+        const { data: schoolData, error: schoolCodeError } = await supabase
           .from("schools")
           .select("code")
           .eq("school_id", student.school_id)
           .single();
+          
+        if (schoolCodeError && schoolCodeError.code !== 'PGRST116') {
+          console.error("School code fetch error for parent bootstrap:", schoolCodeError);
+        }
         const sc = schoolData?.code?.toLowerCase() || "school";
 
         const { data: insertedParent, error: insertedParentError } = await supabase
@@ -540,6 +637,8 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
 
         if (!insertedParentError && insertedParent) {
           user = insertedParent;
+        } else if (insertedParentError) {
+          console.error("Failed to create parent account:", insertedParentError);
         }
       }
     }
@@ -555,11 +654,15 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
 
       if (canBootstrapFromStudentOnly) {
         // Fetch school code for unique email
-        const { data: schoolData } = await supabase
+        const { data: schoolData, error: schoolCodeError } = await supabase
           .from("schools")
           .select("code")
           .eq("school_id", student.school_id)
           .single();
+          
+        if (schoolCodeError && schoolCodeError.code !== 'PGRST116') {
+          console.error("School code fetch error for bootstrap:", schoolCodeError);
+        }
         const sc = schoolData?.code?.toLowerCase() || "school";
         
         const bootstrapEmail = `${trimmedAdmissionNumber.toLowerCase()}.${sc}.${role}@portal`;
@@ -582,6 +685,8 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
 
         if (!insertedUserError && insertedUser) {
           user = insertedUser;
+        } else if (insertedUserError) {
+          console.error("Failed to create bootstrap user:", insertedUserError);
         }
       }
     }
@@ -604,8 +709,14 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
     if (!passwordMatches && password === trimmedAdmissionNumber) {
       passwordMatches = true;
     }
-    if (!passwordMatches) return res.status(401).json({ message: "Invalid credentials" });
-    if (user.status !== "active") return res.status(403).json({ message: "Account inactive" });
+    if (!passwordMatches) {
+      logAuthFailure(req, { admissionNumber, reason: "Invalid credentials", schoolId: resolvedSchoolId });
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+    if (user.status !== "active") {
+      logAuthFailure(req, { admissionNumber, reason: "Account inactive", schoolId: resolvedSchoolId });
+      return res.status(403).json({ message: "Account inactive" });
+    }
 
     if (String(student.admission_number).trim().toLowerCase() !== trimmedAdmissionNumber.toLowerCase()) {
       return res.status(401).json({ message: "Portal account is not linked to that admission number" });
@@ -640,30 +751,44 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
 
     // Check if defaulter blocking is enabled by admin
     let feeBlocked = false;
-    const { data: settingsData } = await supabase
-      .from("school_settings")
-      .select("setting_value")
-      .eq("school_id", resolvedSchoolId)
-      .eq("setting_key", "block_defaulters")
-      .maybeSingle();
-    const blockDefaulters = settingsData?.setting_value !== "false";
-
-    // Check student fee balance if blocking enabled
-    if (blockDefaulters) {
-      try {
-        const { data: ledgerData } = await supabase
-          .from("student_ledger")
-          .select("balance_after")
-          .eq("school_id", resolvedSchoolId)
-          .eq("student_id", student.student_id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const balance = Number(ledgerData?.balance_after || 0);
-        feeBlocked = balance > 0;
-      } catch (err) {
-        console.error("Fee balance check error:", err);
+    try {
+      const { data: settingsData, error: settingsError } = await supabase
+        .from("school_settings")
+        .select("setting_value")
+        .eq("school_id", resolvedSchoolId)
+        .eq("setting_key", "block_defaulters")
+        .maybeSingle();
+        
+      if (settingsError && settingsError.code !== 'PGRST116') {
+        console.error("Settings fetch error:", settingsError);
       }
+      
+      const blockDefaulters = settingsData?.setting_value !== "false";
+
+      // Check student fee balance if blocking enabled
+      if (blockDefaulters) {
+        try {
+          const { data: ledgerData, error: ledgerError } = await supabase
+            .from("student_ledger")
+            .select("balance_after")
+            .eq("school_id", resolvedSchoolId)
+            .eq("student_id", student.student_id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+            
+          if (ledgerError && ledgerError.code !== 'PGRST116') {
+            console.error("Fee balance check error:", ledgerError);
+          }
+          
+          const balance = Number(ledgerData?.balance_after || 0);
+          feeBlocked = balance > 0;
+        } catch (err) {
+          console.error("Fee balance check error:", err);
+        }
+      }
+    } catch (settingsErr) {
+      console.error("Settings check error:", settingsErr);
     }
 
     res.json({
@@ -682,6 +807,7 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       },
     });
   } catch (err) {
+    console.error("Portal login error:", err);
     next(err);
   }
 });

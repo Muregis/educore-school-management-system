@@ -118,81 +118,51 @@ export default function LoginView({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [manualSchool, setManualSchool] = useState(() => Boolean(getInitialSchoolId()));
 
-  // Clear form fields on component mount and add multiple layers of credential prevention
+  // Clear form fields on component mount and prevent credential autofill
   useEffect(() => {
-    console.log('=== LOGIN PAGE MOUNT - CLEARING CREDENTIALS ===');
     setEmail("");
     setPassword("");
     setAdmission("");
     
-    // Clear any stored credentials aggressively
+    // Clear stored credentials
     if (typeof window !== "undefined") {
-      // Clear localStorage items that might contain credentials
       localStorage.removeItem('educore.auth');
       localStorage.removeItem('educore.remember');
       localStorage.removeItem('educore.activeSchool');
-      console.log('Cleared localStorage credentials');
-      
-      // Clear sessionStorage
       sessionStorage.clear();
-      console.log('Cleared sessionStorage');
       
-      // Clear any form data that browser might have stored
+      // Clear form data
       const forms = document.querySelectorAll('form');
       forms.forEach(form => form.reset());
-      console.log('Reset all forms');
       
-      // Clear autocomplete values aggressively with multiple attempts
-      const clearInputs = () => {
-        const inputs = document.querySelectorAll('input[type="email"], input[type="password"], input[type="text"]');
-        inputs.forEach(input => {
-          input.value = '';
-          input.autocomplete = 'off';
-          input.setAttribute('autocomplete', 'off');
-          input.setAttribute('autocorrect', 'off');
-          input.setAttribute('autocapitalize', 'off');
-          input.setAttribute('spellcheck', 'false');
-        });
-      };
-      
-      clearInputs();
-      console.log('Cleared input values immediately');
-      
-      // Try again after a delay to catch late autofill
-      setTimeout(clearInputs, 100);
-      setTimeout(clearInputs, 500);
-      setTimeout(clearInputs, 1000);
+      // Prevent autofill with proper attributes
+      const inputs = document.querySelectorAll('input[type="email"], input[type="password"], input[type="text"]');
+      inputs.forEach(input => {
+        input.value = '';
+        input.autocomplete = 'new-password';
+        input.setAttribute('autocomplete', 'new-password');
+      });
     }
-    console.log('=== CREDENTIAL CLEARING COMPLETE ===');
   }, []);
   
   // Generate random form field names to prevent browser recognition
   const [randomFieldSuffix] = useState(() => Math.random().toString(36).substring(2, 15));
 
-  // Additional cleanup that runs whenever page becomes visible/active
+  // Prevent autofill when page becomes visible
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // Clear credentials when page becomes visible again
         setEmail("");
         setPassword("");
         setAdmission("");
         
-        // Clear any autofilled values aggressively
-        const clearAutofill = () => {
-          const inputs = document.querySelectorAll('input[type="email"], input[type="password"], input[type="text"]');
-          inputs.forEach(input => {
-            if (input.type === 'password' || input.type === 'email') {
-              input.value = '';
-              input.setAttribute('autocomplete', 'new-password');
-            }
-          });
-        };
-        
-        clearAutofill();
-        setTimeout(clearAutofill, 100);
-        setTimeout(clearAutofill, 500);
-        setTimeout(clearAutofill, 1000);
+        const inputs = document.querySelectorAll('input[type="email"], input[type="password"]');
+        inputs.forEach(input => {
+          if (input.value) {
+            input.value = '';
+            input.setAttribute('autocomplete', 'new-password');
+          }
+        });
       }
     };
 
@@ -238,18 +208,11 @@ export default function LoginView({ onLogin }) {
   useEffect(() => {
     if (!tenantReady) return undefined;
     if (!activeIdentifier && !schoolId) {
-      console.log('No active identifier or schoolId, using default branding');
       setBranding(prev => ({ ...DEFAULT_BRANDING, ...prev, schoolOptions: [] }));
       return undefined;
     }
 
     const timer = window.setTimeout(async () => {
-      console.log('=== SCHOOL BRANDING FETCH ===');
-      console.log('activeIdentifier:', activeIdentifier);
-      console.log('schoolId:', schoolId);
-      console.log('mode:', mode);
-      console.log('portalRole:', portalRole);
-      
       try {
         const resolvePath = buildResolveSchoolPath({
           hostname: window.location.hostname,
@@ -257,16 +220,11 @@ export default function LoginView({ onLogin }) {
           selectedSchoolId: schoolId,
           role: mode === "portal" ? portalRole : "staff",
         });
-        console.log('Resolve path:', resolvePath);
         
         const res = await apiFetch(resolvePath);
-        console.log('Branding response:', res);
-        
         const newBranding = { ...DEFAULT_BRANDING, ...res, schoolOptions: res.schoolOptions || [] };
-        console.log('Final branding:', newBranding);
         setBranding(newBranding);
-      } catch (_err) {
-        console.error('Branding fetch failed:', _err);
+      } catch (err) {
         setBranding(DEFAULT_BRANDING);
       }
     }, 350);
