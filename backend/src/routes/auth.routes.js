@@ -163,9 +163,16 @@ router.get("/resolve-school", authRateLimit, async (req, res) => {
     const { hostname = "", loginId = "", selectedSchoolId = "", role = "staff" } = req.query;
     const numericSchoolId = selectedSchoolId ? Number(selectedSchoolId) : null;
 
-    if (numericSchoolId && !Number.isNaN(numericSchoolId)) {
-      const matchedSchool = await findSchoolById(numericSchoolId);
-      if (matchedSchool) return res.json(await buildSchoolBranding(matchedSchool));
+    if (numericSchoolId && !Number.isNaN(numericSchoolId) && loginId) {
+      // Validate that the user actually belongs to the selected school
+      const userSchools = await resolveSchoolCandidates({ loginId, role });
+      const userSchoolIds = userSchools.map(school => school.school_id);
+      
+      if (userSchoolIds.includes(numericSchoolId)) {
+        const matchedSchool = await findSchoolById(numericSchoolId);
+        if (matchedSchool) return res.json(await buildSchoolBranding(matchedSchool));
+      }
+      // If user doesn't belong to selected school, continue with normal flow
     }
 
     const subdomain = getHostSubdomain(hostname);
