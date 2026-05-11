@@ -98,7 +98,7 @@ router.get("/:id", async (req, res, next) => {
 });
 
 // ─── POST / ───────────────────────────────────────────────────────────────────
-router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), async (req, res, next) => {
+router.post("/", requireRoles("admin", "teacher"), requireDirector(), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const {
@@ -253,7 +253,7 @@ router.post("/", requireRoles("admin", "teacher", "director", "superadmin"), asy
 });
 
 // ─── PUT /:id ─────────────────────────────────────────────────────────────────
-router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), async (req, res, next) => {
+router.put("/:id", requireRoles("admin", "teacher"), requireDirector(), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const {
@@ -345,7 +345,7 @@ router.put("/:id", requireRoles("admin", "teacher", "director", "superadmin"), a
 });
 
 // ─── DELETE /:id ──────────────────────────────────────────────────────────────
-router.delete("/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
+router.delete("/:id", requireRoles("admin"), requireDirector(), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 

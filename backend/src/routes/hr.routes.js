@@ -1,12 +1,12 @@
 import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
-import { requireRoles } from "../middleware/roles.js";
+import { requireRoles, requireDirector } from "../middleware/roles.js";
 
 const router = Router();
 router.use(authRequired);
 
-const HR_ROLES = ["admin", "hr", "director", "superadmin"];
+const HR_ROLES = ["admin", "hr"];
 
 function isMissingColumnError(error) {
   const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
@@ -20,7 +20,7 @@ function isMissingColumnError(error) {
 // ═══════════════════════════════════════════════════════════════════
 // STAFF RECORDS
 // ═══════════════════════════════════════════════════════════════════
-router.get("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
+router.get("/staff", requireRoles(...HR_ROLES), requireDirector(), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { data: rows, error } = await supabase
@@ -35,7 +35,7 @@ router.get("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
+router.post("/staff", requireRoles(...HR_ROLES), requireDirector(), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { fullName, email, phone, department, jobTitle, contractType, startDate, salary, status, nationalId, notes } = req.body;
@@ -93,7 +93,7 @@ router.post("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put("/staff/:id", requireRoles(...HR_ROLES), async (req, res, next) => {
+router.put("/staff/:id", requireRoles(...HR_ROLES), requireDirector(), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { fullName, email, phone, department, jobTitle, contractType, startDate, salary, status, nationalId, notes } = req.body;
@@ -147,7 +147,7 @@ router.put("/staff/:id", requireRoles(...HR_ROLES), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete("/staff/:id", requireRoles(...HR_ROLES), async (req, res, next) => {
+router.delete("/staff/:id", requireRoles(...HR_ROLES), requireDirector(), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { error } = await supabase

@@ -11,7 +11,7 @@ import { logActivity } from "../helpers/activity.logger.js";
 import { logAuthFailure } from "../helpers/security.logger.js";
 import { generateSupabaseJWT } from "../helpers/supabase-jwt.js";
 import { logTenantContext, logTenantQuery } from "../helpers/tenant-debug.logger.js";
-import { requireRoles } from "../middleware/roles.js";
+import { requireRoles, requireDirector } from "../middleware/roles.js";
 import { pgPool } from "../config/pg.js";
 
 const router = Router();
@@ -821,7 +821,7 @@ router.post("/logout", authRequired, validateSession, async (req, res, next) => 
   }
 });
 
-router.get("/sessions", authRequired, validateSession, requireRoles("director"), async (_req, res, next) => {
+router.get("/sessions", authRequired, validateSession, requireDirector(), async (_req, res, next) => {
   try {
     const result = await pgPool.query(`
       SELECT
@@ -856,7 +856,7 @@ router.get("/sessions", authRequired, validateSession, requireRoles("director"),
   }
 });
 
-router.delete("/sessions/:sessionId", authRequired, validateSession, requireRoles("director"), async (req, res, next) => {
+router.delete("/sessions/:sessionId", authRequired, validateSession, requireDirector(), async (req, res, next) => {
   try {
     const result = await revokeUserSession(req.params.sessionId);
     if (!result.revoked) {

@@ -408,17 +408,18 @@ export default function LoginView({ onLogin }) {
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {manualSchool ? (
-                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <span style={{ color: "#95a9c6", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>School ID</span>
-                  <input value={schoolId} onChange={(e) => setSchoolId(e.target.value)} placeholder="e.g. 101" style={fieldStyle} />
-                </label>
-              ) : null}
-
+              {/* Always show school selector when multiple schools are available */}
               {schoolOptions.length > 1 ? (
                 <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <span style={{ color: "#95a9c6", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Choose school</span>
-                  <select value={schoolId} onChange={(e) => setSchoolId(e.target.value)} style={fieldStyle}>
+                  <select 
+                    value={schoolId} 
+                    onChange={(e) => {
+                      setSchoolId(e.target.value);
+                      setError(""); // Clear any previous errors when switching schools
+                    }} 
+                    style={fieldStyle}
+                  >
                     <option value="">Select your school</option>
                     {schoolOptions.map(option => (
                       <option key={option.school_id} value={option.school_id}>{option.name}</option>
@@ -426,7 +427,45 @@ export default function LoginView({ onLogin }) {
                   </select>
                 </label>
               ) : null}
-
+              
+              {/* Show manual school ID input when manually enabled or when no schools found */}
+              {manualSchool || schoolOptions.length === 0 ? (
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ color: "#95a9c6", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>School ID</span>
+                  <input 
+                    value={schoolId} 
+                    onChange={(e) => {
+                      setSchoolId(e.target.value);
+                      setError(""); // Clear errors when typing
+                    }} 
+                    placeholder="e.g. 101" 
+                    style={fieldStyle}
+                  />
+                </label>
+              ) : null}
+              
+              {/* Show manual toggle button when there are school options (to allow manual override) */}
+              {schoolOptions.length > 0 ? (
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setManualSchool(prev => !prev);
+                    setError(""); // Clear errors when toggling
+                  }} 
+                  style={{ 
+                    alignSelf: "center", 
+                    border: "none", 
+                    background: "transparent", 
+                    color: "var(--secondary-color)", 
+                    cursor: "pointer", 
+                    fontSize: 12, 
+                    fontWeight: 700 
+                  }}
+                >
+                  {manualSchool ? "Use school selector" : "Enter school ID manually"}
+                </button>
+              ) : null}
+              
               {mode === "staff" ? (
                 <form onSubmit={submitStaff} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
                   {/* Hidden fields to trick browser autofill */}
@@ -589,10 +628,6 @@ export default function LoginView({ onLogin }) {
                   {error}
                 </div>
               ) : null}
-
-              <button type="button" onClick={() => setManualSchool(prev => !prev)} style={{ alignSelf: "center", border: "none", background: "transparent", color: "var(--secondary-color)", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
-                {manualSchool ? "Hide manual school selector" : "Choose school manually"}
-              </button>
             </div>
           </div>
         </section>
