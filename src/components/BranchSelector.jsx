@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { apiFetch } from "../lib/api";
 import { getSession, saveSession } from "../lib/auth";
 import { C } from "../lib/theme";
@@ -12,6 +12,12 @@ export function useBranches(token, onSwitch) {
   const [error, setError] = useState(null);
   const [canAccessBranches, setCanAccessBranches] = useState(false);
   const [isDirector, setIsDirector] = useState(false);
+  
+  // Store onSwitch in a ref to ensure it's properly captured
+  const onSwitchRef = useRef(onSwitch);
+  useEffect(() => {
+    onSwitchRef.current = onSwitch;
+  }, [onSwitch]);
 
   const fetchBranches = async () => {
     if (!token) {
@@ -97,9 +103,9 @@ export function useBranches(token, onSwitch) {
       console.log("Selected school data:", selectedSchool);
 
       // Call the parent switch handler
-      if (onSwitch) {
+      if (onSwitchRef.current) {
         console.log("Calling onSwitch callback");
-        await onSwitch(branchId, selectedSchool);
+        await onSwitchRef.current(branchId, selectedSchool);
       } else {
         console.warn("No onSwitch callback provided");
       }

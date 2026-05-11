@@ -110,13 +110,11 @@ export default function LoginView({ onLogin }) {
   const [admission, setAdmission] = useState("");
   const [password, setPassword] = useState("");
   const [portalRole, setPortalRole] = useState("parent");
-  const [schoolId, setSchoolId] = useState(() => getInitialSchoolId());
   const [branding, setBranding] = useState(DEFAULT_BRANDING);
   const [tenantReady, setTenantReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [manualSchool, setManualSchool] = useState(() => Boolean(getInitialSchoolId()));
 
   // Clear form fields on component mount and prevent credential autofill
   useEffect(() => {
@@ -184,7 +182,6 @@ export default function LoginView({ onLogin }) {
         const hostname = window.location.hostname;
         const res = await apiFetch(buildResolveSchoolPath({
           hostname,
-          selectedSchoolId: schoolId,
           role: mode === "portal" ? portalRole : "staff",
         }));
         if (!cancelled) {
@@ -207,7 +204,7 @@ export default function LoginView({ onLogin }) {
 
   useEffect(() => {
     if (!tenantReady) return undefined;
-    if (!activeIdentifier && !schoolId) {
+    if (!activeIdentifier) {
       setBranding(prev => ({ ...DEFAULT_BRANDING, ...prev, schoolOptions: [] }));
       return undefined;
     }
@@ -217,7 +214,6 @@ export default function LoginView({ onLogin }) {
         const resolvePath = buildResolveSchoolPath({
           hostname: window.location.hostname,
           loginId: activeIdentifier,
-          selectedSchoolId: schoolId,
           role: mode === "portal" ? portalRole : "staff",
         });
         
@@ -230,7 +226,7 @@ export default function LoginView({ onLogin }) {
     }, 350);
 
     return () => window.clearTimeout(timer);
-  }, [activeIdentifier, schoolId, portalRole, mode, tenantReady]);
+  }, [activeIdentifier, portalRole, mode, tenantReady]);
 
   const themeStyle = useMemo(() => ({
     "--primary-color": branding.primary_color || DEFAULT_BRANDING.primary_color,
@@ -246,10 +242,9 @@ export default function LoginView({ onLogin }) {
     setError("");
     setLoading(true);
     try {
-      const numericSchoolId = schoolId ? Number(schoolId) : null;
       const raw = await apiFetch("/auth/login", {
         method: "POST",
-        body: { email, password, schoolId: numericSchoolId },
+        body: { email, password },
       });
       const data = raw?.data || raw;
       if (!data?.token || !data?.user) {
@@ -279,14 +274,12 @@ export default function LoginView({ onLogin }) {
     setError("");
     setLoading(true);
     try {
-      const numericSchoolId = schoolId ? Number(schoolId) : null;
       const raw = await apiFetch("/auth/portal-login", {
         method: "POST",
         body: {
           admissionNumber: admission.trim(),
           password,
           role: portalRole,
-          schoolId: numericSchoolId,
         },
       });
       const data = raw?.data || raw;
@@ -408,63 +401,6 @@ export default function LoginView({ onLogin }) {
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {/* Always show school selector when multiple schools are available */}
-              {schoolOptions.length > 1 ? (
-                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <span style={{ color: "#95a9c6", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Choose school</span>
-                  <select 
-                    value={schoolId} 
-                    onChange={(e) => {
-                      setSchoolId(e.target.value);
-                      setError(""); // Clear any previous errors when switching schools
-                    }} 
-                    style={fieldStyle}
-                  >
-                    <option value="">Select your school</option>
-                    {schoolOptions.map(option => (
-                      <option key={option.school_id} value={option.school_id}>{option.name}</option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
-              
-              {/* Show manual school ID input when manually enabled or when no schools found */}
-              {manualSchool || schoolOptions.length === 0 ? (
-                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <span style={{ color: "#95a9c6", fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>School ID</span>
-                  <input 
-                    value={schoolId} 
-                    onChange={(e) => {
-                      setSchoolId(e.target.value);
-                      setError(""); // Clear errors when typing
-                    }} 
-                    placeholder="e.g. 101" 
-                    style={fieldStyle}
-                  />
-                </label>
-              ) : null}
-              
-              {/* Show manual toggle button when there are school options (to allow manual override) */}
-              {schoolOptions.length > 0 ? (
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    setManualSchool(prev => !prev);
-                    setError(""); // Clear errors when toggling
-                  }} 
-                  style={{ 
-                    alignSelf: "center", 
-                    border: "none", 
-                    background: "transparent", 
-                    color: "var(--secondary-color)", 
-                    cursor: "pointer", 
-                    fontSize: 12, 
-                    fontWeight: 700 
-                  }}
-                >
-                  {manualSchool ? "Use school selector" : "Enter school ID manually"}
-                </button>
-              ) : null}
               
               {mode === "staff" ? (
                 <form onSubmit={submitStaff} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
