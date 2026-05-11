@@ -16,8 +16,10 @@ export function requireRoles(...allowed) {
     if (role === 'director' || req.user?.isDirector) {
       try {
         // Get the school ID being accessed from the request
+        // Prioritize headers that are set during branch switching
         const targetSchoolId = req.headers['x-school-id'] || 
                             req.headers['x-effective-school-id'] || 
+                            req.headers['x-active-school-id'] ||
                             req.params.schoolId || 
                             req.query.schoolId || 
                             req.body.schoolId || 
@@ -30,14 +32,17 @@ export function requireRoles(...allowed) {
         // Check if director can access this school
         const accessibleSchools = await getAccessibleSchoolIds(userId, userSchoolId);
         
-        if (!accessibleSchools.includes(Number(targetSchoolId))) {
+        const targetSchoolIdNum = Number(targetSchoolId);
+        if (!accessibleSchools.includes(targetSchoolIdNum)) {
+          console.log(`Director access denied: user ${userId}, target school ${targetSchoolIdNum}, accessible: ${accessibleSchools.join(',')}`);
           return res.status(403).json({ 
             message: "Access denied. Directors can only access their own school and authorized branches." 
           });
         }
         
-        // Add accessible schools to request for downstream use
+        // Add accessible schools and target school to request for downstream use
         req.accessibleSchools = accessibleSchools;
+        req.targetSchoolId = targetSchoolIdNum;
         return next();
         
       } catch (error) {
@@ -68,8 +73,10 @@ export function requireDirector() {
     
     try {
       // Get the school ID being accessed
+      // Prioritize headers that are set during branch switching
       const targetSchoolId = req.headers['x-school-id'] || 
                           req.headers['x-effective-school-id'] || 
+                          req.headers['x-active-school-id'] ||
                           req.params.schoolId || 
                           req.query.schoolId || 
                           req.body.schoolId || 
@@ -82,13 +89,16 @@ export function requireDirector() {
       // Validate director can access this school
       const accessibleSchools = await getAccessibleSchoolIds(userId, userSchoolId);
       
-      if (!accessibleSchools.includes(Number(targetSchoolId))) {
+      const targetSchoolIdNum = Number(targetSchoolId);
+      if (!accessibleSchools.includes(targetSchoolIdNum)) {
+        console.log(`Director access denied: user ${userId}, target school ${targetSchoolIdNum}, accessible: ${accessibleSchools.join(',')}`);
         return res.status(403).json({ 
           message: "Access denied. Directors can only access their own school and authorized branches." 
         });
       }
       
       req.accessibleSchools = accessibleSchools;
+      req.targetSchoolId = targetSchoolIdNum;
       return next();
       
     } catch (error) {

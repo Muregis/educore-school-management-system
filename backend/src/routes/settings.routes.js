@@ -335,7 +335,19 @@ async function ensurePermissionsTable() {
 
 router.get("/permissions", requireRoles("admin", "director", "superadmin", "parent", "student"), async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
+    // Use the target school ID determined by the middleware, or fallback to user's school
+    let targetSchoolId = req.targetSchoolId || req.user.schoolId;
+    
+    // For directors, also check headers as fallback (in case middleware didn't set targetSchoolId)
+    if ((req.user.role === 'director' || req.user.isDirector) && !req.targetSchoolId) {
+      const headerSchoolId = req.headers['x-school-id'] || 
+                           req.headers['x-effective-school-id'] || 
+                           req.headers['x-active-school-id'];
+      if (headerSchoolId) {
+        targetSchoolId = Number(headerSchoolId);
+      }
+    }
+    
     const check = await ensurePermissionsTable();
     if (check.missing) {
       return res.json({ permissions: {} });
@@ -344,7 +356,7 @@ router.get("/permissions", requireRoles("admin", "director", "superadmin", "pare
     const { data: rows, error: queryError } = await supabase
       .from('role_permissions')
       .select('role_name, can_edit, pages_json')
-      .eq('school_id', schoolId);
+      .eq('school_id', targetSchoolId);
     if (queryError) throw queryError;
 
     const permissions = Object.fromEntries(
