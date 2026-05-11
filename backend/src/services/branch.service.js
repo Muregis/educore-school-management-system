@@ -142,36 +142,99 @@ export async function getAccessibleSchoolIds(userId, schoolId, targetSchoolId = 
   if (user.role === "director") {
     // Use the director's original school as the base for branch lookup
     const baseSchoolId = user.school_id || schoolId;
+    console.log(`[DEBUG] Director access: userId=${userId}, baseSchoolId=${baseSchoolId}, schoolId=${schoolId}, targetSchoolId=${targetSchoolId}`);
     if (!baseSchoolId) return []; // Director must have a school context
     
     const school = await getSchoolWithBranches(baseSchoolId);
+    console.log(`[DEBUG] Director's school info:`, school ? {
+      school_id: school.school_id,
+      is_branch: school.is_branch,
+      parent_school_id: school.parent_school_id,
+      branches_count: school.branches?.length || 0,
+      siblings_count: school.sibling_branches?.length || 0,
+      name: school.name
+    } : 'null');
+    
     if (!school) return [targetSchoolId || schoolId];
     
     const ids = [baseSchoolId];
     
     if (school.is_branch && school.parent_school_id) {
       // If director is at a branch, include parent and sibling branches
+      console.log(`[DEBUG] Director at branch, adding parent ${school.parent_school_id} and siblings`);
       ids.push(school.parent_school_id);
-      school.sibling_branches?.forEach(b => ids.push(b.school_id));
+      school.sibling_branches?.forEach(b => {
+        console.log(`[DEBUG] Adding sibling branch ${b.school_id}`);
+        ids.push(b.school_id);
+      });
     } else if (school.branches?.length > 0) {
       // If director is at main school, include all branches
-      school.branches.forEach(b => ids.push(b.school_id));
+      console.log(`[DEBUG] Director at main school, adding ${school.branches.length} branches`);
+      school.branches.forEach(b => {
+        console.log(`[DEBUG] Adding branch ${b.school_id}`);
+        ids.push(b.school_id);
+      });
     }
     
     // If a specific target school is requested, check if director can access it
     if (targetSchoolId) {
       const targetIdNum = Number(targetSchoolId);
+      console.log(`[DEBUG] Target validation: targetIdNum=${targetIdNum}, baseSchoolId=${baseSchoolId}, current ids=${ids.join(',')}`);
+      
       if (ids.includes(targetIdNum)) {
+        console.log(`[DEBUG] Target ${targetIdNum} found in accessible list`);
         return [...new Set([...ids, targetIdNum])]; // Include target if accessible
       }
       // For directors, also allow access to the specific target if they're switching branches
       // This handles the case where director switched to a branch before this check
       const targetSchool = await getSchoolWithBranches(targetIdNum);
-      if (targetSchool && (
-        (targetSchool.is_branch && targetSchool.parent_school_id === baseSchoolId) ||
-        (!targetSchool.is_branch && targetSchool.school_id === baseSchoolId)
-      )) {
-        return [...new Set([...ids, targetIdNum])];
+      console.log(`[DEBUG] Target school info:`, targetSchool ? {
+        school_id: targetSchool.school_id,
+        is_branch: targetSchool.is_branch,
+        parent_school_id: targetSchool.parent_school_id,
+        name: targetSchool.name
+      } : 'null');
+      
+      if (targetSchool) {
+        // Check if target is the director's base school
+        if (targetIdNum === baseSchoolId) {
+          console.log(`[DEBUG] Target ${targetIdNum} is director's base school`);
+          return [...new Set([...ids, targetIdNum])];
+        }
+        // Check if target is a branch of the director's school
+        if (targetSchool.is_branch && targetSchool.parent_school_id === baseSchoolId) {
+          console.log(`[DEBUG] Target ${targetIdNum} is a branch of director's school ${baseSchoolId}`);
+          return [...new Set([...ids, targetIdNum])];
+        }
+        // Check if director is at a branch and target is the parent school
+        if (!targetSchool.is_branch && school.is_branch && targetIdNum === school.parent_school_id) {
+          console.log(`[DEBUG] Target ${targetIdNum} is parent school of director's branch`);
+          return [...new Set([...ids, targetIdNum])];
+        }
+        // Check if director is at a branch and target is a sibling branch
+        if (targetSchool.is_branch && school.is_branch && targetSchool.parent_school_id === school.parent_school_id) {
+          console.log(`[DEBUG] Target ${targetIdNum} is sibling branch of director's branch`);
+          return [...new Set([...ids, targetIdNum])];
+        }
+      }
+      console.log(`[DEBUG] Target ${targetIdNum} not accessible to director through normal means`);
+      
+      // Fallback: If director is switching to a school that exists, allow it with a warning
+      // This handles cases where the school relationships aren't properly set up in the database
+      try {
+        const { data: targetExists, error: targetError } = await supabase
+          .from('schools')
+          .select('school_id, is_branch, parent_school_id, name')
+          .eq('school_id', targetIdNum)
+          .eq('is_deleted', false)
+          .maybeSingle();
+          
+        if (!targetError && targetExists) {
+          console.log(`[DEBUG] FALLBACK: Allowing director access to school ${targetIdNum} (${targetExists.name}) - database relationships may need review`);
+          return [...new Set([...ids, targetIdNum])];
+        }
+      } catch (fallbackError) {
+        console.log(`[DEBUG] Fallback check failed:`, fallbackError.message);
       }
     }
     

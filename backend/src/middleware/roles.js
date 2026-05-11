@@ -30,9 +30,14 @@ export function requireRoles(...allowed) {
         }
         
         // Check if director can access this school
+        console.log(`[DEBUG] Director access check: userId=${userId}, userSchoolId=${userSchoolId}, targetSchoolId=${targetSchoolId}`);
+        console.log(`[DEBUG] Request headers:`, Object.keys(req.headers).filter(h => h.toLowerCase().includes('school')).map(h => `${h}=${req.headers[h]}`));
+        
         const accessibleSchools = await getAccessibleSchoolIds(userId, userSchoolId, targetSchoolId);
         
         const targetSchoolIdNum = Number(targetSchoolId);
+        console.log(`[DEBUG] Accessible schools: ${accessibleSchools.join(',')}, target: ${targetSchoolIdNum}`);
+        
         if (!accessibleSchools.includes(targetSchoolIdNum)) {
           console.log(`Director access denied: user ${userId}, target school ${targetSchoolIdNum}, accessible: ${accessibleSchools.join(',')}`);
           return res.status(403).json({ 

@@ -339,6 +339,10 @@ async function ensurePermissionsTable() {
 
 router.get("/permissions", requireRoles("admin", "director", "superadmin", "parent", "student"), async (req, res, next) => {
   try {
+    console.log(`[DEBUG] Permissions endpoint: user=${req.user?.user_id}, role=${req.user?.role}, userSchoolId=${req.user?.schoolId}`);
+    console.log(`[DEBUG] Permissions endpoint: targetSchoolId from middleware=${req.targetSchoolId}`);
+    console.log(`[DEBUG] Permissions endpoint: headers=`, Object.keys(req.headers).filter(h => h.toLowerCase().includes('school')).map(h => `${h}=${req.headers[h]}`));
+    
     // Use the target school ID determined by the middleware, or fallback to user's school
     let targetSchoolId = req.targetSchoolId || req.user.schoolId;
     
@@ -347,10 +351,13 @@ router.get("/permissions", requireRoles("admin", "director", "superadmin", "pare
       const headerSchoolId = req.headers['x-school-id'] || 
                            req.headers['x-effective-school-id'] || 
                            req.headers['x-active-school-id'];
+      console.log(`[DEBUG] Director fallback: headerSchoolId=${headerSchoolId}`);
       if (headerSchoolId) {
         targetSchoolId = Number(headerSchoolId);
       }
     }
+    
+    console.log(`[DEBUG] Final targetSchoolId for permissions query: ${targetSchoolId}`);
     
     const check = await ensurePermissionsTable();
     if (check.missing) {
