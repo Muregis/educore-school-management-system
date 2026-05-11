@@ -88,7 +88,11 @@ router.get("/users", requireRoles("admin", "director", "superadmin"), async (req
     if ((role === 'director' || role === 'superadmin') && all === 'true') {
       // Get all school IDs director can access
       const { getAccessibleSchoolIds } = await import('../services/branch.service.js');
-      const accessibleIds = await getAccessibleSchoolIds(req.user.user_id, schoolId);
+      const headerSchoolId = req.headers['x-school-id'] || 
+                           req.headers['x-effective-school-id'] || 
+                           req.headers['x-active-school-id'];
+      const targetSchoolId = headerSchoolId || schoolId;
+      const accessibleIds = await getAccessibleSchoolIds(req.user.user_id, schoolId, targetSchoolId);
       query = query.in('school_id', accessibleIds);
     } else {
       // Regular school-scoped query

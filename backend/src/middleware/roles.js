@@ -30,7 +30,7 @@ export function requireRoles(...allowed) {
         }
         
         // Check if director can access this school
-        const accessibleSchools = await getAccessibleSchoolIds(userId, userSchoolId);
+        const accessibleSchools = await getAccessibleSchoolIds(userId, userSchoolId, targetSchoolId);
         
         const targetSchoolIdNum = Number(targetSchoolId);
         if (!accessibleSchools.includes(targetSchoolIdNum)) {
@@ -87,7 +87,7 @@ export function requireDirector() {
       }
       
       // Validate director can access this school
-      const accessibleSchools = await getAccessibleSchoolIds(userId, userSchoolId);
+      const accessibleSchools = await getAccessibleSchoolIds(userId, userSchoolId, targetSchoolId);
       
       const targetSchoolIdNum = Number(targetSchoolId);
       if (!accessibleSchools.includes(targetSchoolIdNum)) {

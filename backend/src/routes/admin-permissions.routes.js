@@ -29,7 +29,11 @@ router.get("/admins", requireRoles("director", "superadmin"), async (req, res) =
 
     if (role === "director") {
       // Director sees admins from all their schools
-      const accessibleIds = await getAccessibleSchoolIds(user_id, schoolId);
+      const headerSchoolId = req.headers['x-school-id'] || 
+                           req.headers['x-effective-school-id'] || 
+                           req.headers['x-active-school-id'];
+      const targetSchoolId = headerSchoolId || schoolId;
+      const accessibleIds = await getAccessibleSchoolIds(user_id, schoolId, targetSchoolId);
       query = query.in("school_id", accessibleIds);
     }
 
@@ -74,7 +78,11 @@ router.put("/:userId/permissions", requireRoles("director", "superadmin"), async
 
     // Director can only manage admins in their accessible schools
     if (role === "director") {
-      const accessibleIds = await getAccessibleSchoolIds(user_id, schoolId);
+      const headerSchoolId = req.headers['x-school-id'] || 
+                           req.headers['x-effective-school-id'] || 
+                           req.headers['x-active-school-id'];
+      const targetSchoolId = headerSchoolId || schoolId;
+      const accessibleIds = await getAccessibleSchoolIds(user_id, schoolId, targetSchoolId);
       if (!accessibleIds.includes(targetUser.school_id)) {
         return res.status(403).json({ error: "You don't have access to this admin's school" });
       }

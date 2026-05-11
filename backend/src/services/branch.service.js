@@ -114,38 +114,40 @@ export async function canAccessBranches(userId, schoolId) {
  * Get all school IDs the user can access (for cross-branch queries)
  * DIRECTOR: Returns ALL school IDs in the system
  */
-export async function getAccessibleSchoolIds(userId, schoolId) {
-  if (!userId) return schoolId ? [schoolId] : [];
+export async function getAccessibleSchoolIds(userId, schoolId, targetSchoolId = null) {
+  if (!userId) return targetSchoolId || schoolId ? [targetSchoolId || schoolId] : [];
   
-  // Get user's role
+  // Get user's role and their original school
   const { data: user, error } = await supabase
     .from("users")
-    .select("role")
+    .select("role, school_id")
     .eq("user_id", userId)
     .eq("is_deleted", false)
     .maybeSingle();
   
-  if (error || !user) return schoolId ? [schoolId] : [];
+  if (error || !user) return targetSchoolId || schoolId ? [targetSchoolId || schoolId] : [];
   
-  // Superadmin can access ALL schools, but Director only their own school + branches
+  // Superadmin can access ALL schools
   if (user.role === "superadmin") {
     const { data: allSchools, error: schoolsError } = await supabase
       .from("schools")
       .select("school_id")
       .eq("is_deleted", false);
     
-    if (schoolsError) return schoolId ? [schoolId] : [];
-    return allSchools?.map(s => s.school_id) || (schoolId ? [schoolId] : []);
+    if (schoolsError) return targetSchoolId || schoolId ? [targetSchoolId || schoolId] : [];
+    return allSchools?.map(s => s.school_id) || (targetSchoolId || schoolId ? [targetSchoolId || schoolId] : []);
   }
   
   // Director can only access their own school and its branches
   if (user.role === "director") {
-    if (!schoolId) return []; // Director must have a school context
+    // Use the director's original school as the base for branch lookup
+    const baseSchoolId = user.school_id || schoolId;
+    if (!baseSchoolId) return []; // Director must have a school context
     
-    const school = await getSchoolWithBranches(schoolId);
-    if (!school) return [schoolId];
+    const school = await getSchoolWithBranches(baseSchoolId);
+    if (!school) return [targetSchoolId || schoolId];
     
-    const ids = [schoolId];
+    const ids = [baseSchoolId];
     
     if (school.is_branch && school.parent_school_id) {
       // If director is at a branch, include parent and sibling branches
@@ -154,6 +156,23 @@ export async function getAccessibleSchoolIds(userId, schoolId) {
     } else if (school.branches?.length > 0) {
       // If director is at main school, include all branches
       school.branches.forEach(b => ids.push(b.school_id));
+    }
+    
+    // If a specific target school is requested, check if director can access it
+    if (targetSchoolId) {
+      const targetIdNum = Number(targetSchoolId);
+      if (ids.includes(targetIdNum)) {
+        return [...new Set([...ids, targetIdNum])]; // Include target if accessible
+      }
+      // For directors, also allow access to the specific target if they're switching branches
+      // This handles the case where director switched to a branch before this check
+      const targetSchool = await getSchoolWithBranches(targetIdNum);
+      if (targetSchool && (
+        (targetSchool.is_branch && targetSchool.parent_school_id === baseSchoolId) ||
+        (!targetSchool.is_branch && targetSchool.school_id === baseSchoolId)
+      )) {
+        return [...new Set([...ids, targetIdNum])];
+      }
     }
     
     return [...new Set(ids)]; // Remove duplicates
