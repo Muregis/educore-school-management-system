@@ -141,7 +141,7 @@ export async function getAccessibleSchoolIds(userId, schoolId, targetSchoolId = 
   // Director can only access their own school and its branches
   if (user.role === "director") {
     // Use the director's original school as the base for branch lookup
-    const baseSchoolId = user.school_id || schoolId;
+    const baseSchoolId = user.school_id;
     console.log(`[DEBUG] Director access: userId=${userId}, baseSchoolId=${baseSchoolId}, schoolId=${schoolId}, targetSchoolId=${targetSchoolId}`);
     if (!baseSchoolId) return []; // Director must have a school context
     

@@ -33,18 +33,33 @@ export function useBranches(token, onSwitch) {
         setAllSchools(data.allSchools || []);
         setIsDirector(true);
         setCanAccessBranches(true);
+      } else if (data.role === "director" && data.school) {
+        // Director response - handle branch context properly
+        setBranches(data.branches || []);
+        setCurrentBranch(data.school);
+        setParentSchool(data.parent_school);
+        setIsDirector(true);
+        
+        // For directors, combine branches and sibling branches for full access
+        const allBranches = [
+          ...(data.branches || []),
+          ...(data.sibling_branches || [])
+        ];
+        setBranches(allBranches);
+        setCanAccessBranches(data.is_branch || (allBranches.length > 0));
       } else if (data.school && data.branches) {
+        // Non-director response
         setBranches(data.branches || []);
         setCurrentBranch(data.school);
         setParentSchool(data.parent_school);
         setIsDirector(false);
         setCanAccessBranches(data.is_branch || (data.branches?.length > 0));
       } else {
-        // Director response - single school with branches
+        // Fallback for any other response structure
         setBranches(data.branches || []);
         setCurrentBranch(data.school);
         setParentSchool(data.parent_school);
-        setIsDirector(true);
+        setIsDirector(data.role === "director");
         setCanAccessBranches(data.is_branch || (data.branches?.length > 0));
       }
       setError(null);
@@ -300,7 +315,57 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
             <div style={{ maxHeight: 320, overflowY: "auto" }}>
               {isDirector ? (
                 <>
-                  {/* Show main school first */}
+                  {/* Show parent school first if director is at a branch */}
+                  {parentSchool && currentBranch?.is_branch && (
+                    <button
+                      key={parentSchool.school_id}
+                      className="school-list-item"
+                      onClick={() => handleSwitch(parentSchool.school_id)}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "12px 16px",
+                        background: currentSchoolId === parentSchool.school_id ? "var(--color-primary-muted)" : "transparent",
+                        border: "none",
+                        borderLeft: `4px solid ${currentSchoolId === parentSchool.school_id ? "var(--color-primary)" : "transparent"}`,
+                        color: "var(--color-text-primary)",
+                        cursor: "pointer",
+                        transition: "all var(--transition-fast)",
+                        fontSize: "14px",
+                        fontWeight: 500
+                      }}
+                      onMouseEnter={(e) => {
+                        if (currentSchoolId !== parentSchool.school_id) {
+                          e.currentTarget.style.background = "var(--color-bg-hover)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (currentSchoolId !== parentSchool.school_id) {
+                          e.currentTarget.style.background = "transparent";
+                        }
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>
+                        {parentSchool.name}
+                        {currentSchoolId === parentSchool.school_id && (
+                          <span style={{ float: "right", color: "var(--color-primary)", fontWeight: 800 }}>✓</span>
+                        )}
+                        <span style={{
+                          marginLeft: 8,
+                          fontSize: 10,
+                          background: "var(--color-primary)",
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          color: "white"
+                        }}>Main Campus</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>
+                        ID: {parentSchool.school_id} {parentSchool.code && ` • ${parentSchool.code}`}
+                      </div>
+                    </button>
+                  )}
+
+                  {/* Show current school (main school if not at branch, or current branch if at branch) */}
                   {currentBranch && (
                     <button
                       key={currentBranch.school_id}
@@ -338,11 +403,11 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
                         <span style={{
                           marginLeft: 8,
                           fontSize: 10,
-                          background: "var(--color-primary)",
+                          background: currentBranch.is_branch ? "var(--color-border)" : "var(--color-primary)",
                           padding: "2px 6px",
                           borderRadius: 4,
-                          color: "white"
-                        }}>Main</span>
+                          color: currentBranch.is_branch ? "var(--color-text-muted)" : "white"
+                        }}>{currentBranch.is_branch ? "Current Branch" : "Main"}</span>
                       </div>
                       <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 4 }}>
                         ID: {currentBranch.school_id} {currentBranch.code && ` • ${currentBranch.code}`}
@@ -350,8 +415,8 @@ export function BranchSelector({ style = {}, token, activeSchoolId, onSwitch }) 
                     </button>
                   )}
                   
-                  {/* Show branches */}
-                  {branches.map((branch) => {
+                  {/* Show other branches (exclude current branch) */}
+                  {branches.filter(branch => branch.school_id !== currentBranch?.school_id).map((branch) => {
                     const isActive = currentSchoolId === branch.school_id;
                     return (
                       <button
