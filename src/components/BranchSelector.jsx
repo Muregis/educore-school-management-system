@@ -55,12 +55,30 @@ export function useBranches(token, onSwitch) {
   }, [token]);
 
   const switchBranch = async (branchId) => {
-    if (!token) return;
+    if (!token) {
+      console.error("No token provided for branch switch");
+      return;
+    }
 
     try {
-      localStorage.setItem("educore.activeSchool", String(branchId));
+      console.log("Attempting to switch to branch:", branchId);
+      
+      // First call the backend to validate the switch
+      const response = await apiFetch(`/branches/switch/${branchId}`, {
+        method: "PUT",
+        token,
+      });
 
+      console.log("Backend switch response:", response);
+
+      // Update local storage
+      localStorage.setItem("educore.activeSchool", String(branchId));
+      console.log("Updated localStorage educore.activeSchool to:", branchId);
+
+      // Update session storage
       const auth = JSON.parse(sessionStorage.getItem("educore.auth") || "{}");
+      console.log("Current auth before update:", auth);
+      
       auth.schoolId = branchId;
       auth.school_id = branchId;
       const session = getSession();
@@ -69,12 +87,23 @@ export function useBranches(token, onSwitch) {
         sessionId: session?.sessionId || auth.sessionId,
         user: auth,
       });
+      console.log("Updated sessionStorage with new schoolId:", branchId);
 
+      // Find the selected school data
       const selectedSchool = [...allSchools, currentBranch, parentSchool, ...branches]
         .filter(Boolean)
-        .find((school) => Number(school.school_id) === Number(branchId));
+        .find((school) => Number(school.school_id) === Number(branchId)) || response.newSchool;
 
-      await onSwitch?.(branchId, selectedSchool);
+      console.log("Selected school data:", selectedSchool);
+
+      // Call the parent switch handler
+      if (onSwitch) {
+        console.log("Calling onSwitch callback");
+        await onSwitch(branchId, selectedSchool);
+      } else {
+        console.warn("No onSwitch callback provided");
+      }
+      
       return { newSchoolId: branchId, newSchool: selectedSchool };
     } catch (err) {
       console.error("Error switching branch:", err);
