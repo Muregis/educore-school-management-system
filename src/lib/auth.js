@@ -93,6 +93,7 @@ export function getAuthHeaders(token = null) {
       headers["x-school-id"] = schoolId;
       headers["X-School-Id"] = schoolId;
       headers["x-active-school-id"] = schoolId;
+      headers["x-active-school"] = schoolId;
     }
   }
 

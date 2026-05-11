@@ -26,7 +26,9 @@ export function requireRoles(...allowed) {
                             userSchoolId;
         
         if (!targetSchoolId) {
-          return res.status(403).json({ message: "Director must specify school context" });
+          // If no specific target school, allow access to user's own school
+          req.targetSchoolId = Number(userSchoolId);
+          return next();
         }
         
         // Check if director can access this school
@@ -88,7 +90,9 @@ export function requireDirector() {
                           userSchoolId;
       
       if (!targetSchoolId) {
-        return res.status(403).json({ message: "Director must specify school context" });
+        // If no specific target school, allow access to user's own school
+        req.targetSchoolId = Number(userSchoolId);
+        return next();
       }
       
       // Validate director can access this school

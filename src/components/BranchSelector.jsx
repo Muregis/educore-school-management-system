@@ -66,6 +66,13 @@ export function useBranches(token, onSwitch) {
       return;
     }
 
+    // Prevent repeated attempts to switch to the same branch
+    const currentActiveSchool = localStorage.getItem("educore.activeSchool");
+    if (currentActiveSchool === String(branchId)) {
+      console.log("Already on the target branch, skipping switch");
+      return { newSchoolId: branchId, newSchool: null };
+    }
+
     try {
       console.log("Attempting to switch to branch:", branchId);
       

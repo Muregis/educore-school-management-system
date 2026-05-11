@@ -357,10 +357,22 @@ router.get("/permissions", requireRoles("admin", "director", "superadmin", "pare
       }
     }
     
+    // Final fallback: use localStorage activeSchool if available in headers
+    if (!targetSchoolId && req.headers['x-active-school']) {
+      targetSchoolId = Number(req.headers['x-active-school']);
+      console.log(`[DEBUG] Using x-active-school header: ${targetSchoolId}`);
+    }
+    
     console.log(`[DEBUG] Final targetSchoolId for permissions query: ${targetSchoolId}`);
+    
+    if (!targetSchoolId) {
+      console.log(`[DEBUG] No target school ID found, returning empty permissions`);
+      return res.json({ permissions: {} });
+    }
     
     const check = await ensurePermissionsTable();
     if (check.missing) {
+      console.log(`[DEBUG] Permissions table missing, returning empty permissions`);
       return res.json({ permissions: {} });
     }
 
@@ -368,14 +380,19 @@ router.get("/permissions", requireRoles("admin", "director", "superadmin", "pare
       .from('role_permissions')
       .select('role_name, can_edit, pages_json')
       .eq('school_id', targetSchoolId);
-    if (queryError) throw queryError;
+    if (queryError) {
+      console.error(`[DEBUG] Permissions query error:`, queryError);
+      throw queryError;
+    }
 
     const permissions = Object.fromEntries(
       (rows || []).map(r => [r.role_name, { edit: Boolean(r.can_edit), pages: JSON.parse(r.pages_json || "[]") }])
     );
 
+    console.log(`[DEBUG] Returning permissions for ${Object.keys(permissions).length} roles`);
     res.json({ permissions });
   } catch (err) {
+    console.error(`[DEBUG] Permissions endpoint error:`, err);
     next(err);
   }
 });
