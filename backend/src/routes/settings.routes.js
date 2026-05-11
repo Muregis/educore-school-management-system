@@ -346,14 +346,15 @@ router.get("/permissions", requireRoles("admin", "director", "superadmin", "pare
     // Use the target school ID determined by the middleware, or fallback to user's school
     let targetSchoolId = req.targetSchoolId || req.user.schoolId;
     
-    // For directors, also check headers as fallback (in case middleware didn't set targetSchoolId)
-    if ((req.user.role === 'director' || req.user.isDirector) && !req.targetSchoolId) {
+    // For directors, prioritize headers for branch switching scenarios
+    if (req.user.role === 'director' || req.user.isDirector) {
       const headerSchoolId = req.headers['x-school-id'] || 
                            req.headers['x-effective-school-id'] || 
                            req.headers['x-active-school-id'];
-      console.log(`[DEBUG] Director fallback: headerSchoolId=${headerSchoolId}`);
+      console.log(`[DEBUG] Director checking headers: headerSchoolId=${headerSchoolId}`);
       if (headerSchoolId) {
         targetSchoolId = Number(headerSchoolId);
+        console.log(`[DEBUG] Director using header school ID: ${targetSchoolId}`);
       }
     }
     

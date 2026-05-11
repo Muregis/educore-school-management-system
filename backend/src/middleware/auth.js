@@ -113,14 +113,15 @@ export function authRequired(req, res, next) {
       return next();
     }
 
-    // ── DIRECTOR — full access locked to own school ──
-    // Your director (muregivictor) can switch between owned schools via header
-    // All other directors locked strictly to their own school_id
+    // ── DIRECTOR — can switch between own school and authorized branches ──
     if (isDirectorToken) {
       const headerSchoolId = req.headers["x-active-school-id"] || 
-                             req.headers["x-school-id"];
-      const allowedSwitch = payload.email === SUPERADMIN_EMAIL && headerSchoolId;
-      const effectiveSchoolId = allowedSwitch
+                             req.headers["x-school-id"] ||
+                             req.headers["x-effective-school-id"];
+      
+      // Allow directors to switch schools via headers (for branch switching)
+      // The roles middleware will validate if they can access the target school
+      const effectiveSchoolId = headerSchoolId 
         ? Number(headerSchoolId)
         : Number(payload.school_id || payload.schoolId);
 
@@ -137,7 +138,7 @@ export function authRequired(req, res, next) {
         tokenRole: payload.role
       };
 
-      console.log(`[AUTH DEBUG] Director context: school=${effectiveSchoolId} email=${payload.email}`);
+      console.log(`[AUTH DEBUG] Director context: school=${effectiveSchoolId} email=${payload.email} header=${headerSchoolId}`);
       return next();
     }
 
