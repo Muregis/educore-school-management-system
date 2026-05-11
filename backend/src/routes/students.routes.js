@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { logActivity } from "../helpers/activity.logger.js";
-import { requireRoles } from "../middleware/roles.js";
+import { requireRoles, requireDirector } from "../middleware/roles.js";
 import multer from "multer";
 
 // Configure multer for photo uploads
