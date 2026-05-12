@@ -479,4 +479,123 @@ router.patch("/:id/fees", requireRoles("admin", "finance", "director", "superadm
   } catch (err) { next(err); }
 });
 
+// ─── GET /api/students/:studentId/ledger ───────────────────────────────────────
+router.get("/:studentId/ledger", async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { studentId } = req.params;
+    const { limit = 50, offset = 0, term, academic_year } = req.query;
+
+    // Verify student belongs to school
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('student_id, first_name, last_name, admission_number')
+      .eq('student_id', studentId)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (studentError || !student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    // Build query for student ledger
+    let query = supabase
+      .from('student_ledger')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false });
+
+    // Apply filters if provided
+    if (term) {
+      query = query.eq('term', term);
+    }
+    if (academic_year) {
+      query = query.eq('academic_year', academic_year);
+    }
+
+    const { data: ledger, error: ledgerError } = await query
+      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+    if (ledgerError) throw ledgerError;
+
+    res.json({
+      student: {
+        student_id: student.student_id,
+        name: `${student.first_name} ${student.last_name}`,
+        admission_number: student.admission_number
+      },
+      ledger: ledger || [],
+      pagination: {
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        hasMore: (ledger || []).length === parseInt(limit)
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── GET /api/students/:studentId/invoices ───────────────────────────────────────
+router.get("/:studentId/invoices", async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { studentId } = req.params;
+    const { limit = 50, offset = 0, term, academic_year } = req.query;
+
+    // Verify student belongs to school
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('student_id, first_name, last_name, admission_number')
+      .eq('student_id', studentId)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (studentError || !student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    // Build query for student invoices
+    let query = supabase
+      .from('invoices')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('student_id', studentId)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false });
+
+    // Apply filters if provided
+    if (term) {
+      query = query.eq('term', term);
+    }
+    if (academic_year) {
+      query = query.eq('academic_year', academic_year);
+    }
+
+    const { data: invoices, error: invoicesError } = await query
+      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+    if (invoicesError) throw invoicesError;
+
+    res.json({
+      student: {
+        student_id: student.student_id,
+        name: `${student.first_name} ${student.last_name}`,
+        admission_number: student.admission_number
+      },
+      invoices: invoices || [],
+      pagination: {
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        hasMore: (invoices || []).length === parseInt(limit)
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;
