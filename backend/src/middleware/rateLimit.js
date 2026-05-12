@@ -64,3 +64,12 @@ export const passwordResetRateLimit = rateLimit({
   legacyHeaders: false,
   skipSuccessfulRequests: true,
 });
+
+// Student data rate limiting (higher limit for bulk operations)
+export const studentDataRateLimit = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 200, // Limit each IP to 200 student data requests per minute
+  message: { message: "Too many student data requests, please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});

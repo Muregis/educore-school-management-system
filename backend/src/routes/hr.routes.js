@@ -6,7 +6,7 @@ import { requireRoles, requireDirector } from "../middleware/roles.js";
 const router = Router();
 router.use(authRequired);
 
-const HR_ROLES = ["admin", "hr"];
+const HR_ROLES = ["admin", "hr", "director"];
 
 function isMissingColumnError(error) {
   const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();

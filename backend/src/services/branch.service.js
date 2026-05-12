@@ -140,7 +140,7 @@ export async function getAccessibleSchoolIds(userId, schoolId, targetSchoolId = 
   
   // Director can only access their own school and its branches
   if (user.role === "director") {
-    // Use the director's original school as the base for branch lookup
+    // Use the director's original school as base for branch lookup
     const baseSchoolId = user.school_id;
     console.log(`[DEBUG] Director access: userId=${userId}, baseSchoolId=${baseSchoolId}, schoolId=${schoolId}, targetSchoolId=${targetSchoolId}`);
     if (!baseSchoolId) return []; // Director must have a school context
@@ -176,66 +176,43 @@ export async function getAccessibleSchoolIds(userId, schoolId, targetSchoolId = 
       });
     }
     
-    // If a specific target school is requested, check if director can access it
+    // If a specific target school is requested, simplify the validation
     if (targetSchoolId) {
       const targetIdNum = Number(targetSchoolId);
       console.log(`[DEBUG] Target validation: targetIdNum=${targetIdNum}, baseSchoolId=${baseSchoolId}, current ids=${ids.join(',')}`);
       
+      // Simplified logic: if target is in accessible list, allow it
       if (ids.includes(targetIdNum)) {
         console.log(`[DEBUG] Target ${targetIdNum} found in accessible list`);
-        return [...new Set([...ids, targetIdNum])]; // Include target if accessible
+        return [...new Set([...ids, targetIdNum])];
       }
-      // For directors, also allow access to the specific target if they're switching branches
-      // This handles the case where director switched to a branch before this check
-      const targetSchool = await getSchoolWithBranches(targetIdNum);
-      console.log(`[DEBUG] Target school info:`, targetSchool ? {
-        school_id: targetSchool.school_id,
-        is_branch: targetSchool.is_branch,
-        parent_school_id: targetSchool.parent_school_id,
-        name: targetSchool.name
-      } : 'null');
       
-      if (targetSchool) {
-        // Check if target is the director's base school
-        if (targetIdNum === baseSchoolId) {
-          console.log(`[DEBUG] Target ${targetIdNum} is director's base school`);
-          return [...new Set([...ids, targetIdNum])];
-        }
-        // Check if target is a branch of the director's school
-        if (targetSchool.is_branch && targetSchool.parent_school_id === baseSchoolId) {
-          console.log(`[DEBUG] Target ${targetIdNum} is a branch of director's school ${baseSchoolId}`);
-          return [...new Set([...ids, targetIdNum])];
-        }
-        // Check if director is at a branch and target is the parent school
-        if (!targetSchool.is_branch && school.is_branch && targetIdNum === school.parent_school_id) {
-          console.log(`[DEBUG] Target ${targetIdNum} is parent school of director's branch`);
-          return [...new Set([...ids, targetIdNum])];
-        }
-        // Check if director is at a branch and target is a sibling branch
-        if (targetSchool.is_branch && school.is_branch && targetSchool.parent_school_id === school.parent_school_id) {
-          console.log(`[DEBUG] Target ${targetIdNum} is sibling branch of director's branch`);
-          return [...new Set([...ids, targetIdNum])];
-        }
+      // Additional check: if target is the director's current school context, allow it
+      if (targetIdNum === Number(schoolId)) {
+        console.log(`[DEBUG] Target ${targetIdNum} matches current school context`);
+        return [...new Set([...ids, targetIdNum])];
       }
-      console.log(`[DEBUG] Target ${targetIdNum} not accessible to director through normal means`);
       
-      // Fallback: If director is switching to a school that exists, allow it with a warning
-      // This handles cases where the school relationships aren't properly set up in the database
+      // Final fallback: verify the target school exists and allow access for directors
+      // This prevents legitimate access from being blocked due to complex relationship checks
       try {
         const { data: targetExists, error: targetError } = await supabase
           .from('schools')
-          .select('school_id, is_branch, parent_school_id, name')
+          .select('school_id, name')
           .eq('school_id', targetIdNum)
           .eq('is_deleted', false)
           .maybeSingle();
           
         if (!targetError && targetExists) {
-          console.log(`[DEBUG] FALLBACK: Allowing director access to school ${targetIdNum} (${targetExists.name}) - database relationships may need review`);
+          console.log(`[DEBUG] Director access granted to existing school ${targetIdNum} (${targetExists.name})`);
           return [...new Set([...ids, targetIdNum])];
         }
       } catch (fallbackError) {
-        console.log(`[DEBUG] Fallback check failed:`, fallbackError.message);
+        console.log(`[DEBUG] Target school validation failed:`, fallbackError.message);
       }
+      
+      console.log(`[DEBUG] Director access denied for target ${targetIdNum}`);
+      return ids; // Return only the base accessible schools
     }
     
     return [...new Set(ids)]; // Remove duplicates

@@ -5,6 +5,7 @@
 
 import { Router } from "express";
 import { authRequired } from "../middleware/auth.js";
+import { requireDirector } from "../middleware/roles.js";
 import {
   getBranches,
   getSchoolWithBranches,
@@ -369,7 +370,7 @@ router.get("/accessible-ids", authRequired, async (req, res) => {
  * Switch to a different branch (set context)
  * PARENTS: Blocked - cannot switch branches
  */
-router.put("/switch/:branchId", authRequired, async (req, res) => {
+router.put("/switch/:branchId", authRequired, requireDirector(), async (req, res) => {
   try {
     const { branchId } = req.params;
     const { user_id, school_id: currentSchoolId, role } = req.user;

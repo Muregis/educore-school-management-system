@@ -4,6 +4,7 @@ import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { requireRoles, requireDirector } from "../middleware/roles.js";
+import { studentDataRateLimit } from "../middleware/rateLimit.js";
 import multer from "multer";
 
 // Configure multer for photo uploads
@@ -480,7 +481,7 @@ router.patch("/:id/fees", requireRoles("admin", "finance", "director", "superadm
 });
 
 // ─── GET /api/students/:studentId/ledger ───────────────────────────────────────
-router.get("/:studentId/ledger", async (req, res, next) => {
+router.get("/:studentId/ledger", studentDataRateLimit, requireRoles("director", "admin", "finance", "staff", "parent", "student"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
@@ -539,7 +540,7 @@ router.get("/:studentId/ledger", async (req, res, next) => {
 });
 
 // ─── GET /api/students/:studentId/invoices ───────────────────────────────────────
-router.get("/:studentId/invoices", async (req, res, next) => {
+router.get("/:studentId/invoices", studentDataRateLimit, requireRoles("director", "admin", "finance", "staff", "parent", "student"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
