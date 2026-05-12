@@ -76,7 +76,7 @@ router.get("/student/:studentId/statement", async (req, res, next) => {
 
 // ─── POST /api/ledger/assess-fees ─────────────────────────────────────────────
 router.post("/assess-fees", 
-  requireRoles("admin", "finance"), 
+  requireRoles("admin", "finance", "director", "superadmin"), 
   async (req, res, next) => {
     try {
       const { schoolId } = req.user;
@@ -194,7 +194,7 @@ router.get("/balances",
 
 // ─── POST /api/ledger/adjustment ───────────────────────────────────────────────
 router.post("/adjustment", 
-  requireRoles("admin", "finance"), 
+  requireRoles("admin", "finance", "director", "superadmin"), 
   async (req, res, next) => {
     try {
       const { schoolId } = req.user;

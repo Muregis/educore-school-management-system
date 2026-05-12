@@ -77,7 +77,7 @@ router.get("/fee-structures", async (req, res, next) => {
 });
 
 // ─── POST fee structure ───────────────────────────────────────────────────────
-router.post("/fee-structures", requireRoles("admin", "finance"), async (req, res, next) => {
+router.post("/fee-structures", requireRoles("admin", "finance", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { className, term = "Term 2", tuition = 0, activity = 0, misc = 0 } = req.body;
@@ -273,7 +273,7 @@ router.delete("/:id", requireRoles("director", "superadmin"), async (req, res, n
 });
 
 // ─── POST record manual payment (Cash, Bank Transfer, M-Pesa Manual) ───────
-router.post("/record-manual", authRequired, requireRoles('admin', 'finance'), async (req, res, next) => {
+router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'director', 'superadmin'), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const {

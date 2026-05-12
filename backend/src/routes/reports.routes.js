@@ -5,7 +5,7 @@ import { requireRoles } from "../middleware/roles.js";
 
 const router = Router();
 router.use(authRequired);
-router.use(requireRoles("admin", "teacher", "finance"));
+router.use(requireRoles("admin", "teacher", "finance", "director", "superadmin"));
 
 function getOpeningBalanceImpact(student) {
   const amount = Number(student?.opening_balance || 0);

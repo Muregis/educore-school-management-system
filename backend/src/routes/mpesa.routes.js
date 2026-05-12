@@ -448,7 +448,7 @@ router.post("/ignore/:id", authRequired, requireRoles("admin", "finance"), async
 });
 
 // GET /api/mpesa/reconciliation-logs - View reconciliation audit trail
-router.get("/reconciliation-logs", authRequired, requireRoles("admin", "finance"), async (req, res, next) => {
+router.get("/reconciliation-logs", authRequired, requireRoles("admin", "finance", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { limit = 50 } = req.query;

@@ -288,7 +288,7 @@ router.put("/school", requireRoles("admin", "director", "superadmin"), async (re
 });
 
 // GET /api/settings/payment-config - Bank details for frontend
-router.get("/payment-config", requireRoles("admin"), async (req, res, next) => {
+router.get("/payment-config", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 

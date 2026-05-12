@@ -3,8 +3,11 @@
 
 import express from "express";
 import { supabase } from "../config/supabaseClient.js";
-import { requireAuth } from "../middleware/auth.js";
+import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
+
+// Backward-compat alias — this file uses requireAuth but middleware exports authRequired
+const requireAuth = authRequired;
 
 const router = express.Router();
 
