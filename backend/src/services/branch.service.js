@@ -97,7 +97,7 @@ export async function canAccessBranches(userId, schoolId) {
   }
   
   // Admin, finance can access their school's branches
-  const allowedRoles = ["admin", "finance"];
+  const allowedRoles = ["director", "finance"];
   if (!allowedRoles.includes(user.role)) return false;
   
   // Check if this school has branches or is a branch
@@ -176,25 +176,25 @@ export async function getAccessibleSchoolIds(userId, schoolId, targetSchoolId = 
       });
     }
     
-    // If a specific target school is requested, simplify the validation
+    // If a specific target school is requested, validate it
     if (targetSchoolId) {
       const targetIdNum = Number(targetSchoolId);
-      console.log(`[DEBUG] Target validation: targetIdNum=${targetIdNum}, baseSchoolId=${baseSchoolId}, current ids=${ids.join(',')}`);
+      console.log(`[DEBUG] Target validation: targetIdNum=${targetIdNum}, baseSchoolId=${baseSchoolId}, accessible=${ids.join(',')}`);
       
-      // Simplified logic: if target is in accessible list, allow it
+      // Allow access if target is in the accessible list
       if (ids.includes(targetIdNum)) {
         console.log(`[DEBUG] Target ${targetIdNum} found in accessible list`);
         return [...new Set([...ids, targetIdNum])];
       }
       
-      // Additional check: if target is the director's current school context, allow it
+      // Allow access if target matches the director's current school context
       if (targetIdNum === Number(schoolId)) {
         console.log(`[DEBUG] Target ${targetIdNum} matches current school context`);
         return [...new Set([...ids, targetIdNum])];
       }
       
-      // Simplified fallback: For directors, allow access to any valid school if they have base school access
-      // This prevents legitimate access from being blocked due to complex relationship checks
+      // For directors, allow access to any valid school to prevent blocking
+      // This is a permissive fallback that ensures directors can access their data
       try {
         const { data: targetExists, error: targetError } = await supabase
           .from('schools')
@@ -204,16 +204,16 @@ export async function getAccessibleSchoolIds(userId, schoolId, targetSchoolId = 
           .maybeSingle();
           
         if (!targetError && targetExists) {
-          console.log(`[DEBUG] Director access granted to existing school ${targetIdNum} (${targetExists.name})`);
+          console.log(`[DEBUG] Director fallback: granting access to existing school ${targetIdNum} (${targetExists.name})`);
           return [...new Set([...ids, targetIdNum])];
         }
       } catch (fallbackError) {
         console.log(`[DEBUG] Target school validation failed:`, fallbackError.message);
       }
       
-      // If all else fails but director has valid base school, grant access to prevent blocking
+      // Final fallback: if director has a valid base school, grant access
       if (baseSchoolId && targetIdNum) {
-        console.log(`[DEBUG] Director fallback: granting access to ${targetIdNum} based on base school ${baseSchoolId}`);
+        console.log(`[DEBUG] Director final fallback: granting access to ${targetIdNum} based on base school ${baseSchoolId}`);
         return [...new Set([...ids, targetIdNum])];
       }
       
