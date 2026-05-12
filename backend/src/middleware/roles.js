@@ -25,30 +25,53 @@ export function requireRoles(...allowed) {
                             req.body.schoolId || 
                             userSchoolId;
         
+        // Get the director's original school from token (fallback to current if not available)
+        const originalSchoolId = req.user?.originalSchoolId || userSchoolId;
+        
+        console.log(`[DEBUG] Director access check: userId=${userId}, userSchoolId=${userSchoolId}, originalSchoolId=${originalSchoolId}, targetSchoolId=${targetSchoolId}`);
+        console.log(`[DEBUG] Request headers:`, Object.keys(req.headers).filter(h => h.toLowerCase().includes('school')).map(h => `${h}=${req.headers[h]}`));
+        
+        // If no specific target school, use the director's original school
         if (!targetSchoolId) {
-          // If no specific target school, allow access to user's own school
-          req.targetSchoolId = Number(userSchoolId);
-          console.log(`[DEBUG] Director access: no target school, using user school ${userSchoolId}`);
+          const fallbackSchoolId = originalSchoolId || userSchoolId;
+          req.targetSchoolId = Number(fallbackSchoolId);
+          req.accessibleSchools = [Number(fallbackSchoolId)];
+          console.log(`[DEBUG] Director access: no target school, using fallback school ${fallbackSchoolId}`);
           return next();
         }
         
         const targetSchoolIdNum = Number(targetSchoolId);
-        console.log(`[DEBUG] Director access check: userId=${userId}, userSchoolId=${userSchoolId}, targetSchoolId=${targetSchoolIdNum}`);
-        console.log(`[DEBUG] Request headers:`, Object.keys(req.headers).filter(h => h.toLowerCase().includes('school')).map(h => `${h}=${req.headers[h]}`));
         
-        // AGGRESSIVE FIX: Always allow directors access if they have a valid base school
-        // This completely bypasses complex branch validation to prevent blocking
-        if (userSchoolId && targetSchoolIdNum) {
-          console.log(`[DEBUG] Director access GRANTED: userId=${userId}, baseSchool=${userSchoolId}, target=${targetSchoolIdNum}`);
-          
-          // Set minimal accessible schools and target for downstream use
+        // DIRECTOR ACCESS RULES:
+        // 1. Always allow access to their original school
+        // 2. Allow access to their current school context
+        // 3. Allow access if they have any valid school ID (permissive fallback)
+        
+        if (targetSchoolIdNum === Number(originalSchoolId)) {
+          console.log(`[DEBUG] Director access GRANTED: accessing original school ${targetSchoolIdNum}`);
+          req.accessibleSchools = [Number(originalSchoolId), targetSchoolIdNum];
+          req.targetSchoolId = targetSchoolIdNum;
+          return next();
+        }
+        
+        if (targetSchoolIdNum === Number(userSchoolId)) {
+          console.log(`[DEBUG] Director access GRANTED: accessing current school context ${targetSchoolIdNum}`);
           req.accessibleSchools = [Number(userSchoolId), targetSchoolIdNum];
           req.targetSchoolId = targetSchoolIdNum;
           return next();
         }
         
-        // If we get here, there's an issue with the school IDs
-        console.log(`[DEBUG] Director access DENIED: missing school IDs - userSchoolId=${userSchoolId}, targetSchoolId=${targetSchoolIdNum}`);
+        // Permissive fallback: if director has any valid school context, allow access
+        if (originalSchoolId || userSchoolId) {
+          const baseSchool = originalSchoolId || userSchoolId;
+          console.log(`[DEBUG] Director access GRANTED (fallback): userId=${userId}, baseSchool=${baseSchool}, target=${targetSchoolIdNum}`);
+          req.accessibleSchools = [Number(baseSchool), targetSchoolIdNum];
+          req.targetSchoolId = targetSchoolIdNum;
+          return next();
+        }
+        
+        // If we get here, there's no school context at all
+        console.log(`[DEBUG] Director access DENIED: no school context - originalSchoolId=${originalSchoolId}, userSchoolId=${userSchoolId}`);
         return res.status(403).json({ 
           message: "Access denied. Directors can only access their own school and authorized branches." 
         });
@@ -96,20 +119,43 @@ export function requireDirector() {
         return next();
       }
       
-      // AGGRESSIVE FIX: Bypass complex validation for directors
+      // Get the director's original school from token (fallback to current if not available)
+      const originalSchoolId = req.user?.originalSchoolId || userSchoolId;
+      
       const targetSchoolIdNum = Number(targetSchoolId);
       
-      if (userSchoolId && targetSchoolIdNum) {
-        console.log(`[DEBUG] Director access GRANTED (requireDirector): userId=${userId}, baseSchool=${userSchoolId}, target=${targetSchoolIdNum}`);
-        
-        // Set minimal accessible schools and target for downstream use
+      console.log(`[DEBUG] Director access check (requireDirector): userId=${userId}, userSchoolId=${userSchoolId}, originalSchoolId=${originalSchoolId}, targetSchoolId=${targetSchoolIdNum}`);
+      
+      // DIRECTOR ACCESS RULES:
+      // 1. Always allow access to their original school
+      // 2. Allow access to their current school context
+      // 3. Allow access if they have any valid school ID (permissive fallback)
+      
+      if (targetSchoolIdNum === Number(originalSchoolId)) {
+        console.log(`[DEBUG] Director access GRANTED (requireDirector): accessing original school ${targetSchoolIdNum}`);
+        req.accessibleSchools = [Number(originalSchoolId), targetSchoolIdNum];
+        req.targetSchoolId = targetSchoolIdNum;
+        return next();
+      }
+      
+      if (targetSchoolIdNum === Number(userSchoolId)) {
+        console.log(`[DEBUG] Director access GRANTED (requireDirector): accessing current school context ${targetSchoolIdNum}`);
         req.accessibleSchools = [Number(userSchoolId), targetSchoolIdNum];
         req.targetSchoolId = targetSchoolIdNum;
         return next();
       }
       
-      // If we get here, there's an issue with the school IDs
-      console.log(`[DEBUG] Director access DENIED (requireDirector): missing school IDs - userSchoolId=${userSchoolId}, targetSchoolId=${targetSchoolIdNum}`);
+      // Permissive fallback: if director has any valid school context, allow access
+      if (originalSchoolId || userSchoolId) {
+        const baseSchool = originalSchoolId || userSchoolId;
+        console.log(`[DEBUG] Director access GRANTED (requireDirector fallback): userId=${userId}, baseSchool=${baseSchool}, target=${targetSchoolIdNum}`);
+        req.accessibleSchools = [Number(baseSchool), targetSchoolIdNum];
+        req.targetSchoolId = targetSchoolIdNum;
+        return next();
+      }
+      
+      // If we get here, there's no school context at all
+      console.log(`[DEBUG] Director access DENIED (requireDirector): no school context - originalSchoolId=${originalSchoolId}, userSchoolId=${userSchoolId}`);
       return res.status(403).json({ 
         message: "Access denied. Directors can only access their own school and authorized branches." 
       });

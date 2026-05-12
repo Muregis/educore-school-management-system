@@ -109,14 +109,19 @@ router.get("/my-branches", authRequired, async (req, res) => {
     
 // Director sees only their own school + its branches
 if (role === "director") {
-  const { school_id } = req.user;
+  const { school_id, originalSchoolId } = req.user;
+  
+  // Use originalSchoolId as fallback if school_id is not available
+  const effectiveSchoolId = school_id || originalSchoolId;
+  
+  console.log(`[BRANCH DEBUG] Director accessing branches: school_id=${school_id}, originalSchoolId=${originalSchoolId}, effective=${effectiveSchoolId}`);
 
-  if (!school_id) {
+  if (!effectiveSchoolId) {
     return res.status(400).json({ error: "Director must have a school context" });
   }
 
   // Get branches for their school only
-  const schoolWithBranches = await getSchoolWithBranches(school_id);
+  const schoolWithBranches = await getSchoolWithBranches(effectiveSchoolId);
   
   if (!schoolWithBranches) {
     return res.status(404).json({ error: "School not found" });
