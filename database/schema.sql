@@ -35,6 +35,7 @@ DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS hr_leave;
 DROP TABLE IF EXISTS hr_attendance;
 DROP TABLE IF EXISTS hr_payslips;
+DROP TABLE IF EXISTS expenditures;
 DROP TABLE IF EXISTS hr_staff;
 DROP TABLE IF EXISTS admissions;
 DROP TABLE IF EXISTS notifications;
@@ -401,6 +402,32 @@ CREATE TABLE payments (
   CONSTRAINT fk_payments_student  FOREIGN KEY (student_id) REFERENCES students(student_id)
 ) ENGINE=InnoDB;
 
+-- Expenditures
+CREATE TABLE expenditures (
+  expenditure_id   BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+  school_id        BIGINT UNSIGNED NOT NULL,
+  expense_date     DATE NOT NULL,
+  category         VARCHAR(80)  NOT NULL,
+  item_name        VARCHAR(180) NOT NULL,
+  description      TEXT NULL,
+  amount           DECIMAL(12,2) NOT NULL DEFAULT 0,
+  payment_method   VARCHAR(40)  NOT NULL DEFAULT 'cash',
+  vendor_name      VARCHAR(180) NULL,
+  paid_to_name     VARCHAR(180) NULL,
+  purpose          VARCHAR(255) NULL,
+  reference_number VARCHAR(120) NULL,
+  notes            TEXT NULL,
+  created_by       BIGINT UNSIGNED NULL,
+  released_by_user_id BIGINT UNSIGNED NULL,
+  released_by_name VARCHAR(180) NULL,
+  is_deleted       TINYINT(1)   NOT NULL DEFAULT 0,
+  created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_expenditures_school_date (school_id, expense_date),
+  INDEX idx_expenditures_school_category (school_id, category),
+  CONSTRAINT fk_expenditures_school FOREIGN KEY (school_id) REFERENCES schools(school_id)
+) ENGINE=InnoDB;
+
 -- Transport 
 CREATE TABLE transport_routes (
   transport_id   BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
@@ -662,6 +689,8 @@ CREATE TABLE hr_payslips (
   notes          TEXT NULL,
   status         ENUM('draft','approved','paid') DEFAULT 'draft',
   paid_date      DATE NULL,
+  paid_by_user_id BIGINT UNSIGNED NULL,
+  payment_recorded_by VARCHAR(180) NULL,
   generated_by   BIGINT UNSIGNED NULL,
   is_deleted     TINYINT(1)   NOT NULL DEFAULT 0,
   created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,

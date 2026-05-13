@@ -454,7 +454,7 @@ router.patch("/payslips/approve", requireRoles(...HR_ROLES), async (req, res, ne
 // Mark payslips as paid for a month (supports professional payment recording)
 router.patch("/payslips/mark-paid", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
+    const { schoolId, userId, user_id: legacyUserId } = req.user;
     const { month, year, staffIds, paymentMethod, paymentReference } = req.body;
 
     let query = supabase
@@ -464,6 +464,8 @@ router.patch("/payslips/mark-paid", requireRoles(...HR_ROLES), async (req, res, 
         paid_date: new Date().toISOString().slice(0, 10),
         payment_method: paymentMethod || 'Cash',
         payment_reference: paymentReference || null,
+        paid_by_user_id: userId || legacyUserId || null,
+        payment_recorded_by: req.user?.name || req.user?.full_name || null,
         updated_at: new Date().toISOString()
       })
       .eq('school_id', schoolId)

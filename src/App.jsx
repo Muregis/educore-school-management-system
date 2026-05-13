@@ -19,6 +19,7 @@ import CommunicationPage from "./pages/CommunicationPage";
 import AccountsPage from "./pages/AdminAccountsPage";
 import AdminSettings from "./pages/AdminSettings";
 import ReportsPage from "./pages/ReportsPage";
+import ExpendituresPage from "./pages/ExpendituresPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import AnalysisPage from "./pages/AnalysisPage";
 import TimetablePage from "./pages/TimetablePage";
@@ -123,8 +124,8 @@ const BOTTOM_NAV_PAGES = {
   superadmin:["dashboard","students","staff","attendance","fees"],
   admin:     ["dashboard","students","grades","fees","reports"],
   teacher:   ["dashboard","grades","attendance","timetable"],
-  finance:   ["dashboard","fees","invoices"],
-  hr:        ["dashboard","hr","staff"],
+  finance:   ["dashboard","fees","expenditures","invoices"],
+  hr:        ["dashboard","hr","staff","expenditures"],
   librarian: ["dashboard","library"],
   parent:    ["dashboard","grades","fees","attendance","communication"],
   student:   ["dashboard","grades","attendance","timetable","library"],
@@ -493,6 +494,7 @@ export default function App() {
     grades: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     subjects: ["admin","teacher","director","superadmin"].includes(auth.role) ? <SubjectsPage auth={auth} toast={toast} canEdit={canEdit} /> : <Forbidden />,
     fees: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <FeesPage auth={auth} school={school} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} canViewTotals={canViewTotals} canDeletePayments={canDeletePayments} toast={toast} linkedStudentId={linkedStudentId} />,
+    expenditures: ["admin","finance","hr","director","superadmin"].includes(auth.role) ? <ExpendituresPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
     "mpesa-reconcile": <MpesaReconciliationPage auth={auth} students={students} toast={toast} />,
     "bulk-import": ["admin","director","superadmin"].includes(auth.role) ? <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} payments={payments} feeStructures={feeStructures} results={results} /> : <Forbidden />,
     exams: <ExamsPage auth={auth} students={students} subjects={[]} toast={toast} />,
@@ -509,7 +511,7 @@ export default function App() {
     lessonplans: ["admin","teacher","director","superadmin"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     announcements: perms?.pages.includes("announcements") ? <AnnouncementsPage auth={auth} toast={toast} /> : <Forbidden />,
     analytics: ["admin","director","superadmin"].includes(auth.role) ? <AnalyticsPage auth={auth} students={students} teachers={teachers} payments={payments} results={results} attendance={attendance} feeStructures={feeStructures} toast={toast} /> : <Forbidden />,
-    reports: ["admin","teacher","director","superadmin"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
+    reports: ["admin","finance","director","superadmin"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
     analysis: ["admin","teacher","director","superadmin"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,
     "update-requests": ["admin","parent"].includes(auth.role) ? <UpdateRequestsPage auth={auth} students={students} pendingUpdates={pendingUpdates} setPendingUpdates={setPendingUpdates} toast={toast} /> : <Forbidden />,
     settings: ["admin","director","superadmin"].includes(auth.role)

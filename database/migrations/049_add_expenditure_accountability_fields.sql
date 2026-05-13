@@ -1,0 +1,9 @@
+ALTER TABLE public.expenditures
+  ADD COLUMN IF NOT EXISTS paid_to_name VARCHAR(180) NULL,
+  ADD COLUMN IF NOT EXISTS purpose VARCHAR(255) NULL,
+  ADD COLUMN IF NOT EXISTS released_by_user_id BIGINT NULL,
+  ADD COLUMN IF NOT EXISTS released_by_name VARCHAR(180) NULL;
+
+ALTER TABLE public.hr_payslips
+  ADD COLUMN IF NOT EXISTS paid_by_user_id BIGINT NULL,
+  ADD COLUMN IF NOT EXISTS payment_recorded_by VARCHAR(180) NULL;

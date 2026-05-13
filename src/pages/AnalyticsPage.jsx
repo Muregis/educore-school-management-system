@@ -91,6 +91,7 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
   const [aiLoading, setAiLoading] = useState(false);
   const [studentBalances, setStudentBalances] = useState({});
   const [balancesLoading, setBalancesLoading] = useState(false);
+  const [expenditureSummary, setExpenditureSummary] = useState(null);
 
   // Fetch student balances
   useEffect(() => {
@@ -115,6 +116,13 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
     fetchBalances();
   }, [auth?.token, students]);
 
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch("/reports/expenditure-summary", { token: auth.token })
+      .then((data) => setExpenditureSummary(data || null))
+      .catch((err) => console.error("Error fetching expenditure summary:", err));
+  }, [auth?.token]);
+
   // Calculate statistics
   const stats = useMemo(() => {
     const totalStudents = students.length;
@@ -124,6 +132,9 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
 
     // Fee stats - use proper balance calculations that include opening balance
     const totalCollected = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const totalExpenses = Number(expenditureSummary?.totals?.total || 0);
+    const payrollExpenses = Number(expenditureSummary?.totals?.payroll || 0);
+    const manualExpenses = Number(expenditureSummary?.totals?.manual || 0);
     const pendingFees = students.reduce((sum, s) => {
       const studentId = s.id ?? s.student_id;
       const balanceData = studentBalances[studentId];
@@ -155,11 +166,12 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
 
     return {
       totalStudents, activeStudents, byClass, byGender,
-      totalCollected, pendingFees,
+      totalCollected, pendingFees, totalExpenses, payrollExpenses, manualExpenses,
+      netCashflow: totalCollected - totalExpenses,
       gradeDist, avgMarks,
       presentCount, absentCount, attendanceRate,
     };
-  }, [students, payments, results, attendance, feeStructures, studentBalances]);
+  }, [students, payments, results, attendance, feeStructures, studentBalances, expenditureSummary]);
 
   // Generate AI analysis
   const generateAIReport = useCallback(async () => {
@@ -178,6 +190,8 @@ School Overview:
 
 Financial Status:
 - Total Collected (KES): ${stats.totalCollected.toFixed(2)}
+- Total Expenses (KES): ${stats.totalExpenses.toFixed(2)}
+- Payroll Costs (KES): ${stats.payrollExpenses.toFixed(2)}
 - Outstanding Fees (KES): ${stats.pendingFees.toFixed(2)}
 - Collection Rate: ${stats.totalCollected > 0 ? ((stats.totalCollected / (stats.totalCollected + stats.pendingFees)) * 100).toFixed(1) : 100}%
 
@@ -254,6 +268,14 @@ Provide a structured analysis with:
     }));
   }, [payments]);
 
+  const expenseChartData = useMemo(() => {
+    return (expenditureSummary?.monthlyTrend || []).slice().reverse().map((item) => ({
+      label: item.label,
+      value: Math.round(Number(item.total || 0)),
+      color: "var(--color-danger)",
+    }));
+  }, [expenditureSummary]);
+
   const tabs = [
     { id: "overview", label: "Overview" },
     { id: "academic", label: "Academic" },
@@ -294,6 +316,15 @@ Provide a structured analysis with:
                 <EmptyState icon="🧠" title="AI Analytics Ready" description="Click the button above to generate a deep-dive analysis of your school's current standing." />
               )}
             </Card>
+
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Monthly Expenditure Trend</h3>
+              {expenseChartData.length > 0 ? (
+                <BarChart data={expenseChartData} height={200} />
+              ) : (
+                <EmptyState icon="📊" title="No Data" description="No expenditure data available." />
+              )}
+            </Card>
           </div>
         )}
 
@@ -306,6 +337,8 @@ Provide a structured analysis with:
               <StatCard title="Teachers" value={teachers.length} subtitle="Staff members" icon="👨‍🏫" trend={0} />
               <StatCard title="Total Collected" value={money(stats.totalCollected)} subtitle="Fees this term" icon="💰" trend={0} />
               <StatCard title="Pending Fees" value={money(stats.pendingFees)} subtitle="Outstanding balance" icon="⏳" trend={0} />
+              <StatCard title="Total Expenses" value={money(stats.totalExpenses)} subtitle="Operations and payroll" icon="💸" trend={0} />
+              <StatCard title="Net Cashflow" value={money(stats.netCashflow)} subtitle="Collected minus expenses" icon="📉" trend={0} />
             </div>
 
             {/* Charts Row */}
@@ -355,6 +388,9 @@ Provide a structured analysis with:
               <StatCard title="Total Collected" value={money(stats.totalCollected)} icon="💵" trend={0} />
               <StatCard title="Pending Balance" value={money(stats.pendingFees)} icon="⏳" trend={0} />
               <StatCard title="Collection Rate" value={`${stats.pendingFees > 0 ? ((stats.totalCollected / (stats.totalCollected + stats.pendingFees)) * 100).toFixed(1) : 100}%`} icon="📊" trend={0} />
+              <StatCard title="Total Expenses" value={money(stats.totalExpenses)} icon="💸" trend={0} />
+              <StatCard title="Payroll Costs" value={money(stats.payrollExpenses)} icon="👨‍💼" trend={0} />
+              <StatCard title="Net Cashflow" value={money(stats.netCashflow)} icon="📉" trend={0} />
             </div>
 
             {/* Class-wise Outstanding Balance */}

@@ -9,7 +9,7 @@ const { promisify } = require('util');
 // Role permissions mapping
 const ROLE_PERMISSIONS = {
   admin: [
-    'dashboard', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees',
+    'dashboard', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees', 'expenditures',
     'mpesa-reconcile', 'admissions', 'invoices', 'reportcards', 'discipline', 'transport',
     'communication', 'timetable', 'reports', 'analytics', 'accounts', 'hr',
     'library', 'lessonplans', 'settings', 'announcements', 'bulk-import',
@@ -20,7 +20,7 @@ const ROLE_PERMISSIONS = {
     'communication', 'library', 'analysis', 'lessonplans', 'announcements', 'exams'
   ],
   finance: [
-    'dashboard', 'fees', 'mpesa-reconcile', 'invoices', 'announcements'
+    'dashboard', 'fees', 'expenditures', 'mpesa-reconcile', 'invoices', 'announcements', 'reports'
   ],
   hr: [
     'dashboard', 'hr', 'staff', 'announcements'

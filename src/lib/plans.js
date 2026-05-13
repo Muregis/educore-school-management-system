@@ -17,7 +17,7 @@ export const PLAN_FEATURES = {
   standard: {
     pages: [
       "dashboard", "students", "teachers",
-      "attendance", "grades", "fees", "payments",
+      "attendance", "grades", "fees", "payments", "expenditures",
       "reportcards", "discipline", "timetable",
       "invoices", "admissions", "hr", "staff",
       "library", "communication", "reports",
@@ -35,7 +35,7 @@ export const PLAN_FEATURES = {
   premium: {
     pages: [
       "dashboard", "students", "teachers",
-      "attendance", "grades", "fees", "payments",
+      "attendance", "grades", "fees", "payments", "expenditures",
       "reportcards", "discipline", "timetable",
       "invoices", "admissions", "hr", "staff",
       "library", "communication", "reports",
@@ -55,7 +55,7 @@ export const PLAN_FEATURES = {
 
 export const PLAN_LIMITS = {
   starter: ["dashboard", "students", "teachers", "attendance", "grades", "fees", "reportcards", "discipline", "timetable", "settings"],
-  standard: ["dashboard", "students", "teachers", "attendance", "grades", "fees", "payments", "reportcards", "discipline", "timetable", "invoices", "admissions", "hr", "library", "communication", "reports", "analytics", "accounts", "settings"],
+  standard: ["dashboard", "students", "teachers", "attendance", "grades", "fees", "payments", "expenditures", "reportcards", "discipline", "timetable", "invoices", "admissions", "hr", "library", "communication", "reports", "analytics", "accounts", "settings"],
   premium: ["all"]
 };
 

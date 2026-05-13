@@ -16,6 +16,7 @@ const NAVIGATION_GROUPS = [
       { id: "attendance", label: "Attendance", icon: "✅" },
       { id: "grades", label: "Grades", icon: "🧾" },
       { id: "fees", label: "Fees", icon: "💳" },
+      { id: "expenditures", label: "Expenditures", icon: "💸" },
       { id: "mpesa-reconcile", label: "M-Pesa Reconcile", icon: "📱" }
     ]
   },
@@ -102,17 +103,15 @@ const Sidebar = ({
   
   const roleColor = getRoleColor(auth?.role);
   const isParent = auth?.role === "parent";
-  const isDirector = auth?.role === "director";
-  const isSuperadmin = auth?.role === "superadmin";
 
   // ROLE FILTERING LOGIC
   const ROLE_NAV_LIMITS = {
-    admin: ["dashboard", "students", "teachers", "subjects", "attendance", "grades", "fees", "invoices", "reportcards", "discipline", "transport", "communication", "timetable", "library", "lessonplans", "announcements", "exams", "admissions", "hr", "bulk-import"],
+    admin: ["dashboard", "students", "teachers", "subjects", "attendance", "grades", "fees", "expenditures", "invoices", "reportcards", "discipline", "transport", "communication", "timetable", "library", "lessonplans", "announcements", "exams", "admissions", "hr", "bulk-import", "reports"],
     director: null, 
     superadmin: null, 
     teacher: ["dashboard", "subjects", "attendance", "grades", "reportcards", "discipline", "timetable", "communication", "library", "analysis", "lessonplans", "announcements", "exams"],
-    finance: ["dashboard", "fees", "mpesa-reconcile", "invoices", "announcements"],
-    hr: ["dashboard", "hr", "staff", "announcements"],
+    finance: ["dashboard", "fees", "expenditures", "mpesa-reconcile", "invoices", "announcements", "reports"],
+    hr: ["dashboard", "hr", "staff", "expenditures", "announcements"],
     librarian: ["dashboard", "library", "announcements"],
     parent: ["dashboard", "grades", "fees", "attendance", "communication", "announcements"],
     student: ["dashboard", "grades", "attendance", "reportcards", "library", "announcements"],
@@ -129,11 +128,6 @@ const Sidebar = ({
       })).filter(group => group.id === "dashboard" || group.items.length > 0);
     }
 
-    // Hide SYSTEM section for non-director roles
-    if (!isDirector && !isSuperadmin) {
-      groups = groups.filter(group => !group.systemOnly);
-    }
-
     if (allowedPages.length) {
       groups = groups.map(group => ({
         ...group,
@@ -142,7 +136,7 @@ const Sidebar = ({
     }
 
     return groups;
-  }, [allowedPages, auth?.role, isDirector, isSuperadmin]);
+  }, [allowedPages, auth?.role]);
 
   useEffect(() => {
     setOpenGroup(findGroupForPage(page));

@@ -9,7 +9,7 @@ import { promisify } from 'util';
 // Role permissions mapping
 const ROLE_PERMISSIONS = {
   director: [
-    'dashboard', 'upgrade', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees',
+    'dashboard', 'upgrade', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees', 'expenditures',
     'mpesa-reconcile', 'admissions', 'invoices', 'reportcards', 'discipline', 'transport',
     'communication', 'messaging', 'timetable', 'reports', 'analytics', 'accounts', 'hr',
     'library', 'lessonplans', 'pendingplans', 'settings', 'announcements', 'bulk-import',
@@ -17,7 +17,7 @@ const ROLE_PERMISSIONS = {
     'promotion.view', 'promotion.approve', 'branch-management', 'admin-permissions'
   ],
   superadmin: [
-    'dashboard', 'upgrade', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees',
+    'dashboard', 'upgrade', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees', 'expenditures',
     'mpesa-reconcile', 'admissions', 'invoices', 'reportcards', 'discipline', 'transport',
     'communication', 'messaging', 'timetable', 'reports', 'analytics', 'accounts', 'hr',
     'library', 'lessonplans', 'pendingplans', 'settings', 'announcements', 'bulk-import',
@@ -34,10 +34,10 @@ const ROLE_PERMISSIONS = {
     'academic.view', 'students.view'
   ],
   finance: [
-    'dashboard', 'fees', 'mpesa-reconcile', 'invoices', 'announcements', 'upgrade'
+    'dashboard', 'fees', 'expenditures', 'mpesa-reconcile', 'invoices', 'announcements', 'upgrade', 'reports'
   ],
   hr: [
-    'dashboard', 'hr', 'staff', 'announcements', 'upgrade'
+    'dashboard', 'hr', 'staff', 'expenditures', 'announcements', 'upgrade'
   ],
   librarian: [
     'dashboard', 'library', 'announcements'

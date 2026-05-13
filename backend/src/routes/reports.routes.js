@@ -2,6 +2,7 @@ import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
+import { getExpenditureSummary } from "../services/expenditure.service.js";
 
 const router = Router();
 router.use(authRequired);
@@ -16,6 +17,7 @@ function getOpeningBalanceImpact(student) {
 router.get("/summary", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    const expenditureSummary = await getExpenditureSummary(schoolId);
     
     const { count: totalStudents, error: stuErr } = await supabase
       .from('students')
@@ -68,8 +70,33 @@ router.get("/summary", async (req, res, next) => {
       .eq('is_deleted', false);
     if (absErr) throw absErr;
 
-    res.json({ totalStudents: totalStudents || 0, totalTeachers: totalTeachers || 0, totalCollected, totalPending, presentToday: presentCount || 0, absentToday: absentCount || 0 });
+    const totalExpenses = expenditureSummary?.totals?.total || 0;
+    const payrollExpenses = expenditureSummary?.totals?.payroll || 0;
+    const manualExpenses = expenditureSummary?.totals?.manual || 0;
+
+    res.json({
+      totalStudents: totalStudents || 0,
+      totalTeachers: totalTeachers || 0,
+      totalCollected,
+      totalPending,
+      totalExpenses,
+      payrollExpenses,
+      manualExpenses,
+      netCashflow: totalCollected - totalExpenses,
+      presentToday: presentCount || 0,
+      absentToday: absentCount || 0
+    });
   } catch (err) { next(err); }
+});
+
+router.get("/expenditure-summary", async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const summary = await getExpenditureSummary(schoolId);
+    res.json(summary);
+  } catch (err) {
+    next(err);
+  }
 });
 
 // ─── Monthly fee collection ───────────────────────────────────────────────────

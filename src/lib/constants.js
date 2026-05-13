@@ -14,17 +14,17 @@ export const DEFAULTS = {
 
 export const ROLE = {
   // Director - HIGHEST ROLE - Full control over all schools, can delegate permissions
-  director:  { pages:["dashboard","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true, canDelegate:true },
+  director:  { pages:["dashboard","students","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true, canDelegate:true },
   // Superadmin - System-level full access
-  superadmin:{ pages:["dashboard","students","staff","attendance","grades","subjects","fees","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true },
+  superadmin:{ pages:["dashboard","students","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true },
   // Admin - School administrator with full school-level access
-  admin:     { pages:["dashboard","students","teachers","subjects","attendance","grades","fees","invoices","reportcards","discipline","transport","communication","timetable","library","lessonplans","announcements","exams","admissions"], edit:true },
+  admin:     { pages:["dashboard","students","teachers","subjects","attendance","grades","fees","expenditures","invoices","reportcards","discipline","transport","communication","timetable","library","lessonplans","announcements","exams","admissions","reports"], edit:true },
   // Teacher - Classroom operations
   teacher:   { pages:["dashboard","subjects","attendance","grades","reportcards","discipline","timetable","communication","library","analysis","lessonplans","announcements","exams"], edit:true },
   // Finance - Fee operations
-  finance:   { pages:["dashboard","fees","mpesa-reconcile","invoices","announcements"], edit:true },
+  finance:   { pages:["dashboard","fees","expenditures","mpesa-reconcile","invoices","announcements","reports"], edit:true },
   // HR - Staff management
-  hr:        { pages:["dashboard","hr","staff","announcements"], edit:true },
+  hr:        { pages:["dashboard","hr","staff","expenditures","announcements"], edit:true },
   // Librarian - Library management
   librarian: { pages:["dashboard","library","announcements"], edit:true },
   // Parent - View child data (minimal essential pages only)
@@ -42,6 +42,7 @@ export const NAV = [
   { id:"grades",          label:"Grades",         icon:"\u{1F4CA}" },
   { id:"subjects",        label:"Subjects",       icon:"\u{1F4D6}" },
   { id:"fees",            label:"Fees",           icon:"\u{1F4B3}" },
+  { id:"expenditures",    label:"Expenditures",   icon:"\u{1F4B8}" },
   { id:"mpesa-reconcile", label:"M-Pesa Reconcile", icon:"\u{1F4F2}" },
   { id:"admissions",      label:"Admissions",     icon:"\u{1F4CB}" },
   { id:"invoices",        label:"Invoices",       icon:"\u{1F9FE}" },

@@ -586,6 +586,7 @@ export default function ReportsPage({ auth }) {
   const [defaulters, setDefaulters] = useState([]);
   const [grades, setGrades]         = useState([]);
   const [classFeeSummary, setClassFeeSummary] = useState([]);
+  const [expenditureSummary, setExpenditureSummary] = useState(null);
   const [tab, setTab]               = useState("overview");
   const [filterClass, setFilterClass] = useState("all");
   const [loading, setLoading]       = useState(true);
@@ -610,12 +611,17 @@ export default function ReportsPage({ auth }) {
       apiFetch("/reports/fee-defaulters",         { token }),
       apiFetch("/reports/grade-distribution",     { token }),
       apiFetch("/reports/class-fee-summary",      { token }), // New endpoint for class-wise fees
-    ]).then(([s, m, a, d, g, cfs]) => {
+      apiFetch("/reports/expenditure-summary",    { token }),
+    ]).then(([s, m, a, d, g, cfs, es]) => {
       const normSummary = s ? {
         students:       s.totalStudents  ?? s.students       ?? 0,
         teachers:       s.totalTeachers  ?? s.teachers       ?? 0,
         feesCollected:  s.totalCollected ?? s.feesCollected  ?? 0,
         feesPending:    s.totalPending   ?? s.feesPending    ?? 0,
+        totalExpenses:  s.totalExpenses  ?? 0,
+        payrollExpenses:s.payrollExpenses ?? 0,
+        manualExpenses: s.manualExpenses ?? 0,
+        netCashflow:    s.netCashflow ?? 0,
         openDiscipline: s.openDiscipline ?? 0,
       } : null;
       setSummary(normSummary);
@@ -623,6 +629,7 @@ export default function ReportsPage({ auth }) {
       setAttendance(a);
       setDefaulters(d);
       setClassFeeSummary(cfs || []);
+      setExpenditureSummary(es || null);
       setGrades((g || []).map(row => ({
         ...row,
         avg_score:  row.avg_score  ?? row.avgScore  ?? 0,
@@ -675,13 +682,15 @@ export default function ReportsPage({ auth }) {
           <StatCard label="Active Teachers"  value={summary.teachers}               tone="info" />
           <StatCard label="Fees Collected"   value={money(summary.feesCollected)}   tone="success" />
           <StatCard label="Fees Pending"     value={money(summary.feesPending)}     tone="warning" />
+          <StatCard label="Total Expenses"   value={money(summary.totalExpenses)}   tone="danger" />
+          <StatCard label="Net Cashflow"     value={money(summary.netCashflow)}     tone={summary.netCashflow >= 0 ? "success" : "danger"} />
           <StatCard label="Open Discipline"  value={summary.openDiscipline}         tone="danger" />
         </div>
       )}
 
       {/* Tabs */}
       <div style={{ display: "flex", borderBottom: "1px solid var(--color-border)", flexWrap: "wrap" }}>
-        {["overview","fees","attendance","grades","defaulters","analysis"].map(tabBtn)}
+        {["overview","fees","expenditures","attendance","grades","defaulters","analysis"].map(tabBtn)}
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
@@ -701,21 +710,41 @@ export default function ReportsPage({ auth }) {
 
         {/* ── Overview ── */}
         {tab === "overview" && (
-          <Card style={{ padding: "var(--space-4)" }}>
-            <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Monthly Fee Collection</h3>
-            {monthly.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No payment data yet.</p> : (
-              <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
-                <Table 
-                  headers={["Month", "Transactions", "Total"]}
-                  data={monthly.map((m, i) => [
-                    <span key="month" style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>{m.month}</span>,
-                    <span key="tx" style={{ color: "var(--color-text-secondary)" }}>{m.transactions}</span>,
-                    <span key="total" style={{ color: "var(--color-success)", fontWeight: 700 }}>{money(m.total)}</span>
-                  ])}
-                />
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Monthly Fee Collection</h3>
+              {monthly.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No payment data yet.</p> : (
+                <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                  <Table 
+                    headers={["Month", "Transactions", "Total"]}
+                    data={monthly.map((m, i) => [
+                      <span key="month" style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>{m.month}</span>,
+                      <span key="tx" style={{ color: "var(--color-text-secondary)" }}>{m.transactions}</span>,
+                      <span key="total" style={{ color: "var(--color-success)", fontWeight: 700 }}>{money(m.total)}</span>
+                    ])}
+                  />
+                </div>
+              )}
+            </Card>
+
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Income vs Expenses</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--space-3)" }}>
+                <div style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
+                  <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-1)" }}>Fee Income</div>
+                  <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-success)" }}>{money(summary?.feesCollected || 0)}</div>
+                </div>
+                <div style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
+                  <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-1)" }}>Operating Expenses</div>
+                  <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-danger)" }}>{money(summary?.totalExpenses || 0)}</div>
+                </div>
+                <div style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
+                  <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-1)" }}>Net Cashflow</div>
+                  <div style={{ fontSize: "24px", fontWeight: 800, color: (summary?.netCashflow || 0) >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>{money(summary?.netCashflow || 0)}</div>
+                </div>
               </div>
-            )}
-          </Card>
+            </Card>
+          </div>
         )}
 
         {/* ── Fees ── */}
@@ -762,6 +791,50 @@ export default function ReportsPage({ auth }) {
                           <div style={{ width: `${pct}%`, background: "linear-gradient(90deg, var(--color-primary), var(--color-info))", height: "100%", borderRadius: "var(--radius-full)", transition: "width 0.4s" }} />
                         </div>
                         <div style={{ width: "120px", fontSize: "14px", color: "var(--color-text-primary)", textAlign: "right", fontWeight: 700 }}>{money(m.total)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {tab === "expenditures" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Expense Breakdown</h3>
+              {!expenditureSummary?.byCategory?.length ? (
+                <p style={{ color: "var(--color-text-muted)" }}>No expenditure data yet.</p>
+              ) : (
+                <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                  <Table
+                    headers={["Category", "Amount"]}
+                    data={expenditureSummary.byCategory.map((item) => [
+                      <span key="category" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{item.category}</span>,
+                      <span key="amount" style={{ color: "var(--color-danger)", fontWeight: 700 }}>{money(item.amount)}</span>
+                    ])}
+                  />
+                </div>
+              )}
+            </Card>
+
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Monthly Expense Trend</h3>
+              {!expenditureSummary?.monthlyTrend?.length ? (
+                <p style={{ color: "var(--color-text-muted)" }}>No expenditure trend available yet.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                  {expenditureSummary.monthlyTrend.map((month) => {
+                    const max = Math.max(...expenditureSummary.monthlyTrend.map(x => Number(x.total)), 1);
+                    const pct = (Number(month.total) / max) * 100;
+                    return (
+                      <div key={month.month} style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-2) 0" }}>
+                        <div style={{ width: "90px", fontSize: "13px", color: "var(--color-text-secondary)", fontWeight: 500 }}>{month.label}</div>
+                        <div style={{ flex: 1, background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-full)", height: "24px", overflow: "hidden" }}>
+                          <div style={{ width: `${pct}%`, background: "linear-gradient(90deg, var(--color-danger), var(--color-warning))", height: "100%", borderRadius: "var(--radius-full)", transition: "width 0.4s" }} />
+                        </div>
+                        <div style={{ width: "130px", fontSize: "14px", color: "var(--color-text-primary)", textAlign: "right", fontWeight: 700 }}>{money(month.total)}</div>
                       </div>
                     );
                   })}
