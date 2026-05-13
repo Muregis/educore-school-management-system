@@ -7,9 +7,8 @@ import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { getAuthHeaders } from "../lib/auth";
 import { printHTML } from "../lib/print";
-import { calculateStudentBalance, formatBalance, getBalanceStatusColor } from "../services/balanceService";
-import { ledgerBalanceService } from "../services/ledgerBalanceService";
 import discountService from "../services/discountService";
+import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 import Button from "../components/ui/Button";
@@ -233,78 +232,39 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const normalisedPayments   = payments.map(p => p.payment_id ? normalisePayment(p) : p);
   const normalisedStructures = feeStructures.map(f => f.fee_structure_id ? normaliseFeeStruct(f) : f);
 
-  const expectedByClass = c => {
-    const fs = normalisedStructures.find(f => f.className === c);
-    return fs ? Number(fs.tuition) + Number(fs.activity) + Number(fs.misc) : 0;
-  };
-
-  const getCurrentTerm = () => {
-    const terms = [...new Set(normalisedStructures.map(f => f.term).filter(Boolean))];
-    if (terms.length > 0) return terms[0];
-    return "Term 2";
-  };
-
   const calculateLedgerBalance = (student, studentDiscounts = []) => {
     const sid = student.id ?? student.student_id;
     const cls = student.className ?? student.class_name ?? "";
-
-    const baseExpected = expectedByClass(cls);
-    const transportDirection = student.transport_direction || 'none';
-    const lunchEnabled = student.lunch_enabled || false;
-    const breakfastEnabled = student.breakfast_enabled || false;
-    const openingBalanceAmount = Number(student.opening_balance) || 0;
-    const openingBalance = student.opening_balance_type === "credit" ? -openingBalanceAmount : openingBalanceAmount;
-
-    const transportFee = ledgerBalanceService.calculateTransportFee(student.transport_base_fee || 0, transportDirection);
-    const lunchFee = lunchEnabled ? ledgerBalanceService.calculateLunchFee(student.lunch_daily_rate || 100, student.lunch_days || 66, student.lunch_billing_type || 'daily') : 0;
-    const breakfastFee = breakfastEnabled ? ledgerBalanceService.calculateBreakfastFee(student.breakfast_daily_rate || 100, student.breakfast_days || 66, student.breakfast_billing_type || 'daily') : 0;
-
-    const grossAmount = baseExpected + transportFee + lunchFee + breakfastFee + openingBalance;
-
-    const discountCalc = discountService.calculateFeeWithDiscount({
-      baseFee: baseExpected,
-      transportFee,
-      lunchFee,
-      breakfastFee,
-      openingBalance,
+    const balanceInfo = calculateStudentBalanceLocal({
+      student,
+      feeStructures: normalisedStructures,
+      payments: normalisedPayments,
       discounts: studentDiscounts
     });
-
-    const totalExpected = discountCalc.netAmount;
-    const totalDiscount = discountCalc.discountAmount;
-    const discountPercent = discountCalc.discountPercent;
-    const discountType = discountCalc.discountType;
-    const discountLabel = discountCalc.discountLabel;
-
-    const paid = normalisedPayments
-      .filter(p => String(p.studentId) === String(sid) && p.status === "paid")
-      .reduce((sum, p) => sum + Number(p.amount), 0);
-
-    const balance = Math.max(0, totalExpected - paid);
 
     return {
       studentId: sid,
       name: student.firstName ? `${student.firstName} ${student.lastName}` : `${student.first_name} ${student.last_name}`,
       className: cls,
-      expected: totalExpected,
-      grossAmount,
-      totalDiscount,
-      discountPercent,
-      discountType,
-      discountLabel,
-      paid,
-      balance,
-      openingBalance,
-      transportFee,
-      lunchFee,
-      breakfastFee,
-      baseFee: baseExpected,
+      expected: balanceInfo.expected,
+      grossAmount: balanceInfo.grossAmount,
+      totalDiscount: balanceInfo.totalDiscount,
+      discountPercent: balanceInfo.discountPercent,
+      discountType: balanceInfo.discountType,
+      discountLabel: balanceInfo.discountLabel,
+      paid: balanceInfo.paid,
+      balance: balanceInfo.balance,
+      openingBalance: balanceInfo.openingBalance,
+      transportFee: balanceInfo.transportFee,
+      lunchFee: balanceInfo.lunchFee,
+      breakfastFee: balanceInfo.breakfastFee,
+      baseFee: balanceInfo.baseFee,
       admissionNumber: student.admission ?? student.admission_number ?? "",
       email: student.email ?? student.parentEmail ?? "",
-      transportDirection,
-      lunchEnabled,
-      breakfastEnabled,
-      hasDiscount: discountCalc.hasDiscount
+      transportDirection: student.transport_direction || 'none',
+      lunchEnabled: student.lunch_enabled || false,
+      breakfastEnabled: student.breakfast_enabled || false,
+      hasDiscount: balanceInfo.hasDiscount
     };
   };
 
@@ -418,10 +378,15 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     if (amt > balance) return toast("Cannot exceed outstanding balance", "error");
 
     try {
-      await apiFetch("/payments/manual", {
+      await apiFetch("/payments/record-manual", {
         method: "POST",
         token: auth?.token,
-        body: { studentId: paymentForm.studentId, amount: amt, method: paymentForm.method, date: paymentForm.date },
+        body: {
+          studentId: paymentForm.studentId,
+          amount: amt,
+          paymentMethod: paymentForm.method,
+          paymentDate: paymentForm.date,
+        },
       });
       await reloadPayments();
       setShowPayment(false);

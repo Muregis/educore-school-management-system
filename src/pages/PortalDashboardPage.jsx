@@ -6,6 +6,7 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import EmptyState from "../components/ui/EmptyState";
+import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 
 export default function PortalDashboardPage({ 
   auth, 
@@ -44,18 +45,13 @@ export default function PortalDashboardPage({
     ? Math.round((presentCount / studentAttendance.length) * 100) 
     : 0;
   
-  const totalPaid = studentPayments
-    .filter(p => p.status === "paid")
-    .reduce((sum, p) => sum + Number(p.amount), 0);
-  
-  // Calculate class fee from fee structure (tuition + activity + misc)
-  const feeStruct = feeStructures?.find(f => 
-    (f.className ?? f.class_name) === (student?.className ?? student?.class_name)
+  const balanceInfo = useMemo(
+    () => calculateStudentBalanceLocal({ student, feeStructures, payments: studentPayments }),
+    [student, feeStructures, studentPayments]
   );
-  const classFee = feeStruct
-    ? (Number(feeStruct.tuition || 0) + Number(feeStruct.activity || 0) + Number(feeStruct.misc || 0))
-    : 0;
-  const balance = classFee - totalPaid;
+  const totalPaid = balanceInfo.paid;
+  const classFee = balanceInfo.expected;
+  const balance = balanceInfo.balance;
   
   // Calculate average grade across all subjects
   const avgGrade = useMemo(() => {

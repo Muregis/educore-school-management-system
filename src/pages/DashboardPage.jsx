@@ -6,6 +6,7 @@ import Badge from "../components/ui/Badge";
 import Skeleton from "../components/ui/Skeleton";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
+import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 
 // Define money here locally just in case it was a global that gets lost in strict module scope
 const money = (val) => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(val || 0);
@@ -226,25 +227,12 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   
   const totalPaid = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
 
-  const expectedByClass = cls => {
-    const fs = feeStructures.find(f => (f.className ?? f.class_name) === cls);
-    return fs ? Number(fs.tuition || 0) + Number(fs.activity || 0) + Number(fs.misc || 0) : 0;
-  };
+  const studentBalances = students.map(student => ({
+    student,
+    ...calculateStudentBalanceLocal({ student, feeStructures, payments })
+  }));
 
-  const openingBalanceImpact = student => {
-    const amount = Number(student.opening_balance || student.openingBalance || 0);
-    return (student.opening_balance_type || student.openingBalanceType) === "credit" ? -amount : amount;
-  };
-
-  const outstanding = students.reduce((sum, s) => {
-    const cls = s.className ?? s.class_name ?? "";
-    const expected = expectedByClass(cls) + openingBalanceImpact(s);
-    const sid = s.id ?? s.student_id ?? s.studentId ?? s.student_id;
-    const paidByStudent = payments
-      .filter(p => String(p.studentId ?? p.student_id) === String(sid) && (p.status ?? "paid") === "paid")
-      .reduce((acc, p) => acc + Number(p.amount || 0), 0);
-    return sum + Math.max(0, expected - paidByStudent);
-  }, 0);
+  const outstanding = studentBalances.reduce((sum, item) => sum + item.balance, 0);
 
   const gradeCount = {
     EE: results.filter(r => r.grade === "EE").length,
@@ -518,12 +506,8 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     
     const outstandingByClass = students.map(s => {
       const cls = s.className ?? s.class_name ?? "";
-      const expected = expectedByClass(cls) + openingBalanceImpact(s);
-      const sid = s.id ?? s.student_id ?? s.studentId;
-      const paid = payments.filter(p => 
-        String(p.studentId ?? p.student_id) === String(sid) && (p.status ?? "paid") === "paid"
-      ).reduce((sum, p) => sum + Number(p.amount), 0);
-      return { className: cls, outstanding: Math.max(0, expected - paid) };
+      const balanceInfo = studentBalances.find(item => String(item.studentId) === String(s.id ?? s.student_id ?? s.studentId));
+      return { className: cls, outstanding: balanceInfo?.balance || 0 };
     }).reduce((acc, item) => {
       acc[item.className] = (acc[item.className] || 0) + item.outstanding;
       return acc;
@@ -618,8 +602,14 @@ export default function DashboardPage({ auth, school, students, teachers, attend
       : 0;
 
     const totalPaid = myPayments.reduce((s, p) => s + Number(p.amount), 0);
-    const totalExpected = myChildrenStudents.reduce((sum, s) => sum + expectedByClass(s.className), 0);
-    const balance = totalExpected - totalPaid;
+    const totalExpected = myChildrenStudents.reduce((sum, s) => {
+      const balanceInfo = calculateStudentBalanceLocal({ student: s, feeStructures, payments });
+      return sum + balanceInfo.expected;
+    }, 0);
+    const balance = myChildrenStudents.reduce((sum, s) => {
+      const balanceInfo = calculateStudentBalanceLocal({ student: s, feeStructures, payments });
+      return sum + balanceInfo.balance;
+    }, 0);
 
     const attendanceByDate = Object.entries(
       myAttendance.reduce((acc, row) => {

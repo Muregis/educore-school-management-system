@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import MobileHeader from '../components/MobileHeader';
 import MobileNav from '../components/MobileNav';
 import { money } from '../lib/utils';
+import { calculateStudentBalanceLocal } from '../services/studentBalanceUtils';
 
 export default function ParentPortalMobile({
   auth,
@@ -56,18 +57,18 @@ export default function ParentPortalMobile({
     ? Math.round((presentCount / childAttendance.length) * 100)
     : 0;
 
-  const totalPaid = childPayments
-    .filter(p => p.status === 'paid')
-    .reduce((sum, p) => sum + Number(p.amount), 0);
+  const balanceInfo = useMemo(
+    () => calculateStudentBalanceLocal({ student: activeChild, feeStructures, payments: childPayments }),
+    [activeChild, feeStructures, childPayments]
+  );
+  const totalPaid = balanceInfo.paid;
 
   // Read tuition+activity+misc — .amount does not exist on feeStructures
   const feeStruct = feeStructures.find(
     f => (f.className ?? f.class_name) === (activeChild?.className ?? activeChild?.class_name)
   );
-  const classFee = feeStruct
-    ? (Number(feeStruct.tuition || 0) + Number(feeStruct.activity || 0) + Number(feeStruct.misc || 0))
-    : 0;
-  const balance = Math.max(0, classFee - totalPaid);
+  const classFee = balanceInfo.expected;
+  const balance = balanceInfo.balance;
 
   // Navigation items
   const navItems = [

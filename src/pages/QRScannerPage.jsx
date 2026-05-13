@@ -5,6 +5,7 @@ import Btn from "../components/Btn";
 import { C } from "../lib/theme";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
+import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 
 export default function QRScannerPage({ auth, students, payments, feeStructures, toast }) {
   const [scannedData, setScannedData] = useState(null);
@@ -61,21 +62,18 @@ export default function QRScannerPage({ auth, students, payments, feeStructures,
         (p.studentId || p.student_id) === (student.id || student.student_id)
       );
 
-      // Calculate balance
-      const expectedFees = feeStructures.find(fs =>
-        fs.className === student.className || fs.class_name === student.className
-      );
-      const totalExpected = expectedFees ?
-        Number(expectedFees.tuition) + Number(expectedFees.activity) + Number(expectedFees.misc) : 0;
-      const totalPaid = studentPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-      const balance = totalExpected - totalPaid;
+      const balanceInfo = calculateStudentBalanceLocal({
+        student,
+        feeStructures,
+        payments: studentPayments
+      });
 
       setStudentInfo({
         student,
         payments: studentPayments,
-        totalExpected,
-        totalPaid,
-        balance
+        totalExpected: balanceInfo.expected,
+        totalPaid: balanceInfo.paid,
+        balance: balanceInfo.balance
       });
 
       toast("Student data loaded", "success");

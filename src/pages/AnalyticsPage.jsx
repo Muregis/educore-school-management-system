@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 import { money, countBy } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { ALL_CLASSES } from "../lib/constants";
-import { calculateBatchBalances } from "../services/balanceService";
+import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 
 import Card from "../components/ui/Card";
 import StatCard from "../components/ui/StatCard";
@@ -89,32 +89,7 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
   const [activeTab, setActiveTab] = useState("overview");
   const [aiReport, setAiReport] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-  const [studentBalances, setStudentBalances] = useState({});
-  const [balancesLoading, setBalancesLoading] = useState(false);
   const [expenditureSummary, setExpenditureSummary] = useState(null);
-
-  // Fetch student balances
-  useEffect(() => {
-    if (!auth?.token || students.length === 0) return;
-
-    const fetchBalances = async () => {
-      setBalancesLoading(true);
-      try {
-        const studentIds = students.map(s => s.id ?? s.student_id).filter(Boolean);
-        const balances = await calculateBatchBalances({
-          studentIds,
-          token: auth.token
-        });
-        setStudentBalances(balances);
-      } catch (err) {
-        console.error('Error fetching student balances:', err);
-      } finally {
-        setBalancesLoading(false);
-      }
-    };
-
-    fetchBalances();
-  }, [auth?.token, students]);
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -131,26 +106,16 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
     const byGender = countBy(students, "gender");
 
     // Fee stats - use proper balance calculations that include opening balance
-    const totalCollected = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const totalCollected = payments
+      .filter(p => (p.status ?? "paid") === "paid")
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
     const totalExpenses = Number(expenditureSummary?.totals?.total || 0);
     const payrollExpenses = Number(expenditureSummary?.totals?.payroll || 0);
     const manualExpenses = Number(expenditureSummary?.totals?.manual || 0);
-    const pendingFees = students.reduce((sum, s) => {
-      const studentId = s.id ?? s.student_id;
-      const balanceData = studentBalances[studentId];
-      
-      if (balanceData && balanceData.success) {
-        // Use the proper balance calculation that includes opening balance
-        return sum + Math.max(0, balanceData.balance || 0);
-      } else {
-        // Fallback to manual calculation if balance data not available
-        const struct = feeStructures.find(f => f.className === s.className);
-        const expected = struct ? (Number(struct.tuition || 0) + Number(struct.activity || 0) + Number(struct.misc || 0)) : 0;
-        const openingBalance = Number(s.opening_balance || 0);
-        const studentPayments = payments.filter(p => p.studentId === studentId).reduce((t, p) => t + Number(p.amount), 0);
-        return sum + Math.max(0, (openingBalance + expected) - studentPayments);
-      }
-    }, 0);
+    const pendingFees = students.reduce(
+      (sum, student) => sum + calculateStudentBalanceLocal({ student, feeStructures, payments }).balance,
+      0
+    );
 
     // Grade stats
     const gradeDist = countBy(results, "grade");
@@ -171,7 +136,7 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
       gradeDist, avgMarks,
       presentCount, absentCount, attendanceRate,
     };
-  }, [students, payments, results, attendance, feeStructures, studentBalances, expenditureSummary]);
+  }, [students, payments, results, attendance, feeStructures, expenditureSummary]);
 
   // Generate AI analysis
   const generateAIReport = useCallback(async () => {
@@ -401,17 +366,12 @@ Provide a structured analysis with:
                   const classStudents = students.filter(s => (s.className || s.class_name) === cls);
                   if (classStudents.length === 0) return null;
                   
-                  const classExpected = classStudents.reduce((sum, s) => {
-                    const struct = feeStructures.find(f => f.className === cls);
-                    return sum + (struct ? (Number(struct.tuition || 0) + Number(struct.activity || 0) + Number(struct.misc || 0)) : 0);
-                  }, 0);
-                  
-                  const classPaid = classStudents.reduce((sum, s) => {
-                    const sid = s.id ?? s.student_id;
-                    return sum + payments.filter(p => p.studentId === sid).reduce((t, p) => t + Number(p.amount), 0);
-                  }, 0);
-                  
-                  const classOutstanding = Math.max(0, classExpected - classPaid);
+                  const classBalanceInfo = classStudents.map(student =>
+                    calculateStudentBalanceLocal({ student, feeStructures, payments })
+                  );
+                  const classExpected = classBalanceInfo.reduce((sum, item) => sum + item.expected, 0);
+                  const classPaid = classBalanceInfo.reduce((sum, item) => sum + item.paid, 0);
+                  const classOutstanding = classBalanceInfo.reduce((sum, item) => sum + item.balance, 0);
                   
                   return (
                     <div key={cls} style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>

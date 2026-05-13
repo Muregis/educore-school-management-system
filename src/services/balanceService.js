@@ -81,11 +81,10 @@ async function calculateFromLedger(studentId, term, academicYear, token) {
       { token }
     );
 
-    if (!result || !result.entries) {
+    const entries = result?.entries || result?.ledger || [];
+    if (!result || !entries.length && !result?.student) {
       throw new Error('No ledger data available');
     }
-
-    const entries = result.entries || [];
     const student = result.student || {};
 
     // Categorize transactions
@@ -181,14 +180,14 @@ async function calculateFromSummation(studentId, term, academicYear, token) {
       `/students/${studentId}/invoices?term=${term || ''}&academic_year=${academicYear || ''}`,
       { token }
     );
-    const invoices = (invoicesResult?.data || invoicesResult || []).filter(i => i.status !== 'cancelled');
+    const invoices = (invoicesResult?.data || invoicesResult?.invoices || invoicesResult || []).filter(i => i.status !== 'cancelled');
 
     // Fetch payments
     const paymentsResult = await apiFetch(
       `/students/${studentId}/payments?term=${term || ''}&academic_year=${academicYear || ''}`,
       { token }
     );
-    const payments = paymentsResult?.data || paymentsResult || [];
+    const payments = paymentsResult?.data || paymentsResult?.payments || paymentsResult || [];
 
     // Calculate
     const openingBalance = student.opening_balance || 0;

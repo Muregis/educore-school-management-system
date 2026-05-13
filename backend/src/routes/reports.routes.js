@@ -13,6 +13,40 @@ function getOpeningBalanceImpact(student) {
   return student?.opening_balance_type === "credit" ? -amount : amount;
 }
 
+function getStudentExtraCharges(student) {
+  const transportDirection = student?.transport_direction || "none";
+  const transportBaseFee = Number(student?.transport_base_fee || 0);
+  const transportFee = transportDirection === "two_way"
+    ? transportBaseFee
+    : transportDirection === "one_way"
+    ? transportBaseFee / 2
+    : 0;
+
+  const lunchFee = student?.lunch_enabled
+    ? Number(student?.lunch_daily_rate || 100) * Number(student?.lunch_days || 66)
+    : 0;
+
+  const breakfastFee = student?.breakfast_enabled
+    ? Number(student?.breakfast_daily_rate || 100) * Number(student?.breakfast_days || 66)
+    : 0;
+
+  return transportFee + lunchFee + breakfastFee;
+}
+
+function applyStudentDiscount(expected, student) {
+  const discountValue = Number(student?.discount_value || 0);
+  if (!discountValue) return expected;
+  const isPercentage = student?.discount_is_percentage !== false;
+  const discountAmount = isPercentage ? (expected * discountValue) / 100 : discountValue;
+  return Math.max(0, expected - discountAmount);
+}
+
+function getStudentExpectedAmount(student, feeMap) {
+  const classFee = feeMap[student.class_name] || 0;
+  const grossExpected = classFee + getOpeningBalanceImpact(student) + getStudentExtraCharges(student);
+  return applyStudentDiscount(grossExpected, student);
+}
+
 // ─── Summary dashboard stats ──────────────────────────────────────────────────
 router.get("/summary", async (req, res, next) => {
   try {
@@ -220,7 +254,7 @@ router.get("/fee-defaulters", async (req, res, next) => {
       // Get students with their classes
       const { data: allStudents, error: stuErr } = await supabase
         .from('students')
-        .select('student_id, first_name, last_name, admission_number, class_name, parent_phone, opening_balance, opening_balance_type')
+        .select('student_id, first_name, last_name, admission_number, class_name, parent_phone, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
         .eq('school_id', schoolId)
         .eq('is_deleted', false)
         .order('class_name', { ascending: true });
@@ -266,8 +300,7 @@ router.get("/fee-defaulters", async (req, res, next) => {
       
       // Calculate defaulters with proper balances
       const defaultersList = allStudents?.map(student => {
-        const openingBalance = getOpeningBalanceImpact(student);
-        const expected = (feeMap[student.class_name] || 0) + openingBalance;
+        const expected = getStudentExpectedAmount(student, feeMap);
         const paid = paymentMap[student.student_id]?.total || 0;
         const balance = Math.max(0, expected - paid);
         const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
@@ -302,7 +335,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
     // Get all students
     const { data: allStudents, error: stuErr } = await supabase
       .from('students')
-      .select('student_id, first_name, last_name, class_name, opening_balance, opening_balance_type')
+      .select('student_id, first_name, last_name, class_name, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
       .eq('school_id', schoolId)
       .eq('is_deleted', false);
     if (stuErr) throw stuErr;
@@ -354,7 +387,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
         };
       }
       
-      const expected = (feeMap[cls] || 0) + getOpeningBalanceImpact(student);
+      const expected = getStudentExpectedAmount(student, feeMap);
       const paid = paymentMap[student.student_id] || 0;
       const outstanding = Math.max(0, expected - paid);
       
