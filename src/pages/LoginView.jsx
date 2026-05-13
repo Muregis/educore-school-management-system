@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
 
@@ -115,6 +115,8 @@ export default function LoginView({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const lastResolvedIdentifierRef = useRef("");
+  const lastResolveRoleRef = useRef("");
 
   // Clear form fields on component mount and prevent credential autofill
   useEffect(() => {
@@ -174,6 +176,21 @@ export default function LoginView({ onLogin }) {
   const activeIdentifier = mode === "staff" ? email : admission;
   const schoolOptions = branding.schoolOptions || [];
 
+  function shouldResolveIdentifier(identifier, currentMode, currentPortalRole) {
+    const trimmed = String(identifier || "").trim();
+    if (!trimmed) return false;
+
+    if (currentMode === "staff") {
+      return trimmed.includes("@") && trimmed.includes(".");
+    }
+
+    if (currentPortalRole === "student") {
+      return trimmed.length >= 4;
+    }
+
+    return trimmed.length >= 6;
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -204,8 +221,24 @@ export default function LoginView({ onLogin }) {
 
   useEffect(() => {
     if (!tenantReady) return undefined;
-    if (!activeIdentifier) {
+    const trimmedIdentifier = String(activeIdentifier || "").trim();
+    const currentRole = mode === "portal" ? portalRole : "staff";
+
+    if (!trimmedIdentifier) {
+      lastResolvedIdentifierRef.current = "";
+      lastResolveRoleRef.current = "";
       setBranding(prev => ({ ...DEFAULT_BRANDING, ...prev, schoolOptions: [] }));
+      return undefined;
+    }
+
+    if (!shouldResolveIdentifier(trimmedIdentifier, mode, portalRole)) {
+      return undefined;
+    }
+
+    if (
+      lastResolvedIdentifierRef.current === trimmedIdentifier &&
+      lastResolveRoleRef.current === currentRole
+    ) {
       return undefined;
     }
 
@@ -213,17 +246,20 @@ export default function LoginView({ onLogin }) {
       try {
         const resolvePath = buildResolveSchoolPath({
           hostname: window.location.hostname,
-          loginId: activeIdentifier,
-          role: mode === "portal" ? portalRole : "staff",
+          loginId: trimmedIdentifier,
+          role: currentRole,
         });
         
         const res = await apiFetch(resolvePath);
         const newBranding = { ...DEFAULT_BRANDING, ...res, schoolOptions: res.schoolOptions || [] };
+        lastResolvedIdentifierRef.current = trimmedIdentifier;
+        lastResolveRoleRef.current = currentRole;
         setBranding(newBranding);
       } catch (err) {
+        if (err?.status === 429) return;
         setBranding(DEFAULT_BRANDING);
       }
-    }, 350);
+    }, 900);
 
     return () => window.clearTimeout(timer);
   }, [activeIdentifier, portalRole, mode, tenantReady]);
