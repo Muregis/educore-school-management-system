@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
+import { LedgerService } from "../services/ledger.service.js";
+import { getExpenditureSummary } from "../services/expenditure.service.js";
 
 const router = Router();
 router.use(authRequired);
@@ -60,13 +62,23 @@ router.get("/", async (req, res, next) => {
       .eq('is_deleted', false);
     if (admErr) throw admErr;
 
+    // Get expenditure summary for net cashflow calculation
+    const expenditureSummary = await getExpenditureSummary(schoolId);
+    const totalExpenses = expenditureSummary?.totals?.total || 0;
+    const payrollExpenses = expenditureSummary?.totals?.payroll || 0;
+    const manualExpenses = expenditureSummary?.totals?.manual || 0;
+
     const counts = {
       totalStudents: Number(totalStudents) || 0,
       totalTeachers: Number(totalTeachers) || 0,
       portalUsers: Number(portalUsers) || 0,
       totalCollected: Number(totalCollected) || 0,
       totalPending: Number(totalPending) || 0,
-      pendingAdmissions: Number(pendingAdmissions) || 0
+      pendingAdmissions: Number(pendingAdmissions) || 0,
+      totalExpenses: Number(totalExpenses) || 0,
+      payrollExpenses: Number(payrollExpenses) || 0,
+      manualExpenses: Number(manualExpenses) || 0,
+      netCashflow: Number(totalCollected) - Number(totalExpenses)
     };
 
     // Monthly collections - last 6 months (manual grouping)
@@ -173,16 +185,30 @@ router.get("/", async (req, res, next) => {
       class_name: p.students?.class_name || ''
     }));
 
-    // Fee defaulters - simplified calculation
+    // Fee defaulters - use proper fee structure calculation
     let defaultersCount = 0;
     try {
       const { data: allStudents, error: stuListErr } = await supabase
         .from('students')
-        .select('student_id')
+        .select('student_id, class_name, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
         .eq('school_id', schoolId)
         .eq('is_deleted', false)
         .eq('status', 'active');
       if (stuListErr) throw stuListErr;
+
+      // Get fee structures
+      const { data: feeStructures, error: feeErr } = await supabase
+        .from('fee_structures')
+        .select('class_name, tuition, activity, misc')
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false);
+      if (feeErr) throw feeErr;
+
+      const feeMap = {};
+      feeStructures?.forEach(fs => {
+        const expected = Number(fs.tuition) + Number(fs.activity) + Number(fs.misc);
+        feeMap[fs.class_name] = expected;
+      });
 
       const studentIds = allStudents?.map(s => s.student_id) || [];
       if (studentIds.length > 0) {
@@ -200,8 +226,14 @@ router.get("/", async (req, res, next) => {
           paymentMap[p.student_id] = (paymentMap[p.student_id] || 0) + Number(p.amount);
         });
 
-        // Count students with less than 10000 paid (simplified threshold)
-        defaultersCount = studentIds.filter(id => (paymentMap[id] || 0) < 10000).length;
+        // Count students with outstanding balance using proper calculation
+        defaultersCount = allStudents?.filter(s => {
+          const classFee = feeMap[s.class_name] || 0;
+          const grossExpected = classFee + LedgerService.getOpeningBalanceImpact(s) + LedgerService.getStudentExtraCharges(s);
+          const expected = LedgerService.applyStudentDiscount(grossExpected, s);
+          const paid = paymentMap[s.student_id] || 0;
+          return expected > paid;
+        }).length || 0;
       }
     } catch { /* ignore */ }
 

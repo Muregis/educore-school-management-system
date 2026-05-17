@@ -454,11 +454,11 @@ router.patch("/:id/fees", requireRoles("admin", "finance", "director", "superadm
     if (transport_base_fee !== undefined) updateData.transport_base_fee = parseFloat(transport_base_fee) || 0;
     if (lunch_enabled !== undefined) updateData.lunch_enabled = Boolean(lunch_enabled);
     if (lunch_daily_rate !== undefined) updateData.lunch_daily_rate = parseFloat(lunch_daily_rate) || 0;
-    if (lunch_days !== undefined) updateData.lunch_days = parseInt(lunch_days, 10) || 66;
+    if (lunch_days !== undefined) updateData.lunch_days = parseInt(lunch_days, 10) || 0;
     if (lunch_billing_type !== undefined) updateData.lunch_billing_type = lunch_billing_type || "daily";
     if (breakfast_enabled !== undefined) updateData.breakfast_enabled = Boolean(breakfast_enabled);
     if (breakfast_daily_rate !== undefined) updateData.breakfast_daily_rate = parseFloat(breakfast_daily_rate) || 0;
-    if (breakfast_days !== undefined) updateData.breakfast_days = parseInt(breakfast_days, 10) || 66;
+    if (breakfast_days !== undefined) updateData.breakfast_days = parseInt(breakfast_days, 10) || 0;
     if (breakfast_billing_type !== undefined) updateData.breakfast_billing_type = breakfast_billing_type || "daily";
     if (discount_type !== undefined) updateData.discount_type = discount_type || null;
     if (discount_value !== undefined) updateData.discount_value = parseFloat(discount_value) || 0;

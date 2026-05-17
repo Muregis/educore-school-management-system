@@ -16,14 +16,10 @@ import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { sendPaymentReceipt } from "../utils/smsUtils.js";
+import { LedgerService } from "../services/ledger.service.js";
 
 const router = Router();
 router.use(authRequired);
-
-function getOpeningBalanceImpact(student) {
-  const amount = Number(student?.opening_balance || 0);
-  return student?.opening_balance_type === "credit" ? -amount : amount;
-}
 
 // POST /api/fees/send-reminders
 router.post("/send-reminders", requireRoles("admin", "finance", "director", "superadmin"), async (req, res, next) => {
@@ -77,7 +73,7 @@ router.post("/send-reminders", requireRoles("admin", "finance", "director", "sup
     // 4. Compute defaulters
     const defaulters = [];
     for (const s of (students || [])) {
-      const expected = (feeByClass.get(s.class_name) || 0) + getOpeningBalanceImpact(s);
+      const expected = (feeByClass.get(s.class_name) || 0) + LedgerService.getOpeningBalanceImpact(s);
       if (expected <= 0) continue; // no fee structure for this class — skip
       const paid    = paidByStudent.get(s.student_id) || 0;
       const balance = expected - paid;
