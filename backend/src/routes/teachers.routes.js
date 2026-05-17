@@ -24,7 +24,7 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-router.post("/", requireRoles("admin", "hr"), requireDirector(), async (req, res, next) => {
+router.post("/", requireRoles("admin", "hr", "director"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const {
@@ -134,7 +134,7 @@ router.post("/", requireRoles("admin", "hr"), requireDirector(), async (req, res
   }
 });
 
-router.put("/:id", requireRoles("admin", "hr"), requireDirector(), async (req, res, next) => {
+router.put("/:id", requireRoles("admin", "hr", "director"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const {
@@ -300,7 +300,7 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
   }
 });
 
-router.delete("/:id", requireRoles("admin"), requireDirector(), async (req, res, next) => {
+router.delete("/:id", requireRoles("admin", "director"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { data: deletedTeacher, error } = await supabase

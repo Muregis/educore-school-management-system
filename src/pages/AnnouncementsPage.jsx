@@ -178,7 +178,7 @@ export default function AnnouncementsPage({ auth, toast }) {
     expiry_date: ''
   });
 
-  const canEdit = auth?.role === 'admin' || auth?.role === 'teacher';
+  const canEdit = auth?.role === 'admin' || auth?.role === 'teacher' || auth?.role === 'director';
   const isPortal = auth?.role === "parent" || auth?.role === "student";
 
   const loadAnnouncements = useCallback(async () => {

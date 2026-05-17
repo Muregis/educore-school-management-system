@@ -46,7 +46,7 @@ router.get("/", async (req, res, next) => {
 });
 
 // ─── Create announcement ───────────────────────────────────────────────────
-router.post("/", requireRoles("admin","teacher"), async (req, res, next) => {
+router.post("/", requireRoles("admin","teacher","director"), async (req, res, next) => {
   try {
     const { schoolId, user } = req.user;
     const { title, message, type = 'general', priority = 'normal', target_audience = 'all', pinned = false, publish_date, expiry_date } = req.body;
