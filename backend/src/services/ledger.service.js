@@ -28,11 +28,11 @@ export class LedgerService {
       : 0;
 
     const lunchFee = student?.lunch_enabled
-      ? Number(student?.lunch_daily_rate || 100) * Number(student?.lunch_days || 66)
+      ? Number(student?.lunch_daily_rate || 0) * Number(student?.lunch_days || 0)
       : 0;
 
     const breakfastFee = student?.breakfast_enabled
-      ? Number(student?.breakfast_daily_rate || 100) * Number(student?.breakfast_days || 66)
+      ? Number(student?.breakfast_daily_rate || 0) * Number(student?.breakfast_days || 0)
       : 0;
 
     return transportFee + lunchFee + breakfastFee;

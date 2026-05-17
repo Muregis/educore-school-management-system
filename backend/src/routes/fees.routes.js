@@ -60,17 +60,10 @@ router.post("/", async (req, res, next) => {
       return res.status(400).json({ message: "classId, term and academicYear required" });
     }
     
-    // Kenyan school fee validation (minimum amounts)
     const totalFees = Number(tuition || 0) + Number(activity || 0) + Number(misc || 0) + Number(transport || 0);
-    if (totalFees < 500) {
+    if (totalFees <= 0) {
       return res.status(400).json({ 
-        message: "Total fees must be at least KES 500 for Kenyan schools" 
-      });
-    }
-    
-    if (totalFees > 200000) {
-      return res.status(400).json({ 
-        message: "Total fees exceed reasonable limit for Kenyan schools (KES 200,000)" 
+        message: "Total fees must be greater than 0" 
       });
     }
     const { data: inserted, error } = await supabase

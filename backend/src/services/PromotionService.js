@@ -183,23 +183,45 @@ export class PromotionService {
   /**
    * Get next class in progression
    */
-  static getNextClass(currentClass) {
-    const progression = {
-      'Playgroup': 'PP1',
-      'PP1': 'PP2',
-      'PP2': 'Grade 1',
-      'Grade 1': 'Grade 2',
-      'Grade 2': 'Grade 3',
-      'Grade 3': 'Grade 4',
-      'Grade 4': 'Grade 5',
-      'Grade 5': 'Grade 6',
-      'Grade 6': 'Grade 7',
-      'Grade 7': 'Grade 8',
-      'Grade 8': 'Grade 9',
-      'Grade 9': 'Form 1'
-    };
-    
-    return progression[currentClass] || null;
+  static async getNextClass(currentClass, schoolId = null) {
+    try {
+      // Try to get progression from database if schoolId provided
+      if (schoolId) {
+        const { data: config } = await database.query('school_settings', {
+          where: {
+            school_id: schoolId,
+            setting_key: 'class_progression'
+          },
+          limit: 1
+        });
+        
+        if (config && config.length > 0) {
+          const progression = JSON.parse(config[0].setting_value || '{}');
+          return progression[currentClass] || null;
+        }
+      }
+      
+      // Default CBC progression as fallback
+      const defaultProgression = {
+        'Playgroup': 'PP1',
+        'PP1': 'PP2',
+        'PP2': 'Grade 1',
+        'Grade 1': 'Grade 2',
+        'Grade 2': 'Grade 3',
+        'Grade 3': 'Grade 4',
+        'Grade 4': 'Grade 5',
+        'Grade 5': 'Grade 6',
+        'Grade 6': 'Grade 7',
+        'Grade 7': 'Grade 8',
+        'Grade 8': 'Grade 9',
+        'Grade 9': 'Form 1'
+      };
+      
+      return defaultProgression[currentClass] || null;
+    } catch (error) {
+      console.error('Get next class error:', error);
+      return null;
+    }
   }
   
   /**
@@ -227,7 +249,20 @@ export class PromotionService {
    */
   static async getPromotionRules(schoolId) {
     try {
-      // Default CBC promotion rules
+      // Try to get promotion rules from database
+      const { data: config } = await database.query('school_settings', {
+        where: {
+          school_id: schoolId,
+          setting_key: 'promotion_rules'
+        },
+        limit: 1
+      });
+      
+      if (config && config.length > 0) {
+        return JSON.parse(config[0].setting_value || '{}');
+      }
+      
+      // Default CBC promotion rules as fallback
       return {
         progression: {
           'Playgroup': 'PP1',
@@ -244,9 +279,9 @@ export class PromotionService {
           'Grade 9': 'Form 1'
         },
         requirements: {
-          minimumPercentage: 50, // Default minimum percentage
-          clearFees: true, // Must have cleared all fees
-          goodStanding: true // Must be in good disciplinary standing
+          minimumPercentage: 50,
+          clearFees: true,
+          goodStanding: true
         }
       };
     } catch (error) {

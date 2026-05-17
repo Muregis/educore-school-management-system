@@ -177,13 +177,13 @@ router.get('/detect/:studentId', requireRoles('finance', 'director', 'superadmin
 
         if (studentPosition === 2) {
           siblingType = 'sibling_2nd';
-          siblingDiscount = configMap['sibling_2nd'] || 10;
+          siblingDiscount = configMap['sibling_2nd'] || 0;
         } else if (studentPosition === 3) {
           siblingType = 'sibling_3rd';
-          siblingDiscount = configMap['sibling_3rd'] || 20;
+          siblingDiscount = configMap['sibling_3rd'] || 0;
         } else if (studentPosition >= 4) {
           siblingType = 'sibling_4th_plus';
-          siblingDiscount = configMap['sibling_4th_plus'] || 30;
+          siblingDiscount = configMap['sibling_4th_plus'] || 0;
         }
 
         if (siblingType) {
@@ -213,7 +213,7 @@ router.get('/detect/:studentId', requireRoles('finance', 'director', 'superadmin
       if (staffMatch) {
         qualifies.push({
           type: 'staff_child',
-          discountPercent: configMap['staff_child'] || 50,
+          discountPercent: configMap['staff_child'] || 0,
           label: DISCOUNT_LABELS['staff_child'],
           reason: `Staff child — Parent: ${staffMatch.full_name} (${staffMatch.job_title})`,
           staffMember: staffMatch.full_name,

@@ -3,48 +3,16 @@ import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { getExpenditureSummary } from "../services/expenditure.service.js";
+import { LedgerService } from "../services/ledger.service.js";
 
 const router = Router();
 router.use(authRequired);
 router.use(requireRoles("admin", "teacher", "finance", "director", "superadmin"));
 
-function getOpeningBalanceImpact(student) {
-  const amount = Number(student?.opening_balance || 0);
-  return student?.opening_balance_type === "credit" ? -amount : amount;
-}
-
-function getStudentExtraCharges(student) {
-  const transportDirection = student?.transport_direction || "none";
-  const transportBaseFee = Number(student?.transport_base_fee || 0);
-  const transportFee = transportDirection === "two_way"
-    ? transportBaseFee
-    : transportDirection === "one_way"
-    ? transportBaseFee / 2
-    : 0;
-
-  const lunchFee = student?.lunch_enabled
-    ? Number(student?.lunch_daily_rate || 100) * Number(student?.lunch_days || 66)
-    : 0;
-
-  const breakfastFee = student?.breakfast_enabled
-    ? Number(student?.breakfast_daily_rate || 100) * Number(student?.breakfast_days || 66)
-    : 0;
-
-  return transportFee + lunchFee + breakfastFee;
-}
-
-function applyStudentDiscount(expected, student) {
-  const discountValue = Number(student?.discount_value || 0);
-  if (!discountValue) return expected;
-  const isPercentage = student?.discount_is_percentage !== false;
-  const discountAmount = isPercentage ? (expected * discountValue) / 100 : discountValue;
-  return Math.max(0, expected - discountAmount);
-}
-
 function getStudentExpectedAmount(student, feeMap) {
   const classFee = feeMap[student.class_name] || 0;
-  const grossExpected = classFee + getOpeningBalanceImpact(student) + getStudentExtraCharges(student);
-  return applyStudentDiscount(grossExpected, student);
+  const grossExpected = classFee + LedgerService.getOpeningBalanceImpact(student) + LedgerService.getStudentExtraCharges(student);
+  return LedgerService.applyStudentDiscount(grossExpected, student);
 }
 
 // ─── Summary dashboard stats ──────────────────────────────────────────────────
