@@ -337,7 +337,7 @@ async function ensurePermissionsTable() {
   return { missing: false };
 }
 
-router.get("/permissions", requireRoles("admin", "director", "superadmin", "parent", "student"), async (req, res, next) => {
+router.get("/permissions", requireRoles("admin", "director", "superadmin", "teacher", "parent", "student"), async (req, res, next) => {
   try {
     console.log(`[DEBUG] Permissions endpoint: user=${req.user?.user_id}, role=${req.user?.role}, userSchoolId=${req.user?.schoolId}`);
     console.log(`[DEBUG] Permissions endpoint: targetSchoolId from middleware=${req.targetSchoolId}`);

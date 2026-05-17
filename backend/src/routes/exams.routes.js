@@ -14,7 +14,6 @@ const router = express.Router();
 const EXAM_SELECT = [
   "exam_id",
   "exam_name",
-  "exam_type",
   "term",
   "academic_year",
   "start_date",
