@@ -9,11 +9,6 @@ const router = Router();
 router.use(authRequired);
 router.use(requireRoles("admin", "teacher", "finance", "director", "superadmin"));
 
-function getStudentExpectedAmount(student, feeMap) {
-  const classFee = feeMap[student.class_name] || 0;
-  const grossExpected = classFee + LedgerService.getOpeningBalanceImpact(student) + LedgerService.getStudentExtraCharges(student);
-  return LedgerService.applyStudentDiscount(grossExpected, student);
-}
 
 // ─── Summary dashboard stats ──────────────────────────────────────────────────
 router.get("/summary", async (req, res, next) => {
@@ -268,7 +263,9 @@ router.get("/fee-defaulters", async (req, res, next) => {
       
       // Calculate defaulters with proper balances
       const defaultersList = allStudents?.map(student => {
-        const expected = getStudentExpectedAmount(student, feeMap);
+        const classFee = feeMap[student.class_name] || 0;
+        const grossExpected = classFee + LedgerService.getOpeningBalanceImpact(student) + LedgerService.getStudentExtraCharges(student);
+        const expected = LedgerService.applyStudentDiscount(grossExpected, student);
         const paid = paymentMap[student.student_id]?.total || 0;
         const balance = Math.max(0, expected - paid);
         const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
@@ -355,7 +352,9 @@ router.get("/class-fee-summary", async (req, res, next) => {
         };
       }
       
-      const expected = getStudentExpectedAmount(student, feeMap);
+      const classFee = feeMap[student.class_name] || 0;
+      const grossExpected = classFee + LedgerService.getOpeningBalanceImpact(student) + LedgerService.getStudentExtraCharges(student);
+      const expected = LedgerService.applyStudentDiscount(grossExpected, student);
       const paid = paymentMap[student.student_id] || 0;
       const outstanding = Math.max(0, expected - paid);
       
