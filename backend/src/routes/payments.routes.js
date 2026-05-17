@@ -7,6 +7,7 @@ import { logActivity } from "../helpers/activity.logger.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import { env } from "../config/env.js";
 import { sendWhatsAppPaymentReceipt } from "../services/whatsappService.js";
+import { LedgerService } from "../services/ledger.service.js";
 import multer from "multer";
 
 // Configure multer for file uploads
@@ -152,6 +153,14 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
 
     if (insertError) throw insertError;
     const paymentId = inserted.payment_id;
+
+    // Update student ledger balance
+    try {
+      await LedgerService.recordPayment(schoolId, studentId, Number(amount), `${feeType} payment`, paymentId, req);
+    } catch (ledgerErr) {
+      console.error('Failed to update ledger:', ledgerErr);
+      // Don't fail the payment if ledger update fails
+    }
 
     // Email notification (fire-and-forget)
     if (isEmailConfigured()) {
@@ -340,12 +349,13 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
 
     if (error) throw error;
 
-    // Update student fee balance
-    await supabase.rpc('update_fee_balance', {
-      p_student_id: studentId,
-      p_school_id: schoolId,
-      p_amount: parseFloat(amount)
-    });
+    // Update student fee balance using ledger service
+    try {
+      await LedgerService.recordPayment(schoolId, studentId, parseFloat(amount), `Payment recorded via ${paymentMethod}`, data.payment_id, req);
+    } catch (ledgerErr) {
+      console.error('Failed to update ledger:', ledgerErr);
+      // Don't fail the payment if ledger update fails
+    }
 
     res.status(201).json({
       success: true,

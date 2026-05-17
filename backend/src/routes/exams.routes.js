@@ -33,10 +33,10 @@ router.get("/", requireAuth, async (req, res, next) => {
       .select(EXAM_SELECT)
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
-      .order("academic_year", { ascending: false })
+      .order("year", { ascending: false })
       .order("created_at", { ascending: false });
 
-    if (year) query = query.eq("academic_year", year);
+    if (year) query = query.eq("year", year);
     if (term) query = query.eq("term", term);
     if (status) query = query.eq("status", status);
 
@@ -66,7 +66,7 @@ router.post("/", requireAuth, requireRoles("admin", "teacher"), async (req, res,
         name: name.trim(),
         exam_type: examType,
         term: term.trim(),
-        academic_year: Number(year),
+        year: Number(year),
         start_date: startDate,
         end_date: endDate,
         status: "draft",

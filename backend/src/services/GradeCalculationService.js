@@ -51,7 +51,7 @@ export class GradeCalculationService {
    * Calculate grade for a result
    */
   static async calculateResultGrade(schoolId, result) {
-    const percentage = (result.marks / result.total_marks) * 100;
+    const percentage = (Number(result.marks || 0) / Number(result.total_marks || 1)) * 100;
     const grade = await this.calculateKNECGrade(schoolId, percentage, result.subject);
     
     return {
@@ -162,7 +162,7 @@ export class GradeCalculationService {
         });
       }
       
-      const meanPoints = totalPoints / totalSubjects;
+      const meanPoints = totalSubjects > 0 ? totalPoints / totalSubjects : 0;
       
       // Get the mean grade based on mean points
       const { data: meanGradeData } = await database.query('knec_grades', {

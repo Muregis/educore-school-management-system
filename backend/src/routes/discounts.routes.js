@@ -169,7 +169,11 @@ router.get('/detect/:studentId', requireRoles('finance', 'director', 'superadmin
         ];
 
         // Find this student's position (1-indexed)
-        const studentPosition = allSiblings.findIndex(s => s.student_id === parseInt(studentId)) + 1;
+        const numericStudentId = parseInt(studentId, 10);
+        if (isNaN(numericStudentId)) {
+          return res.status(400).json({ message: 'Invalid student ID' });
+        }
+        const studentPosition = allSiblings.findIndex(s => s.student_id === numericStudentId) + 1;
 
         if (studentPosition === 2) {
           siblingType = 'sibling_2nd';

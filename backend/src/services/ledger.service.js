@@ -1,5 +1,6 @@
 import { database } from "../config/db.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
+import { supabase } from "../config/supabaseClient.js";
 
 // Student Ledger Service for fee balance tracking
 export class LedgerService {
@@ -10,8 +11,58 @@ export class LedgerService {
     return `REC-${date}-${random}`;
   }
 
+  // Helper: Get opening balance impact
+  static getOpeningBalanceImpact(student) {
+    const amount = Number(student?.opening_balance || 0);
+    return student?.opening_balance_type === "credit" ? -amount : amount;
+  }
+
+  // Helper: Get student extra charges (transport, lunch, breakfast)
+  static getStudentExtraCharges(student) {
+    const transportDirection = student?.transport_direction || "none";
+    const transportBaseFee = Number(student?.transport_base_fee || 0);
+    const transportFee = transportDirection === "two_way"
+      ? transportBaseFee
+      : transportDirection === "one_way"
+      ? transportBaseFee / 2
+      : 0;
+
+    const lunchFee = student?.lunch_enabled
+      ? Number(student?.lunch_daily_rate || 100) * Number(student?.lunch_days || 66)
+      : 0;
+
+    const breakfastFee = student?.breakfast_enabled
+      ? Number(student?.breakfast_daily_rate || 100) * Number(student?.breakfast_days || 66)
+      : 0;
+
+    return transportFee + lunchFee + breakfastFee;
+  }
+
+  // Helper: Apply student discount
+  static applyStudentDiscount(expected, student) {
+    const discountValue = Number(student?.discount_value || 0);
+    if (!discountValue) return expected;
+    const isPercentage = student?.discount_is_percentage !== false;
+    const discountAmount = isPercentage ? (expected * discountValue) / 100 : discountValue;
+    return Math.max(0, expected - discountAmount);
+  }
+
+  // Helper: Get student with all fee-related fields
+  static async getStudentWithFeeDetails(schoolId, studentId) {
+    const { data: student, error } = await supabase
+      .from('students')
+      .select('student_id, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
+      .eq('student_id', studentId)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+    
+    if (error || !student) return null;
+    return student;
+  }
+
   // Record a charge (fee assessment) in student ledger
-  static async recordCharge(schoolId, studentId, amount, description, referenceType = null, referenceId = null) {
+  static async recordCharge(schoolId, studentId, amount, description, referenceType = null, referenceId = null, includeStudentFactors = true) {
     try {
       // Get current balance using Supabase
       const { data: currentEntries } = await database.query('student_ledger', {
@@ -23,14 +74,27 @@ export class LedgerService {
       });
 
       const previousBalance = currentEntries?.[0]?.balance_after || 0;
-      const newBalance = previousBalance + Number(amount);
+      let finalAmount = Number(amount);
+
+      // Add student-specific factors if requested
+      if (includeStudentFactors) {
+        const student = await this.getStudentWithFeeDetails(schoolId, studentId);
+        if (student) {
+          const openingBalanceImpact = this.getOpeningBalanceImpact(student);
+          const extraCharges = this.getStudentExtraCharges(student);
+          const grossAmount = finalAmount + openingBalanceImpact + extraCharges;
+          finalAmount = this.applyStudentDiscount(grossAmount, student);
+        }
+      }
+
+      const newBalance = previousBalance + finalAmount;
 
       // Insert ledger entry using Supabase
       const { data: result } = await database.insert('student_ledger', {
         school_id: schoolId,
         student_id: studentId,
         transaction_type: 'charge',
-        amount: Number(amount),
+        amount: finalAmount,
         balance_after: newBalance,
         reference_type: referenceType,
         reference_id: referenceId,
@@ -199,12 +263,13 @@ export class LedgerService {
         for (const feeItem of feeItems || []) {
           if (!feeItem.is_optional) {
             const ledgerId = await this.recordCharge(
-              schoolId, 
-              student.student_id, 
-              feeItem.amount, 
+              schoolId,
+              student.student_id,
+              feeItem.amount,
               `${feeItem.item_name} - ${term} ${academicYear}`,
               'fee_item',
-              feeItem.fee_item_id
+              feeItem.fee_item_id,
+              true // Include student-specific factors
             );
             results.push({ studentId: student.student_id, feeItemId: feeItem.fee_item_id, ledgerId });
           }
