@@ -27,6 +27,12 @@ function normaliseManualExpenditure(row) {
     purpose: row.purpose || row.item_name,
     reference_number: row.reference_number,
     notes: row.notes,
+    mpesa_code: row.mpesa_code || null,
+    receipt_url: row.receipt_url || null,
+    approval_status: row.approval_status || "pending",
+    approval_timestamp: row.approval_timestamp || null,
+    approved_by: row.approved_by || null,
+    rejection_reason: row.rejection_reason || null,
     created_by: row.created_by,
     released_by_user_id: row.released_by_user_id || row.created_by,
     released_by_name: row.released_by_name || null,
@@ -142,4 +148,231 @@ export async function getExpenditureSummary(schoolId) {
     monthlyTrend,
     recent: combined.slice(0, 50),
   };
+}
+
+// Approval Workflow Functions
+
+export async function approveExpenditure(schoolId, expenditureId, approvedById) {
+  const { data, error } = await supabase
+    .from("expenditures")
+    .update({
+      approval_status: "approved",
+      approved_by: approvedById,
+      approval_timestamp: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("school_id", schoolId)
+    .eq("expenditure_id", expenditureId)
+    .eq("is_deleted", false)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  if (!data) throw new Error("Expense not found");
+  return normaliseManualExpenditure(data);
+}
+
+export async function rejectExpenditure(schoolId, expenditureId, rejectionReason, rejectedById) {
+  const { data, error } = await supabase
+    .from("expenditures")
+    .update({
+      approval_status: "rejected",
+      rejection_reason: rejectionReason || null,
+      approved_by: rejectedById,
+      approval_timestamp: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("school_id", schoolId)
+    .eq("expenditure_id", expenditureId)
+    .eq("is_deleted", false)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  if (!data) throw new Error("Expense not found");
+  return normaliseManualExpenditure(data);
+}
+
+export async function getExpendituresByStatus(schoolId, status) {
+  const { data, error } = await supabase
+    .from("expenditures")
+    .select("*")
+    .eq("school_id", schoolId)
+    .eq("approval_status", status)
+    .eq("is_deleted", false)
+    .order("expense_date", { ascending: false });
+
+  if (error) throw error;
+  return (data || []).map(normaliseManualExpenditure);
+}
+
+// Filtering and Export Functions
+
+export async function getFilteredExpenditures(schoolId, filters = {}) {
+  let query = supabase
+    .from("expenditures")
+    .select("*")
+    .eq("school_id", schoolId)
+    .eq("is_deleted", false);
+
+  if (filters.category) {
+    query = query.eq("category", filters.category);
+  }
+
+  if (filters.paymentMethod) {
+    query = query.eq("payment_method", filters.paymentMethod);
+  }
+
+  if (filters.approvalStatus) {
+    query = query.eq("approval_status", filters.approvalStatus);
+  }
+
+  if (filters.startDate && filters.endDate) {
+    query = query.gte("expense_date", filters.startDate).lte("expense_date", filters.endDate);
+  }
+
+  if (filters.minAmount !== undefined && filters.maxAmount !== undefined) {
+    query = query.gte("amount", filters.minAmount).lte("amount", filters.maxAmount);
+  }
+
+  if (filters.search) {
+    query = query.or(
+      `item_name.ilike.%${filters.search}%,vendor_name.ilike.%${filters.search}%,paid_to_name.ilike.%${filters.search}%,reference_number.ilike.%${filters.search}%`
+    );
+  }
+
+  query = query.order("expense_date", { ascending: false }).order("expenditure_id", { ascending: false });
+
+  if (filters.limit) {
+    query = query.limit(filters.limit);
+  }
+
+  if (filters.offset) {
+    query = query.offset(filters.offset);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(normaliseManualExpenditure);
+}
+
+export async function getExpendituresByDateRange(schoolId, startDate, endDate) {
+  const { data, error } = await supabase
+    .from("expenditures")
+    .select("*")
+    .eq("school_id", schoolId)
+    .eq("is_deleted", false)
+    .gte("expense_date", startDate)
+    .lte("expense_date", endDate)
+    .order("expense_date", { ascending: false });
+
+  if (error) throw error;
+  return (data || []).map(normaliseManualExpenditure);
+}
+
+export async function getExpendituresByCategory(schoolId, category) {
+  const { data, error } = await supabase
+    .from("expenditures")
+    .select("*")
+    .eq("school_id", schoolId)
+    .eq("category", category)
+    .eq("is_deleted", false)
+    .order("expense_date", { ascending: false });
+
+  if (error) throw error;
+  return (data || []).map(normaliseManualExpenditure);
+}
+
+// Statistics and Analytics Functions
+
+export async function getApprovalStatistics(schoolId) {
+  const { data, error } = await supabase
+    .from("expenditures")
+    .select("approval_status, amount")
+    .eq("school_id", schoolId)
+    .eq("is_deleted", false);
+
+  if (error) throw error;
+
+  const stats = {
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    pendingAmount: 0,
+    approvedAmount: 0,
+    rejectedAmount: 0,
+  };
+
+  (data || []).forEach((row) => {
+    const status = row.approval_status || "pending";
+    const amount = Number(row.amount || 0);
+    stats[status]++;
+    stats[`${status}Amount`] += amount;
+  });
+
+  return stats;
+}
+
+export async function getCategoryAnalytics(schoolId, startDate, endDate) {
+  const expenses = await getExpendituresByDateRange(schoolId, startDate, endDate);
+
+  const categoryMap = new Map();
+  expenses.forEach((expense) => {
+    const category = expense.category || "Other";
+    if (!categoryMap.has(category)) {
+      categoryMap.set(category, { category, count: 0, total: 0, percentage: 0 });
+    }
+    const cat = categoryMap.get(category);
+    cat.count++;
+    cat.total += expense.amount;
+  });
+
+  const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const result = Array.from(categoryMap.values()).map((cat) => ({
+    ...cat,
+    percentage: totalAmount > 0 ? ((cat.total / totalAmount) * 100).toFixed(2) : 0,
+  }));
+
+  return result.sort((a, b) => b.total - a.total);
+}
+
+export async function getMonthlyTrendAnalytics(schoolId, monthsBack = 12) {
+  const now = new Date();
+  const startDate = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 1);
+
+  const { data, error } = await supabase
+    .from("expenditures")
+    .select("expense_date, amount, approval_status")
+    .eq("school_id", schoolId)
+    .eq("is_deleted", false)
+    .gte("expense_date", startDate.toISOString().split("T")[0]);
+
+  if (error) throw error;
+
+  const monthMap = new Map();
+  (data || []).forEach((row) => {
+    const date = new Date(row.expense_date);
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    if (!monthMap.has(monthKey)) {
+      monthMap.set(monthKey, {
+        month: monthKey,
+        label: monthLabel(monthKey),
+        total: 0,
+        approved: 0,
+        pending: 0,
+        rejected: 0,
+        count: 0,
+      });
+    }
+    const month = monthMap.get(monthKey);
+    const amount = Number(row.amount || 0);
+    month.total += amount;
+    month.count++;
+    const status = row.approval_status || "pending";
+    month[status] += amount;
+  });
+
+  return Array.from(monthMap.values())
+    .sort((a, b) => b.month.localeCompare(a.month))
+    .slice(0, monthsBack);
 }
