@@ -17,7 +17,7 @@ const EXPENSE_CATEGORIES = [
   "Rent",
   "Utilities",
   "Daily Use",
-  "Food",
+  "Kitchen",
   "Transport",
   "Supplies",
   "Maintenance",
