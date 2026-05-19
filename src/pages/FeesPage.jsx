@@ -254,6 +254,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       discountLabel: balanceInfo.discountLabel,
       paid: balanceInfo.paid,
       balance: balanceInfo.balance,
+      rawBalance: balanceInfo.rawBalance,
+      overpaymentAmount: balanceInfo.overpaymentAmount,
+      isOverpaid: balanceInfo.isOverpaid,
       openingBalance: balanceInfo.openingBalance,
       transportFee: balanceInfo.transportFee,
       lunchFee: balanceInfo.lunchFee,
@@ -719,10 +722,12 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                         </>
                       ) : "—"}
                     </span>,
-                    <span key="balance" style={{ fontWeight: 700, fontSize: "15px", color: b.balance > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>{money(b.balance)}</span>,
+                    <span key="balance" style={{ fontWeight: 700, fontSize: "15px", color: b.isOverpaid ? 'var(--color-success)' : b.balance > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                      {b.isOverpaid ? `-${money(b.overpaymentAmount)}` : money(b.balance)}
+                    </span>,
                     b.expected === 0
                       ? <Badge key="bdg" text="No Structure" variant="neutral" />
-                      : <Badge key="bdg" text={b.balance > 0 ? "Pending" : "Cleared"} variant={b.balance > 0 ? "warning" : "success"} />,
+                      : <Badge key="bdg" text={b.isOverpaid ? "Credit" : b.balance > 0 ? "Pending" : "Cleared"} variant={b.isOverpaid ? "success" : b.balance > 0 ? "warning" : "success"} />,
                     b.expected > 0 && b.balance > 0 ? (
                       <div key="pay" style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
                         <Button size="sm" onClick={() => openPaystack(b)}>💳 Paystack</Button>

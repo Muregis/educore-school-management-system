@@ -49,7 +49,7 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
   const [fb, setFb]             = useState(BLANK_BOOK);
   const [fw, setFw]             = useState(BLANK_BORROW);
   const [err, setErr]           = useState("");
-  const isLibrarian = ["admin","librarian","director","superadmin","teacher"].includes(auth?.role);
+  const isLibrarian = ["admin","librarian","director","superadmin"].includes(auth?.role);
 
   const load = async () => {
     setLoading(true);

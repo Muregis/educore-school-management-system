@@ -77,7 +77,7 @@ router.get("/books", async (req, res, next) => {
 
 // ── POST add book ─────────────────────────────────────────────────────────────
 // This now uses the library_books table with auto-generated book codes
-router.post("/books", requireRoles("admin","librarian"), async (req, res, next) => {
+router.post("/books", requireRoles("admin","librarian","director","superadmin"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const { title, author, category = "General", isbn = null, quantityTotal = 1 } = req.body;
@@ -159,7 +159,7 @@ router.post("/books", requireRoles("admin","librarian"), async (req, res, next) 
 });
 
 // ── PUT update book ───────────────────────────────────────────────────────────
-router.put("/books/:id", requireRoles("admin","librarian"), async (req, res, next) => {
+router.put("/books/:id", requireRoles("admin","librarian","director","superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { title, author, category, isbn, quantityTotal } = req.body;
@@ -315,7 +315,7 @@ router.get("/borrow-records", async (req, res, next) => {
 });
 
 // ── POST issue book ───────────────────────────────────────────────────────────
-router.post("/borrows", requireRoles("admin","librarian","teacher"), async (req, res, next) => {
+router.post("/borrows", requireRoles("admin","librarian","director","superadmin"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
     const { bookId, borrowerId, borrowerType = "student", dueDate, notes = null } = req.body;
@@ -391,7 +391,7 @@ router.post("/borrows", requireRoles("admin","librarian","teacher"), async (req,
 });
 
 // ── PUT return book ───────────────────────────────────────────────────────────
-router.put("/borrows/:id/return", requireRoles("admin","librarian"), async (req, res, next) => {
+router.put("/borrows/:id/return", requireRoles("admin","librarian","director","superadmin"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
 

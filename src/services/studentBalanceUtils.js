@@ -92,7 +92,9 @@ export function calculateStudentBalanceLocal({
     .filter(p => String(p?.studentId ?? p?.student_id) === String(studentId) && (p?.status ?? "paid") === "paid")
     .reduce((sum, p) => sum + toNumber(p.amount), 0);
 
-  const balance = Math.max(0, discountCalc.netAmount - paid);
+  const rawBalance = discountCalc.netAmount - paid;
+  const overpaymentAmount = rawBalance < 0 ? Math.abs(rawBalance) : 0;
+  const balance = Math.max(0, rawBalance);
 
   return {
     studentId,
@@ -110,6 +112,9 @@ export function calculateStudentBalanceLocal({
     discountLabel: discountCalc.discountLabel,
     hasDiscount: discountCalc.hasDiscount,
     paid,
+    rawBalance,
+    overpaymentAmount,
+    isOverpaid: overpaymentAmount > 0,
     balance
   };
 }

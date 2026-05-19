@@ -14,6 +14,7 @@ CREATE OR REPLACE FUNCTION get_student_ledger_balance(
   total_expected DECIMAL(12,2),
   total_paid DECIMAL(12,2),
   balance DECIMAL(12,2),
+  overpayment_amount DECIMAL(12,2),
   opening_balance DECIMAL(12,2),
   transport_fee DECIMAL(12,2),
   lunch_fee DECIMAL(12,2),
@@ -76,6 +77,7 @@ BEGIN
   total_expected := v_base_fee + v_transport + v_lunch + GREATEST(v_opening, 0);
   total_paid := v_paid;
   balance := GREATEST(total_expected - total_paid, 0);
+  overpayment_amount := GREATEST(total_paid - total_expected, 0);
   opening_balance := v_opening;
   transport_fee := v_transport;
   lunch_fee := v_lunch;
