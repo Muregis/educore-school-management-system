@@ -163,37 +163,35 @@ router.put("/books/:id", requireRoles("admin","librarian","director","superadmin
   try {
     const { schoolId } = req.user;
     const { title, author, category, isbn, quantityTotal } = req.body;
-    let fetchQuery = supabase
-      .from('books')
+    const { data: book, error: fetchError } = await supabase
+      .from('library_books')
       .select('*')
-      .eq('school_id', schoolId);
-    fetchQuery = applyBookIdentityFilter(fetchQuery, req.params.id);
-    const { data: book, error: fetchError } = await fetchQuery.single();
+      .eq('school_id', schoolId)
+      .eq('book_id', req.params.id)
+      .single();
 
     if (fetchError || !book) return res.status(404).json({ message: "Book not found" });
 
-    const newTotal = Number(quantityTotal) || book.quantity_total;
-    const checkedOut = book.quantity_total - book.quantity_available;
+    const newTotal = Number(quantityTotal) || book.total_copies;
+    const checkedOut = book.total_copies - book.available_copies;
     const newAvailable = Math.max(0, newTotal - checkedOut);
 
-    const updateQuery = applyBookIdentityFilter(
-      supabase
-        .from('books')
-        .update({
-          title: title || book.title,
-          author: author || book.author,
-          category: category || book.category,
-          isbn: isbn ?? book.isbn,
-          quantity_total: newTotal,
-          quantity_available: newAvailable,
-          updated_at: new Date().toISOString()
-        })
-        .eq('school_id', schoolId),
-      req.params.id
-    );
-    const { error: updateError } = await updateQuery;
+    const { error: updateError } = await supabase
+      .from('library_books')
+      .update({
+        title: title || book.title,
+        author: author || book.author,
+        category: category || book.category,
+        isbn: isbn ?? book.isbn,
+        total_copies: newTotal,
+        available_copies: newAvailable,
+        updated_at: new Date().toISOString()
+      })
+      .eq('school_id', schoolId)
+      .eq('book_id', req.params.id);
+
     if (updateError) throw updateError;
-    res.json({ updated: true });
+    res.json({ updated: true, book_id: book.book_id });
   } catch (err) { next(err); }
 });
 
@@ -202,14 +200,11 @@ router.delete("/books/:id", requireRoles("admin", "director", "superadmin"), asy
   try {
     const { schoolId } = req.user;
 
-    const deleteQuery = applyBookIdentityFilter(
-      supabase
-        .from('books')
-        .update({ is_deleted: true, updated_at: new Date().toISOString() })
-        .eq('school_id', schoolId),
-      req.params.id
-    );
-    const { error: updateError } = await deleteQuery;
+    const { error: updateError } = await supabase
+      .from('library_books')
+      .update({ is_deleted: true, updated_at: new Date().toISOString() })
+      .eq('school_id', schoolId)
+      .eq('book_id', req.params.id);
 
     if (updateError) throw updateError;
     res.json({ deleted: true });
@@ -265,7 +260,7 @@ router.get("/borrows", async (req, res, next) => {
     const [{ data: books, error: booksErr }, { data: students, error: stuErr }, { data: teachers, error: teaErr }] =
       await Promise.all([
         bookIds.length
-          ? supabase.from("books").select("book_id, title, category").eq("school_id", schoolId).in("book_id", bookIds)
+          ? supabase.from("library_books").select("book_id, title, category").eq("school_id", schoolId).in("book_id", bookIds)
           : Promise.resolve({ data: [], error: null }),
         borrowerIds.length
           ? supabase.from("students").select("student_id, admission_number").eq("school_id", schoolId).in("student_id", borrowerIds)
@@ -326,7 +321,7 @@ router.post("/borrows", requireRoles("admin","librarian","director","superadmin"
 
     // Check book exists and has copies available
     const { data: book, error: bookError } = await supabase
-      .from('books')
+      .from('library_books')
       .select('*')
       .eq('book_id', bookId)
       .eq('school_id', schoolId)
@@ -334,7 +329,7 @@ router.post("/borrows", requireRoles("admin","librarian","director","superadmin"
       .single();
 
     if (bookError || !book) return res.status(404).json({ message: "Book not found" });
-    if (book.quantity_available < 1)
+    if (book.available_copies < 1)
       return res.status(400).json({ message: `No copies available for "${book.title}"` });
 
     // Verify borrower exists
@@ -379,8 +374,8 @@ router.post("/borrows", requireRoles("admin","librarian","director","superadmin"
 
     // Decrement available count
     const { error: updateError } = await supabase
-      .from('books')
-      .update({ quantity_available: book.quantity_available - 1 })
+      .from('library_books')
+      .update({ available_copies: book.available_copies - 1 })
       .eq('book_id', bookId)
       .eq('school_id', schoolId);
 
@@ -422,8 +417,8 @@ router.put("/borrows/:id/return", requireRoles("admin","librarian","director","s
 
     // Increment available count
     const { data: book, error: bookError } = await supabase
-      .from('books')
-      .select('quantity_available')
+      .from('library_books')
+      .select('available_copies')
       .eq('book_id', record.book_id)
       .eq('school_id', schoolId)
       .single();
@@ -431,8 +426,8 @@ router.put("/borrows/:id/return", requireRoles("admin","librarian","director","s
     if (bookError) throw bookError;
 
     const { error: bookUpdateError } = await supabase
-      .from('books')
-      .update({ quantity_available: book.quantity_available + 1 })
+      .from('library_books')
+      .update({ available_copies: book.available_copies + 1 })
       .eq('book_id', record.book_id)
       .eq('school_id', schoolId);
 

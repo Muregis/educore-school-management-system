@@ -744,7 +744,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
               {/* Legend */}
               <div style={{ marginTop: "var(--space-4)", fontSize: "12px", color: "var(--color-text-muted)", display: "flex", gap: "var(--space-4)", flexWrap: "wrap", justifyContent: "center" }}>
                 <span>💡 <strong>Base Fee:</strong> Tuition + Activity + Misc</span>
-                <span>🚌 <strong>Transport:</strong> 1-way (60%) or 2-way (100%)</span>
+                <span>🚌 <strong>Transport:</strong> 1-way or 2-way</span>
                 <span>🍽️ <strong>Lunch:</strong> Daily or termly rate</span>
                 <span>🥐 <strong>Breakfast:</strong> Daily or termly rate</span>
                 <span>📖 <strong>Opening:</strong> Balance carried forward</span>

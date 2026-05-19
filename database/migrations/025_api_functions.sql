@@ -41,12 +41,8 @@ BEGIN
   FROM students
   WHERE student_id = p_student_id AND school_id = p_school_id;
   
-  -- Calculate transport fee (60% for one-way, 100% for two-way)
-  IF v_student_record.transport_direction = 'one_way' THEN
-    v_transport := COALESCE(v_student_record.transport_base_fee, 0) * 0.6;
-  ELSIF v_student_record.transport_direction = 'two_way' THEN
-    v_transport := COALESCE(v_student_record.transport_base_fee, 0);
-  END IF;
+  -- Use transport fee as inserted
+  v_transport := COALESCE(v_student_record.transport_base_fee, 0);
   
   -- Calculate lunch fee
   IF v_student_record.lunch_enabled THEN
