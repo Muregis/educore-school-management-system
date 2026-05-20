@@ -88,10 +88,14 @@ router.get("/summary", async (req, res, next) => {
     let totalOutstanding = 0;
     students?.forEach(student => {
       const classFee = feeMap[student.class_name] || 0;
-      const grossExpected = classFee + LedgerService.getStudentExtraCharges(student) + LedgerService.getOpeningBalanceImpact(student);
-      const expected = LedgerService.applyStudentDiscount(grossExpected, student);
+      // Calculate current term expected fees (without opening balance)
+      const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student);
+      const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
+      // Opening balance is separate carryover from previous terms
+      const openingBalanceImpact = LedgerService.getOpeningBalanceImpact(student);
       const paid = paymentMap[student.student_id] || 0;
-      const outstanding = Math.max(0, expected - paid);
+      // Total outstanding = (current term expected - all payments) + opening balance impact
+      const outstanding = Math.max(0, currentTermExpected - paid + openingBalanceImpact);
       totalOutstanding += outstanding;
     });
 
@@ -329,11 +333,15 @@ router.get("/fee-defaulters", async (req, res, next) => {
       // Calculate defaulters with proper balances
       const defaultersList = allStudents?.map(student => {
         const classFee = feeMap[student.class_name] || 0;
-        // Include current-term fees + carryover balance (owing or credit)
-        const grossExpected = classFee + LedgerService.getStudentExtraCharges(student) + LedgerService.getOpeningBalanceImpact(student);
-        const expected = LedgerService.applyStudentDiscount(grossExpected, student);
+        // Calculate current term expected fees (without opening balance)
+        const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student);
+        const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
+        // Opening balance is separate carryover from previous terms
+        const openingBalanceImpact = LedgerService.getOpeningBalanceImpact(student);
         const paid = paymentMap[student.student_id]?.total || 0;
-        const balance = Math.max(0, expected - paid);
+        // Total outstanding = (current term expected - all payments) + opening balance impact
+        // This correctly handles: if they overpaid previously (credit), it reduces current balance
+        const balance = Math.max(0, currentTermExpected - paid + openingBalanceImpact);
         const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
         
         return {
@@ -342,11 +350,11 @@ router.get("/fee-defaulters", async (req, res, next) => {
           admission_number: student.admission_number,
           class_name: student.class_name,
           parent_phone: student.parent_phone,
-          expected_amount: expected,
+          expected_amount: currentTermExpected,
           paid_amount: paid,
           balance: balance,
           last_payment_date: lastPaymentDate,
-          balance_percentage: expected > 0 ? (balance / expected) * 100 : 0
+          balance_percentage: currentTermExpected > 0 ? (balance / currentTermExpected) * 100 : 0
         };
       }).filter(student => student.balance > 0)
         .sort((a, b) => b.balance - a.balance); // Sort highest balance first
@@ -419,14 +427,17 @@ router.get("/class-fee-summary", async (req, res, next) => {
       }
       
       const classFee = feeMap[student.class_name] || 0;
-      // Include current-term fees + carryover balance (owing or credit)
-      const grossExpected = classFee + LedgerService.getStudentExtraCharges(student) + LedgerService.getOpeningBalanceImpact(student);
-      const expected = LedgerService.applyStudentDiscount(grossExpected, student);
+      // Calculate current term expected fees (without opening balance)
+      const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student);
+      const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
+      // Opening balance is separate carryover from previous terms
+      const openingBalanceImpact = LedgerService.getOpeningBalanceImpact(student);
       const paid = paymentMap[student.student_id] || 0;
-      const outstanding = Math.max(0, expected - paid);
+      // Total outstanding = (current term expected - all payments) + opening balance impact
+      const outstanding = Math.max(0, currentTermExpected - paid + openingBalanceImpact);
       
       classSummary[cls].student_count += 1;
-      classSummary[cls].total_expected += expected;
+      classSummary[cls].total_expected += currentTermExpected;
       classSummary[cls].total_paid += paid;
       classSummary[cls].total_outstanding += outstanding;
     });
