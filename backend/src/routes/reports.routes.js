@@ -16,12 +16,17 @@ router.get("/summary", async (req, res, next) => {
     const { schoolId } = req.user;
     const expenditureSummary = await getExpenditureSummary(schoolId);
     
-    const { count: totalStudents, error: stuErr } = await supabase
+    // Get student counts by gender
+    const { data: students, error: stuErr } = await supabase
       .from('students')
-      .select('*', { count: 'exact', head: true })
+      .select('student_id, gender, class_name, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
       .eq('school_id', schoolId)
       .eq('is_deleted', false);
     if (stuErr) throw stuErr;
+
+    const boys = students?.filter(s => s.gender === 'male').length || 0;
+    const girls = students?.filter(s => s.gender === 'female').length || 0;
+    const totalStudents = students?.length || 0;
 
     const { count: totalTeachers, error: teaErr } = await supabase
       .from('teachers')
@@ -30,14 +35,21 @@ router.get("/summary", async (req, res, next) => {
       .eq('is_deleted', false);
     if (teaErr) throw teaErr;
 
+    // Get all paid payments for total collection
     const { data: paidPayments, error: paidErr } = await supabase
       .from('payments')
-      .select('amount')
+      .select('amount, payment_date, student_id')
       .eq('school_id', schoolId)
       .eq('status', 'paid')
       .eq('is_deleted', false);
     if (paidErr) throw paidErr;
     const totalCollected = paidPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+
+    // Get today's collection
+    const today = new Date().toISOString().split('T')[0];
+    const todayCollection = paidPayments
+      ?.filter(p => p.payment_date === today)
+      .reduce((sum, p) => sum + Number(p.amount), 0) || 0;
 
     const { data: pendingPayments, error: pendErr } = await supabase
       .from('payments')
@@ -48,7 +60,55 @@ router.get("/summary", async (req, res, next) => {
     if (pendErr) throw pendErr;
     const totalPending = pendingPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
 
-    const today = new Date().toISOString().split('T')[0];
+    // Calculate outstanding balance (expected fees - paid)
+    const { data: feeStructures, error: feeErr } = await supabase
+      .from('fee_structures')
+      .select('class_name, tuition, activity, misc')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
+    if (feeErr) throw feeErr;
+
+    // Build fee structure map
+    const feeMap = {};
+    feeStructures?.forEach(fs => {
+      const expected = Number(fs.tuition) + Number(fs.activity) + Number(fs.misc);
+      feeMap[fs.class_name] = expected;
+    });
+
+    // Build payment map per student
+    const paymentMap = {};
+    paidPayments?.forEach(payment => {
+      if (!paymentMap[payment.student_id]) {
+        paymentMap[payment.student_id] = 0;
+      }
+      paymentMap[payment.student_id] += Number(payment.amount);
+    });
+
+    // Calculate total outstanding
+    let totalOutstanding = 0;
+    students?.forEach(student => {
+      const classFee = feeMap[student.class_name] || 0;
+      const grossExpected = classFee + LedgerService.getStudentExtraCharges(student) + LedgerService.getOpeningBalanceImpact(student);
+      const expected = LedgerService.applyStudentDiscount(grossExpected, student);
+      const paid = paymentMap[student.student_id] || 0;
+      const outstanding = Math.max(0, expected - paid);
+      totalOutstanding += outstanding;
+    });
+
+    // Get pending plans count (if payment_plans table exists)
+    let pendingPlans = 0;
+    try {
+      const { count, error: plansErr } = await supabase
+        .from('payment_plans')
+        .select('*', { count: 'exact', head: true })
+        .eq('school_id', schoolId)
+        .eq('status', 'pending')
+        .eq('is_deleted', false);
+      if (!plansErr) pendingPlans = count || 0;
+    } catch {
+      pendingPlans = 0;
+    }
+
     const { count: presentCount, error: presErr } = await supabase
       .from('attendance')
       .select('*', { count: 'exact', head: true })
@@ -72,10 +132,15 @@ router.get("/summary", async (req, res, next) => {
     const manualExpenses = expenditureSummary?.totals?.manual || 0;
 
     res.json({
-      totalStudents: totalStudents || 0,
+      boys,
+      girls,
+      totalStudents,
       totalTeachers: totalTeachers || 0,
       totalCollected,
+      todayCollection,
       totalPending,
+      totalOutstanding,
+      pendingPlans,
       totalExpenses,
       payrollExpenses,
       manualExpenses,
