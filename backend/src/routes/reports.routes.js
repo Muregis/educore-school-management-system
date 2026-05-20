@@ -38,7 +38,7 @@ router.get("/summary", async (req, res, next) => {
       .eq('is_deleted', false);
     if (teaErr) throw teaErr;
 
-    // Get all paid payments for total collection
+    // Get all paid payments for total collection (filter by term for balance calculation)
     const { data: paidPayments, error: paidErr } = await supabase
       .from('payments')
       .select('amount, payment_date, student_id, term')
@@ -72,12 +72,21 @@ router.get("/summary", async (req, res, next) => {
       .eq('is_deleted', false);
     if (feeErr) throw feeErr;
 
-    // Build fee structure map
+    // Build fee structure map (check for duplicates)
     const feeMap = {};
+    const duplicateClasses = new Set();
     feeStructures?.forEach(fs => {
       const expected = Number(fs.tuition) + Number(fs.activity) + Number(fs.misc);
+      if (feeMap[fs.class_name]) {
+        duplicateClasses.add(fs.class_name);
+        console.warn(`[FEE STRUCTURE DUPLICATE] Class ${fs.class_name} has multiple fee structures. Using latest value.`);
+      }
       feeMap[fs.class_name] = expected;
     });
+    if (duplicateClasses.size > 0) {
+      console.warn(`[FEE STRUCTURE DUPLICATES] Found duplicates for classes: ${Array.from(duplicateClasses).join(', ')}`);
+    }
+    console.log(`[FEE STRUCTURES] Loaded ${Object.keys(feeMap).length} unique class fees for term ${currentTerm}`);
 
     // Build payment map per student (filter by current term)
     const paymentMap = {};
@@ -91,7 +100,7 @@ router.get("/summary", async (req, res, next) => {
       }
     });
 
-    // Calculate total outstanding
+    // Calculate total outstanding (current term only)
     let totalOutstanding = 0;
     let debugCount = 0;
     students?.forEach(student => {
@@ -425,16 +434,19 @@ router.get("/class-fee-summary", async (req, res, next) => {
       feeMap[fs.class_name] = expected;
     });
     
-    // Build payment map per student
+    // Build payment map per student (filter by current term for balance calculation)
     const paymentMap = {};
-    payments?.forEach(payment => {
-      if (!paymentMap[payment.student_id]) {
-        paymentMap[payment.student_id] = 0;
+    paidPayments?.forEach(payment => {
+      // Only include payments for the current term
+      if (payment.term === currentTerm) {
+        if (!paymentMap[payment.student_id]) {
+          paymentMap[payment.student_id] = 0;
+        }
+        paymentMap[payment.student_id] += Number(payment.amount);
       }
-      paymentMap[payment.student_id] += Number(payment.amount);
     });
     
-    // Calculate per-class summary
+    // Calculate per-class summary (current term only)
     const classSummary = {};
     allStudents?.forEach(student => {
       const cls = student.class_name;
@@ -449,14 +461,12 @@ router.get("/class-fee-summary", async (req, res, next) => {
       }
       
       const classFee = feeMap[student.class_name] || 0;
-      // Calculate current term expected fees (without opening balance)
+      // Current term expected fees only
       const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student);
       const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
-      // Opening balance is separate carryover from previous terms
-      const openingBalanceImpact = LedgerService.getOpeningBalanceImpact(student);
       const paid = paymentMap[student.student_id] || 0;
-      // Total outstanding = (current term expected - all payments) + opening balance impact
-      const outstanding = Math.max(0, currentTermExpected - paid + openingBalanceImpact);
+      // Outstanding = current term expected - current term paid
+      const outstanding = Math.max(0, currentTermExpected - paid);
       
       classSummary[cls].student_count += 1;
       classSummary[cls].total_expected += currentTermExpected;
