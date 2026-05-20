@@ -14,6 +14,8 @@ router.use(requireRoles("admin", "teacher", "finance", "director", "superadmin")
 router.get("/summary", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    const { term } = req.query; // Allow term filtering via query param
+    const currentTerm = term || 'Term 2'; // Default to Term 2 if not specified
     const expenditureSummary = await getExpenditureSummary(schoolId);
     
     // Get student counts by gender
@@ -38,7 +40,7 @@ router.get("/summary", async (req, res, next) => {
     // Get all paid payments for total collection
     const { data: paidPayments, error: paidErr } = await supabase
       .from('payments')
-      .select('amount, payment_date, student_id')
+      .select('amount, payment_date, student_id, term')
       .eq('school_id', schoolId)
       .eq('status', 'paid')
       .eq('is_deleted', false);
@@ -65,6 +67,7 @@ router.get("/summary", async (req, res, next) => {
       .from('fee_structures')
       .select('class_name, tuition, activity, misc')
       .eq('school_id', schoolId)
+      .eq('term', currentTerm)
       .eq('is_deleted', false);
     if (feeErr) throw feeErr;
 
@@ -75,13 +78,16 @@ router.get("/summary", async (req, res, next) => {
       feeMap[fs.class_name] = expected;
     });
 
-    // Build payment map per student
+    // Build payment map per student (filter by current term)
     const paymentMap = {};
     paidPayments?.forEach(payment => {
-      if (!paymentMap[payment.student_id]) {
-        paymentMap[payment.student_id] = 0;
+      // Only include payments for the current term
+      if (payment.term === currentTerm) {
+        if (!paymentMap[payment.student_id]) {
+          paymentMap[payment.student_id] = 0;
+        }
+        paymentMap[payment.student_id] += Number(payment.amount);
       }
-      paymentMap[payment.student_id] += Number(payment.amount);
     });
 
     // Calculate total outstanding
@@ -262,6 +268,8 @@ router.get("/attendance-rate", async (req, res, next) => {
 router.get("/fee-defaulters", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    const { term } = req.query; // Allow term filtering via query param
+    const currentTerm = term || 'Term 2'; // Default to Term 2 if not specified
     
     // OLD: Basic defaulters with hardcoded 10,000 KSh expected amount
     // let students = null;
@@ -292,20 +300,22 @@ router.get("/fee-defaulters", async (req, res, next) => {
         .order('class_name', { ascending: true });
       if (stuErr) throw stuErr;
       
-      // Get fee structures for proper expected amounts
+      // Get fee structures for proper expected amounts (filter by term)
       const { data: feeStructures, error: feeErr } = await supabase
         .from('fee_structures')
         .select('class_name, tuition, activity, misc')
         .eq('school_id', schoolId)
+        .eq('term', currentTerm)
         .eq('is_deleted', false);
       if (feeErr) throw feeErr;
       
-      // Get paid payments
+      // Get paid payments (filter by term)
       const { data: payments, error: payErr } = await supabase
         .from('payments')
-        .select('student_id, amount, payment_date')
+        .select('student_id, amount, payment_date, term')
         .eq('school_id', schoolId)
         .eq('status', 'paid')
+        .eq('term', currentTerm)
         .eq('is_deleted', false);
       if (payErr) throw payErr;
       
@@ -370,6 +380,8 @@ router.get("/fee-defaulters", async (req, res, next) => {
 router.get("/class-fee-summary", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    const { term } = req.query; // Allow term filtering via query param
+    const currentTerm = term || 'Term 2'; // Default to Term 2 if not specified
     
     // Get all students
     const { data: allStudents, error: stuErr } = await supabase
@@ -379,20 +391,22 @@ router.get("/class-fee-summary", async (req, res, next) => {
       .eq('is_deleted', false);
     if (stuErr) throw stuErr;
     
-    // Get fee structures
+    // Get fee structures (filter by term)
     const { data: feeStructures, error: feeErr } = await supabase
       .from('fee_structures')
       .select('class_name, tuition, activity, misc')
       .eq('school_id', schoolId)
+      .eq('term', currentTerm)
       .eq('is_deleted', false);
     if (feeErr) throw feeErr;
     
-    // Get all paid payments
+    // Get all paid payments (filter by term)
     const { data: payments, error: payErr } = await supabase
       .from('payments')
       .select('student_id, amount')
       .eq('school_id', schoolId)
       .eq('status', 'paid')
+      .eq('term', currentTerm)
       .eq('is_deleted', false);
     if (payErr) throw payErr;
     
