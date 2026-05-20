@@ -313,11 +313,8 @@ export function calculateTransportFee(baseFee, direction = 'two_way') {
     return 0;
   }
 
-  if (direction === 'one_way') {
-    return Math.round(base * 0.6 * 100) / 100; // 60% for one-way
-  }
-
-  return base; // 100% for two-way
+  // Use full amount as inserted (no percentage reduction)
+  return base;
 }
 
 /**

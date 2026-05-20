@@ -264,7 +264,8 @@ router.get("/fee-defaulters", async (req, res, next) => {
       // Calculate defaulters with proper balances
       const defaultersList = allStudents?.map(student => {
         const classFee = feeMap[student.class_name] || 0;
-        const grossExpected = classFee + LedgerService.getOpeningBalanceImpact(student) + LedgerService.getStudentExtraCharges(student);
+        // Include current-term fees + carryover balance (owing or credit)
+        const grossExpected = classFee + LedgerService.getStudentExtraCharges(student) + LedgerService.getOpeningBalanceImpact(student);
         const expected = LedgerService.applyStudentDiscount(grossExpected, student);
         const paid = paymentMap[student.student_id]?.total || 0;
         const balance = Math.max(0, expected - paid);
@@ -353,7 +354,8 @@ router.get("/class-fee-summary", async (req, res, next) => {
       }
       
       const classFee = feeMap[student.class_name] || 0;
-      const grossExpected = classFee + LedgerService.getOpeningBalanceImpact(student) + LedgerService.getStudentExtraCharges(student);
+      // Include current-term fees + carryover balance (owing or credit)
+      const grossExpected = classFee + LedgerService.getStudentExtraCharges(student) + LedgerService.getOpeningBalanceImpact(student);
       const expected = LedgerService.applyStudentDiscount(grossExpected, student);
       const paid = paymentMap[student.student_id] || 0;
       const outstanding = Math.max(0, expected - paid);

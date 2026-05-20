@@ -229,7 +229,8 @@ router.get("/", async (req, res, next) => {
         // Count students with outstanding balance using proper calculation
         defaultersCount = allStudents?.filter(s => {
           const classFee = feeMap[s.class_name] || 0;
-          const grossExpected = classFee + LedgerService.getOpeningBalanceImpact(s) + LedgerService.getStudentExtraCharges(s);
+          // Include current-term fees + carryover balance (owing or credit)
+          const grossExpected = classFee + LedgerService.getStudentExtraCharges(s) + LedgerService.getOpeningBalanceImpact(s);
           const expected = LedgerService.applyStudentDiscount(grossExpected, s);
           const paid = paymentMap[s.student_id] || 0;
           return expected > paid;

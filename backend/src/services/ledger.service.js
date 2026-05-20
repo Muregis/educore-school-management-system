@@ -19,13 +19,9 @@ export class LedgerService {
 
   // Helper: Get student extra charges (transport, lunch, breakfast)
   static getStudentExtraCharges(student) {
-    const transportDirection = student?.transport_direction || "none";
     const transportBaseFee = Number(student?.transport_base_fee || 0);
-    const transportFee = transportDirection === "two_way"
-      ? transportBaseFee
-      : transportDirection === "one_way"
-      ? transportBaseFee / 2
-      : 0;
+    // Use full amount as inserted (no percentage reduction)
+    const transportFee = transportBaseFee;
 
     const lunchFee = student?.lunch_enabled
       ? Number(student?.lunch_daily_rate || 0) * Number(student?.lunch_days || 0)

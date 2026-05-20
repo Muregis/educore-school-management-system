@@ -32,7 +32,7 @@ router.post("/send-reminders", requireRoles("admin", "finance", "director", "sup
     // 1. Load all active students (read-only)
     const { data: students, error: sErr } = await supabase
       .from("students")
-      .select("student_id, first_name, last_name, class_name, parent_phone, admission_number, opening_balance, opening_balance_type")
+      .select("student_id, first_name, last_name, class_name, parent_phone, admission_number, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage")
       .eq("school_id", schoolId)
       .eq("status", "active")
       .eq("is_deleted", false);
@@ -73,7 +73,10 @@ router.post("/send-reminders", requireRoles("admin", "finance", "director", "sup
     // 4. Compute defaulters
     const defaulters = [];
     for (const s of (students || [])) {
-      const expected = (feeByClass.get(s.class_name) || 0) + LedgerService.getOpeningBalanceImpact(s);
+      // Include current-term fees + carryover balance (owing or credit)
+      const classFee = feeByClass.get(s.class_name) || 0;
+      const grossExpected = classFee + LedgerService.getStudentExtraCharges(s) + LedgerService.getOpeningBalanceImpact(s);
+      const expected = LedgerService.applyStudentDiscount(grossExpected, s);
       if (expected <= 0) continue; // no fee structure for this class — skip
       const paid    = paidByStudent.get(s.student_id) || 0;
       const balance = expected - paid;
