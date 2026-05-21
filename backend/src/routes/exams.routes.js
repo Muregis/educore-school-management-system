@@ -6,21 +6,264 @@ import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 
-// Backward-compat alias — this file uses requireAuth but middleware exports authRequired
+// Backward-compat alias: this file uses requireAuth but middleware exports authRequired
 const requireAuth = authRequired;
 
 const router = express.Router();
 
-const EXAM_SELECT = [
+const EXAM_SELECT_NEW = [
   "exam_id",
   "name",
+  "exam_type",
   "term",
   "year",
   "start_date",
   "end_date",
+  "description",
   "status",
   "created_at",
+  "updated_at",
 ].join(",");
+
+const EXAM_SELECT_OLD = [
+  "exam_id",
+  "exam_name",
+  "term",
+  "academic_year",
+  "start_date",
+  "end_date",
+  "status",
+  "created_at",
+  "updated_at",
+].join(",");
+
+function isMissingColumnError(error) {
+  const text = [
+    error?.message,
+    error?.details,
+    error?.hint,
+    error?.code,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    text.includes("column") ||
+    text.includes("schema cache") ||
+    text.includes("pgrst") ||
+    text.includes("42703")
+  );
+}
+
+function normalizeExam(row, schema = "new") {
+  if (!row) return row;
+
+  if (schema === "old") {
+    return {
+      ...row,
+      name: row.exam_name,
+      exam_type: row.exam_type || "internal",
+      year: row.academic_year,
+      description: row.description || null,
+    };
+  }
+
+  return {
+    ...row,
+    name: row.name,
+    exam_type: row.exam_type || "internal",
+    year: row.year,
+  };
+}
+
+function buildNewExamFilters(query, filters = {}) {
+  let next = query
+    .eq("is_deleted", false)
+    .order("year", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (filters.year) next = next.eq("year", filters.year);
+  if (filters.term) next = next.eq("term", filters.term);
+  if (filters.status) next = next.eq("status", filters.status);
+
+  return next;
+}
+
+function buildOldExamFilters(query, filters = {}) {
+  let next = query
+    .eq("is_deleted", false)
+    .order("academic_year", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (filters.year) next = next.eq("academic_year", filters.year);
+  if (filters.term) next = next.eq("term", filters.term);
+  if (filters.status) next = next.eq("status", filters.status);
+
+  return next;
+}
+
+async function listExamsCompat(schoolId, filters = {}) {
+  const newQuery = buildNewExamFilters(
+    supabase.from("exams").select(EXAM_SELECT_NEW).eq("school_id", schoolId),
+    filters
+  );
+  const { data, error } = await newQuery;
+
+  if (!error) {
+    return (data || []).map((row) => normalizeExam(row, "new"));
+  }
+
+  if (!isMissingColumnError(error)) throw error;
+
+  const oldQuery = buildOldExamFilters(
+    supabase.from("exams").select(EXAM_SELECT_OLD).eq("school_id", schoolId),
+    filters
+  );
+  const { data: legacyData, error: legacyError } = await oldQuery;
+  if (legacyError) throw legacyError;
+
+  return (legacyData || []).map((row) => normalizeExam(row, "old"));
+}
+
+async function getExamCompat(schoolId, examId) {
+  const { data, error } = await supabase
+    .from("exams")
+    .select("*")
+    .eq("exam_id", examId)
+    .eq("school_id", schoolId)
+    .eq("is_deleted", false)
+    .single();
+
+  if (!error && data) {
+    const schema = Object.prototype.hasOwnProperty.call(data, "name") ? "new" : "old";
+    return normalizeExam(data, schema);
+  }
+
+  if (error && !isMissingColumnError(error)) {
+    if (error.code === "PGRST116") return null;
+    throw error;
+  }
+
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("exams")
+    .select(EXAM_SELECT_OLD)
+    .eq("exam_id", examId)
+    .eq("school_id", schoolId)
+    .eq("is_deleted", false)
+    .single();
+
+  if (legacyError) {
+    if (legacyError.code === "PGRST116") return null;
+    throw legacyError;
+  }
+
+  return normalizeExam(legacyData, "old");
+}
+
+async function insertExamCompat(schoolId, payload) {
+  const newPayload = {
+    school_id: schoolId,
+    name: payload.name.trim(),
+    exam_type: payload.examType,
+    term: payload.term.trim(),
+    year: Number(payload.year),
+    start_date: payload.startDate,
+    end_date: payload.endDate,
+    description: payload.description?.trim() || null,
+    status: "draft",
+    is_deleted: false,
+  };
+
+  const { data, error } = await supabase
+    .from("exams")
+    .insert(newPayload)
+    .select()
+    .single();
+
+  if (!error) {
+    return normalizeExam(data, "new");
+  }
+
+  if (!isMissingColumnError(error)) throw error;
+
+  const oldPayload = {
+    school_id: schoolId,
+    exam_name: payload.name.trim(),
+    term: payload.term.trim(),
+    academic_year: Number(payload.year),
+    start_date: payload.startDate,
+    end_date: payload.endDate,
+    status: "draft",
+    is_deleted: false,
+  };
+
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("exams")
+    .insert(oldPayload)
+    .select(EXAM_SELECT_OLD)
+    .single();
+
+  if (legacyError) throw legacyError;
+  return normalizeExam(legacyData, "old");
+}
+
+async function updateExamCompat(schoolId, examId, updates) {
+  const newUpdates = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (updates.name !== undefined) newUpdates.name = String(updates.name).trim();
+  if (updates.examType !== undefined) newUpdates.exam_type = updates.examType;
+  if (updates.term !== undefined) newUpdates.term = String(updates.term).trim();
+  if (updates.year !== undefined) newUpdates.year = Number(updates.year);
+  if (updates.startDate !== undefined) newUpdates.start_date = updates.startDate;
+  if (updates.endDate !== undefined) newUpdates.end_date = updates.endDate;
+  if (updates.description !== undefined) newUpdates.description = updates.description?.trim() || null;
+  if (updates.status !== undefined) newUpdates.status = updates.status;
+
+  const { data, error } = await supabase
+    .from("exams")
+    .update(newUpdates)
+    .eq("exam_id", examId)
+    .eq("school_id", schoolId)
+    .eq("is_deleted", false)
+    .select()
+    .single();
+
+  if (!error) {
+    return data ? normalizeExam(data, "new") : null;
+  }
+
+  if (!isMissingColumnError(error)) throw error;
+
+  const oldUpdates = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (updates.name !== undefined) oldUpdates.exam_name = String(updates.name).trim();
+  if (updates.term !== undefined) oldUpdates.term = String(updates.term).trim();
+  if (updates.year !== undefined) oldUpdates.academic_year = Number(updates.year);
+  if (updates.startDate !== undefined) oldUpdates.start_date = updates.startDate;
+  if (updates.endDate !== undefined) oldUpdates.end_date = updates.endDate;
+  if (updates.status !== undefined) oldUpdates.status = updates.status;
+
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("exams")
+    .update(oldUpdates)
+    .eq("exam_id", examId)
+    .eq("school_id", schoolId)
+    .eq("is_deleted", false)
+    .select(EXAM_SELECT_OLD)
+    .single();
+
+  if (legacyError) {
+    if (legacyError.code === "PGRST116") return null;
+    throw legacyError;
+  }
+
+  return legacyData ? normalizeExam(legacyData, "old") : null;
+}
 
 // GET /api/exams - List all exams
 router.get("/", requireAuth, async (req, res, next) => {
@@ -28,22 +271,8 @@ router.get("/", requireAuth, async (req, res, next) => {
     const { schoolId } = req.user;
     const { year, term, status } = req.query;
 
-    let query = supabase
-      .from("exams")
-      .select(EXAM_SELECT)
-      .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .order("year", { ascending: false })
-      .order("created_at", { ascending: false });
-
-    if (year) query = query.eq("year", year);
-    if (term) query = query.eq("term", term);
-    if (status) query = query.eq("status", status);
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    res.json(data || []);
+    const exams = await listExamsCompat(schoolId, { year, term, status });
+    res.json(exams);
   } catch (err) {
     next(err);
   }
@@ -59,24 +288,17 @@ router.post("/", requireAuth, requireRoles("admin", "teacher"), async (req, res,
       return res.status(400).json({ message: "name, term, year, startDate, endDate are required" });
     }
 
-    const { data, error } = await supabase
-      .from("exams")
-      .insert({
-        school_id: schoolId,
-        name: name.trim(),
-        exam_type: examType,
-        term: term.trim(),
-        year: Number(year),
-        start_date: startDate,
-        end_date: endDate,
-        status: "draft",
-        is_deleted: false,
-      })
-      .select()
-      .single();
+    const exam = await insertExamCompat(schoolId, {
+      name,
+      examType,
+      term,
+      year,
+      startDate,
+      endDate,
+      description,
+    });
 
-    if (error) throw error;
-    res.status(201).json(data);
+    res.status(201).json(exam);
   } catch (err) {
     next(err);
   }
@@ -88,17 +310,9 @@ router.get("/:id", requireAuth, async (req, res, next) => {
     const { schoolId } = req.user;
     const { id } = req.params;
 
-    const { data: exam, error: examError } = await supabase
-      .from("exams")
-      .select("*")
-      .eq("exam_id", id)
-      .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .single();
+    const exam = await getExamCompat(schoolId, id);
+    if (!exam) return res.status(404).json({ message: "Exam not found" });
 
-    if (examError || !exam) return res.status(404).json({ message: "Exam not found" });
-
-    // Get schedules
     const { data: schedules, error: schedError } = await supabase
       .from("exam_schedules")
       .select(`
@@ -109,6 +323,7 @@ router.get("/:id", requireAuth, async (req, res, next) => {
       .eq("is_deleted", false)
       .order("exam_date", { ascending: true });
 
+    if (schedError) throw schedError;
     res.json({ ...exam, schedules: schedules || [] });
   } catch (err) {
     next(err);
@@ -120,22 +335,10 @@ router.put("/:id", requireAuth, requireRoles("admin", "teacher"), async (req, re
   try {
     const { schoolId } = req.user;
     const { id } = req.params;
-    const updates = req.body;
 
-    const { data, error } = await supabase
-      .from("exams")
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("exam_id", id)
-      .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .select()
-      .single();
-
-    if (error) throw error;
+    const data = await updateExamCompat(schoolId, id, req.body || {});
     if (!data) return res.status(404).json({ message: "Exam not found" });
+
     res.json(data);
   } catch (err) {
     next(err);
@@ -157,6 +360,8 @@ router.delete("/:id", requireAuth, requireRoles("admin", "director", "superadmin
       .single();
 
     if (error) throw error;
+    if (!data) return res.status(404).json({ message: "Exam not found" });
+
     res.json({ deleted: true });
   } catch (err) {
     next(err);
@@ -166,7 +371,6 @@ router.delete("/:id", requireAuth, requireRoles("admin", "director", "superadmin
 // POST /api/exams/:id/schedules - Add exam schedule
 router.post("/:id/schedules", requireAuth, requireRoles("admin", "teacher"), async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
     const { id } = req.params;
     const { subjectId, className, examDate, startTime, endTime, venue, maxMarks = 100, instructions } = req.body;
 
@@ -215,20 +419,24 @@ router.post("/:id/results/bulk", requireAuth, requireRoles("admin", "teacher"), 
       return res.status(400).json({ message: "subjectId and results array are required" });
     }
 
-    // Get grade boundaries
+    const exam = await getExamCompat(schoolId, id);
+    if (!exam) return res.status(404).json({ message: "Exam not found" });
+
+    const examType = exam.exam_type || "internal";
+
     const { data: boundaries } = await supabase
       .from("grade_boundaries")
       .select("*")
       .eq("school_id", schoolId)
+      .eq("exam_type", examType)
       .eq("is_deleted", false);
 
-    // Calculate grades
-    const resultsWithGrades = results.map(r => {
+    const resultsWithGrades = results.map((r) => {
       if (r.isAbsent) return { ...r, grade: "X", remarks: "Absent" };
-      
-      const percentage = (r.marks / 100) * 100;
-      const boundary = boundaries?.find(b => percentage >= b.min_score && percentage <= b.max_score);
-      
+
+      const percentage = Number(r.marks);
+      const boundary = boundaries?.find((b) => percentage >= b.min_score && percentage <= b.max_score);
+
       return {
         ...r,
         grade: boundary?.grade || "F",
@@ -236,8 +444,7 @@ router.post("/:id/results/bulk", requireAuth, requireRoles("admin", "teacher"), 
       };
     });
 
-    // Insert results
-    const insertData = resultsWithGrades.map(r => ({
+    const insertData = resultsWithGrades.map((r) => ({
       exam_id: id,
       student_id: r.studentId,
       subject_id: subjectId,
@@ -257,7 +464,6 @@ router.post("/:id/results/bulk", requireAuth, requireRoles("admin", "teacher"), 
 
     if (error) throw error;
 
-    // Calculate and update positions
     await calculatePositions(id, subjectId);
 
     res.json({ uploaded: data?.length || 0 });
@@ -269,7 +475,6 @@ router.post("/:id/results/bulk", requireAuth, requireRoles("admin", "teacher"), 
 // GET /api/exams/:id/results - Get results for an exam
 router.get("/:id/results", requireAuth, async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
     const { id } = req.params;
     const { subjectId, className } = req.query;
 
@@ -295,7 +500,6 @@ router.get("/:id/results", requireAuth, async (req, res, next) => {
   }
 });
 
-// Helper functions
 function getRemarks(percentage) {
   if (percentage >= 80) return "Excellent";
   if (percentage >= 70) return "Very Good";
@@ -306,7 +510,6 @@ function getRemarks(percentage) {
 }
 
 async function calculatePositions(examId, subjectId) {
-  // Calculate class positions for each subject
   const { data: results } = await supabase
     .from("exam_results")
     .select("result_id, marks, student:class_name")
@@ -317,16 +520,15 @@ async function calculatePositions(examId, subjectId) {
 
   if (!results) return;
 
-  // Group by class and assign positions
   const byClass = {};
-  results.forEach(r => {
+  results.forEach((r) => {
     const className = r.student?.class_name || "Unknown";
     if (!byClass[className]) byClass[className] = [];
     byClass[className].push(r);
   });
 
-  for (const [className, classResults] of Object.entries(byClass)) {
-    for (let i = 0; i < classResults.length; i++) {
+  for (const classResults of Object.values(byClass)) {
+    for (let i = 0; i < classResults.length; i += 1) {
       await supabase
         .from("exam_results")
         .update({ position: i + 1 })
