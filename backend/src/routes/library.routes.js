@@ -214,48 +214,58 @@ router.delete("/books/:id", requireRoles("admin", "director", "superadmin"), asy
 // ── GET all borrow records ────────────────────────────────────────────────────
 router.get("/borrows", async (req, res, next) => {
   try {
-    const { schoolId, role, userId } = req.user;
+    const { schoolId, role } = req.user;
     const studentId = req.user.studentId;
 
-    let sql = `
-      SELECT br.borrow_id, br.book_id, b.title AS book_title, b.category,
-             br.borrower_id, br.borrower_type, br.borrow_date, br.due_date,
-             br.return_date, br.status, br.notes,
-             CASE WHEN br.borrower_type='student' THEN s.admission_number ELSE t.staff_number END AS borrower_ref
-      FROM borrow_records br
-      JOIN books b ON b.book_id = br.book_id
-      LEFT JOIN students s ON s.student_id = br.borrower_id AND br.borrower_type='student'
-      LEFT JOIN teachers t ON t.teacher_id = br.borrower_id AND br.borrower_type='staff'
-      WHERE br.school_id=$1 AND br.is_deleted=false`;
+    const fetchLegacyBorrows = async () => {
+      let q = supabase
+        .from("borrow_records")
+        .select("borrow_id, book_id, borrower_id, borrower_type, borrow_date, due_date, return_date, status, notes")
+        .eq("school_id", schoolId)
+        .eq("is_deleted", false)
+        .order("borrow_date", { ascending: false })
+        .order("borrow_id", { ascending: false });
 
-    const params = [schoolId];
+      if (role === "student" && studentId) {
+        q = q.eq("borrower_type", "student").eq("borrower_id", studentId);
+      }
 
-    // Students only see their own borrows
-    if (role === "student" && studentId) {
-      sql += " AND br.borrower_type='student' AND br.borrower_id=$2";
-      params.push(studentId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    };
+
+    const fetchLibraryBorrowings = async () => {
+      let q = supabase
+        .from("library_borrowings")
+        .select("borrowing_id, book_id, student_id, borrowed_date, due_date, returned_date, status, notes")
+        .eq("school_id", schoolId)
+        .eq("is_deleted", false)
+        .order("borrowed_date", { ascending: false })
+        .order("borrowing_id", { ascending: false });
+
+      if (role === "student" && studentId) {
+        q = q.eq("student_id", studentId);
+      }
+
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    };
+
+    let borrows = [];
+    let legacyMode = false;
+
+    try {
+      borrows = await fetchLibraryBorrowings();
+    } catch (err) {
+      console.warn("[LIBRARY] library_borrowings query failed, falling back to borrow_records", err.message || err);
+      legacyMode = true;
+      borrows = await fetchLegacyBorrows();
     }
-
-    sql += " ORDER BY br.borrow_date DESC, br.borrow_id DESC";
-
-    // Supabase-native query (no raw SQL / no $1 placeholders)
-    let q = supabase
-      .from("borrow_records")
-      .select("borrow_id, book_id, borrower_id, borrower_type, borrow_date, due_date, return_date, status, notes")
-      .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .order("borrow_date", { ascending: false })
-      .order("borrow_id", { ascending: false });
-
-    if (role === "student" && studentId) {
-      q = q.eq("borrower_type", "student").eq("borrower_id", studentId);
-    }
-
-    const { data: borrows, error: bErr } = await q;
-    if (bErr) throw bErr;
 
     const bookIds = Array.from(new Set((borrows || []).map(r => r.book_id).filter(Boolean)));
-    const borrowerIds = Array.from(new Set((borrows || []).map(r => r.borrower_id).filter(Boolean)));
+    const borrowerIds = Array.from(new Set((borrows || []).map(r => legacyMode ? r.borrower_id : r.student_id).filter(Boolean)));
 
     const [{ data: books, error: booksErr }, { data: students, error: stuErr }, { data: teachers, error: teaErr }] =
       await Promise.all([
@@ -278,23 +288,28 @@ router.get("/borrows", async (req, res, next) => {
     const teacherMap = new Map((teachers || []).map(t => [String(t.teacher_id), t.staff_number]));
 
     const rows = (borrows || []).map(br => {
+      const borrowerType = legacyMode ? br.borrower_type : "student";
+      const borrowerId = legacyMode ? br.borrower_id : br.student_id;
+      const borrowDate = legacyMode ? br.borrow_date : br.borrowed_date;
+      const returnDate = legacyMode ? br.return_date : br.returned_date;
+      const borrowId = legacyMode ? br.borrow_id : br.borrowing_id;
       const book = bookMap.get(String(br.book_id));
       return {
-        borrow_id: br.borrow_id,
+        borrow_id: borrowId,
         book_id: br.book_id,
         book_title: book?.title ?? null,
         category: book?.category ?? null,
-        borrower_id: br.borrower_id,
-        borrower_type: br.borrower_type,
-        borrow_date: br.borrow_date,
+        borrower_id: borrowerId,
+        borrower_type: borrowerType,
+        borrow_date: borrowDate,
         due_date: br.due_date,
-        return_date: br.return_date,
+        return_date: returnDate,
         status: br.status,
         notes: br.notes,
         borrower_ref:
-          br.borrower_type === "student"
-            ? studentMap.get(String(br.borrower_id)) ?? null
-            : teacherMap.get(String(br.borrower_id)) ?? null,
+          borrowerType === "student"
+            ? studentMap.get(String(borrowerId)) ?? null
+            : teacherMap.get(String(borrowerId)) ?? null,
       };
     });
 
@@ -319,7 +334,6 @@ router.post("/borrows", requireRoles("admin","librarian","director","superadmin"
     if (!borrowerId) return res.status(400).json({ message: "borrowerId is required" });
     if (!dueDate)    return res.status(400).json({ message: "dueDate is required" });
 
-    // Check book exists and has copies available
     const { data: book, error: bookError } = await supabase
       .from('library_books')
       .select('*')
@@ -332,7 +346,6 @@ router.post("/borrows", requireRoles("admin","librarian","director","superadmin"
     if (book.available_copies < 1)
       return res.status(400).json({ message: `No copies available for "${book.title}"` });
 
-    // Verify borrower exists
     if (borrowerType === "student") {
       const { data: student, error: studentError } = await supabase
         .from('students')
@@ -353,26 +366,49 @@ router.post("/borrows", requireRoles("admin","librarian","director","superadmin"
       if (teacherError || !teacher) return res.status(404).json({ message: "Staff member not found" });
     }
 
-    // Insert borrow record
-    const { data: inserted, error: insertError } = await supabase
-      .from('borrow_records')
-      .insert({
-        school_id: schoolId,
-        book_id: bookId,
-        borrower_id: borrowerId,
-        borrower_type: borrowerType,
-        borrow_date: new Date().toISOString().slice(0, 10),
-        due_date: dueDate,
-        notes,
-        status: 'borrowed',
-        issued_by_user_id: userId
-      })
-      .select('borrow_id')
-      .single();
+    let inserted;
 
-    if (insertError) throw insertError;
+    if (borrowerType === "student") {
+      const { data, error } = await supabase
+        .from('library_borrowings')
+        .insert({
+          school_id: schoolId,
+          book_id: bookId,
+          student_id: borrowerId,
+          borrowed_date: new Date().toISOString().slice(0, 10),
+          due_date: dueDate,
+          notes,
+          status: 'borrowed'
+        })
+        .select('borrowing_id')
+        .single();
 
-    // Decrement available count
+      if (!error && data) {
+        inserted = data;
+      }
+    }
+
+    if (!inserted) {
+      const { data, error } = await supabase
+        .from('borrow_records')
+        .insert({
+          school_id: schoolId,
+          book_id: bookId,
+          borrower_id: borrowerId,
+          borrower_type: borrowerType,
+          borrow_date: new Date().toISOString().slice(0, 10),
+          due_date: dueDate,
+          notes,
+          status: 'borrowed',
+          issued_by_user_id: userId
+        })
+        .select('borrow_id')
+        .single();
+
+      if (error) throw error;
+      inserted = data;
+    }
+
     const { error: updateError } = await supabase
       .from('library_books')
       .update({ available_copies: book.available_copies - 1 })
@@ -381,7 +417,7 @@ router.post("/borrows", requireRoles("admin","librarian","director","superadmin"
 
     if (updateError) throw updateError;
 
-    res.status(201).json({ borrowId: inserted.borrow_id });
+    res.status(201).json({ borrowId: inserted?.borrowing_id || inserted?.borrow_id });
   } catch (err) { next(err); }
 });
 
@@ -389,37 +425,67 @@ router.post("/borrows", requireRoles("admin","librarian","director","superadmin"
 router.put("/borrows/:id/return", requireRoles("admin","librarian","director","superadmin"), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
+    const borrowId = req.params.id;
 
-    const { data: record, error: fetchError } = await supabase
-      .from('borrow_records')
+    let record;
+    let isLegacy = false;
+
+    const { data: libRecord, error: libError } = await supabase
+      .from('library_borrowings')
       .select('*')
-      .eq('borrow_id', req.params.id)
+      .eq('borrowing_id', borrowId)
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
       .single();
 
-    if (fetchError || !record) return res.status(404).json({ message: "Borrow record not found" });
+    if (!libError && libRecord) {
+      record = libRecord;
+    } else {
+      const { data: legacyRecord, error: legacyError } = await supabase
+        .from('borrow_records')
+        .select('*')
+        .eq('borrow_id', borrowId)
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false)
+        .single();
+      if (legacyError || !legacyRecord) return res.status(404).json({ message: "Borrow record not found" });
+      record = legacyRecord;
+      isLegacy = true;
+    }
+
     if (record.status === "returned") return res.status(400).json({ message: "Already returned" });
 
-    // Mark returned
-    const { error: updateError } = await supabase
-      .from('borrow_records')
-      .update({
-        status: 'returned',
-        return_date: new Date().toISOString().slice(0, 10),
-        returned_to_user_id: userId,
-        updated_at: new Date().toISOString()
-      })
-      .eq('borrow_id', req.params.id)
-      .eq('school_id', schoolId);
+    if (isLegacy) {
+      const { error: updateError } = await supabase
+        .from('borrow_records')
+        .update({
+          status: 'returned',
+          return_date: new Date().toISOString().slice(0, 10),
+          returned_to_user_id: userId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('borrow_id', borrowId)
+        .eq('school_id', schoolId);
 
-    if (updateError) throw updateError;
+      if (updateError) throw updateError;
+    } else {
+      const { error: updateError } = await supabase
+        .from('library_borrowings')
+        .update({
+          status: 'returned',
+          returned_date: new Date().toISOString().slice(0, 10)
+        })
+        .eq('borrowing_id', borrowId)
+        .eq('school_id', schoolId);
 
-    // Increment available count
+      if (updateError) throw updateError;
+    }
+
+    const bookId = record.book_id;
     const { data: book, error: bookError } = await supabase
       .from('library_books')
       .select('available_copies')
-      .eq('book_id', record.book_id)
+      .eq('book_id', bookId)
       .eq('school_id', schoolId)
       .single();
 
@@ -428,7 +494,7 @@ router.put("/borrows/:id/return", requireRoles("admin","librarian","director","s
     const { error: bookUpdateError } = await supabase
       .from('library_books')
       .update({ available_copies: book.available_copies + 1 })
-      .eq('book_id', record.book_id)
+      .eq('book_id', bookId)
       .eq('school_id', schoolId);
 
     if (bookUpdateError) throw bookUpdateError;

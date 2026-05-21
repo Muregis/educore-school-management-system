@@ -4,6 +4,7 @@ import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { getExpenditureSummary } from "../services/expenditure.service.js";
 import { LedgerService } from "../services/ledger.service.js";
+import { FeeBalanceService } from "../services/backend_services.js";
 
 const router = Router();
 router.use(authRequired);
@@ -99,26 +100,30 @@ router.get("/summary", async (req, res, next) => {
       }
     });
 
-    // Calculate total outstanding (current term only)
+    // Calculate total outstanding (use ledger as source-of-truth)
     let totalOutstanding = 0;
-    let debugCount = 0;
-    students?.forEach(student => {
-      const classFee = feeMap[student.class_name] || 0;
-      // Current term expected fees only
-      const extraCharges = LedgerService.getStudentExtraCharges(student);
-      const grossCurrentTerm = classFee + extraCharges;
-      const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
-      const paid = paymentMap[student.student_id] || 0;
-      // Outstanding = current term expected - current term paid
-      const outstanding = Math.max(0, currentTermExpected - paid);
-      totalOutstanding += outstanding;
-      
-      // Debug: log first 5 students with high balances
-      if (debugCount < 5 && outstanding > 10000) {
-        console.log(`[DEBUG] Student ${student.student_id}: classFee=${classFee}, extraCharges=${extraCharges}, expected=${currentTermExpected}, paid=${paid}, outstanding=${outstanding}`);
-        debugCount++;
-      }
-    });
+    try {
+      // Use ledger-based balances for accuracy. This may issue one query per student.
+      const balances = await Promise.all((students || []).map(s => FeeBalanceService.getStudentBalanceWithFallback(schoolId, s.student_id)));
+      balances.forEach(b => { if (b > 0) totalOutstanding += Number(b); });
+    } catch (e) {
+      console.error('[REPORTS] Failed to compute ledger balances, falling back to legacy calculation', e);
+      // Fallback to previous method when ledger read fails
+      let debugCount = 0;
+      students?.forEach(student => {
+        const classFee = feeMap[student.class_name] || 0;
+        const extraCharges = LedgerService.getStudentExtraCharges(student);
+        const grossCurrentTerm = classFee + extraCharges;
+        const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
+        const paid = paymentMap[student.student_id] || 0;
+        const outstanding = Math.max(0, currentTermExpected - paid);
+        totalOutstanding += outstanding;
+        if (debugCount < 5 && outstanding > 10000) {
+          console.log(`[DEBUG] Student ${student.student_id}: classFee=${classFee}, extraCharges=${extraCharges}, expected=${currentTermExpected}, paid=${paid}, outstanding=${outstanding}`);
+          debugCount++;
+        }
+      });
+    }
     console.log(`[DEBUG] Total outstanding: ${totalOutstanding}, Total students: ${students?.length}`);
 
     // Get pending plans count (if payment_plans table exists)
@@ -299,7 +304,10 @@ router.get("/fee-defaulters", async (req, res, next) => {
     // NEW: Enhanced defaulters with proper fee structure integration
     let defaulters = null;
     try {
-      const { data } = await supabase.rpc('get_fee_defaulters_enhanced', { p_school_id: schoolId });
+      const { data } = await supabase.rpc('get_fee_defaulters_enhanced', {
+        p_school_id: schoolId,
+        p_term: currentTerm,
+      });
       defaulters = data;
     } catch {
       defaulters = null;
@@ -356,32 +364,39 @@ router.get("/fee-defaulters", async (req, res, next) => {
         }
       });
       
-      // Calculate defaulters with proper balances (current term only)
-      const defaultersList = allStudents?.map(student => {
-        const classFee = feeMap[student.class_name] || 0;
-        // Current term expected fees only
-        const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student);
-        const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
-        const paid = paymentMap[student.student_id]?.total || 0;
-        // Outstanding = current term expected - current term paid
-        const balance = Math.max(0, currentTermExpected - paid);
-        const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
-        
-        return {
-          student_id: student.student_id,
-          student_name: `${student.first_name} ${student.last_name}`,
-          admission_number: student.admission_number,
-          class_name: student.class_name,
-          parent_phone: student.parent_phone,
-          expected_amount: currentTermExpected,
-          paid_amount: paid,
-          balance: balance,
-          last_payment_date: lastPaymentDate,
-          balance_percentage: currentTermExpected > 0 ? (balance / currentTermExpected) * 100 : 0
-        };
-      }).filter(student => student.balance > 0)
-        .sort((a, b) => b.balance - a.balance); // Sort highest balance first
-      
+      // Calculate defaulters using ledger balances (more accurate)
+      const defaultersList = [];
+      for (const student of (allStudents || [])) {
+        try {
+          // Ledger-first balance
+          const ledgerBalance = await FeeBalanceService.getStudentBalanceWithFallback(schoolId, student.student_id);
+          // Keep expected amount for context
+          const classFee = feeMap[student.class_name] || 0;
+          const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student);
+          const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
+          const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
+
+          const balance = Math.max(0, Number(ledgerBalance) || 0);
+          if (balance > 0) {
+            defaultersList.push({
+              student_id: student.student_id,
+              student_name: `${student.first_name} ${student.last_name}`,
+              admission_number: student.admission_number,
+              class_name: student.class_name,
+              parent_phone: student.parent_phone,
+              expected_amount: currentTermExpected,
+              paid_amount: paymentMap[student.student_id]?.total || 0,
+              balance: balance,
+              last_payment_date: lastPaymentDate,
+              balance_percentage: currentTermExpected > 0 ? (balance / currentTermExpected) * 100 : 0
+            });
+          }
+        } catch (e) {
+          console.error('[REPORTS] Failed to get balance for student', student.student_id, e);
+        }
+      }
+
+      defaultersList.sort((a,b) => b.balance - a.balance);
       return res.json(defaultersList);
     }
     
