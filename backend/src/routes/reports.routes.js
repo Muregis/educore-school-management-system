@@ -40,6 +40,55 @@ async function getCarryForwardMap(schoolId, termName) {
   }
 }
 
+function toNumber(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function getTransportFeeLikeFeesPage(student) {
+  const direction = student?.transport_direction ?? "none";
+  if (!direction || direction === "none") return 0;
+  return toNumber(student?.transport_base_fee);
+}
+
+function getLunchFeeLikeFeesPage(student) {
+  const enabled = Boolean(student?.lunch_enabled);
+  if (!enabled) return 0;
+  const rate = toNumber(student?.lunch_daily_rate);
+  const days = toNumber(student?.lunch_days || 66);
+  return student?.lunch_billing_type === "termly" ? rate : rate * days;
+}
+
+function getBreakfastFeeLikeFeesPage(student) {
+  const enabled = Boolean(student?.breakfast_enabled);
+  if (!enabled) return 0;
+  const rate = toNumber(student?.breakfast_daily_rate);
+  const days = toNumber(student?.breakfast_days || 66);
+  return student?.breakfast_billing_type === "termly" ? rate : rate * days;
+}
+
+function calculateReportBalanceLikeFeesPage(student, classFee, paidAmount) {
+  const openingBalance = LedgerService.getOpeningBalanceImpact(student);
+  const transportFee = getTransportFeeLikeFeesPage(student);
+  const lunchFee = getLunchFeeLikeFeesPage(student);
+  const breakfastFee = getBreakfastFeeLikeFeesPage(student);
+  const grossAmount = classFee + transportFee + lunchFee + breakfastFee + openingBalance;
+  const expected = LedgerService.applyStudentDiscount(grossAmount, student);
+  const rawBalance = expected - toNumber(paidAmount);
+
+  return {
+    openingBalance,
+    transportFee,
+    lunchFee,
+    breakfastFee,
+    currentTermCharge: classFee + transportFee + lunchFee + breakfastFee,
+    expected,
+    rawBalance,
+    balance: Math.max(0, rawBalance),
+    overpaymentAmount: rawBalance < 0 ? Math.abs(rawBalance) : 0,
+  };
+}
+
 
 // ─── Summary dashboard stats ──────────────────────────────────────────────────
 router.get("/summary", async (req, res, next) => {
@@ -52,7 +101,7 @@ router.get("/summary", async (req, res, next) => {
     // Get student counts by gender
     const { data: students, error: stuErr } = await supabase
       .from('students')
-      .select('student_id, gender, class_name, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
+      .select('student_id, gender, class_name, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, discount_type, discount_value, discount_is_percentage')
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
       .eq('status', 'active');
@@ -102,7 +151,6 @@ router.get("/summary", async (req, res, next) => {
       .eq('term', currentTerm)
       .eq('is_deleted', false);
     if (feeErr) throw feeErr;
-    const carryForwardMap = await getCarryForwardMap(schoolId, currentTerm);
 
     // Build fee structure map (check for duplicates)
     const feeMap = {};
@@ -137,17 +185,12 @@ router.get("/summary", async (req, res, next) => {
     let debugCount = 0;
     students?.forEach(student => {
       const classFee = feeMap[student.class_name] || 0;
-      const extraCharges = LedgerService.getStudentExtraCharges(student);
-      const carryForwardImpact = carryForwardMap.has(student.student_id)
-        ? Number(carryForwardMap.get(student.student_id) || 0)
-        : LedgerService.getOpeningBalanceImpact(student);
-      const grossCurrentTerm = classFee + extraCharges + carryForwardImpact;
-      const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
       const paid = paymentMap[student.student_id] || 0;
-      const outstanding = Math.max(0, currentTermExpected - paid);
+      const balanceInfo = calculateReportBalanceLikeFeesPage(student, classFee, paid);
+      const outstanding = balanceInfo.balance;
       totalOutstanding += outstanding;
       if (debugCount < 5 && outstanding > 10000) {
-        console.log(`[DEBUG] Student ${student.student_id}: classFee=${classFee}, extraCharges=${extraCharges}, carryForward=${carryForwardImpact}, expected=${currentTermExpected}, paid=${paid}, outstanding=${outstanding}`);
+        console.log(`[DEBUG] Student ${student.student_id}: classFee=${classFee}, openingBalance=${balanceInfo.openingBalance}, transportFee=${balanceInfo.transportFee}, lunchFee=${balanceInfo.lunchFee}, breakfastFee=${balanceInfo.breakfastFee}, expected=${balanceInfo.expected}, paid=${paid}, outstanding=${outstanding}`);
         debugCount++;
       }
     });
@@ -321,7 +364,7 @@ router.get("/fee-defaulters", async (req, res, next) => {
 
     const { data: allStudents, error: stuErr } = await supabase
       .from('students')
-      .select('student_id, first_name, last_name, admission_number, class_name, parent_phone, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
+      .select('student_id, first_name, last_name, admission_number, class_name, parent_phone, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, discount_type, discount_value, discount_is_percentage')
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
       .eq('status', 'active')
@@ -344,7 +387,6 @@ router.get("/fee-defaulters", async (req, res, next) => {
       .eq('term', currentTerm)
       .eq('is_deleted', false);
     if (payErr) throw payErr;
-    const carryForwardMap = await getCarryForwardMap(schoolId, currentTerm);
 
     const feeMap = {};
     feeStructures?.forEach(fs => {
@@ -367,14 +409,9 @@ router.get("/fee-defaulters", async (req, res, next) => {
     const defaultersList = [];
     for (const student of (allStudents || [])) {
       const classFee = feeMap[student.class_name] || 0;
-      const carryForwardImpact = carryForwardMap.has(student.student_id)
-        ? Number(carryForwardMap.get(student.student_id) || 0)
-        : LedgerService.getOpeningBalanceImpact(student);
-      const currentTermCharge = classFee + LedgerService.getStudentExtraCharges(student);
-      const expectedBeforeDiscount = currentTermCharge + carryForwardImpact;
-      const currentTermExpected = LedgerService.applyStudentDiscount(expectedBeforeDiscount, student);
       const paidAmount = paymentMap[student.student_id]?.total || 0;
-      const balance = Math.max(0, currentTermExpected - paidAmount);
+      const balanceInfo = calculateReportBalanceLikeFeesPage(student, classFee, paidAmount);
+      const balance = balanceInfo.balance;
       const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
 
       if (balance > 0) {
@@ -384,13 +421,13 @@ router.get("/fee-defaulters", async (req, res, next) => {
           admission_number: student.admission_number,
           class_name: student.class_name,
           parent_phone: student.parent_phone,
-          expected_amount: currentTermExpected,
-          current_term_charge: currentTermCharge,
+          expected_amount: balanceInfo.expected,
+          current_term_charge: balanceInfo.currentTermCharge,
           paid_amount: paidAmount,
           balance,
           last_payment_date: lastPaymentDate,
-          balance_percentage: currentTermExpected > 0 ? (balance / currentTermExpected) * 100 : 0,
-          carry_forward_amount: carryForwardImpact
+          balance_percentage: balanceInfo.expected > 0 ? (balance / balanceInfo.expected) * 100 : 0,
+          carry_forward_amount: balanceInfo.openingBalance
         });
       }
     }
@@ -410,7 +447,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
     // Get all students
     const { data: allStudents, error: stuErr } = await supabase
       .from('students')
-      .select('student_id, first_name, last_name, class_name, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
+      .select('student_id, first_name, last_name, class_name, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, discount_type, discount_value, discount_is_percentage')
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
       .eq('status', 'active');
@@ -424,7 +461,6 @@ router.get("/class-fee-summary", async (req, res, next) => {
       .eq('term', currentTerm)
       .eq('is_deleted', false);
     if (feeErr) throw feeErr;
-    const carryForwardMap = await getCarryForwardMap(schoolId, currentTerm);
     
     // Get all paid payments (filter by term)
     const { data: payments, error: payErr } = await supabase
@@ -466,18 +502,13 @@ router.get("/class-fee-summary", async (req, res, next) => {
         };
       }
       
-      const classFee = feeMap[student.class_name] || 0;
-      const carryForwardImpact = carryForwardMap.has(student.student_id)
-        ? Number(carryForwardMap.get(student.student_id) || 0)
-        : LedgerService.getOpeningBalanceImpact(student);
-      const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student) + carryForwardImpact;
-      const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
       const paid = paymentMap[student.student_id] || 0;
-      // Outstanding = (current term charges +/- carry-forward) - current term paid
-      const outstanding = Math.max(0, currentTermExpected - paid);
+      const classFee = feeMap[student.class_name] || 0;
+      const balanceInfo = calculateReportBalanceLikeFeesPage(student, classFee, paid);
+      const outstanding = balanceInfo.balance;
       
       classSummary[cls].student_count += 1;
-      classSummary[cls].total_expected += currentTermExpected;
+      classSummary[cls].total_expected += balanceInfo.expected;
       classSummary[cls].total_paid += paid;
       classSummary[cls].total_outstanding += outstanding;
     });
