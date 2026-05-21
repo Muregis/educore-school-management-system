@@ -34,32 +34,46 @@ function normalizeBookRow(row = {}) {
 }
 
 // ── GET all books ─────────────────────────────────────────────────────────────
-// Now uses library_books table with book codes
+// Supports both the new library_books schema and legacy books table
 router.get("/books", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
 
-    const { data: books, error } = await supabase
-      .from("library_books")
-      .select(`
-        book_id, book_code, title, author, isbn,
-        category, publisher, publication_year,
-        shelf_location, total_copies, available_copies,
-        copies:library_book_copies(
-          copy_id, copy_code, copy_number,
-          status, condition, is_lost
-        )
-      `)
-      .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .order("book_code");
+    const [libraryResponse, legacyResponse] = await Promise.all([
+      supabase
+        .from("library_books")
+        .select(`
+          book_id, book_code, title, author, isbn,
+          category, publisher, publication_year,
+          shelf_location, total_copies, available_copies,
+          copies:library_book_copies(
+            copy_id, copy_code, copy_number,
+            status, condition, is_lost
+          )
+        `)
+        .eq("school_id", schoolId)
+        .eq("is_deleted", false)
+        .order("book_code")
+        .then(result => ({ data: result.data, error: result.error })),
+      supabase
+        .from("books")
+        .select("book_id, title, author, isbn, category, quantity_total, quantity_available, status")
+        .eq("school_id", schoolId)
+        .eq("is_deleted", false)
+        .order("title")
+        .then(result => ({ data: result.data, error: result.error })),
+    ]);
 
-    if (error) throw error;
+    const libraryError = libraryResponse.error;
+    const legacyError = legacyResponse.error;
 
-    // Transform to legacy format for frontend compatibility
-    const transformed = (books || []).map(b => ({
+    if (libraryError && !isMissingColumnError(libraryError)) throw libraryError;
+    if (legacyError) throw legacyError;
+
+    const transformedLibrary = (libraryResponse.data || []).map(b => ({
       book_id: b.book_id,
       id: b.book_id,
+      source: "library",
       book_code: b.book_code,
       title: b.title,
       author: b.author,
@@ -71,7 +85,22 @@ router.get("/books", async (req, res, next) => {
       status: b.available_copies > 0 ? 'active' : 'unavailable'
     }));
 
-    res.json(transformed);
+    const transformedLegacy = (legacyResponse.data || []).map(b => ({
+      book_id: b.book_id,
+      id: b.book_id,
+      source: "legacy",
+      book_code: null,
+      title: b.title,
+      author: b.author,
+      isbn: b.isbn,
+      category: b.category,
+      quantity_total: b.quantity_total,
+      quantity_available: b.quantity_available,
+      copies: [],
+      status: b.status || (b.quantity_available > 0 ? 'active' : 'unavailable')
+    }));
+
+    res.json([...transformedLibrary, ...transformedLegacy]);
   } catch (err) { next(err); }
 });
 
@@ -267,10 +296,13 @@ router.get("/borrows", async (req, res, next) => {
     const bookIds = Array.from(new Set((borrows || []).map(r => r.book_id).filter(Boolean)));
     const borrowerIds = Array.from(new Set((borrows || []).map(r => legacyMode ? r.borrower_id : r.student_id).filter(Boolean)));
 
-    const [{ data: books, error: booksErr }, { data: students, error: stuErr }, { data: teachers, error: teaErr }] =
+    const [{ data: libraryBooks, error: libraryErr }, { data: legacyBooks, error: legacyErr }, { data: students, error: stuErr }, { data: teachers, error: teaErr }] =
       await Promise.all([
         bookIds.length
           ? supabase.from("library_books").select("book_id, title, category").eq("school_id", schoolId).in("book_id", bookIds)
+          : Promise.resolve({ data: [], error: null }),
+        bookIds.length
+          ? supabase.from("books").select("book_id, title, category").eq("school_id", schoolId).eq("is_deleted", false).in("book_id", bookIds)
           : Promise.resolve({ data: [], error: null }),
         borrowerIds.length
           ? supabase.from("students").select("student_id, admission_number").eq("school_id", schoolId).in("student_id", borrowerIds)
@@ -279,11 +311,15 @@ router.get("/borrows", async (req, res, next) => {
           ? supabase.from("teachers").select("teacher_id, staff_number").eq("school_id", schoolId).in("teacher_id", borrowerIds)
           : Promise.resolve({ data: [], error: null }),
       ]);
-    if (booksErr) throw booksErr;
+    if (libraryErr) throw libraryErr;
+    if (legacyErr) throw legacyErr;
     if (stuErr) throw stuErr;
     if (teaErr) throw teaErr;
 
-    const bookMap = new Map((books || []).map(b => [String(b.book_id), { title: b.title, category: b.category }]));
+    const bookMap = new Map([
+      ...((libraryBooks || []).map(b => [String(b.book_id), { title: b.title, category: b.category }])),
+      ...((legacyBooks || []).map(b => [String(b.book_id), { title: b.title, category: b.category }]))
+    ]);
     const studentMap = new Map((students || []).map(s => [String(s.student_id), s.admission_number]));
     const teacherMap = new Map((teachers || []).map(t => [String(t.teacher_id), t.staff_number]));
 
@@ -334,7 +370,7 @@ router.post("/borrows", requireRoles("admin","librarian","director","superadmin"
     if (!borrowerId) return res.status(400).json({ message: "borrowerId is required" });
     if (!dueDate)    return res.status(400).json({ message: "dueDate is required" });
 
-    const { data: book, error: bookError } = await supabase
+    const { data: libraryBook, error: libraryBookError } = await supabase
       .from('library_books')
       .select('*')
       .eq('book_id', bookId)
@@ -342,8 +378,26 @@ router.post("/borrows", requireRoles("admin","librarian","director","superadmin"
       .eq('is_deleted', false)
       .single();
 
+    let book = libraryBook;
+    let bookSource = 'library';
+    let bookError = libraryBookError;
+
+    const shouldTryLegacy = !libraryBook && !libraryBookError || isMissingColumnError(libraryBookError);
+    if (shouldTryLegacy) {
+      const { data: legacyBook, error: legacyBookError } = await supabase
+        .from('books')
+        .select('*')
+        .eq('book_id', bookId)
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false)
+        .single();
+      book = legacyBook;
+      bookSource = 'legacy';
+      bookError = legacyBookError;
+    }
+
     if (bookError || !book) return res.status(404).json({ message: "Book not found" });
-    if (book.available_copies < 1)
+    if (book.quantity_available < 1)
       return res.status(400).json({ message: `No copies available for "${book.title}"` });
 
     if (borrowerType === "student") {
@@ -409,9 +463,12 @@ router.post("/borrows", requireRoles("admin","librarian","director","superadmin"
       inserted = data;
     }
 
+    const bookTable = bookSource === 'library' ? 'library_books' : 'books';
+    const availableField = bookSource === 'library' ? 'available_copies' : 'quantity_available';
+
     const { error: updateError } = await supabase
-      .from('library_books')
-      .update({ available_copies: book.available_copies - 1 })
+      .from(bookTable)
+      .update({ [availableField]: Number(book[availableField]) - 1 })
       .eq('book_id', bookId)
       .eq('school_id', schoolId);
 
@@ -482,18 +539,36 @@ router.put("/borrows/:id/return", requireRoles("admin","librarian","director","s
     }
 
     const bookId = record.book_id;
-    const { data: book, error: bookError } = await supabase
+    let bookTable = 'library_books';
+    let availableField = 'available_copies';
+    let bookRecord = null;
+
+    const { data: libBook, error: libBookError } = await supabase
       .from('library_books')
       .select('available_copies')
       .eq('book_id', bookId)
       .eq('school_id', schoolId)
       .single();
 
-    if (bookError) throw bookError;
+    if (!libBookError && libBook) {
+      bookRecord = libBook;
+    } else {
+      const { data: legacyBook, error: legacyBookError } = await supabase
+        .from('books')
+        .select('quantity_available')
+        .eq('book_id', bookId)
+        .eq('school_id', schoolId)
+        .single();
+      if (legacyBookError) throw legacyBookError;
+      if (!legacyBook) throw new Error('Book record not found');
+      bookTable = 'books';
+      availableField = 'quantity_available';
+      bookRecord = legacyBook;
+    }
 
     const { error: bookUpdateError } = await supabase
-      .from('library_books')
-      .update({ available_copies: book.available_copies + 1 })
+      .from(bookTable)
+      .update({ [availableField]: Number(bookRecord[availableField]) + 1 })
       .eq('book_id', bookId)
       .eq('school_id', schoolId);
 
