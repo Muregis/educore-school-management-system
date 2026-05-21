@@ -376,7 +376,7 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
 
       {/* Add/Edit Book Modal */}
       {showBook && (
-        <Modal title={editBook ? "Edit Book / Item" : "Add Book / Stationery"} onClose={() => setShowBook(false)} footer={
+        <Modal isOpen={showBook} title={editBook ? "Edit Book / Item" : "Add Book / Stationery"} onClose={() => setShowBook(false)} footer={
           <>
             <Button variant="ghost" onClick={() => setShowBook(false)}>Cancel</Button>
             <Button onClick={saveBook}>{editBook ? "Update Book" : "Add Book"}</Button>
@@ -425,7 +425,7 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
 
       {/* Issue Book Modal */}
       {showBorrow && (
-        <Modal title="Issue Book / Item" onClose={() => setShowBorrow(false)} footer={
+        <Modal isOpen={showBorrow} title="Issue Book / Item" onClose={() => setShowBorrow(false)} footer={
           <>
             <Button variant="ghost" onClick={() => setShowBorrow(false)}>Cancel</Button>
             <Button onClick={issueBorrow}>Issue Book</Button>
