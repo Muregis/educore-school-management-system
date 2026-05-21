@@ -952,7 +952,7 @@ export default function ReportsPage({ auth }) {
                 {/* Enhanced table with color coding */}
                 <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
                   <Table 
-                    headers={["Student", "Class", "Admission", "Phone", "Expected", "Paid", "Balance", "% Owed", "Status", "Last Payment", "Actions"]}
+                    headers={["Student", "Class", "Admission", "Phone", "Carry Fwd", "Term Charge", "Expected", "Paid", "Balance", "% Owed", "Status", "Last Payment", "Actions"]}
                     data={paginatedDefaulters.map((d, i) => {
                       const balancePercentage = d.balance_percentage || (d.expected_amount > 0 ? (d.balance / d.expected_amount) * 100 : 0);
                       let severityColor, severityBg, severityLabel;
@@ -970,6 +970,12 @@ export default function ReportsPage({ auth }) {
                         <span key="class" style={{ color: "var(--color-text-secondary)" }}>{d.class_name}</span>,
                         <span key="admin" style={{ color: "var(--color-text-muted)", fontSize: "12px", fontFamily: "var(--font-mono)" }}>{d.admission_number}</span>,
                         <span key="phone" style={{ color: "var(--color-text-muted)", fontSize: "12px", fontFamily: "var(--font-mono)" }}>{d.parent_phone}</span>,
+                        <span key="carry" style={{ color: (d.carry_forward_amount || 0) >= 0 ? "var(--color-warning)" : "var(--color-success)", fontWeight: 500 }}>
+                          {money(d.carry_forward_amount || 0)}
+                        </span>,
+                        <span key="term" style={{ color: "var(--color-text-secondary)" }}>
+                          {money(d.current_term_charge || 0)}
+                        </span>,
                         <span key="expected" style={{ color: "var(--color-text-secondary)" }}>{money(d.expected_amount || d.expected || 0)}</span>,
                         <span key="paid" style={{ color: "var(--color-success)", fontWeight: 500 }}>{money(d.paid_amount || d.paid || 0)}</span>,
                         <Badge key="balance" text={money(d.balance)} style={{ background: severityBg, color: severityColor, borderColor: "transparent", fontWeight: 700 }} />,

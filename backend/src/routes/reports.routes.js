@@ -9,6 +9,37 @@ const router = Router();
 router.use(authRequired);
 router.use(requireRoles("admin", "teacher", "finance", "director", "superadmin"));
 
+async function getCarryForwardMap(schoolId, termName) {
+  try {
+    const { data: termRow, error: termErr } = await supabase
+      .from('terms')
+      .select('term_id')
+      .eq('school_id', schoolId)
+      .eq('term_name', termName)
+      .limit(1)
+      .maybeSingle();
+
+    if (termErr || !termRow?.term_id) return new Map();
+
+    const { data: ledgerRows, error: ledgerErr } = await supabase
+      .from('fee_balance_ledger')
+      .select('student_id, amount')
+      .eq('school_id', schoolId)
+      .eq('term_id', termRow.term_id)
+      .eq('transaction_type', 'carry_forward');
+
+    if (ledgerErr || !ledgerRows?.length) return new Map();
+
+    const carryMap = new Map();
+    ledgerRows.forEach((row) => {
+      carryMap.set(row.student_id, (carryMap.get(row.student_id) || 0) + Number(row.amount || 0));
+    });
+    return carryMap;
+  } catch {
+    return new Map();
+  }
+}
+
 
 // ─── Summary dashboard stats ──────────────────────────────────────────────────
 router.get("/summary", async (req, res, next) => {
@@ -21,9 +52,10 @@ router.get("/summary", async (req, res, next) => {
     // Get student counts by gender
     const { data: students, error: stuErr } = await supabase
       .from('students')
-      .select('student_id, gender, class_name, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
+      .select('student_id, gender, class_name, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
       .eq('school_id', schoolId)
-      .eq('is_deleted', false);
+      .eq('is_deleted', false)
+      .eq('status', 'active');
     if (stuErr) throw stuErr;
 
     const boys = students?.filter(s => s.gender === 'male').length || 0;
@@ -70,6 +102,7 @@ router.get("/summary", async (req, res, next) => {
       .eq('term', currentTerm)
       .eq('is_deleted', false);
     if (feeErr) throw feeErr;
+    const carryForwardMap = await getCarryForwardMap(schoolId, currentTerm);
 
     // Build fee structure map (check for duplicates)
     const feeMap = {};
@@ -105,7 +138,9 @@ router.get("/summary", async (req, res, next) => {
     students?.forEach(student => {
       const classFee = feeMap[student.class_name] || 0;
       const extraCharges = LedgerService.getStudentExtraCharges(student);
-      const carryForwardImpact = LedgerService.getOpeningBalanceImpact(student);
+      const carryForwardImpact = carryForwardMap.has(student.student_id)
+        ? Number(carryForwardMap.get(student.student_id) || 0)
+        : LedgerService.getOpeningBalanceImpact(student);
       const grossCurrentTerm = classFee + extraCharges + carryForwardImpact;
       const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
       const paid = paymentMap[student.student_id] || 0;
@@ -286,9 +321,10 @@ router.get("/fee-defaulters", async (req, res, next) => {
 
     const { data: allStudents, error: stuErr } = await supabase
       .from('students')
-      .select('student_id, first_name, last_name, admission_number, class_name, parent_phone, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
+      .select('student_id, first_name, last_name, admission_number, class_name, parent_phone, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
+      .eq('status', 'active')
       .order('class_name', { ascending: true });
     if (stuErr) throw stuErr;
 
@@ -308,6 +344,7 @@ router.get("/fee-defaulters", async (req, res, next) => {
       .eq('term', currentTerm)
       .eq('is_deleted', false);
     if (payErr) throw payErr;
+    const carryForwardMap = await getCarryForwardMap(schoolId, currentTerm);
 
     const feeMap = {};
     feeStructures?.forEach(fs => {
@@ -330,9 +367,12 @@ router.get("/fee-defaulters", async (req, res, next) => {
     const defaultersList = [];
     for (const student of (allStudents || [])) {
       const classFee = feeMap[student.class_name] || 0;
-      const carryForwardImpact = LedgerService.getOpeningBalanceImpact(student);
-      const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student) + carryForwardImpact;
-      const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
+      const carryForwardImpact = carryForwardMap.has(student.student_id)
+        ? Number(carryForwardMap.get(student.student_id) || 0)
+        : LedgerService.getOpeningBalanceImpact(student);
+      const currentTermCharge = classFee + LedgerService.getStudentExtraCharges(student);
+      const expectedBeforeDiscount = currentTermCharge + carryForwardImpact;
+      const currentTermExpected = LedgerService.applyStudentDiscount(expectedBeforeDiscount, student);
       const paidAmount = paymentMap[student.student_id]?.total || 0;
       const balance = Math.max(0, currentTermExpected - paidAmount);
       const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
@@ -345,6 +385,7 @@ router.get("/fee-defaulters", async (req, res, next) => {
           class_name: student.class_name,
           parent_phone: student.parent_phone,
           expected_amount: currentTermExpected,
+          current_term_charge: currentTermCharge,
           paid_amount: paidAmount,
           balance,
           last_payment_date: lastPaymentDate,
@@ -369,9 +410,10 @@ router.get("/class-fee-summary", async (req, res, next) => {
     // Get all students
     const { data: allStudents, error: stuErr } = await supabase
       .from('students')
-      .select('student_id, first_name, last_name, class_name, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
+      .select('student_id, first_name, last_name, class_name, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
       .eq('school_id', schoolId)
-      .eq('is_deleted', false);
+      .eq('is_deleted', false)
+      .eq('status', 'active');
     if (stuErr) throw stuErr;
     
     // Get fee structures (filter by term)
@@ -382,6 +424,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
       .eq('term', currentTerm)
       .eq('is_deleted', false);
     if (feeErr) throw feeErr;
+    const carryForwardMap = await getCarryForwardMap(schoolId, currentTerm);
     
     // Get all paid payments (filter by term)
     const { data: payments, error: payErr } = await supabase
@@ -424,7 +467,9 @@ router.get("/class-fee-summary", async (req, res, next) => {
       }
       
       const classFee = feeMap[student.class_name] || 0;
-      const carryForwardImpact = LedgerService.getOpeningBalanceImpact(student);
+      const carryForwardImpact = carryForwardMap.has(student.student_id)
+        ? Number(carryForwardMap.get(student.student_id) || 0)
+        : LedgerService.getOpeningBalanceImpact(student);
       const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student) + carryForwardImpact;
       const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
       const paid = paymentMap[student.student_id] || 0;
