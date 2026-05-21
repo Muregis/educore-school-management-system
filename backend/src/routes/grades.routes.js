@@ -7,6 +7,19 @@ import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 const router = Router();
 router.use(authRequired);
 
+// Map common frontend special mark codes to numeric sentinels or null
+const INPUT_SPECIAL_MAP = {
+  'absent': -1,
+  'x': -1,
+  'cheat': -3,
+  'y': -3,
+  'inc': -2,
+  'incomplete': -2,
+  'medical': -4,
+  'na': null,
+  'n/a': null,
+};
+
 // ─── Helper: validate teacher class access for grades ─────────────────────
 async function validateTeacherGradeAccess(schoolId, userId, classId) {
   if (!classId) return true; // No class filter, allow access
@@ -181,6 +194,22 @@ try {
         const { subject, marks } = entry;
         if (!subject || marks === undefined || marks === null || marks === "") continue;
 
+        // Normalize special mark inputs from the frontend (strings like 'absent', 'cheat', 'na')
+        let marksValue = marks;
+        if (typeof marks === 'string') {
+          const key = marks.trim().toLowerCase();
+          if (Object.prototype.hasOwnProperty.call(INPUT_SPECIAL_MAP, key)) {
+            marksValue = INPUT_SPECIAL_MAP[key];
+          } else {
+            marksValue = Number(marks);
+          }
+        } else {
+          marksValue = Number(marks);
+        }
+
+        // If marksValue is explicitly null (N/A / not assessed), skip saving this subject
+        if (marksValue === null) continue;
+
       // Resolve subject_id — find or create the subject
         let { data: subjectRow, error: subjectError } = await supabase
           .from('subjects')
@@ -208,17 +237,17 @@ try {
           subjectId = inserted.subject_id;
         }
 
-    const grade = calcGrade(marks, totalMarks);
+      const grade = (typeof marksValue === 'number' && marksValue < 0) ? 'X' : calcGrade(marksValue, totalMarks);
 
       // Upsert — update if already exists for this student/subject combo
         const { data: upserted, error: upsertError } = await supabase
           .from('results')
-          .upsert({
+            .upsert({
             school_id: schoolId,
             student_id: studentId,
             subject,
             class_id: resolvedClassId,
-            marks: Number(marks),
+            marks: Number(marksValue),
             total_marks: Number(totalMarks),
             grade,
             term
@@ -247,14 +276,34 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
     const { schoolId } = req.user;
     const { marks, totalMarks, subject, term, teacherComment } = req.body;
 
-    const m = Number(marks);
+    // Normalize special input marks if provided (strings like 'absent','cheat','na')
+    let marksValue = marks;
+    if (typeof marks === 'string') {
+      const key = marks.trim().toLowerCase();
+      if (Object.prototype.hasOwnProperty.call(INPUT_SPECIAL_MAP, key)) {
+        marksValue = INPUT_SPECIAL_MAP[key];
+      } else {
+        marksValue = Number(marks);
+      }
+    } else {
+      marksValue = marks != null ? Number(marks) : null;
+    }
+
     const t = Number(totalMarks || 100);
-    const pct = (m / (t || 1)) * 100;
-    const grade = pct >= 80 ? "EE" : pct >= 65 ? "ME" : pct >= 50 ? "AE" : "BE";
+    let grade;
+    if (marksValue === null) {
+      grade = null;
+    } else if (typeof marksValue === 'number' && marksValue < 0) {
+      grade = 'X';
+    } else {
+      const m = Number(marksValue);
+      const pct = (m / (t || 1)) * 100;
+      grade = pct >= 80 ? "EE" : pct >= 65 ? "ME" : pct >= 50 ? "AE" : "BE";
+    }
 
     // Build update data
     const updateData = {
-      marks: m,
+      marks: marksValue === null ? null : Number(marksValue),
       total_marks: t,
       grade,
       term,

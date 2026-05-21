@@ -8,8 +8,7 @@
  * - Proper tie handling (same rank for equal scores)
  */
 
-import { apiFetch } from '../lib/api';
-import { calculateGrade, getGradePoints } from '../lib/grading';
+import { calculateGrade, getGradePoints } from '../lib/grading.js';
 
 /**
  * Calculate class rankings from grade results
@@ -66,22 +65,33 @@ export function calculateClassRankings(results, options = {}) {
     .filter(s => s.subjects.length >= minSubjects)
     .map(s => {
       const validSubjects = s.subjects;
-      const totalMarks = validSubjects.reduce((sum, subj) => sum + subj.percentage, 0);
-      const meanScore = totalMarks / validSubjects.length;
-      
-      // Calculate KNEC points if applicable
-      const totalPoints = validSubjects.reduce((sum, subj) => 
-        sum + getGradePoints(subj.percentage), 0);
+
+      // Raw totals (marks and possible) and per-entry percentages
+      const totalMarksRaw = validSubjects.reduce((sum, subj) => sum + (Number(subj.marks) || 0), 0);
+      const maxPossible = validSubjects.reduce((sum, subj) => sum + (Number(subj.total) || 0), 0);
+      const sumPercentages = validSubjects.reduce((sum, subj) => sum + subj.percentage, 0);
+      const meanScore = sumPercentages / validSubjects.length;
+
+      // Calculate grade points using derived grade for each subject
+      const totalPoints = validSubjects.reduce((sum, subj) => {
+        const grade = calculateGrade(subj.percentage).grade;
+        return sum + getGradePoints(grade);
+      }, 0);
       const meanPoints = totalPoints / validSubjects.length;
 
       return {
         ...s,
-        total_subjects: validSubjects.length,
-        total_marks: Math.round(totalMarks * 100) / 100,
-        mean_score: Math.round(meanScore * 100) / 100,
-        total_points: Math.round(totalPoints * 100) / 100,
-        mean_points: Math.round(meanPoints * 100) / 100,
-        overall_grade: calculateGrade(meanScore).grade
+        totalSubjects: validSubjects.length,
+        totalMarksRaw: Math.round(totalMarksRaw * 100) / 100,
+        maxPossible: Math.round(maxPossible * 100) / 100,
+        totalMarks: Math.round(totalMarksRaw * 100) / 100, // raw marks sum for UI display
+        totalPercent: Math.round(sumPercentages * 100) / 100, // sum of percentages (auxiliary)
+        meanScore: Math.round(meanScore * 100) / 100,
+        totalPoints: Math.round(totalPoints * 100) / 100,
+        meanPoints: Math.round(meanPoints * 100) / 100,
+        overallGrade: calculateGrade(meanScore).grade,
+        studentName: s.student_name || s.studentName || `Student ${s.student_id}`,
+        admissionNumber: s.admission_number || s.admissionNumber || ''
       };
     });
 
@@ -101,8 +111,8 @@ export function calculateClassRankings(results, options = {}) {
     if (previousScore !== null && student.mean_score < previousScore) {
       currentRank = index + 1;
     }
-    previousScore = student.mean_score;
-    
+    previousScore = student.meanScore;
+
     return {
       ...student,
       rank: currentRank,
@@ -140,7 +150,7 @@ export function calculateClassRankings(results, options = {}) {
   }).filter(Boolean);
 
   // Calculate class summary statistics
-  const allMeans = rankedStudents.map(s => s.mean_score);
+  const allMeans = rankedStudents.map(s => s.meanScore);
   const summary = {
     total_students: rankedStudents.length,
     class_mean: allMeans.length > 0 
@@ -155,10 +165,21 @@ export function calculateClassRankings(results, options = {}) {
       : 0
   };
 
+  const classStats = {
+    meanScore: summary.class_mean,
+    highestMean: summary.highest_mean,
+    lowestMean: summary.lowest_mean,
+    passingCount: summary.passing_count,
+    failingCount: summary.failing_count,
+    passRate: summary.pass_rate,
+    totalStudents: summary.total_students
+  };
+
   return {
     students: rankedStudents,
     subjects: subjectRankings,
-    summary
+    summary,
+    classStats
   };
 }
 

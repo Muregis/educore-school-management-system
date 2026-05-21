@@ -106,15 +106,19 @@ export function calculateMeanScore(results) {
   let totalPossible = 0;
   let validCount = 0;
 
+  let sumPercentages = 0;
+
   for (const r of results) {
     const marks = Number(r.marks);
     const possible = Number(r.total_marks);
-    
+
     // Skip special marks and invalid entries
     if (marks < 0 || isNaN(marks) || isNaN(possible) || possible === 0) {
       continue;
     }
-    
+
+    const entryPercent = (marks / possible) * 100;
+    sumPercentages += entryPercent;
     totalMarks += marks;
     totalPossible += possible;
     validCount++;
@@ -124,10 +128,11 @@ export function calculateMeanScore(results) {
     return { mean: 0, total: 0, count: 0, percentage: 0 };
   }
 
-  const percentage = (totalMarks / totalPossible) * 100;
+  const mean = sumPercentages / validCount; // average of per-entry percentages
+  const percentage = (totalMarks / totalPossible) * 100; // weighted percentage across entries
 
   return {
-    mean: parseFloat((totalMarks / validCount).toFixed(2)),
+    mean: parseFloat(mean.toFixed(2)),
     total: totalMarks,
     count: validCount,
     percentage: parseFloat(percentage.toFixed(2)),
