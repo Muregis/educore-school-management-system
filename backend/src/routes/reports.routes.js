@@ -445,16 +445,13 @@ router.get("/class-fee-summary", async (req, res, next) => {
       feeMap[fs.class_name] = expected;
     });
     
-    // Build payment map per student (current term only)
+    // Build payment map per student for the already-filtered term
     const paymentMap = {};
-    paidPayments?.forEach(payment => {
-      // Only include payments for the current term
-      if (payment.term === currentTerm) {
-        if (!paymentMap[payment.student_id]) {
-          paymentMap[payment.student_id] = 0;
-        }
-        paymentMap[payment.student_id] += Number(payment.amount);
+    payments?.forEach(payment => {
+      if (!paymentMap[payment.student_id]) {
+        paymentMap[payment.student_id] = 0;
       }
+      paymentMap[payment.student_id] += Number(payment.amount);
     });
     
     // Calculate per-class summary (current term only)
