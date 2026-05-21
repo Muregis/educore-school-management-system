@@ -4,6 +4,7 @@ import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { getExpenditureSummary } from "../services/expenditure.service.js";
 import { LedgerService } from "../services/ledger.service.js";
+import { FeeBalanceService } from "../services/backend_services.js";
 
 const router = Router();
 router.use(authRequired);
@@ -92,18 +93,25 @@ router.get("/summary", async (req, res, next) => {
 
     // Calculate total outstanding
     let totalOutstanding = 0;
+    let debugCount = 0;
     students?.forEach(student => {
       const classFee = feeMap[student.class_name] || 0;
-      // Calculate current term expected fees (without opening balance)
-      const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student);
+      // Current term expected fees only
+      const extraCharges = LedgerService.getStudentExtraCharges(student);
+      const grossCurrentTerm = classFee + extraCharges;
       const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
-      // Opening balance is separate carryover from previous terms
-      const openingBalanceImpact = LedgerService.getOpeningBalanceImpact(student);
       const paid = paymentMap[student.student_id] || 0;
-      // Total outstanding = (current term expected - all payments) + opening balance impact
-      const outstanding = Math.max(0, currentTermExpected - paid + openingBalanceImpact);
+      // Outstanding = current term expected - current term paid
+      const outstanding = Math.max(0, currentTermExpected - paid);
       totalOutstanding += outstanding;
+      
+      // Debug: log first 5 students with high balances
+      if (debugCount < 5 && outstanding > 10000) {
+        console.log(`[DEBUG] Student ${student.student_id}: classFee=${classFee}, extraCharges=${extraCharges}, expected=${currentTermExpected}, paid=${paid}, outstanding=${outstanding}`);
+        debugCount++;
+      }
     });
+    console.log(`[DEBUG] Total outstanding: ${totalOutstanding}, Total students: ${students?.length}`);
 
     // Get pending plans count (if payment_plans table exists)
     let pendingPlans = 0;
@@ -283,7 +291,10 @@ router.get("/fee-defaulters", async (req, res, next) => {
     // NEW: Enhanced defaulters with proper fee structure integration
     let defaulters = null;
     try {
-      const { data } = await supabase.rpc('get_fee_defaulters_enhanced', { p_school_id: schoolId });
+      const { data } = await supabase.rpc('get_fee_defaulters_enhanced', {
+        p_school_id: schoolId,
+        p_term: currentTerm,
+      });
       defaulters = data;
     } catch {
       defaulters = null;
@@ -340,18 +351,15 @@ router.get("/fee-defaulters", async (req, res, next) => {
         }
       });
       
-      // Calculate defaulters with proper balances
+      // Calculate defaulters with proper balances (current term only)
       const defaultersList = allStudents?.map(student => {
         const classFee = feeMap[student.class_name] || 0;
-        // Calculate current term expected fees (without opening balance)
+        // Current term expected fees only
         const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student);
         const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
-        // Opening balance is separate carryover from previous terms
-        const openingBalanceImpact = LedgerService.getOpeningBalanceImpact(student);
         const paid = paymentMap[student.student_id]?.total || 0;
-        // Total outstanding = (current term expected - all payments) + opening balance impact
-        // This correctly handles: if they overpaid previously (credit), it reduces current balance
-        const balance = Math.max(0, currentTermExpected - paid + openingBalanceImpact);
+        // Outstanding = current term expected - current term paid
+        const balance = Math.max(0, currentTermExpected - paid);
         const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
         
         return {

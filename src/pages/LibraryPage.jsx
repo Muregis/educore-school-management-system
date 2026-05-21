@@ -94,6 +94,12 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
   const saveBook = async () => {
     setErr("");
     setLoading(true); // Show loading during save
+    if (!auth?.token) {
+      setLoading(false);
+      const m = "Not authenticated. Please login.";
+      setErr(m); toast?.(m, "error");
+      return;
+    }
     if (!fb.title || !fb.author) {
       setLoading(false);
       return setErr("Title and author are required.");
@@ -102,6 +108,7 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
       setLoading(false);
       return setErr("Quantity must be at least 1.");
     }
+    console.debug('[Library] saveBook start', { editBook, fb });
     try {
       let result;
       if (editBook) {
@@ -112,13 +119,10 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
         toast("Book added", "success");
       }
       
-      // Handle different response formats - backend may return { data: book } or book directly
+      console.debug('[Library] saveBook response', result);
       const savedBook = result?.data || result;
-      
-      // Extract book_id from various possible response structures
       const bookId = savedBook?.book_id || savedBook?.id;
       
-      // Optimistically add to list if new book with properly normalized data
       if (!editBook && bookId) {
         const normalizedBook = {
           book_id: bookId,
@@ -134,10 +138,9 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
       }
       
       setShowBook(false); setFb(BLANK_BOOK); setEditBook(null);
-      
-      // Force refresh to ensure consistency
       await load();
     } catch (e) { 
+      console.error('[Library] saveBook error', e);
       const message = e.message || "Failed to save";
       setErr(message);
       toast?.(message, "error");
@@ -149,30 +152,42 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
   // ── Issue book ─────────────────────────────────────────────────────────────
   const issueBorrow = async () => {
     setErr("");
+    if (!auth?.token) return setErr("Not authenticated.");
     if (!fw.borrowerId) return setErr("Please select a borrower.");
     if (!fw.bookId)     return setErr("Please select a book.");
     const book = books.find(b => b.book_id === Number(fw.bookId));
     if (!book) return setErr("Book not found.");
     if (Number(book.quantity_available) < 1) return setErr("No copies available for this book.");
+    console.debug('[Library] issueBorrow', fw);
     try {
-      await apiFetch("/library/borrows", { method: "POST", token: auth?.token, body: {
+      const res = await apiFetch("/library/borrows", { method: "POST", token: auth?.token, body: {
         bookId:       Number(fw.bookId),
         borrowerId:   Number(fw.borrowerId),
         borrowerType: fw.borrowerType,
         dueDate:      fw.dueDate,
         notes:        fw.notes,
       }});
+      console.debug('[Library] issueBorrow response', res);
       setShowBorrow(false); setFw(BLANK_BORROW);
       load();
-    } catch (e) { setErr(e.message || "Failed to issue"); }
+    } catch (e) { console.error('[Library] issueBorrow error', e); setErr(e.message || "Failed to issue"); }
   };
 
   // ── Return book ────────────────────────────────────────────────────────────
   const returnBook = async (borrowId) => {
+    setErr("");
     try {
-      await apiFetch(`/library/borrows/${borrowId}/return`, { method: "PUT", token: auth?.token });
+      console.debug('[Library] returnBook', borrowId);
+      const res = await apiFetch(`/library/borrows/${borrowId}/return`, { method: "PUT", token: auth?.token });
+      console.debug('[Library] returnBook response', res);
+      toast?.("Book returned successfully", "success");
       load();
-    } catch { /* ignore */ }
+    } catch (e) {
+      console.error('[Library] returnBook error', e);
+      const message = e.message || "Failed to return book";
+      setErr(message);
+      toast?.(message, "error");
+    }
   };
 
   // toast prop is provided by App.jsx — no internal stub needed

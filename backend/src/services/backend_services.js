@@ -724,10 +724,13 @@ export class FeeBalanceService {
       const { data, error } = await query;
       if (error) throw error;
 
-      return data?.[0]?.balance_after || 0;
+      if (!data || data.length === 0) {
+        return null;
+      }
+      return parseFloat(data[0].balance_after) || 0;
     } catch (error) {
       console.error('Error getting student balance:', error);
-      return 0;
+      return null;
     }
   }
 
@@ -737,7 +740,7 @@ export class FeeBalanceService {
   static async getStudentBalanceWithFallback(schoolId, studentId) {
     // Try new system first
     const newBalance = await this.getStudentBalance(schoolId, studentId);
-    if (newBalance !== 0) return newBalance;
+    if (newBalance !== null) return newBalance;
 
     // Fallback to legacy calculation
     try {
