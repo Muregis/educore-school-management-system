@@ -595,23 +595,32 @@ export default function ReportsPage({ auth }) {
   useEffect(() => {
     const token = auth?.token || sessionStorage.getItem("token");
     if (token) {
-      apiFetch('/classes', { token })
+      const ac = new AbortController();
+      apiFetch('/classes', { token, signal: ac.signal })
         .then(res => setClassOptions(res.data || res || []))
-        .catch(() => {});
+        .catch((e) => {
+          if (e?.code !== "EABORT") {
+            console.error("Classes load error:", e);
+          }
+        });
+      return () => ac.abort();
     }
-  }, [auth]);
+    return undefined;
+  }, [auth?.token]);
 
   useEffect(() => {
     const token = auth?.token || sessionStorage.getItem("token");
     if (!token) { setLoading(false); return; }
+    const ac = new AbortController();
+    setLoading(true);
     Promise.all([
-      apiFetch("/reports/summary",                { token }),
-      apiFetch("/reports/monthly-fee-collection", { token }),
-      apiFetch("/reports/attendance-rate",        { token }),
-      apiFetch("/reports/fee-defaulters",         { token }),
-      apiFetch("/reports/grade-distribution",     { token }),
-      apiFetch("/reports/class-fee-summary",      { token }), // New endpoint for class-wise fees
-      apiFetch("/reports/expenditure-summary",    { token }),
+      apiFetch("/reports/summary",                { token, signal: ac.signal }),
+      apiFetch("/reports/monthly-fee-collection", { token, signal: ac.signal }),
+      apiFetch("/reports/attendance-rate",        { token, signal: ac.signal }),
+      apiFetch("/reports/fee-defaulters",         { token, signal: ac.signal }),
+      apiFetch("/reports/grade-distribution",     { token, signal: ac.signal }),
+      apiFetch("/reports/class-fee-summary",      { token, signal: ac.signal }), // New endpoint for class-wise fees
+      apiFetch("/reports/expenditure-summary",    { token, signal: ac.signal }),
     ]).then(([s, m, a, d, g, cfs, es]) => {
       const normSummary = s ? {
         students:       s.totalStudents  ?? s.students       ?? 0,
@@ -636,9 +645,14 @@ export default function ReportsPage({ auth }) {
         class_name: row.class_name ?? row.subject   ?? "",
       })));
     }).catch(e => {
-      console.error("Reports load error:", e);
-    }).finally(() => setLoading(false));
-  }, [auth]);
+      if (e?.code !== "EABORT") {
+        console.error("Reports load error:", e);
+      }
+    }).finally(() => {
+      if (!ac.signal.aborted) setLoading(false);
+    });
+    return () => ac.abort();
+  }, [auth?.token]);
 
   const tabBtn = id => (
     <button key={id} onClick={() => setTab(id)} style={{

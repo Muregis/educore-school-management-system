@@ -93,9 +93,15 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
 
   useEffect(() => {
     if (!auth?.token) return;
-    apiFetch("/reports/expenditure-summary", { token: auth.token })
+    const ac = new AbortController();
+    apiFetch("/reports/expenditure-summary", { token: auth.token, signal: ac.signal })
       .then((data) => setExpenditureSummary(data || null))
-      .catch((err) => console.error("Error fetching expenditure summary:", err));
+      .catch((err) => {
+        if (err?.code !== "EABORT") {
+          console.error("Error fetching expenditure summary:", err);
+        }
+      });
+    return () => ac.abort();
   }, [auth?.token]);
 
   // Calculate statistics
