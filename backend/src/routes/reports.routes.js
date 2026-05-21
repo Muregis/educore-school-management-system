@@ -4,7 +4,6 @@ import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { getExpenditureSummary } from "../services/expenditure.service.js";
 import { LedgerService } from "../services/ledger.service.js";
-import { FeeBalanceService } from "../services/backend_services.js";
 
 const router = Router();
 router.use(authRequired);
@@ -100,30 +99,23 @@ router.get("/summary", async (req, res, next) => {
       }
     });
 
-    // Calculate total outstanding (use ledger as source-of-truth)
+    // Calculate outstanding using current-term fees plus brought-forward debit/credit.
     let totalOutstanding = 0;
-    try {
-      // Use ledger-based balances for accuracy. This may issue one query per student.
-      const balances = await Promise.all((students || []).map(s => FeeBalanceService.getStudentBalanceWithFallback(schoolId, s.student_id)));
-      balances.forEach(b => { if (b > 0) totalOutstanding += Number(b); });
-    } catch (e) {
-      console.error('[REPORTS] Failed to compute ledger balances, falling back to legacy calculation', e);
-      // Fallback to previous method when ledger read fails
-      let debugCount = 0;
-      students?.forEach(student => {
-        const classFee = feeMap[student.class_name] || 0;
-        const extraCharges = LedgerService.getStudentExtraCharges(student);
-        const grossCurrentTerm = classFee + extraCharges;
-        const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
-        const paid = paymentMap[student.student_id] || 0;
-        const outstanding = Math.max(0, currentTermExpected - paid);
-        totalOutstanding += outstanding;
-        if (debugCount < 5 && outstanding > 10000) {
-          console.log(`[DEBUG] Student ${student.student_id}: classFee=${classFee}, extraCharges=${extraCharges}, expected=${currentTermExpected}, paid=${paid}, outstanding=${outstanding}`);
-          debugCount++;
-        }
-      });
-    }
+    let debugCount = 0;
+    students?.forEach(student => {
+      const classFee = feeMap[student.class_name] || 0;
+      const extraCharges = LedgerService.getStudentExtraCharges(student);
+      const carryForwardImpact = LedgerService.getOpeningBalanceImpact(student);
+      const grossCurrentTerm = classFee + extraCharges + carryForwardImpact;
+      const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
+      const paid = paymentMap[student.student_id] || 0;
+      const outstanding = Math.max(0, currentTermExpected - paid);
+      totalOutstanding += outstanding;
+      if (debugCount < 5 && outstanding > 10000) {
+        console.log(`[DEBUG] Student ${student.student_id}: classFee=${classFee}, extraCharges=${extraCharges}, carryForward=${carryForwardImpact}, expected=${currentTermExpected}, paid=${paid}, outstanding=${outstanding}`);
+        debugCount++;
+      }
+    });
     console.log(`[DEBUG] Total outstanding: ${totalOutstanding}, Total students: ${students?.length}`);
 
     // Get pending plans count (if payment_plans table exists)
@@ -291,116 +283,79 @@ router.get("/fee-defaulters", async (req, res, next) => {
     const { schoolId } = req.user;
     const { term } = req.query; // Allow term filtering via query param
     const currentTerm = term || 'Term 2'; // Default to Term 2 if not specified
-    
-    // OLD: Basic defaulters with hardcoded 10,000 KSh expected amount
-    // let students = null;
-    // try {
-    //   const { data } = await supabase.rpc('get_fee_defaulters', { p_school_id: schoolId });
-    //   students = data;
-    // } catch {
-    //   students = null;
-    // }
-    
-    // NEW: Enhanced defaulters with proper fee structure integration
-    let defaulters = null;
-    try {
-      const { data } = await supabase.rpc('get_fee_defaulters_enhanced', {
-        p_school_id: schoolId,
-        p_term: currentTerm,
-      });
-      defaulters = data;
-    } catch {
-      defaulters = null;
-    }
-    
-    // Fallback to manual calculation if RPC not available
-    if (!defaulters) {
-      // Get students with their classes
-      const { data: allStudents, error: stuErr } = await supabase
-        .from('students')
-        .select('student_id, first_name, last_name, admission_number, class_name, parent_phone, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
-        .eq('school_id', schoolId)
-        .eq('is_deleted', false)
-        .order('class_name', { ascending: true });
-      if (stuErr) throw stuErr;
-      
-      // Get fee structures for proper expected amounts (filter by term)
-      const { data: feeStructures, error: feeErr } = await supabase
-        .from('fee_structures')
-        .select('class_name, tuition, activity, misc')
-        .eq('school_id', schoolId)
-        .eq('term', currentTerm)
-        .eq('is_deleted', false);
-      if (feeErr) throw feeErr;
-      
-      // Get paid payments (filter by term)
-      const { data: payments, error: payErr } = await supabase
-        .from('payments')
-        .select('student_id, amount, payment_date, term')
-        .eq('school_id', schoolId)
-        .eq('status', 'paid')
-        .eq('term', currentTerm)
-        .eq('is_deleted', false);
-      if (payErr) throw payErr;
-      
-      // Build fee structure map
-      const feeMap = {};
-      feeStructures?.forEach(fs => {
-        const expected = Number(fs.tuition) + Number(fs.activity) + Number(fs.misc);
-        feeMap[fs.class_name] = expected;
-      });
-      
-      // Build payment map per student
-      const paymentMap = {};
-      payments?.forEach(payment => {
-        if (!paymentMap[payment.student_id]) {
-          paymentMap[payment.student_id] = { total: 0, lastPaymentDate: null };
-        }
-        paymentMap[payment.student_id].total += Number(payment.amount);
-        // Track last payment date
-        if (!paymentMap[payment.student_id].lastPaymentDate || 
-            payment.payment_date > paymentMap[payment.student_id].lastPaymentDate) {
-          paymentMap[payment.student_id].lastPaymentDate = payment.payment_date;
-        }
-      });
-      
-      // Calculate defaulters using ledger balances (more accurate)
-      const defaultersList = [];
-      for (const student of (allStudents || [])) {
-        try {
-          // Ledger-first balance
-          const ledgerBalance = await FeeBalanceService.getStudentBalanceWithFallback(schoolId, student.student_id);
-          // Keep expected amount for context
-          const classFee = feeMap[student.class_name] || 0;
-          const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student);
-          const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
-          const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
 
-          const balance = Math.max(0, Number(ledgerBalance) || 0);
-          if (balance > 0) {
-            defaultersList.push({
-              student_id: student.student_id,
-              student_name: `${student.first_name} ${student.last_name}`,
-              admission_number: student.admission_number,
-              class_name: student.class_name,
-              parent_phone: student.parent_phone,
-              expected_amount: currentTermExpected,
-              paid_amount: paymentMap[student.student_id]?.total || 0,
-              balance: balance,
-              last_payment_date: lastPaymentDate,
-              balance_percentage: currentTermExpected > 0 ? (balance / currentTermExpected) * 100 : 0
-            });
-          }
-        } catch (e) {
-          console.error('[REPORTS] Failed to get balance for student', student.student_id, e);
-        }
+    const { data: allStudents, error: stuErr } = await supabase
+      .from('students')
+      .select('student_id, first_name, last_name, admission_number, class_name, parent_phone, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .order('class_name', { ascending: true });
+    if (stuErr) throw stuErr;
+
+    const { data: feeStructures, error: feeErr } = await supabase
+      .from('fee_structures')
+      .select('class_name, tuition, activity, misc')
+      .eq('school_id', schoolId)
+      .eq('term', currentTerm)
+      .eq('is_deleted', false);
+    if (feeErr) throw feeErr;
+
+    const { data: payments, error: payErr } = await supabase
+      .from('payments')
+      .select('student_id, amount, payment_date, term')
+      .eq('school_id', schoolId)
+      .eq('status', 'paid')
+      .eq('term', currentTerm)
+      .eq('is_deleted', false);
+    if (payErr) throw payErr;
+
+    const feeMap = {};
+    feeStructures?.forEach(fs => {
+      const expected = Number(fs.tuition) + Number(fs.activity) + Number(fs.misc);
+      feeMap[fs.class_name] = expected;
+    });
+
+    const paymentMap = {};
+    payments?.forEach(payment => {
+      if (!paymentMap[payment.student_id]) {
+        paymentMap[payment.student_id] = { total: 0, lastPaymentDate: null };
       }
+      paymentMap[payment.student_id].total += Number(payment.amount);
+      if (!paymentMap[payment.student_id].lastPaymentDate ||
+          payment.payment_date > paymentMap[payment.student_id].lastPaymentDate) {
+        paymentMap[payment.student_id].lastPaymentDate = payment.payment_date;
+      }
+    });
 
-      defaultersList.sort((a,b) => b.balance - a.balance);
-      return res.json(defaultersList);
+    const defaultersList = [];
+    for (const student of (allStudents || [])) {
+      const classFee = feeMap[student.class_name] || 0;
+      const carryForwardImpact = LedgerService.getOpeningBalanceImpact(student);
+      const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student) + carryForwardImpact;
+      const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
+      const paidAmount = paymentMap[student.student_id]?.total || 0;
+      const balance = Math.max(0, currentTermExpected - paidAmount);
+      const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
+
+      if (balance > 0) {
+        defaultersList.push({
+          student_id: student.student_id,
+          student_name: `${student.first_name} ${student.last_name}`,
+          admission_number: student.admission_number,
+          class_name: student.class_name,
+          parent_phone: student.parent_phone,
+          expected_amount: currentTermExpected,
+          paid_amount: paidAmount,
+          balance,
+          last_payment_date: lastPaymentDate,
+          balance_percentage: currentTermExpected > 0 ? (balance / currentTermExpected) * 100 : 0,
+          carry_forward_amount: carryForwardImpact
+        });
+      }
     }
-    
-    res.json(defaulters || []);
+
+    defaultersList.sort((a, b) => b.balance - a.balance);
+    res.json(defaultersList);
   } catch (err) { next(err); }
 });
 
@@ -454,7 +409,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
       paymentMap[payment.student_id] += Number(payment.amount);
     });
     
-    // Calculate per-class summary (current term only)
+    // Calculate per-class summary using current-term fees plus brought-forward debit/credit.
     const classSummary = {};
     allStudents?.forEach(student => {
       const cls = student.class_name;
@@ -469,11 +424,11 @@ router.get("/class-fee-summary", async (req, res, next) => {
       }
       
       const classFee = feeMap[student.class_name] || 0;
-      // Current term expected fees only
-      const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student);
+      const carryForwardImpact = LedgerService.getOpeningBalanceImpact(student);
+      const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(student) + carryForwardImpact;
       const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, student);
       const paid = paymentMap[student.student_id] || 0;
-      // Outstanding = current term expected - current term paid
+      // Outstanding = (current term charges +/- carry-forward) - current term paid
       const outstanding = Math.max(0, currentTermExpected - paid);
       
       classSummary[cls].student_count += 1;

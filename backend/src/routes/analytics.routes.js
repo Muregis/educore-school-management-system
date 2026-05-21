@@ -230,14 +230,13 @@ router.get("/", async (req, res, next) => {
           paymentMap[p.student_id] = (paymentMap[p.student_id] || 0) + Number(p.amount);
         });
 
-        // Count students with outstanding balance using proper calculation (current term only)
+        // Count students with outstanding balance using current-term fees plus brought-forward debit/credit.
         defaultersCount = allStudents?.filter(s => {
           const classFee = feeMap[s.class_name] || 0;
-          // Current term expected fees only
-          const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(s);
+          const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(s) + LedgerService.getOpeningBalanceImpact(s);
           const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, s);
           const paid = paymentMap[s.student_id] || 0;
-          // Outstanding = current term expected - current term paid
+          // Outstanding = (current term charges +/- carry-forward) - current term paid
           const balance = Math.max(0, currentTermExpected - paid);
           return balance > 0;
         }).length || 0;

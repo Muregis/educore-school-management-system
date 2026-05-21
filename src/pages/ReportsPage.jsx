@@ -595,15 +595,19 @@ export default function ReportsPage({ auth }) {
   useEffect(() => {
     const token = auth?.token || sessionStorage.getItem("token");
     if (token) {
-      const ac = new AbortController();
-      apiFetch('/classes', { token, signal: ac.signal })
-        .then(res => setClassOptions(res.data || res || []))
+      let ignore = false;
+      apiFetch('/classes', { token })
+        .then(res => {
+          if (!ignore) setClassOptions(res.data || res || []);
+        })
         .catch((e) => {
           if (e?.code !== "EABORT") {
             console.error("Classes load error:", e);
           }
         });
-      return () => ac.abort();
+      return () => {
+        ignore = true;
+      };
     }
     return undefined;
   }, [auth?.token]);
@@ -611,17 +615,18 @@ export default function ReportsPage({ auth }) {
   useEffect(() => {
     const token = auth?.token || sessionStorage.getItem("token");
     if (!token) { setLoading(false); return; }
-    const ac = new AbortController();
+    let ignore = false;
     setLoading(true);
     Promise.all([
-      apiFetch("/reports/summary",                { token, signal: ac.signal }),
-      apiFetch("/reports/monthly-fee-collection", { token, signal: ac.signal }),
-      apiFetch("/reports/attendance-rate",        { token, signal: ac.signal }),
-      apiFetch("/reports/fee-defaulters",         { token, signal: ac.signal }),
-      apiFetch("/reports/grade-distribution",     { token, signal: ac.signal }),
-      apiFetch("/reports/class-fee-summary",      { token, signal: ac.signal }), // New endpoint for class-wise fees
-      apiFetch("/reports/expenditure-summary",    { token, signal: ac.signal }),
+      apiFetch("/reports/summary",                { token }),
+      apiFetch("/reports/monthly-fee-collection", { token }),
+      apiFetch("/reports/attendance-rate",        { token }),
+      apiFetch("/reports/fee-defaulters",         { token }),
+      apiFetch("/reports/grade-distribution",     { token }),
+      apiFetch("/reports/class-fee-summary",      { token }), // New endpoint for class-wise fees
+      apiFetch("/reports/expenditure-summary",    { token }),
     ]).then(([s, m, a, d, g, cfs, es]) => {
+      if (ignore) return;
       const normSummary = s ? {
         students:       s.totalStudents  ?? s.students       ?? 0,
         teachers:       s.totalTeachers  ?? s.teachers       ?? 0,
@@ -645,13 +650,15 @@ export default function ReportsPage({ auth }) {
         class_name: row.class_name ?? row.subject   ?? "",
       })));
     }).catch(e => {
-      if (e?.code !== "EABORT") {
+      if (!ignore && e?.code !== "EABORT") {
         console.error("Reports load error:", e);
       }
     }).finally(() => {
-      if (!ac.signal.aborted) setLoading(false);
+      if (!ignore) setLoading(false);
     });
-    return () => ac.abort();
+    return () => {
+      ignore = true;
+    };
   }, [auth?.token]);
 
   const tabBtn = id => (
