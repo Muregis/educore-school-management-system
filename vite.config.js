@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     VitePWA({
@@ -13,7 +13,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}']
       },
       devOptions: {
-        enabled: true
+        // Avoid stale cached bundles and noisy Workbox logs during local development.
+        enabled: command === 'build'
       }
     })
   ],
@@ -22,4 +23,4 @@ export default defineConfig({
       // external: ['qrcode']
     }
   }
-})
+}))
