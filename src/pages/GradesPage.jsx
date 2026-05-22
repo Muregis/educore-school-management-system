@@ -77,10 +77,14 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const [showRankings, setShowRankings] = useState(false);
 
   // Calculate rankings when results change
-  const getStudentClass = s => s.className ?? s.class_name ?? "";
+  const getStudentClass = s => (s.className ?? s.class_name ?? "").toString().trim();
   const getStudentId = s => s.id ?? s.student_id ?? "";
   const getStudentName = s => `${s.firstName ?? s.first_name ?? ""} ${s.lastName ?? s.last_name ?? ""}`.trim();
+  const normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
   const findStudentById = id => students.find(x => `${x.id ?? x.student_id ?? ""}` === `${id}`);
+  const classesForDropdown = classOptions.length
+    ? Array.from(new Set(classOptions.map(c => (c.class_name ?? c.className ?? "").toString().trim()).filter(Boolean)))
+    : ALL_CLASSES;
 
   useEffect(() => {
     if (results.length > 0 && filterClass !== "all") {
@@ -244,8 +248,8 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
         </select>
         <select style={inputStyle} value={filterStudent} onChange={e => setFilterStudent(e.target.value)}>
           <option value="all">{filterClass === "all" ? "All students" : `Students in ${filterClass}`}</option>
-          {(filterClass === "all" ? students : students.filter(s => getStudentClass(s) === filterClass)).map(s => (
-            <option key={getStudentId(s)} value={getStudentId(s)}>{s.firstName} {s.lastName}</option>
+          {(filterClass === "all" ? students : students.filter(s => normalizeClassName(getStudentClass(s)) === normalizeClassName(filterClass))).map(s => (
+            <option key={getStudentId(s)} value={getStudentId(s)}>{getStudentName(s)}</option>
           ))}
         </select>
         <select style={inputStyle} value={filterSubject} onChange={e => setFilterSubject(e.target.value)}>
@@ -259,7 +263,13 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           );
           toast("CSV exported", "success");
         }}>Export CSV</Btn>
-        {canEdit && <Btn onClick={() => setShowBulk(true)}>Bulk Enter Results</Btn>}
+        {canEdit && <Btn onClick={() => {
+          setShowBulk(true);
+          setBulkClass("");
+          setStudentId("");
+          setSelectedSubject("");
+          setBulkMarks(subjects.reduce((a, sub) => ({ ...a, [sub]: "" }), {}));
+        }}>Bulk Enter Results</Btn>}
       </div>
 
       {/* Table */}
@@ -335,18 +345,24 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
 
       {/* Bulk Modal */}
       {showBulk && (
-        <Modal title="Bulk Results Entry" onClose={() => { setShowBulk(false); setBulkClass(""); setStudentId(""); }}>
+        <Modal title="Bulk Results Entry" onClose={() => {
+          setShowBulk(false);
+          setBulkClass("");
+          setStudentId("");
+          setSelectedSubject("");
+          setBulkMarks(subjects.reduce((a, sub) => ({ ...a, [sub]: "" }), {}));
+        }}>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
             <Field label="Class">
               <select style={inputStyle} value={bulkClass} onChange={e => { setBulkClass(e.target.value); setStudentId(""); }}>
                 <option value="">Select class...</option>
-                {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                {classesForDropdown.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
             <Field label="Student">
               <select style={inputStyle} value={studentId} onChange={e => setStudentId(e.target.value)} disabled={!bulkClass}>
                 <option value="">{bulkClass ? "Select student..." : "Select class first"}</option>
-                {students.filter(s => getStudentClass(s) === bulkClass).map(s => (
+                {students.filter(s => normalizeClassName(getStudentClass(s)) === normalizeClassName(bulkClass)).map(s => (
                   <option key={getStudentId(s)} value={getStudentId(s)}>{getStudentName(s)}</option>
                 ))}
               </select>
