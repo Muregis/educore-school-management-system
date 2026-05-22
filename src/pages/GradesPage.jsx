@@ -79,6 +79,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   // Calculate rankings when results change
   const getStudentClass = s => s.className ?? s.class_name ?? "";
   const getStudentId = s => s.id ?? s.student_id ?? "";
+  const getStudentName = s => `${s.firstName ?? s.first_name ?? ""} ${s.lastName ?? s.last_name ?? ""}`.trim();
   const findStudentById = id => students.find(x => `${x.id ?? x.student_id ?? ""}` === `${id}`);
 
   useEffect(() => {
@@ -136,8 +137,11 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
     if (!s) return toast("Select student", "error");
     const t = Number(total);
     if (!t) return toast("Total marks required", "error");
-    const entered = subjects.filter(sub => bulkMarks[sub] !== "");
-    if (entered.length === 0) return toast("Enter at least one subject mark", "error");
+    const bulkSubjects = selectedSubject ? [selectedSubject] : subjects;
+    const entered = bulkSubjects.filter(sub => bulkMarks[sub] !== "");
+    if (entered.length === 0) {
+      return toast(selectedSubject ? `Enter marks for ${selectedSubject}` : "Enter at least one subject mark", "error");
+    }
     try {
       const classId = s.classId ?? s.class_id ?? null;
       await apiFetch("/grades/bulk", {
@@ -343,7 +347,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
               <select style={inputStyle} value={studentId} onChange={e => setStudentId(e.target.value)} disabled={!bulkClass}>
                 <option value="">{bulkClass ? "Select student..." : "Select class first"}</option>
                 {students.filter(s => getStudentClass(s) === bulkClass).map(s => (
-                  <option key={getStudentId(s)} value={getStudentId(s)}>{s.firstName} {s.lastName}</option>
+                  <option key={getStudentId(s)} value={getStudentId(s)}>{getStudentName(s)}</option>
                 ))}
               </select>
             </Field>
@@ -374,7 +378,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           </div>
 
           <div style={{ maxHeight:340, overflowY:"auto", border:`1px solid ${C.border}`, borderRadius:10, padding:8, marginBottom:10 }}>
-            {subjects.map(sub => (
+            {(selectedSubject ? [selectedSubject] : subjects).map(sub => (
               <div key={sub} style={{ display:"grid", gridTemplateColumns:"1fr 180px", gap:8, alignItems:"center", borderBottom:`1px solid ${C.border}`, padding:"8px 4px" }}>
                 <div style={{ color:C.text, fontSize:13 }}>{sub}</div>
                 <select
