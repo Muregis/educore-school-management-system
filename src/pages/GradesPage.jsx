@@ -77,6 +77,10 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const [showRankings, setShowRankings] = useState(false);
 
   // Calculate rankings when results change
+  const getStudentClass = s => s.className ?? s.class_name ?? "";
+  const getStudentId = s => s.id ?? s.student_id ?? "";
+  const findStudentById = id => students.find(x => `${x.id ?? x.student_id ?? ""}` === `${id}`);
+
   useEffect(() => {
     if (results.length > 0 && filterClass !== "all") {
       const classResults = results.filter(r => r.className === filterClass && (term === "all" || r.term === term));
@@ -128,7 +132,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
 
   const saveBulk = async () => {
-    const s = students.find(x => x.id === Number(studentId));
+    const s = findStudentById(studentId);
     if (!s) return toast("Select student", "error");
     const t = Number(total);
     if (!t) return toast("Total marks required", "error");
@@ -139,7 +143,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
       await apiFetch("/grades/bulk", {
         method: "POST",
         body: {
-          studentId: s.id, classId, term,
+          studentId: getStudentId(s), classId, term,
           totalMarks: t,
           subjects: entered.map(sub => ({
             subject: sub,
@@ -236,8 +240,8 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
         </select>
         <select style={inputStyle} value={filterStudent} onChange={e => setFilterStudent(e.target.value)}>
           <option value="all">{filterClass === "all" ? "All students" : `Students in ${filterClass}`}</option>
-          {(filterClass === "all" ? students : students.filter(s => s.className === filterClass)).map(s => (
-            <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
+          {(filterClass === "all" ? students : students.filter(s => getStudentClass(s) === filterClass)).map(s => (
+            <option key={getStudentId(s)} value={getStudentId(s)}>{s.firstName} {s.lastName}</option>
           ))}
         </select>
         <select style={inputStyle} value={filterSubject} onChange={e => setFilterSubject(e.target.value)}>
@@ -336,10 +340,10 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
               </select>
             </Field>
             <Field label="Student">
-              <select style={inputStyle} value={studentId} onChange={e => setStudentId(Number(e.target.value))} disabled={!bulkClass}>
+              <select style={inputStyle} value={studentId} onChange={e => setStudentId(e.target.value)} disabled={!bulkClass}>
                 <option value="">{bulkClass ? "Select student..." : "Select class first"}</option>
-                {students.filter(s => s.className === bulkClass).map(s => (
-                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>
+                {students.filter(s => getStudentClass(s) === bulkClass).map(s => (
+                  <option key={getStudentId(s)} value={getStudentId(s)}>{s.firstName} {s.lastName}</option>
                 ))}
               </select>
             </Field>
