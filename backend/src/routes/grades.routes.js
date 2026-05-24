@@ -365,20 +365,56 @@ router.post("/import", requireRoles("admin", "teacher"), csvUpload.single("file"
 
         const finalGrade = marksValue < 0 ? "X" : grade;
 
-        const { error: upsertErr } = await supabase
+        let upsertErr = null;
+        let finalResultId = null;
+
+        const { data: existing, error: findErr } = await supabase
           .from("results")
-          .upsert({
-            school_id: schoolId,
-            student_id: studentId,
-            subject,
-            class_id: resolvedClassId,
-            marks: marksValue < 0 ? null : marksValue,
-            total_marks: totalMarks,
-            grade: finalGrade,
-            term: row.term,
-            exam_id: resolvedExamId || null,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "school_id,student_id,subject,term" });
+          .select("result_id")
+          .eq("school_id", schoolId)
+          .eq("student_id", studentId)
+          .eq("subject", subject)
+          .eq("term", row.term)
+          .eq("is_deleted", false)
+          .maybeSingle();
+
+        if (findErr) {
+          upsertErr = findErr;
+        } else if (existing) {
+          const { data: updated, error: updateErr } = await supabase
+            .from("results")
+            .update({
+              marks: Number(marksValue),
+              total_marks: totalMarks,
+              grade: finalGrade,
+              class_id: resolvedClassId,
+              exam_id: resolvedExamId || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("result_id", existing.result_id)
+            .select("result_id")
+            .single();
+          if (updateErr) upsertErr = updateErr;
+          else if (updated) finalResultId = updated.result_id;
+        } else {
+          const { data: inserted, error: insertErr } = await supabase
+            .from("results")
+            .insert({
+              school_id: schoolId,
+              student_id: studentId,
+              subject,
+              class_id: resolvedClassId,
+              marks: Number(marksValue),
+              total_marks: totalMarks,
+              grade: finalGrade,
+              term: row.term,
+              exam_id: resolvedExamId || null,
+            })
+            .select("result_id")
+            .single();
+          if (insertErr) upsertErr = insertErr;
+          else if (inserted) finalResultId = inserted.result_id;
+        }
 
         if (upsertErr) {
           console.error("Upsert error for", studentId, subject, upsertErr.message);
@@ -540,10 +576,41 @@ try {
 
       const grade = (typeof marksValue === 'number' && marksValue < 0) ? 'X' : calcGrade(marksValue, totalMarks);
 
-      // Upsert — update if already exists for this student/subject combo
-        const { data: upserted, error: upsertError } = await supabase
+      // Emulate upsert to bypass missing unique constraints on results table
+      let finalResultId = null;
+
+      const { data: existing, error: findErr } = await supabase
+        .from('results')
+        .select('result_id')
+        .eq('school_id', schoolId)
+        .eq('student_id', studentId)
+        .eq('subject', subject)
+        .eq('term', term)
+        .eq('is_deleted', false)
+        .maybeSingle();
+
+      if (findErr) {
+        throw findErr;
+      } else if (existing) {
+        const { data: updated, error: updateErr } = await supabase
           .from('results')
-            .upsert({
+          .update({
+            marks: Number(marksValue),
+            total_marks: Number(totalMarks),
+            grade,
+            class_id: resolvedClassId,
+            exam_id: resolvedExamId || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('result_id', existing.result_id)
+          .select('result_id')
+          .single();
+        if (updateErr) throw updateErr;
+        if (updated) finalResultId = updated.result_id;
+      } else {
+        const { data: inserted, error: insertErr } = await supabase
+          .from('results')
+          .insert({
             school_id: schoolId,
             student_id: studentId,
             subject,
@@ -551,16 +618,20 @@ try {
             marks: Number(marksValue),
             total_marks: Number(totalMarks),
             grade,
-            term
-          }, { onConflict: 'school_id,student_id,subject,term' })
+            term,
+            exam_id: resolvedExamId || null
+          })
           .select('result_id')
           .single();
-        if (upsertError) throw upsertError;
-        saved.push({ subjectId, resultId: upserted.result_id });
+        if (insertErr) throw insertErr;
+        if (inserted) finalResultId = inserted.result_id;
+      }
+
+      saved.push({ subjectId, resultId: finalResultId });
         
         // NEW: Log grade creation/update
         await logAuditEvent(req, AUDIT_ACTIONS.GRADE_CREATE, {
-          entityId: upserted.result_id,
+          entityId: finalResultId,
           entityType: 'result',
           description: `Grade recorded for student ${studentId} in ${subject}: ${marks}/${totalMarks} (${grade})`,
           newValues: { studentId, subject, marks, totalMarks: totalMarks, grade, term }
