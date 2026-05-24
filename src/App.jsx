@@ -500,7 +500,7 @@ export default function App() {
     exams: <ExamsPage auth={auth} students={students} subjects={[]} toast={toast} />,
     admissions: <AdmissionsPage auth={auth} canEdit={canEdit} toast={toast} />,
     invoices: <InvoicesPage auth={auth} school={school} students={students} canEdit={canEdit} toast={toast} />,
-    reportcards: <ReportCardsPage auth={auth} school={school} students={myStudents} canEdit={canEdit} toast={toast} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
+    reportcards: <ReportCardsPage auth={auth} school={school} students={myStudents} results={results} canEdit={canEdit} toast={toast} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
     hr: ["admin","hr","director","superadmin"].includes(auth.role) ? <HRPage auth={auth} school={school} canEdit={canEdit} toast={toast} /> : <Forbidden />,
     library: isPortal && isMobile && auth.role === "student" ? (() => { setPage("dashboard"); return null; })() : <LibraryPage auth={auth} students={myStudents} teachers={teachers} toast={toast} />,
     discipline: <DisciplinePage auth={auth} students={myStudents} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,

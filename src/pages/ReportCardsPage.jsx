@@ -3,6 +3,7 @@ import FeeBlock from "../components/FeeBlock";
 import PropTypes from "prop-types";
 import { ALL_CLASSES } from "../lib/constants";
 import { apiFetch } from "../lib/api";
+import { getGradeColor } from "../lib/grading";
 import { printHTML } from "../lib/print";
 
 import Button from "../components/ui/Button";
@@ -13,7 +14,7 @@ import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 
-export default function ReportCardsPage({ auth, school, students, canEdit, toast, feeBlocked = false, onGoFees}) {
+export default function ReportCardsPage({ auth, school, students, results = [], canEdit, toast, feeBlocked = false, onGoFees}) {
   const [reportCards, setReportCards] = useState([]);
   const [selected, setSelected]       = useState(null);
   const [fullData, setFullData]       = useState(null);
@@ -34,6 +35,19 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
   };
 
   useEffect(() => { load(); }, [auth, term, year]);
+
+  // Re-fetch preview when grades change (e.g. after CSV import on Grades page)
+  useEffect(() => {
+    if (!selected || !auth?.token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await apiFetch(`/reportcards/${selected}/full?term=${term}&academicYear=${year}`, { token: auth.token });
+        if (!cancelled) setFullData(data);
+      } catch { /* keep existing preview on refresh failure */ }
+    })();
+    return () => { cancelled = true; };
+  }, [results, selected, term, year, auth?.token]);
 
   const viewFull = async (studentId) => {
     setLoading(true);
@@ -81,10 +95,13 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
     } catch (e) { toast(e.message, "error"); }
   };
 
+  const gradeBadgeVariant = g =>
+    g === "EE" ? "success" : g === "ME" ? "info" : g === "AE" ? "warning" : g === "X" ? "warning" : "danger";
+
   const printCard = () => {
     if (!fullData) return;
     const { student, results, attendance, reportCard, average, branding } = fullData;
-    const gradeColor = g => g === "A" ? "#22c55e" : g === "B" ? "#3b82f6" : g === "C" ? "#f59e0b" : "#ef4444";
+    const gradeColor = g => getGradeColor(g);
 
     const schoolName = branding?.schoolName || school?.name || school?.school_name || "School";
     const logoUrl = branding?.logoUrl || school?.logo_url || "";
@@ -340,7 +357,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
                       <td style={{ padding: "10px", color: "var(--color-text-primary)", fontSize: "13px" }}>{r.subject}</td>
                       <td style={{ padding: "10px", color: "var(--color-text-primary)", fontWeight: 600 }}>{r.marks}</td>
                       <td style={{ padding: "10px" }}>
-                        <Badge text={r.grade} variant={r.grade==="A" ? "success" : r.grade==="B" ? "info" : r.grade==="C" ? "warning" : "danger"} />
+                        <Badge text={r.grade} variant={gradeBadgeVariant(r.grade)} />
                       </td>
                     </tr>
                   ))}
@@ -494,6 +511,7 @@ ReportCardsPage.propTypes = {
     email: PropTypes.string,
   }),
   students: PropTypes.array.isRequired,
+  results: PropTypes.array,
   canEdit: PropTypes.bool.isRequired,
   toast: PropTypes.func.isRequired,
 };

@@ -8,7 +8,8 @@ import Modal from "../components/Modal";
 import Table from "../components/Table";
 import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
-import { apiFetch } from "../lib/api";
+import { apiFetch, API_BASE } from "../lib/api";
+import { getAuthHeaders } from "../lib/auth";
 import { Pager, Msg, csv, pager } from "../components/Helpers";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
 import { getGradeColor as getGradeHexColor, parseMark } from "../lib/grading";
@@ -82,67 +83,6 @@ function GradesPage({ auth, students, results, setResults, canEdit, toast, feeBl
    const getStudentName = s => `${s.firstName ?? s.first_name ?? ""} ${s.lastName ?? s.last_name ?? ""}`.trim();
    const normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
    const findStudentById = id => students.find(x => `${x.id ?? x.student_id ?? ""}` === `${id}`);
-
-   const handleCSVImport = async (e) => {
-     const file = e.target.files[0];
-     if (!file) return;
-     
-     const text = await file.text();
-     const lines = text.trim().split('\n');
-     if (lines.length === 0) {
-       toast("CSV file is empty", "error");
-       return;
-     }
-     
-     // Parse CSV - assuming no quotes or commas in fields for simplicity
-     const csvData = lines.map(line => line.split(',').map(field => field.trim()));
-     
-     // Remove header if it looks like a header
-     const firstRow = csvData[0];
-     if (firstRow.some(field => 
-       ['student', 'name', 'class', 'subject', 'marks', 'total', 'grade', 'term']
-         .some(keyword => field.toLowerCase().includes(keyword))
-     )) {
-       csvData.shift(); // Remove header row
-     }
-     
-     if (csvData.length === 0) {
-       toast("No data rows found in CSV", "error");
-       return;
-     }
-     
-     try {
-       if (!auth?.token) {
-         toast("Authentication required", "error");
-         return;
-       }
-       
-       const response = await apiFetch("/api/grades/import", {
-         method: "POST",
-         body: {
-           csvData,
-           term: term || "Term 2",
-           totalMarks: total || 100
-         },
-         token: auth.token
-       });
-       
-       if (response.error) {
-         toast(`Import failed: ${response.error}`, "error");
-         return;
-       }
-       
-       // Refresh results
-       const data = await apiFetch("/grades", { token: auth.token });
-       setResults(data);
-       
-       toast(`Import successful: ${response.saved || 0} records imported`, "success");
-       e.target.value = ''; // Reset file input
-     } catch (err) {
-       toast(`Import error: ${err.message || "Unknown error"}`, "error");
-       e.target.value = ''; // Reset file input
-     }
-   };
 
    const classesForDropdown = classOptions.length
     ? Array.from(new Set(classOptions.map(c => (c.class_name ?? c.className ?? "").toString().trim()).filter(Boolean)))
@@ -342,51 +282,55 @@ function GradesPage({ auth, students, results, setResults, canEdit, toast, feeBl
           csv("grade_template.csv", headers, rows);
           toast(`Template exported for ${cls} (${studentsInClass.length} students)`, "success");
         }}>Export Template</Btn>
-        {canEdit && <>
-          <label style={{ cursor: "pointer" }}>
-            <span style={{ display:"inline-block", padding:"6px 16px", borderRadius:8, border:`1px solid ${C.border}`, background:C.card, color:C.accent, fontSize:13, fontWeight:500 }}>
-              Import CSV
-            </span>
-            <input></input>
-              type="file"
-              accept=".csv"
-              style={{ display: "none" }}
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const form = new FormData();
-                form.append("file", file);
-                try {
-                  const token = auth?.token || sessionStorage.getItem("token");
-                  const resJson = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/grades/import`, {
-                    method: "POST",
-                    headers: { Authorization: `Bearer ${token}` },
-                    body: form,
-                  });
-                  const data = await resJson.json();
-                  if (resJson.ok) {
+        {canEdit && (
+          <>
+            <label style={{ cursor: "pointer" }}>
+              <span style={{ display:"inline-block", padding:"6px 16px", borderRadius:8, border:`1px solid ${C.border}`, background:C.card, color:C.accent, fontSize:13, fontWeight:500 }}>
+                Import CSV
+              </span>
+              <input
+                type="file"
+                accept=".csv"
+                style={{ display: "none" }}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const form = new FormData();
+                  form.append("file", file);
+                  try {
+                    const token = auth?.token || sessionStorage.getItem("token");
+                    const res = await fetch(`${API_BASE}/grades/import`, {
+                      method: "POST",
+                      headers: getAuthHeaders(token),
+                      body: form,
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                      toast(data.message || "Import failed", "error");
+                      return;
+                    }
                     toast(
                       `Imported ${data.imported} results (${data.notFound} students not found, ${data.skipped} skipped)`,
                       "success"
                     );
-                    // Refresh results from server
                     const fresh = await apiFetch("/grades", { token });
                     setResults(fresh);
-                  } else {
-                    toast(data.message || "Import failed", "error");
+                  } catch (err) {
+                    toast(err.message || "Import failed", "error");
                   }
-                } catch (err) { toast(err.message || "Import failed", "error"); }
-                e.target.value = "";
-              }}
-            </>
-          </label>
-        </>}
-          setShowBulk(true);
-          setBulkClass("");
-          setStudentId("");
-          setSelectedSubject("");
-          setBulkMarks(subjects.reduce((a, sub) => ({ ...a, [sub]: "" }), {}));
-        }}>Bulk Enter Results</Btn>}
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <Btn onClick={() => {
+              setShowBulk(true);
+              setBulkClass("");
+              setStudentId("");
+              setSelectedSubject("");
+              setBulkMarks(subjects.reduce((a, sub) => ({ ...a, [sub]: "" }), {}));
+            }}>Bulk Enter Results</Btn>
+          </>
+        )}
       </div>
 
       {/* Table */}
