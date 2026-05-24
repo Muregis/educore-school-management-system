@@ -3,6 +3,7 @@ import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
+import { upload } from "../app.js";
 
 const router = Router();
 router.use(authRequired);
@@ -369,6 +370,282 @@ router.delete("/:id", requireRoles("admin", "teacher"), async (req, res, next) =
     });
     
     res.json({ deleted: true });
+  } catch (err) { next(err); }
+});
+
+// ─── POST /api/grades/import — bulk import grades from CSV ─────────────────────
+// CSV format: Student Name, Admission Number, Subject1, Subject2, ..., Term
+// Marks left empty = N/A (not assessed)
+// System auto-calculates grade, mean score and position/rank
+router.post("/import", requireRoles("admin", "teacher"), upload.single("file"), async (req, res, next) => {
+  try {
+    const { schoolId, userId } = req.user;
+
+    if (!req.file) return res.status(400).json({ message: "No CSV file uploaded" });
+
+    const csvText = req.file.buffer.toString("utf-8");
+    const lines = csvText.replace(/\r/g, "").split("\n").filter(Boolean);
+
+    if (lines.length < 2) return res.status(400).json({ message: "CSV file is empty or has no data rows" });
+
+    // Parse header row (strip optional BOM, trim spaces)
+    const headerLine = lines[0].replace(/^\uFEFF/, "").trim();
+    const headers = headerLine.split(",").map(h => h.trim());
+
+    // Identify key columns
+    const getNameIdx   = () => headers.findIndex(h => h.toLowerCase().includes("name"));
+    const getAdmIdx    = () => headers.findIndex(h => 
+      h.toLowerCase().includes("admission") || h.toLowerCase().includes("adm") || h.toLowerCase().includes("reg")
+    );
+    const getTermIdx   = () => headers.findIndex(h => h.toLowerCase().includes("term"));
+
+    const nameIdx   = getNameIdx();
+    const admIdx    = getAdmIdx();
+    const termIdx   = getTermIdx();
+    const term      = (termIdx >= 0 && lines[1]?.split(",")[termIdx]?.trim()) || "Term 1";
+
+    // Subject columns = all non-key columns after the first 2 key columns (name, admission number)
+    // Key columns are: name, admno; everything else is a subject (or term column)
+    // Strategy: subject columns = all header indices NOT name/adm/term
+    const keyIndices = new Set([nameIdx, admIdx, termIdx].filter(i => i >= 0));
+    const subjectIndices = headers
+      .map((h, i) => i)
+      .filter(i => !keyIndices.has(i));
+
+    if (subjectIndices.length === 0) {
+      return res.status(400).json({ message: "No subject columns found in CSV header" });
+    }
+    if (admIdx < 0) {
+      return res.status(400).json({ message: "Admission Number column not found in CSV. Column must be named 'Admission Number' or 'Adm No'" });
+    }
+
+    const subjectColumns = subjectIndices.map(i => headers[i]);
+
+    // Parse data rows
+    const rows = lines.slice(1).filter(l => l.trim()).map(line => {
+      const cells = line.split(",").map(c => c.trim());
+      return {
+        admissionNumber: cells[admIdx] || "",
+        studentName:     nameIdx >= 0 ? (cells[nameIdx] || "") : "",
+        term:             term, // single term for this import batch
+        marks: subjectColumns.reduce((acc, col, subIdx) => {
+          const raw = cells[subjectIndices[subIdx]] || "";
+          acc[col] = raw;
+          return acc;
+        }, {}),
+      };
+    });
+
+    // Resolve all admission numbers to student IDs for this school
+    const uniqueAdmNos = [...new Set(rows.map(r => r.admissionNumber).filter(Boolean))];
+    let studentMap = {}; // admission_number (normalised) → student record
+
+    if (uniqueAdmNos.length > 0) {
+      const { data: studentRows, error: studentsErr } = await supabase
+        .from("students")
+        .select("student_id, admission_number, first_name, last_name, class_id, class_name")
+        .eq("school_id", schoolId)
+        .eq("is_deleted", false)
+        .in("admission_number", uniqueAdmNos);
+
+      if (studentsErr) throw studentsErr;
+
+      for (const s of (studentRows || [])) {
+        studentMap[String(s.admission_number).trim().toLowerCase()] = s;
+      }
+    }
+
+    const INPUT_SPECIAL_MAP = {
+      absent: -1, x: -1, cheat: -3, y: -3, inc: -2, incomplete: -2, medical: -4, na: null, n/a: null,
+    };
+
+    const calcGrade = (marks, total) => {
+      const pct = (Number(marks) / Number(total || 1)) * 100;
+      if (pct >= 80) return "EE";
+      if (pct >= 65) return "ME";
+      if (pct >= 50) return "AE";
+      return "BE";
+    };
+
+    let imported = 0;
+    let skipped  = 0;
+    let notFound = 0;
+
+    for (const row of rows) {
+      const admKey = row.admissionNumber.trim().toLowerCase();
+      const student = studentMap[admKey];
+
+      if (!student) {
+        notFound++;
+        skipped++;
+        continue;
+      }
+
+      const resolvedClassId = student.class_id || null;
+
+      // Upsert exam record for this term (create if not exists)
+      let resolvedExamId;
+      if (row.term) {
+        const { data: exam, error: examError } = await supabase
+          .from("exams")
+          .select("exam_id")
+          .eq("school_id", schoolId)
+          .eq("term", row.term)
+          .eq("is_deleted", false)
+          .single();
+        if (!examError && exam) {
+          resolvedExamId = exam.exam_id;
+        } else {
+          const currentYear = new Date().getFullYear();
+          const { data: inserted, error: insertError } = await supabase
+            .from("exams")
+            .insert({
+              school_id: schoolId,
+              exam_name: `${row.term} Exam`,
+              term: row.term,
+              academic_year: currentYear,
+              status: "published",
+            })
+            .select("exam_id")
+            .single();
+          if (!insertError && inserted) resolvedExamId = inserted.exam_id;
+        }
+      }
+
+      const studentId = student.student_id;
+      const totalMarks = 100;
+
+      // Subject map used for MISSING subject detection
+      const subjectsRow = {};
+      for (const sub of subjectColumns) {
+        const raw = row.marks[sub] ?? "";
+        const key = String(raw).trim().toLowerCase();
+
+        if (!raw) {
+          subjectsRow[sub] = null; // blank = N/A → skip saving
+          continue;
+        }
+
+        const parsed = INPUT_SPECIAL_MAP[key];
+        if (parsed === null) {
+          subjectsRow[sub] = null;
+          continue;
+        }
+        if (typeof parsed === "number" && parsed < 0) {
+          subjectsRow[sub] = { marksValue: parsed, grade: "X" };
+          continue;
+        }
+        const num = Number(raw);
+        if (Number.isNaN(num)) {
+          subjectsRow[sub] = null;
+          continue;
+        }
+        subjectsRow[sub] = { marksValue: num, grade: calcGrade(num, totalMarks) };
+      }
+
+      // --- Detect and CLEAR subjects NOT in the current CSV row (tombstone) ---
+      // If a subject was previously saved for this student/term but is absent from the
+      // current CSV row, mark it N/A so scores only reflect what is in the CSV.
+      const { data: existingResults, error: existingErr } = await supabase
+        .from("results")
+        .select("subject")
+        .eq("school_id", schoolId)
+        .eq("student_id", studentId)
+        .eq("term", row.term)
+        .eq("is_deleted", false);
+
+      if (!existingErr && existingResults) {
+        const currentSubjects = new Set(subjectColumns);
+        for (const er of existingResults) {
+          if (!currentSubjects.has(er.subject)) {
+            await supabase
+              .from("results")
+              .update({ marks: null, grade: null, updated_at: new Date().toISOString() })
+              .eq("school_id", schoolId)
+              .eq("student_id", studentId)
+              .eq("subject", er.subject)
+              .eq("term", row.term)
+              .eq("is_deleted", false);
+          }
+        }
+      }
+
+      // Upsert each subject
+      for (const subject of subjectColumns) {
+        const entry = subjectsRow[subject];
+        if (entry === null) continue; // N/A or blank → not saved
+
+        const { marksValue, grade } = entry;
+
+        // Resolve or create subject record
+        let subjectId;
+        const { data: subjectRow, error: subjErr } = await supabase
+          .from("subjects")
+          .select("subject_id")
+          .eq("school_id", schoolId)
+          .eq("subject_name", subject)
+          .eq("is_deleted", false)
+          .single();
+        if (!subjErr && subjectRow) {
+          subjectId = subjectRow.subject_id;
+        } else {
+          const code = subject.substring(0, 10).toUpperCase().replace(/\s+/g, "_");
+          const { data: ins, error: insErr } = await supabase
+            .from("subjects")
+            .upsert({
+              school_id: schoolId,
+              subject_name: subject,
+              name: subject,
+              code,
+            }, { onConflict: "school_id,subject_name" })
+            .select("subject_id")
+            .single();
+          if (insErr) throw insErr;
+          subjectId = ins.subject_id;
+        }
+
+        const finalGrade = (marksValue < 0) ? "X" : grade;
+
+        // Upsert result
+        const { error: upsertErr } = await supabase
+          .from("results")
+          .upsert({
+            school_id: schoolId,
+            student_id: studentId,
+            subject,
+            class_id: resolvedClassId,
+            marks: marksValue < 0 ? null : marksValue,
+            total_marks: totalMarks,
+            grade: finalGrade,
+            term: row.term,
+            exam_id: resolvedExamId || null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "school_id,student_id,subject,term" });
+
+        if (upsertErr) {
+          console.error("Upsert error for", studentId, subject, upsertErr.message);
+          skipped++;
+          continue;
+        }
+
+        imported++;
+
+        await logAuditEvent(req, AUDIT_ACTIONS.GRADE_CREATE, {
+          entityId: studentId,
+          entityType: "result",
+          description: `Grade imported via CSV for student ${studentId} (${student.admission_number}) in ${subject}: ${marksValue}/${totalMarks} (${finalGrade})`,
+          newValues: { studentId, subject, marks: marksValue, totalMarks, grade: finalGrade, term: row.term },
+        });
+      }
+    }
+
+    res.status(201).json({
+      message: "CSV import complete",
+      imported,
+      skipped,
+      notFound,
+      rowsProcessed: rows.length,
+    });
   } catch (err) { next(err); }
 });
 

@@ -256,14 +256,69 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           <option value="all">All subjects</option>
           {subjects.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <Btn variant="ghost" onClick={() => {
-          csv("results.csv",
-            ["Student","Class","Subject","Term","Marks","Total","Grade"],
-            filtered.map(r => [r.studentName, r.className, r.subject, r.term, r.marks, r.total, r.grade])
+        <Btn variant="ghost" onClick={async () => {
+          // ── Export grade template ──────────────────────────────────────────────
+          // Columns: Student Name | Admission Number | Subject1 | Subject2 | … | Term
+          // No Totals or Grade columns – the system calculates those on import.
+          const cls = filterClass === "all" ? (classOptions.find(c => c.class_name)?.class_name || "") : filterClass;
+          if (!cls) return toast("Select a class before exporting a template", "warn");
+
+          const classTerm = term === "all" ? "Term 1" : term;
+
+          const studentsInClass = students.filter(
+            s => normalizeClassName(getStudentClass(s)) === normalizeClassName(cls)
           );
-          toast("CSV exported", "success");
-        }}>Export CSV</Btn>
-        {canEdit && <Btn onClick={() => {
+
+          if (studentsInClass.length === 0) return toast("No students found in this class", "warn");
+
+          const headers = ["Student Name", "Admission Number", ...subjects, "Term"];
+          const rows = studentsInClass.map(s => {
+            const admno = s.admissionNumber ?? s.admission_number ?? "";
+            return [getStudentName(s), admno, ...subjects.map(() => ""), classTerm];
+          });
+
+          csv("grade_template.csv", headers, rows);
+          toast(`Template exported for ${cls} (${studentsInClass.length} students)`, "success");
+        }}>Export Template</Btn>
+        {canEdit && <>
+          <label style={{ cursor: "pointer" }}>
+            <span style={{ display:"inline-block", padding:"6px 16px", borderRadius:8, border:`1px solid ${C.border}`, background:C.card, color:C.accent, fontSize:13, fontWeight:500 }}>
+              Import CSV
+            </span>
+            <input></input>
+              type="file"
+              accept=".csv"
+              style={{ display: "none" }}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const form = new FormData();
+                form.append("file", file);
+                try {
+                  const token = auth?.token || sessionStorage.getItem("token");
+                  const resJson = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/grades/import`, {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${token}` },
+                    body: form,
+                  });
+                  const data = await resJson.json();
+                  if (resJson.ok) {
+                    toast(
+                      `Imported ${data.imported} results (${data.notFound} students not found, ${data.skipped} skipped)`,
+                      "success"
+                    );
+                    // Refresh results from server
+                    const fresh = await apiFetch("/grades", { token });
+                    setResults(fresh);
+                  } else {
+                    toast(data.message || "Import failed", "error");
+                  }
+                } catch (err) { toast(err.message || "Import failed", "error"); }
+                e.target.value = "";
+              }}
+            </>
+          </label>
+        </>}
           setShowBulk(true);
           setBulkClass("");
           setStudentId("");
