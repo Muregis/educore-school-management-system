@@ -348,6 +348,240 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── POST /api/grades/import — import grades from CSV ───────────────────────
+router.post("/import", requireRoles("admin", "teacher"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { csvData, term = "Term 2", totalMarks = 100 } = req.body;
+
+    if (!csvData || !Array.isArray(csvData) || csvData.length === 0) {
+      return res.status(400).json({ message: "CSV data is required and must be a non-empty array" });
+    }
+
+    // Expected CSV format: Student Name, Class, Subject, Marks
+    // Optional: Term, Total Marks (will use parameters if not provided)
+    const saved = [];
+    const errors = [];
+
+    for (let rowIndex = 0; rowIndex < csvData.length; rowIndex++) {
+      const row = csvData[rowIndex];
+      if (!row || row.length < 4) {
+        errors.push(`Row ${rowIndex + 1}: Insufficient data (expected at least 4 columns)`);
+        continue;
+      }
+
+      const [studentName, className, subject, marks] = row;
+      let rowTerm = term;
+      let rowTotalMarks = totalMarks;
+
+      // Check if term and total marks are provided in CSV (columns 5 and 6)
+      if (row.length >= 5 && row[4]) {
+        rowTerm = row[4];
+      }
+      if (row.length >= 6 && row[5]) {
+        const parsedTotal = parseInt(row[5], 10);
+        if (!isNaN(parsedTotal)) {
+          rowTotalMarks = parsedTotal;
+        }
+      }
+
+      try {
+        // Find student by name and class
+        const { data: studentRows, error: studentError } = await supabase
+          .from('students')
+          .select('student_id, first_name, last_name, class_name, class_id')
+          .eq('school_id', schoolId)
+          .eq('is_deleted', false);
+
+        if (studentError) throw studentError;
+
+        const student = studentRows.find(s => {
+          const fullName = `${s.first_name ?? ""} ${s.last_name ?? ""}`.trim();
+          return fullName.toLowerCase() === studentName.trim().toLowerCase() && 
+                 s.class_name?.toLowerCase() === className.trim().toLowerCase();
+        });
+
+        if (!student) {
+          errors.push(`Row ${rowIndex + 1}: Student "${studentName}" in class "${className}" not found`);
+          continue;
+        }
+
+        // Validate teacher class access for teachers
+        const { role, userId } = req.user;
+        if (role === "teacher") {
+          const { data: teacherClasses, error: teacherError } = await supabase
+            .from("teacher_classes")
+            .select("class_id")
+            .eq("school_id", schoolId)
+            .eq("teacher_id", userId)
+            .eq("is_deleted", false);
+          if (teacherError) throw teacherError;
+
+          const teacherClassIds = teacherClasses?.map(tc => tc.class_id).filter(Boolean) || [];
+          if (!teacherClassIds.includes(student.class_id)) {
+            errors.push(`Row ${rowIndex + 1}: Teacher can only access grades for their assigned classes`);
+            continue;
+          }
+        }
+
+        // Find or create subject
+        let { data: subjectRows, error: subjectError } = await supabase
+          .from('subjects')
+          .select('subject_id')
+          .eq('school_id', schoolId)
+          .eq('subject_name', subject)
+          .eq('is_deleted', false)
+          .single();
+
+        if (subjectError && subjectError.code !== 'PGRST116') { // PGRST116 means no rows returned
+          throw subjectError;
+        }
+
+        let subjectId;
+        if (!subjectRows) {
+          // Create subject
+          const code = subject.substring(0, 10).toUpperCase().replace(/\s+/g, "_");
+          const { data: insertedSubject, error: insertSubjectError } = await supabase
+            .from('subjects')
+            .insert({
+              school_id: schoolId,
+              subject_name: subject,
+              name: subject,
+              code
+            })
+            .select('subject_id')
+            .single();
+
+          if (insertSubjectError) throw insertSubjectError;
+          subjectId = insertedSubject.subject_id;
+        } else {
+          subjectId = subjectRows.subject_id;
+        }
+
+        // Resolve or create a default exam for the term if not provided
+        let { data: exam, error: examError } = await supabase
+          .from('exams')
+          .select('exam_id')
+          .eq('school_id', schoolId)
+          .eq('term', rowTerm)
+          .eq('is_deleted', false)
+          .single();
+
+        let resolvedExamId;
+        if (!examError && exam) {
+          resolvedExamId = exam.exam_id;
+        } else {
+          const currentYear = new Date().getFullYear();
+          const { data: insertedExam, error: insertExamError } = await supabase
+            .from('exams')
+            .insert({
+              school_id: schoolId,
+              exam_name: `${rowTerm} Exam`,
+              term: rowTerm,
+              academic_year: currentYear,
+              status: 'published'
+            })
+            .select('exam_id')
+            .single();
+
+          if (insertExamError) throw insertExamError;
+          resolvedExamId = insertedExam.exam_id;
+        }
+
+        // Normalize marks
+        let marksValue = marks;
+        if (typeof marks === 'string') {
+          const key = marks.trim().toLowerCase();
+          if (Object.prototype.hasOwnProperty.call(INPUT_SPECIAL_MAP, key)) {
+            marksValue = INPUT_SPECIAL_MAP[key];
+          } else {
+            marksValue = Number(marks);
+          }
+        } else {
+          marksValue = Number(marks);
+        }
+
+        // Skip if marksValue is explicitly null (N/A / not assessed)
+        if (marksValue === null) {
+          continue;
+        }
+
+        // Calculate grade
+        const calcGrade = (marks, total) => {
+          const pct = (Number(marks) / Number(total || 1)) * 100;
+          if (pct >= 80) return "EE";
+          if (pct >= 65) return "ME";
+          if (pct >= 50) return "AE";
+          return "BE";
+        };
+
+        const grade = (typeof marksValue === 'number' && marksValue < 0) ? 'X' : calcGrade(marksValue, rowTotalMarks);
+
+        // Upsert result
+        const { data: upserted, error: upsertError } = await supabase
+          .from('results')
+          .upsert({
+            school_id: schoolId,
+            student_id: student.student_id,
+            subject,
+            class_id: student.class_id,
+            marks: Number(marksValue),
+            total_marks: Number(rowTotalMarks),
+            grade,
+            term: rowTerm
+          }, { onConflict: 'school_id,student_id,subject,term' })
+          .select('result_id')
+          .single();
+
+        if (upsertError) throw upsertError;
+
+        saved.push({
+          studentId: student.student_id,
+          studentName: `${student.first_name ?? ""} ${student.last_name ?? ""}`.trim(),
+          className: student.class_name,
+          subject,
+          marks: marksValue,
+          total: rowTotalMarks,
+          grade,
+          term: rowTerm
+        });
+
+        // Log grade creation/update
+        await logAuditEvent(req, AUDIT_ACTIONS.GRADE_CREATE, {
+          entityId: upserted.result_id,
+          entityType: 'result',
+          description: `Grade imported for student ${student.student_id} in ${subject}: ${marksValue}/${rowTotalMarks} (${grade})`,
+          newValues: {
+            studentId: student.student_id,
+            subject,
+            marks: marksValue,
+            totalMarks: rowTotalMarks,
+            grade,
+            term: rowTerm
+          }
+        });
+      } catch (rowError) {
+        errors.push(`Row ${rowIndex + 1}: ${rowError.message}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      return res.status(400).json({ 
+        saved: saved.length, 
+        errors,
+        message: `${saved.length} result(s) imported, ${errors.length} error(s)`
+      });
+    }
+
+    res.status(201).json({ 
+      saved: saved.length, 
+      message: `${saved.length} result(s) imported successfully` 
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── DELETE /api/grades/:id — soft delete ────────────────────────────────────
 router.delete("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
   try {

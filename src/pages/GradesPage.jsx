@@ -11,7 +11,7 @@ import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { Pager, Msg, csv, pager } from "../components/Helpers";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
-import { calculateGrade, getGradeColor as getGradeHexColor, parseMark, formatScore } from "../lib/grading";
+import { getGradeColor as getGradeHexColor, parseMark } from "../lib/grading";
 import { rankingService } from "../services/rankingService";
 
 // Use shared grading utilities instead of local definitions
@@ -40,9 +40,9 @@ function gradeColor(grade) {
   return "danger";
 }
 
-export default function GradesPage({ auth, students, results, setResults, canEdit, toast, feeBlocked = false, onGoFees}) {
+function GradesPage({ auth, students, results, setResults, canEdit, toast, feeBlocked = false, onGoFees}) {
   // Use current term from API instead of hardcoded "Term 2"
-  const { term: currentTerm, isLoading: termLoading } = useCurrentTerm(auth);
+  const { term: currentTerm } = useCurrentTerm(auth);
   const [term, setTerm]                   = useState(""); // Will be set from currentTerm
   const [filterClass, setFilterClass]     = useState("all");
   const [filterStudent, setFilterStudent] = useState("all");
@@ -76,13 +76,75 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const [rankings, setRankings] = useState(null);
   const [showRankings, setShowRankings] = useState(false);
 
-  // Calculate rankings when results change
-  const getStudentClass = s => (s.className ?? s.class_name ?? "").toString().trim();
-  const getStudentId = s => s.id ?? s.student_id ?? "";
-  const getStudentName = s => `${s.firstName ?? s.first_name ?? ""} ${s.lastName ?? s.last_name ?? ""}`.trim();
-  const normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
-  const findStudentById = id => students.find(x => `${x.id ?? x.student_id ?? ""}` === `${id}`);
-  const classesForDropdown = classOptions.length
+   // Calculate rankings when results change
+   const getStudentClass = s => (s.className ?? s.class_name ?? "").toString().trim();
+   const getStudentId = s => s.id ?? s.student_id ?? "";
+   const getStudentName = s => `${s.firstName ?? s.first_name ?? ""} ${s.lastName ?? s.last_name ?? ""}`.trim();
+   const normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
+   const findStudentById = id => students.find(x => `${x.id ?? x.student_id ?? ""}` === `${id}`);
+
+   const handleCSVImport = async (e) => {
+     const file = e.target.files[0];
+     if (!file) return;
+     
+     const text = await file.text();
+     const lines = text.trim().split('\n');
+     if (lines.length === 0) {
+       toast("CSV file is empty", "error");
+       return;
+     }
+     
+     // Parse CSV - assuming no quotes or commas in fields for simplicity
+     const csvData = lines.map(line => line.split(',').map(field => field.trim()));
+     
+     // Remove header if it looks like a header
+     const firstRow = csvData[0];
+     if (firstRow.some(field => 
+       ['student', 'name', 'class', 'subject', 'marks', 'total', 'grade', 'term']
+         .some(keyword => field.toLowerCase().includes(keyword))
+     )) {
+       csvData.shift(); // Remove header row
+     }
+     
+     if (csvData.length === 0) {
+       toast("No data rows found in CSV", "error");
+       return;
+     }
+     
+     try {
+       if (!auth?.token) {
+         toast("Authentication required", "error");
+         return;
+       }
+       
+       const response = await apiFetch("/api/grades/import", {
+         method: "POST",
+         body: {
+           csvData,
+           term: term || "Term 2",
+           totalMarks: total || 100
+         },
+         token: auth.token
+       });
+       
+       if (response.error) {
+         toast(`Import failed: ${response.error}`, "error");
+         return;
+       }
+       
+       // Refresh results
+       const data = await apiFetch("/grades", { token: auth.token });
+       setResults(data);
+       
+       toast(`Import successful: ${response.saved || 0} records imported`, "success");
+       e.target.value = ''; // Reset file input
+     } catch (err) {
+       toast(`Import error: ${err.message || "Unknown error"}`, "error");
+       e.target.value = ''; // Reset file input
+     }
+   };
+
+   const classesForDropdown = classOptions.length
     ? Array.from(new Set(classOptions.map(c => (c.class_name ?? c.className ?? "").toString().trim()).filter(Boolean)))
     : ALL_CLASSES;
 
@@ -218,14 +280,14 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   if (feeBlocked) return <FeeBlock onGoFees={onGoFees} pageName="Grades & Results" />;
   return (
     <div>
-      {/* Grade summary */}
-      <div style={{ display:"flex", gap:8, marginBottom:12, flexWrap:"wrap" }}>
-        {[["EE","success"],["ME","info"],["AE","warning"],["BE","danger"]].map(([g,t]) => (
-          <div key={g} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 16px", minWidth:70, textAlign:"center" }}>
-            <div style={{ fontWeight:800, fontSize:20, color: g==="EE"?"#22c55e":g==="ME"?"#38bdf8":g==="AE"?"#f59e0b":"#ef4444" }}>{counts[g]}</div>
-            <div style={{ fontSize:11, color:C.textMuted }}>{g}</div>
-          </div>
-        ))}
+       {/* Grade summary */}
+       <div style={{ display:"flex", gap:8, marginBottom:12, flexWrap:"wrap" }}>
+         {[["EE","success"],["ME","info"],["AE","warning"],["BE","danger"]].map(([g]) => (
+           <div key={g} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 16px", minWidth:70, textAlign:"center" }}>
+             <div style={{ fontWeight:800, fontSize:20, color: g==="EE"?"#22c55e":g==="ME"?"#38bdf8":g==="AE"?"#f59e0b":"#ef4444" }}>{counts[g]}</div>
+             <div style={{ fontSize:11, color:C.textMuted }}>{g}</div>
+           </div>
+         ))}
         {/* Legend */}
         <div style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 14px", fontSize:11, color:C.textMuted, display:"flex", flexDirection:"column", gap:2, justifyContent:"center" }}>
           <div><span style={{color:C.textMuted, fontStyle:"italic"}}>N/A</span> — Did not sit subject</div>
@@ -537,4 +599,6 @@ GradesPage.propTypes = {
   setResults: PropTypes.func.isRequired,
   canEdit:    PropTypes.bool.isRequired,
   toast:      PropTypes.func.isRequired,
+  feeBlocked: PropTypes.bool,
+  onGoFees:   PropTypes.func,
 };
