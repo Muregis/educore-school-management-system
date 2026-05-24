@@ -6,6 +6,80 @@ import { requireRoles } from "../middleware/roles.js";
 const router = Router();
 router.use(authRequired);
 
+function resultPercent(marks, totalMarks = 100) {
+  const s = String(marks ?? "").trim().toLowerCase();
+  if (["na", "n/a", "absent", "cheat", "x", "y", "inc", "incomplete"].includes(s)) return null;
+  const m = Number(marks);
+  const t = Number(totalMarks || 100);
+  if (Number.isNaN(m) || m < 0 || !t) return null;
+  return (m / t) * 100;
+}
+
+function meanPercentFromResults(rows) {
+  const percents = (rows || [])
+    .map(r => resultPercent(r.marks, r.total_marks))
+    .filter(p => p != null);
+  if (!percents.length) return 0;
+  return percents.reduce((a, b) => a + b, 0) / percents.length;
+}
+
+async function computeClassPosition(schoolId, studentId, term, className) {
+  if (!className) return { classPosition: null, outOf: null };
+
+  const { data: classmates, error: stuErr } = await supabase
+    .from("students")
+    .select("student_id")
+    .eq("school_id", schoolId)
+    .eq("class_name", className)
+    .eq("is_deleted", false)
+    .eq("status", "active");
+  if (stuErr) throw stuErr;
+
+  const classStudentIds = (classmates || []).map(s => s.student_id);
+  if (!classStudentIds.length) return { classPosition: null, outOf: null };
+
+  const { data: classResults, error: resErr } = await supabase
+    .from("results")
+    .select("student_id, marks, total_marks")
+    .eq("school_id", schoolId)
+    .eq("term", term)
+    .eq("is_deleted", false)
+    .in("student_id", classStudentIds);
+  if (resErr) throw resErr;
+
+  const byStudent = new Map();
+  for (const r of classResults || []) {
+    const p = resultPercent(r.marks, r.total_marks);
+    if (p == null) continue;
+    if (!byStudent.has(r.student_id)) byStudent.set(r.student_id, []);
+    byStudent.get(r.student_id).push(p);
+  }
+
+  const ranked = [...byStudent.entries()]
+    .map(([sid, percents]) => ({
+      student_id: sid,
+      mean: percents.reduce((a, b) => a + b, 0) / percents.length,
+    }))
+    .filter(s => s.mean > 0)
+    .sort((a, b) => b.mean - a.mean);
+
+  if (!ranked.length) return { classPosition: null, outOf: null };
+
+  let currentRank = 1;
+  let prevMean = null;
+  const withRanks = ranked.map((s, idx) => {
+    if (prevMean !== null && s.mean < prevMean - 0.0001) currentRank = idx + 1;
+    prevMean = s.mean;
+    return { ...s, rank: currentRank };
+  });
+
+  const mine = withRanks.find(s => String(s.student_id) === String(studentId));
+  return {
+    classPosition: mine?.rank ?? null,
+    outOf: withRanks.length,
+  };
+}
+
 // GET report cards
 router.get("/", async (req, res, next) => {
   try {
@@ -129,10 +203,11 @@ router.get("/:studentId/full", async (req, res, next) => {
 
     const { data: resultsRows, error: resultsErr } = await supabase
       .from("results")
-      .select("subject, marks, grade, teacher_comment, teacher_id, teachers(first_name,last_name)")
+      .select("subject, marks, total_marks, grade, teacher_comment, teacher_id, teachers(first_name,last_name)")
       .eq("school_id", schoolId)
       .eq("student_id", studentId)
-      .eq("term", term);
+      .eq("term", term)
+      .eq("is_deleted", false);
     if (resultsErr) throw resultsErr;
     const results = (resultsRows || []).map(r => ({
       subject: r.subject,
@@ -174,14 +249,30 @@ router.get("/:studentId/full", async (req, res, next) => {
       reportCard = rcRow || null;
     }
 
-    const avg = results.length ? (results.reduce((s,r) => s + Number(r.marks), 0) / results.length).toFixed(1) : 0;
+    const avg = meanPercentFromResults(resultsRows).toFixed(1);
+
+    const computedPosition = await computeClassPosition(
+      schoolId,
+      studentId,
+      term,
+      student.class_name
+    );
+
+    const classPosition = reportCard?.class_position ?? computedPosition.classPosition;
+    const outOf = reportCard?.out_of ?? computedPosition.outOf;
 
     res.json({
       student,
       results,
       attendance: attendanceCounts,
-      reportCard,
+      reportCard: reportCard
+        ? { ...reportCard, class_position: classPosition, out_of: outOf }
+        : classPosition
+          ? { class_position: classPosition, out_of: outOf }
+          : null,
       average: avg,
+      classPosition,
+      outOf,
       term,
       academicYear,
       branding: schoolBranding,

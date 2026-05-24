@@ -1,5 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
+import { parse as parseCsv } from "csv-parse/sync";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
@@ -19,6 +20,10 @@ const csvUpload = multer({
     }
   },
 });
+
+function normalizeAdmissionNumber(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
 
 // Map common frontend special mark codes to numeric sentinels or null
 const INPUT_SPECIAL_MAP = {
@@ -52,6 +57,21 @@ async function validateTeacherGradeAccess(schoolId, userId, classId) {
   return true;
 }
 
+function normaliseMarks(raw) {
+  if (raw === null || raw === undefined || raw === "") return raw;
+  const s = String(raw).trim().toLowerCase();
+  if (s === "na" || s === "n/a") return "na";
+  if (s === "absent" || s === "x") return "absent";
+  if (s === "cheat" || s === "y") return "cheat";
+  const n = Number(raw);
+  if (!Number.isNaN(n) && n < 0) {
+    if (n === -1) return "absent";
+    if (n === -3) return "cheat";
+    return "absent";
+  }
+  return Number.isNaN(n) ? raw : n;
+}
+
 // ─── Helper: map DB result row → camelCase shape frontend expects ─────────
 function normalise(r) {
   return {
@@ -61,7 +81,7 @@ function normalise(r) {
     className:      r.class_name  ?? "",
     subject:        r.subject_name ?? r.subject ?? "",
     term:           r.term        ?? "Term 2",
-    marks:          Number(r.marks ?? 0),
+    marks:          normaliseMarks(r.marks),
     total:          Number(r.total_marks ?? 100),
     grade:          r.grade       ?? "",
     teacherComment: r.teacher_comment ?? "",
@@ -127,52 +147,64 @@ router.post("/import", requireRoles("admin", "teacher"), csvUpload.single("file"
 
     if (!req.file) return res.status(400).json({ message: "No CSV file uploaded" });
 
-    const csvText = req.file.buffer.toString("utf-8");
-    const lines = csvText.replace(/\r/g, "").split("\n").filter(Boolean);
+    const csvText = req.file.buffer.toString("utf-8").replace(/^\uFEFF/, "");
 
-    if (lines.length < 2) return res.status(400).json({ message: "CSV file is empty or has no data rows" });
+    let records;
+    try {
+      records = parseCsv(csvText, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+        relax_column_count: true,
+      });
+    } catch (parseErr) {
+      return res.status(400).json({ message: `Invalid CSV format: ${parseErr.message}` });
+    }
 
-    const headerLine = lines[0].replace(/^\uFEFF/, "").trim();
-    const headers = headerLine.split(",").map(h => h.trim());
+    if (!records.length) {
+      return res.status(400).json({ message: "CSV file is empty or has no data rows" });
+    }
 
-    const getNameIdx = () => headers.findIndex(h => h.toLowerCase().includes("name"));
-    const getAdmIdx = () => headers.findIndex(h =>
-      h.toLowerCase().includes("admission") || h.toLowerCase().includes("adm") || h.toLowerCase().includes("reg")
+    const headerKeys = Object.keys(records[0]);
+    const findCol = (...needles) =>
+      headerKeys.find(h => needles.some(n => h.toLowerCase().includes(n)));
+
+    const nameCol = findCol("student name", "name");
+    const admCol = findCol("admission", "adm no", "adm", "reg no", "reg");
+    const termCol = findCol("term");
+
+    if (!admCol) {
+      return res.status(400).json({
+        message: "Admission Number column not found. Use a column named 'Admission Number'.",
+      });
+    }
+
+    const subjectColumns = headerKeys.filter(
+      h => h !== nameCol && h !== admCol && h !== termCol
     );
-    const getTermIdx = () => headers.findIndex(h => h.toLowerCase().includes("term"));
 
-    const nameIdx = getNameIdx();
-    const admIdx = getAdmIdx();
-    const termIdx = getTermIdx();
-
-    const keyIndices = new Set([nameIdx, admIdx, termIdx].filter(i => i >= 0));
-    const subjectIndices = headers.map((_h, i) => i).filter(i => !keyIndices.has(i));
-
-    if (subjectIndices.length === 0) {
+    if (subjectColumns.length === 0) {
       return res.status(400).json({ message: "No subject columns found in CSV header" });
     }
-    if (admIdx < 0) {
-      return res.status(400).json({ message: "Admission Number column not found in CSV. Column must be named 'Admission Number' or 'Adm No'" });
-    }
 
-    const subjectColumns = subjectIndices.map(i => headers[i]);
-    const defaultTerm = (termIdx >= 0 && lines[1]?.split(",")[termIdx]?.trim()) || "Term 1";
+    const defaultTerm = (termCol && records[0][termCol]?.trim()) || "Term 1";
 
-    const rows = lines.slice(1).filter(l => l.trim()).map(line => {
-      const cells = line.split(",").map(c => c.trim());
-      const rowTerm = termIdx >= 0 ? (cells[termIdx]?.trim() || defaultTerm) : defaultTerm;
+    const rows = records.map(record => {
+      const rowTerm = (termCol && record[termCol]?.trim()) || defaultTerm;
       return {
-        admissionNumber: cells[admIdx] || "",
-        studentName: nameIdx >= 0 ? (cells[nameIdx] || "") : "",
+        admissionNumber: record[admCol] || "",
+        studentName: nameCol ? (record[nameCol] || "") : "",
         term: rowTerm,
-        marks: subjectColumns.reduce((acc, col, subIdx) => {
-          acc[col] = cells[subjectIndices[subIdx]] || "";
+        marks: subjectColumns.reduce((acc, col) => {
+          acc[col] = record[col] ?? "";
           return acc;
         }, {}),
       };
     });
 
-    const uniqueAdmNos = [...new Set(rows.map(r => r.admissionNumber).filter(Boolean))];
+    const uniqueAdmNos = [...new Set(
+      rows.map(r => normalizeAdmissionNumber(r.admissionNumber)).filter(Boolean)
+    )];
     const studentMap = {};
 
     if (uniqueAdmNos.length > 0) {
@@ -180,13 +212,15 @@ router.post("/import", requireRoles("admin", "teacher"), csvUpload.single("file"
         .from("students")
         .select("student_id, admission_number, first_name, last_name, class_id, class_name")
         .eq("school_id", schoolId)
-        .eq("is_deleted", false)
-        .in("admission_number", uniqueAdmNos);
+        .eq("is_deleted", false);
 
       if (studentsErr) throw studentsErr;
 
       for (const s of (studentRows || [])) {
-        studentMap[String(s.admission_number).trim().toLowerCase()] = s;
+        const key = normalizeAdmissionNumber(s.admission_number);
+        if (key && uniqueAdmNos.includes(key)) {
+          studentMap[key] = s;
+        }
       }
     }
 
@@ -203,7 +237,12 @@ router.post("/import", requireRoles("admin", "teacher"), csvUpload.single("file"
     let notFound = 0;
 
     for (const row of rows) {
-      const admKey = row.admissionNumber.trim().toLowerCase();
+      const admKey = normalizeAdmissionNumber(row.admissionNumber);
+      if (!admKey) {
+        notFound++;
+        skipped++;
+        continue;
+      }
       const student = studentMap[admKey];
 
       if (!student) {

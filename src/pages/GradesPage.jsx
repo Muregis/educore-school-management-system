@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import FeeBlock from "../components/FeeBlock";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
@@ -41,6 +41,33 @@ function gradeColor(grade) {
   return "danger";
 }
 
+function parseSubjectRows(data) {
+  return (data || [])
+    .map(s => ({
+      name: (s.name ?? s.subject_name ?? "").trim(),
+      classLevels: (s.class_levels ?? s.classLevels ?? "").toString(),
+    }))
+    .filter(s => s.name);
+}
+
+function defaultSubjectCatalog() {
+  return SUBJECTS.map(name => ({ name, classLevels: "" }));
+}
+
+function markToCsv(val) {
+  if (val === "na" || val === "N/A") return "N/A";
+  if (val === "absent" || val === "X") return "X";
+  if (val === "cheat" || val === "Y") return "Y";
+  return val != null && val !== "" ? String(val) : "";
+}
+
+function lookupSubjectMark(existing, subject) {
+  if (!existing) return "";
+  if (existing[subject] != null && existing[subject] !== "") return existing[subject];
+  const key = Object.keys(existing).find(k => k.toLowerCase() === subject.toLowerCase());
+  return key ? existing[key] : "";
+}
+
 export default function GradesPage({ auth, students, results, setResults, canEdit, toast, feeBlocked = false, onGoFees}) {
   // Use current term from API instead of hardcoded "Term 2"
   const { term: currentTerm } = useCurrentTerm(auth);
@@ -71,7 +98,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const [studentId, setStudentId]         = useState("");
   const [selectedSubject, setSelectedSubject] = useState("");
   const [total, setTotal]                 = useState("100");
-  const [subjects, setSubjects]           = useState([]);
+  const [subjectCatalog, setSubjectCatalog] = useState(defaultSubjectCatalog);
   const [bulkMarks, setBulkMarks]         = useState({});
   const [editing, setEditing] = useState(null);
   const [rankings, setRankings] = useState(null);
@@ -81,16 +108,52 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
    const getStudentClass = s => (s.className ?? s.class_name ?? "").toString().trim();
    const getStudentId = s => s.id ?? s.student_id ?? "";
    const getStudentName = s => `${s.firstName ?? s.first_name ?? ""} ${s.lastName ?? s.last_name ?? ""}`.trim();
+   const getAdmissionNumber = s =>
+     (s.admissionNumber ?? s.admission_number ?? s.admission ?? "").toString().trim();
    const normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
    const findStudentById = id => students.find(x => `${x.id ?? x.student_id ?? ""}` === `${id}`);
 
-   const classesForDropdown = classOptions.length
-    ? Array.from(new Set(classOptions.map(c => (c.class_name ?? c.className ?? "").toString().trim()).filter(Boolean)))
-    : ALL_CLASSES;
+   const classesForDropdown = useMemo(() => {
+     const fromApi = classOptions.map(c => (c.class_name ?? c.className ?? "").toString().trim()).filter(Boolean);
+     const fromStudents = students.map(getStudentClass).filter(Boolean);
+     const merged = Array.from(new Set([...fromApi, ...fromStudents]));
+     return merged.length ? merged.sort() : ALL_CLASSES;
+   }, [classOptions, students]);
+
+   const subjects = useMemo(() => {
+     const fromCatalog = subjectCatalog.map(s => s.name);
+     const fromResults = results.map(r => (r.subject ?? "").trim()).filter(Boolean);
+     return [...new Set([...fromCatalog, ...fromResults])].sort();
+   }, [subjectCatalog, results]);
+
+   const getExportSubjects = useCallback((className, classTerm) => {
+     const cls = normalizeClassName(className);
+     const fromCatalog = subjectCatalog
+       .filter(s => {
+         const levels = s.classLevels.trim();
+         if (!levels) return true;
+         return levels.split(",").some(l => normalizeClassName(l.trim()) === cls);
+       })
+       .map(s => s.name);
+
+     const fromResults = results
+       .filter(r => {
+         if (classTerm && r.term !== classTerm) return false;
+         return normalizeClassName(r.className) === cls;
+       })
+       .map(r => (r.subject ?? "").trim())
+       .filter(Boolean);
+
+     const merged = [...new Set([...fromCatalog, ...fromResults])].sort();
+     return merged.length ? merged : [...SUBJECTS];
+   }, [subjectCatalog, results]);
 
   useEffect(() => {
     if (results.length > 0 && filterClass !== "all") {
-      const classResults = results.filter(r => r.className === filterClass && (term === "all" || r.term === term));
+      const classResults = results.filter(
+        r => normalizeClassName(r.className) === normalizeClassName(filterClass) &&
+          (term === "all" || r.term === term)
+      );
       if (classResults.length > 0) {
         const calculatedRankings = rankingService.calculateClassRankings(classResults);
         setRankings(calculatedRankings);
@@ -102,20 +165,20 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
     }
   }, [results, filterClass, term]);
 
-  // Load subjects from API
+  // Load subjects from API (fallback to curriculum defaults when none configured)
   useEffect(() => {
     if (!auth?.token) return;
     apiFetch("/subjects", { token: auth.token })
       .then(data => {
-        const subjs = (data || []).map(s => s.name);
-        setSubjects(subjs);
-        // Initialize bulkMarks with subjects
-        setBulkMarks(subjs.reduce((a, s) => ({ ...a, [s]: "" }), {}));
+        const catalog = parseSubjectRows(data);
+        const resolved = catalog.length ? catalog : defaultSubjectCatalog();
+        setSubjectCatalog(resolved);
+        setBulkMarks(resolved.reduce((a, s) => ({ ...a, [s.name]: "" }), {}));
       })
       .catch(() => {
-        // Fallback to constants if API fails
-        setSubjects(SUBJECTS);
-        setBulkMarks(SUBJECTS.reduce((a, s) => ({ ...a, [s]: "" }), {}));
+        const resolved = defaultSubjectCatalog();
+        setSubjectCatalog(resolved);
+        setBulkMarks(resolved.reduce((a, s) => ({ ...a, [s.name]: "" }), {}));
       });
   }, [auth]);
 
@@ -246,7 +309,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
         </select>
         <select style={inputStyle} value={filterClass} onChange={e => setFilterClass(e.target.value)}>
           <option value="all">All classes</option>
-          {classOptions.map(c => <option key={c.class_id} value={c.class_name}>{c.class_name}</option>)}
+          {classesForDropdown.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select style={inputStyle} value={filterStudent} onChange={e => setFilterStudent(e.target.value)}>
           <option value="all">{filterClass === "all" ? "All students" : `Students in ${filterClass}`}</option>
@@ -258,29 +321,64 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           <option value="all">All subjects</option>
           {subjects.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <Btn variant="ghost" onClick={async () => {
-          // ── Export grade template ──────────────────────────────────────────────
-          // Columns: Student Name | Admission Number | Subject1 | Subject2 | … | Term
-          // No Totals or Grade columns – the system calculates those on import.
-          const cls = filterClass === "all" ? (classOptions.find(c => c.class_name)?.class_name || "") : filterClass;
-          if (!cls) return toast("Select a class before exporting a template", "warn");
+        <Btn variant="ghost" onClick={() => {
+          // Columns: Student Name | Admission Number | Subject1 | … | Term
+          if (filterClass === "all") {
+            return toast("Select a class from the dropdown, then export", "warn");
+          }
+          const cls = filterClass;
+          const classTerm = term === "all" ? (currentTerm || "Term 1") : term;
+          const exportSubjects = getExportSubjects(cls, classTerm);
 
-          const classTerm = term === "all" ? "Term 1" : term;
+          if (!exportSubjects.length) {
+            return toast("No subjects found. Add subjects under Subjects, or use Seed Defaults.", "warn");
+          }
 
           const studentsInClass = students.filter(
             s => normalizeClassName(getStudentClass(s)) === normalizeClassName(cls)
           );
 
-          if (studentsInClass.length === 0) return toast("No students found in this class", "warn");
+          if (studentsInClass.length === 0) {
+            return toast(`No students found in ${cls}. Check that students have this class assigned.`, "warn");
+          }
 
-          const headers = ["Student Name", "Admission Number", ...subjects, "Term"];
+          const missingAdm = studentsInClass.filter(s => !getAdmissionNumber(s));
+          if (missingAdm.length > 0) {
+            return toast(
+              `${missingAdm.length} student(s) in ${cls} have no admission number. Add admission numbers on the Students page first.`,
+              "error"
+            );
+          }
+
+          const marksByStudent = {};
+          for (const r of results) {
+            if (r.term !== classTerm) continue;
+            if (normalizeClassName(r.className) !== normalizeClassName(cls)) continue;
+            const sid = `${r.studentId ?? r.student_id ?? ""}`;
+            if (!marksByStudent[sid]) marksByStudent[sid] = {};
+            const raw = r.marks;
+            marksByStudent[sid][r.subject] =
+              raw === "na" ? "N/A" : raw === "absent" ? "X" : raw === "cheat" ? "Y" : raw ?? "";
+          }
+
+          const headers = ["Student Name", "Admission Number", ...exportSubjects, "Term"];
           const rows = studentsInClass.map(s => {
-            const admno = s.admissionNumber ?? s.admission_number ?? "";
-            return [getStudentName(s), admno, ...subjects.map(() => ""), classTerm];
+            const sid = `${getStudentId(s)}`;
+            const existing = marksByStudent[sid] || {};
+            return [
+              getStudentName(s),
+              getAdmissionNumber(s),
+              ...exportSubjects.map(sub => markToCsv(lookupSubjectMark(existing, sub))),
+              classTerm,
+            ];
           });
 
-          csv("grade_template.csv", headers, rows);
-          toast(`Template exported for ${cls} (${studentsInClass.length} students)`, "success");
+          const safeClass = cls.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_");
+          csv(`grades_${safeClass}_${classTerm.replace(/\s+/g, "_")}.csv`, headers, rows);
+          toast(
+            `Exported ${studentsInClass.length} students with ${exportSubjects.length} subject columns for ${cls}`,
+            "success"
+          );
         }}>Export Template</Btn>
         {canEdit && (
           <>
@@ -309,9 +407,15 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                       toast(data.message || "Import failed", "error");
                       return;
                     }
+                    const nf = data.notFound ?? 0;
+                    const imp = data.imported ?? 0;
+                    const tone = nf > 0 && imp === 0 ? "error" : nf > 0 ? "warn" : "success";
+                    const detail = nf > 0
+                      ? ` ${nf} row(s) skipped — admission numbers did not match any student.`
+                      : "";
                     toast(
-                      `Imported ${data.imported} results (${data.notFound} students not found, ${data.skipped} skipped)`,
-                      "success"
+                      `Imported ${imp} grade(s).${detail}`,
+                      tone
                     );
                     const fresh = await apiFetch("/grades", { token });
                     setResults(fresh);

@@ -8,7 +8,7 @@
  * - Proper tie handling (same rank for equal scores)
  */
 
-import { calculateGrade, getGradePoints } from '../lib/grading.js';
+import { calculateGrade, getGradePoints, parseMark } from '../lib/grading.js';
 
 /**
  * Calculate class rankings from grade results
@@ -41,19 +41,18 @@ export function calculateClassRankings(results, options = {}) {
       };
     }
 
-    // Only include valid marks (not absent, cheating, etc.)
-    const marks = parseFloat(result.marks);
-    const total = parseFloat(result.total_marks || result.totalMarks || 100);
-    
-    if (!isNaN(marks) && marks >= 0) {
-      const percentage = (marks / total) * 100;
-      
+    const total = parseFloat(result.total_marks || result.totalMarks || 100) || 100;
+    const parsed = parseMark(result.marks);
+
+    if (!parsed.isSpecial && parsed.value != null && parsed.value >= 0 && total > 0) {
+      const percentage = (parsed.value / total) * 100;
+
       acc[studentId].subjects.push({
         subject: result.subject,
-        marks: marks,
-        total: total,
+        marks: parsed.value,
+        total,
         percentage: Math.round(percentage * 100) / 100,
-        grade: includeGradeInfo ? calculateGrade(percentage).grade : null
+        grade: includeGradeInfo ? calculateGrade(percentage).grade : null,
       });
     }
 
@@ -95,28 +94,26 @@ export function calculateClassRankings(results, options = {}) {
       };
     });
 
-  // Sort by mean score descending, then by total marks
+  // Sort by mean score descending, then by total raw marks
   students.sort((a, b) => {
-    if (b.mean_score !== a.mean_score) {
-      return b.mean_score - a.mean_score;
-    }
-    return b.total_marks - a.total_marks;
+    if (b.meanScore !== a.meanScore) return b.meanScore - a.meanScore;
+    return b.totalMarks - a.totalMarks;
   });
 
-  // Assign ranks (handle ties)
+  // Assign ranks (students with the same mean share the same rank)
   let currentRank = 1;
-  let previousScore = null;
-  
+  let previousMean = null;
+
   const rankedStudents = students.map((student, index) => {
-    if (previousScore !== null && student.mean_score < previousScore) {
+    if (previousMean !== null && student.meanScore < previousMean - 0.0001) {
       currentRank = index + 1;
     }
-    previousScore = student.meanScore;
+    previousMean = student.meanScore;
 
     return {
       ...student,
       rank: currentRank,
-      out_of: students.length
+      out_of: students.length,
     };
   });
 
@@ -125,14 +122,15 @@ export function calculateClassRankings(results, options = {}) {
   const subjectRankings = subjectList.map(subject => {
     const subjectResults = results.filter(r => r.subject === subject);
     const scores = subjectResults.map(r => {
-      const marks = parseFloat(r.marks);
-      const total = parseFloat(r.total_marks || r.totalMarks || 100);
+      const total = parseFloat(r.total_marks || r.totalMarks || 100) || 100;
+      const parsed = parseMark(r.marks);
+      if (parsed.isSpecial || parsed.value == null || parsed.value < 0) return null;
       return {
         student_id: r.student_id || r.studentId,
-        marks,
-        percentage: (marks / total) * 100
+        marks: parsed.value,
+        percentage: (parsed.value / total) * 100,
       };
-    }).filter(s => !isNaN(s.percentage));
+    }).filter(Boolean);
 
     if (scores.length === 0) return null;
 
@@ -195,11 +193,12 @@ export function calculateSubjectMean(results, subject) {
   
   const validScores = subjectResults
     .map(r => {
-      const marks = parseFloat(r.marks);
-      const total = parseFloat(r.total_marks || r.totalMarks || 100);
-      return (marks / total) * 100;
+      const total = parseFloat(r.total_marks || r.totalMarks || 100) || 100;
+      const parsed = parseMark(r.marks);
+      if (parsed.isSpecial || parsed.value == null || parsed.value < 0) return null;
+      return (parsed.value / total) * 100;
     })
-    .filter(p => !isNaN(p));
+    .filter(p => p != null && !Number.isNaN(p));
 
   if (validScores.length === 0) {
     return { subject, mean: 0, entries: 0, valid: false };
@@ -235,10 +234,12 @@ export function getStudentPosition(rankedStudents, studentId) {
   return {
     rank: student.rank,
     out_of: student.out_of,
-    mean_score: student.mean_score,
-    total_points: student.total_points,
-    overall_grade: student.overall_grade,
-    percentile: Math.round(((student.out_of - student.rank) / student.out_of) * 100)
+    meanScore: student.meanScore,
+    totalPoints: student.totalPoints,
+    overallGrade: student.overallGrade,
+    percentile: student.out_of > 0
+      ? Math.round(((student.out_of - student.rank + 1) / student.out_of) * 100)
+      : 0,
   };
 }
 

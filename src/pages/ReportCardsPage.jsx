@@ -14,7 +14,7 @@ import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 
-export default function ReportCardsPage({ auth, school, students, results = [], canEdit, toast, feeBlocked = false, onGoFees}) {
+export default function ReportCardsPage({ auth, school, students, canEdit, toast, feeBlocked = false, onGoFees}) {
   const [reportCards, setReportCards] = useState([]);
   const [selected, setSelected]       = useState(null);
   const [fullData, setFullData]       = useState(null);
@@ -36,25 +36,22 @@ export default function ReportCardsPage({ auth, school, students, results = [], 
 
   useEffect(() => { load(); }, [auth, term, year]);
 
-  // Re-fetch preview when grades change (e.g. after CSV import on Grades page)
-  useEffect(() => {
-    if (!selected || !auth?.token) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await apiFetch(`/reportcards/${selected}/full?term=${term}&academicYear=${year}`, { token: auth.token });
-        if (!cancelled) setFullData(data);
-      } catch { /* keep existing preview on refresh failure */ }
-    })();
-    return () => { cancelled = true; };
-  }, [results, selected, term, year, auth?.token]);
-
   const viewFull = async (studentId) => {
     setLoading(true);
     try {
       const data = await apiFetch(`/reportcards/${studentId}/full?term=${term}&academicYear=${year}`, { token: auth.token });
       setFullData(data);
       setSelected(studentId);
+      const pos = data.classPosition ?? data.reportCard?.class_position;
+      const out = data.outOf ?? data.reportCard?.out_of;
+      if (pos != null) {
+        setForm(f => ({
+          ...f,
+          studentId: String(studentId),
+          classPosition: String(pos),
+          outOf: out != null ? String(out) : f.outOf,
+        }));
+      }
     } catch (e) { toast(e.message, "error"); }
     setLoading(false);
   };
@@ -95,13 +92,10 @@ export default function ReportCardsPage({ auth, school, students, results = [], 
     } catch (e) { toast(e.message, "error"); }
   };
 
-  const gradeBadgeVariant = g =>
-    g === "EE" ? "success" : g === "ME" ? "info" : g === "AE" ? "warning" : g === "X" ? "warning" : "danger";
-
   const printCard = () => {
     if (!fullData) return;
     const { student, results, attendance, reportCard, average, branding } = fullData;
-    const gradeColor = g => getGradeColor(g);
+    const gradeColor = g => g === "A" ? "#22c55e" : g === "B" ? "#3b82f6" : g === "C" ? "#f59e0b" : "#ef4444";
 
     const schoolName = branding?.schoolName || school?.name || school?.school_name || "School";
     const logoUrl = branding?.logoUrl || school?.logo_url || "";
@@ -138,7 +132,7 @@ export default function ReportCardsPage({ auth, school, students, results = [], 
           <div class="info-box"><div class="info-label">Admission No.</div><strong>${student.admission_number}</strong></div>
           <div class="info-box"><div class="info-label">Class</div><strong>${student.class_name}</strong></div>
           <div class="info-box"><div class="info-label">Average Score</div><strong>${average}%</strong></div>
-          ${reportCard?.class_position ? `<div class="info-box"><div class="info-label">Position</div><strong>${reportCard.class_position} / ${reportCard.out_of||'—'}</strong></div>` : ''}
+          ${(fullData.classPosition ?? reportCard?.class_position) ? `<div class="info-box"><div class="info-label">Position</div><strong>${fullData.classPosition ?? reportCard.class_position} / ${fullData.outOf ?? reportCard.out_of ?? '—'}</strong></div>` : ''}
           <div class="info-box"><div class="info-label">Attendance</div><strong>${attendance?.present||0} / ${attendance?.total||0} days</strong></div>
         </div>
 
@@ -334,7 +328,9 @@ export default function ReportCardsPage({ auth, school, students, results = [], 
                   ["Average", `${fullData.average}%`], 
                   ["Present", `${fullData.attendance?.present||0} days`], 
                   ["Absent", `${fullData.attendance?.absent||0} days`], 
-                  ["Position", fullData.reportCard?.class_position ? `${fullData.reportCard.class_position}/${fullData.reportCard.out_of||'—'}` : "—"]
+                  ["Position", (fullData.classPosition ?? fullData.reportCard?.class_position)
+                    ? `${fullData.classPosition ?? fullData.reportCard.class_position}/${fullData.outOf ?? fullData.reportCard?.out_of ?? '—'}`
+                    : "—"]
                 ].map(([l,v]) => (
                   <div key={l} style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "8px 12px" }}>
                     <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "2px" }}>{l}</div>
@@ -357,7 +353,7 @@ export default function ReportCardsPage({ auth, school, students, results = [], 
                       <td style={{ padding: "10px", color: "var(--color-text-primary)", fontSize: "13px" }}>{r.subject}</td>
                       <td style={{ padding: "10px", color: "var(--color-text-primary)", fontWeight: 600 }}>{r.marks}</td>
                       <td style={{ padding: "10px" }}>
-                        <Badge text={r.grade} variant={gradeBadgeVariant(r.grade)} />
+                        <Badge text={r.grade} variant={r.grade==="A" ? "success" : r.grade==="B" ? "info" : r.grade==="C" ? "warning" : "danger"} />
                       </td>
                     </tr>
                   ))}
@@ -511,7 +507,6 @@ ReportCardsPage.propTypes = {
     email: PropTypes.string,
   }),
   students: PropTypes.array.isRequired,
-  results: PropTypes.array,
   canEdit: PropTypes.bool.isRequired,
   toast: PropTypes.func.isRequired,
 };
