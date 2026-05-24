@@ -41,7 +41,7 @@ function gradeColor(grade) {
   return "danger";
 }
 
-function GradesPage({ auth, students, results, setResults, canEdit, toast, feeBlocked = false, onGoFees}) {
+export default function GradesPage({ auth, students, results, setResults, canEdit, toast, feeBlocked = false, onGoFees}) {
   // Use current term from API instead of hardcoded "Term 2"
   const { term: currentTerm } = useCurrentTerm(auth);
   const [term, setTerm]                   = useState(""); // Will be set from currentTerm
