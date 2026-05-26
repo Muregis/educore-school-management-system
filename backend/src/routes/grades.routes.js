@@ -147,7 +147,10 @@ router.post("/import", requireRoles("admin", "teacher"), csvUpload.single("file"
 
     if (!req.file) return res.status(400).json({ message: "No CSV file uploaded" });
 
+    console.log("[grades/import] File received:", req.file.originalname, `(${req.file.size} bytes)`);
+
     const csvText = req.file.buffer.toString("utf-8").replace(/^\uFEFF/, "");
+
 
     let records;
     try {
@@ -157,7 +160,14 @@ router.post("/import", requireRoles("admin", "teacher"), csvUpload.single("file"
         trim: true,
         relax_column_count: true,
       });
+      console.log("[grades/import] csv-parse succeeded:", records.length, "record(s)");
+      if (records.length > 0) {
+        console.log("[grades/import] First row keys:", Object.keys(records[0]));
+        console.log("[grades/import] First row values:", JSON.stringify(records[0]).slice(0, 500));
+      }
     } catch (parseErr) {
+      console.error("[grades/import] csv-parse error:", parseErr.message);
+      console.error("[grades/import] Raw CSV text (first 500 chars):", csvText.slice(0, 500));
       return res.status(400).json({ message: `Invalid CSV format: ${parseErr.message}` });
     }
 
@@ -165,17 +175,21 @@ router.post("/import", requireRoles("admin", "teacher"), csvUpload.single("file"
       return res.status(400).json({ message: "CSV file is empty or has no data rows" });
     }
 
-    const headerKeys = Object.keys(records[0]);
+    const headerKeys = Object.keys(records[0]).filter(k => k.trim() !== "");
     const findCol = (...needles) =>
       headerKeys.find(h => needles.some(n => h.toLowerCase().includes(n)));
 
-    const nameCol = findCol("student name", "name");
+    // Prioritize "student name" before falling back to generic "name" to avoid
+    // matching unintended columns like "Admission Name" or "Class Name"
+    const nameCol = findCol("student name") || findCol("name");
     const admCol = findCol("admission", "adm no", "adm", "reg no", "reg");
     const termCol = findCol("term");
 
+    console.log("[grades/import] Column detection:", { nameCol, admCol, termCol, headerKeys });
+
     if (!admCol) {
       return res.status(400).json({
-        message: "Admission Number column not found. Use a column named 'Admission Number'.",
+        message: `Admission Number column not found. Found columns: ${headerKeys.join(", ")}. Use a column named 'Admission Number'.`,
       });
     }
 
@@ -186,6 +200,8 @@ router.post("/import", requireRoles("admin", "teacher"), csvUpload.single("file"
     if (subjectColumns.length === 0) {
       return res.status(400).json({ message: "No subject columns found in CSV header" });
     }
+
+    console.log("[grades/import] Subject columns:", subjectColumns);
 
     const defaultTerm = (termCol && records[0][termCol]?.trim()) || "Term 1";
 
@@ -201,6 +217,8 @@ router.post("/import", requireRoles("admin", "teacher"), csvUpload.single("file"
         }, {}),
       };
     });
+
+    console.log("[grades/import] Rows prepared:", rows.length, "unique admissions:", [...new Set(rows.map(r => normalizeAdmissionNumber(r.admissionNumber)).filter(Boolean))].length);
 
     const uniqueAdmNos = [...new Set(
       rows.map(r => normalizeAdmissionNumber(r.admissionNumber)).filter(Boolean)
@@ -222,6 +240,19 @@ router.post("/import", requireRoles("admin", "teacher"), csvUpload.single("file"
           studentMap[key] = s;
         }
       }
+
+      const matched = Object.keys(studentMap).length;
+      console.log("[grades/import] Student lookup:", matched, "matched out of", uniqueAdmNos.length, "unique admission numbers");
+      if (matched < uniqueAdmNos.length) {
+        const unmatched = uniqueAdmNos.filter(k => !studentMap[k]);
+        console.log("[grades/import] Unmatched admission numbers:", unmatched);
+      }
+    }
+
+    if (Object.keys(studentMap).length === 0 && uniqueAdmNos.length > 0) {
+      return res.status(400).json({
+        message: `No students found matching the ${uniqueAdmNos.length} admission number(s) in the CSV. Check that admission numbers are correct and students exist in the system.`,
+      });
     }
 
     const calcGrade = (marks, total) => {
@@ -359,7 +390,7 @@ router.post("/import", requireRoles("admin", "teacher"), csvUpload.single("file"
               subject_name: subject,
               name: subject,
               code,
-            }, { onConflict: "school_id,subject_name" });
+            }, { onConflict: "school_id,code" });
           if (insErr) throw insErr;
         }
 
@@ -567,7 +598,7 @@ try {
               subject_name: subject,
               name: subject,  // also populate name for compatibility
               code
-            }, { onConflict: 'school_id,subject_name' })
+            }, { onConflict: 'school_id,code' })
             .select('subject_id')
             .single();
           if (upsertError) throw upsertError;

@@ -408,13 +408,23 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                       return;
                     }
                     const nf = data.notFound ?? 0;
+                    const sk = data.skipped ?? 0;
                     const imp = data.imported ?? 0;
-                    const tone = nf > 0 && imp === 0 ? "error" : nf > 0 ? "warn" : "success";
-                    const detail = nf > 0
-                      ? ` ${nf} row(s) skipped — admission numbers did not match any student.`
-                      : "";
+                    const rp = data.rowsProcessed ?? 0;
+                    let tone = "success";
+                    let detail = "";
+                    if (nf > 0 && imp === 0) {
+                      tone = "error";
+                      detail = ` ${nf} admission number(s) did not match any student.`;
+                    } else if (nf > 0) {
+                      tone = "warn";
+                      detail = ` ${nf} row(s) had unmatched admission numbers.`;
+                    }
+                    if (sk > nf) {
+                      detail += ` ${sk - nf} other row(s) were skipped (errors).`;
+                    }
                     toast(
-                      `Imported ${imp} grade(s).${detail}`,
+                      `Imported ${imp} grade(s) across ${rp} row(s).${detail}`,
                       tone
                     );
                     const fresh = await apiFetch("/grades", { token });

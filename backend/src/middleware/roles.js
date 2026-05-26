@@ -22,7 +22,7 @@ export function requireRoles(...allowed) {
                             req.headers['x-active-school-id'] ||
                             req.params.schoolId || 
                             req.query.schoolId || 
-                            req.body.schoolId || 
+                            req.body?.schoolId || 
                             userSchoolId;
         
         // Get the director's original school from token (fallback to current if not available)
@@ -110,7 +110,7 @@ export function requireDirector() {
                           req.headers['x-active-school-id'] ||
                           req.params.schoolId || 
                           req.query.schoolId || 
-                          req.body.schoolId || 
+                           req.body?.schoolId || 
                           userSchoolId;
       
       if (!targetSchoolId) {

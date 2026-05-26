@@ -220,7 +220,7 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
 });
 
 // ─── PUT update payment ───────────────────────────────────────────────────────
-router.put("/:id", requireRoles("director", "superadmin"), async (req, res, next) => {
+router.put("/:id", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { amount, feeType, paymentMethod, referenceNumber, paymentDate, status, paidBy } = req.body;

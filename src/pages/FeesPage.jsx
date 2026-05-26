@@ -101,6 +101,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [paystackForm, setPaystackForm]     = useState({ email: "", amount: "" });
   const [paystackLoading, setPaystackLoading] = useState(false);
   const [editStruct, setEditStruct]   = useState(null);
+  const [editingPayment, setEditingPayment] = useState(null);
   const [filterClass, setFilterClass] = useState("all");
   const [filterDate, setFilterDate] = useState("all"); // 'all' | 'today'
   const [page, setPage]               = useState(1);
@@ -409,6 +410,33 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     } catch (err) { toast(err.message || "Payment failed", "error"); }
   };
 
+  const savePaymentEdit = async () => {
+    if (!editingPayment) return;
+    const amt = Number(editingPayment.amount);
+    if (!amt || amt <= 0) return toast("Amount required", "error");
+
+    try {
+      await apiFetch(`/payments/${editingPayment.id}`, {
+        method: "PUT",
+        token: auth?.token,
+        body: {
+          amount: amt,
+          feeType: editingPayment.feeType,
+          paymentMethod: editingPayment.method,
+          referenceNumber: editingPayment.reference,
+          paymentDate: editingPayment.date,
+          status: editingPayment.status,
+          paidBy: editingPayment.paidBy,
+        },
+      });
+      await reloadPayments();
+      setEditingPayment(null);
+      toast("Payment updated successfully", "success");
+    } catch (err) {
+      toast(err.message || "Update failed", "error");
+    }
+  };
+
   const saveStructure = async () => {
     if (!structForm.className) return toast("Class required", "error");
     try {
@@ -615,7 +643,27 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 <span key="pb" style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{p.paidBy || "—"}</span>,
                 <Badge key="st" text={p.status} variant={p.status==="paid" ? "success" : p.status==="pending" ? "warning" : "danger"} />,
                 <span key="ref" style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>{p.reference || "—"}</span>,
-                canDeletePayments ? <Button key="del" size="sm" variant="danger" onClick={() => delPayment(p.id)}>Delete</Button> : "—"
+                <div key="actions" style={{ display: "flex", gap: "var(--space-2)" }}>
+                  {["admin", "director", "superadmin"].includes(auth?.role) && (
+                    <Button size="sm" variant="secondary" onClick={() => setEditingPayment({
+                      id: p.id,
+                      studentId: p.studentId,
+                      studentName: p.studentName,
+                      className: p.className,
+                      amount: p.amount,
+                      feeType: p.feeType,
+                      method: p.method,
+                      date: p.date,
+                      status: p.status,
+                      reference: p.reference,
+                      paidBy: p.paidBy
+                    })}>Edit</Button>
+                  )}
+                  {canDeletePayments && (
+                    <Button size="sm" variant="danger" onClick={() => delPayment(p.id)}>Delete</Button>
+                  )}
+                  {!["admin", "director", "superadmin"].includes(auth?.role) && !canDeletePayments && "—"}
+                </div>
               ])}
             />
             <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
@@ -967,6 +1015,94 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             />
           </div>
         </div>
+      </Modal>
+
+      {/* Edit Payment Modal */}
+      <Modal isOpen={!!editingPayment} title={`Edit Payment — ${editingPayment?.studentName}`} onClose={() => setEditingPayment(null)} footer={
+        <>
+          <Button variant="ghost" onClick={() => setEditingPayment(null)}>Cancel</Button>
+          <Button 
+            disabled={!editingPayment || Number(editingPayment.amount) <= 0}
+            onClick={savePaymentEdit}
+          >
+            Save Changes
+          </Button>
+        </>
+      }>
+        {editingPayment && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+            <Input label="Student" value={editingPayment.studentName} disabled />
+            <Input label="Class" value={editingPayment.className} disabled />
+            
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <Input 
+                label="Amount (KES)"
+                type="number" 
+                value={editingPayment.amount} 
+                onChange={e => setEditingPayment({ ...editingPayment, amount: e.target.value })} 
+              />
+              {Number(editingPayment.amount) < 100 && (
+                <span style={{ color: "var(--color-danger)", fontSize: "12px", marginTop: "4px" }}>Minimum KSh 100</span>
+              )}
+            </div>
+
+            <Select 
+              label="Type"
+              value={editingPayment.feeType} 
+              onChange={e => setEditingPayment({ ...editingPayment, feeType: e.target.value })}
+              options={[
+                { value: "tuition", label: "Tuition" },
+                { value: "activity", label: "Activity" },
+                { value: "misc", label: "Misc" }
+              ]}
+            />
+
+            <Select 
+              label="Method"
+              value={editingPayment.method} 
+              onChange={e => setEditingPayment({ ...editingPayment, method: e.target.value })}
+              options={[
+                { value: "cash", label: "Cash" },
+                { value: "mpesa", label: "Mpesa" },
+                { value: "bank", label: "Bank" }
+              ]}
+            />
+
+            <Input 
+              label="Date"
+              type="date" 
+              value={editingPayment.date} 
+              onChange={e => setEditingPayment({ ...editingPayment, date: e.target.value })} 
+            />
+
+            <Select 
+              label="Status"
+              value={editingPayment.status} 
+              onChange={e => setEditingPayment({ ...editingPayment, status: e.target.value })}
+              options={[
+                { value: "paid", label: "Paid" },
+                { value: "pending", label: "Pending" },
+                { value: "failed", label: "Failed" },
+                { value: "reversed", label: "Reversed" }
+              ]}
+            />
+
+            <Input 
+              label="Reference Number / Receipt"
+              value={editingPayment.reference} 
+              onChange={e => setEditingPayment({ ...editingPayment, reference: e.target.value })} 
+            />
+
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Input 
+                label="Paid By (parent/guardian/sponsor)"
+                value={editingPayment.paidBy} 
+                onChange={e => setEditingPayment({ ...editingPayment, paidBy: e.target.value })} 
+                placeholder="e.g. John Kamau (Father)" 
+              />
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Fee Structure Modal */}

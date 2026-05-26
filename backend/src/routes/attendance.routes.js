@@ -36,6 +36,7 @@ async function resolveClassId({ schoolId, classId, className }) {
     .eq("school_id", schoolId)
     .eq("class_name", className)
     .eq("is_deleted", false)
+    .limit(1)
     .maybeSingle();
   if (error) throw error;
 
