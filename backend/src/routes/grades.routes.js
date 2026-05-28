@@ -653,7 +653,6 @@ router.post(
     }
   }
 );
-    const resolvedClassId = classId || student.class_id;
 
     // Resolve or create a default exam for the term if not provided
     let resolvedExamId = examId;
