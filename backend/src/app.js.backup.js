@@ -110,7 +110,6 @@ app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api/teacherassignments", teacherAssignmentsRoutes);
-app.use("/api/teacher-assignments", teacherAssignmentsRoutes);
 app.use("/api/parent", authRequired, validateSession, parentRoutes);
 app.use("/api", authRequired);
 app.use("/api", validateSession);

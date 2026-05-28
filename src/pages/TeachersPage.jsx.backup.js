@@ -50,36 +50,13 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const [editId, setEditId] = useState(null);
   const [f, setF] = useState({ firstName: "", lastName: "", email: "", phone: "", staffNumber: "", tscStaffId: "", status: "active", classes: [], timetable: "", subjects: [] });
   const [loading, setLoading] = useState(false);
-  const [assignmentTeachers, setAssignmentTeachers] = useState([]);
-  const [classOptions, setClassOptions] = useState([]);
-  const [subjectOptions, setSubjectOptions] = useState([]);
-  const [showAssign, setShowAssign] = useState(false);
-  const [assigningTeacher, setAssigningTeacher] = useState(null);
-  const [assignmentForm, setAssignmentForm] = useState({ classId: "", subjectId: "", isClassTeacher: false });
-  const canAssign = ["admin", "director", "superadmin"].includes(auth?.role);
-
-  const loadAssignmentData = async () => {
-    if (!auth?.token || !canAssign) return;
-    const [teacherRows, classRows, subjectRows] = await Promise.all([
-      apiFetch("/teacherassignments/teachers-with-classes", { token: auth.token }),
-      apiFetch("/classes", { token: auth.token }),
-      apiFetch("/subjects", { token: auth.token }),
-    ]);
-    setAssignmentTeachers(teacherRows || []);
-    setClassOptions(classRows?.data || classRows || []);
-    setSubjectOptions(subjectRows || []);
-  };
 
   useEffect(() => {
     if (!auth?.token) return;
     setLoading(true);
     const ac = new AbortController();
     apiFetch("/teachers", { token: auth.token, signal: ac.signal })
-      .then(async data => {
-        setTeachers(data.map(normalise));
-        if (canAssign) await loadAssignmentData();
-        setLoading(false);
-      })
+      .then(data => { setTeachers(data.map(normalise)); setLoading(false); })
       .catch(e => { 
         if (e?.code !== "EABORT") {
           toast("Failed to fetch teachers", "error");
@@ -87,7 +64,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
         }
       });
     return () => ac.abort();
-  }, [auth, setTeachers, toast, canAssign]);
+  }, [auth, setTeachers, toast]);
 
   const normalised = teachers.map(t => t.first_name ? normalise(t) : t);
 
@@ -173,59 +150,6 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
     } catch (err) { toast(err.message || "Sync failed", "error"); }
   };
 
-  const assignmentUserForTeacher = teacher =>
-    assignmentTeachers.find(t => String(t.email || "").toLowerCase() === String(teacher.email || "").toLowerCase());
-
-  const assignmentsForTeacher = teacher => assignmentUserForTeacher(teacher)?.assignments || [];
-
-  const openAssign = teacher => {
-    const userTeacher = assignmentUserForTeacher(teacher);
-    if (!userTeacher?.user_id) {
-      return toast("Teacher user account not found. Try Sync to HR or recreate the teacher login first.", "error");
-    }
-    setAssigningTeacher({ ...teacher, userId: userTeacher.user_id });
-    setAssignmentForm({ classId: "", subjectId: "", isClassTeacher: false });
-    setShowAssign(true);
-  };
-
-  const saveAssignment = async () => {
-    if (!assigningTeacher?.userId) return toast("Teacher user account not found", "error");
-    const cls = classOptions.find(c => String(c.class_id ?? c.id) === String(assignmentForm.classId));
-    if (!cls) return toast("Select a class", "error");
-    const subj = subjectOptions.find(s => String(s.subject_id ?? s.id) === String(assignmentForm.subjectId));
-
-    try {
-      await apiFetch("/teacherassignments", {
-        method: "POST",
-        token: auth?.token,
-        body: {
-          teacherId: assigningTeacher.userId,
-          classId: cls.class_id ?? cls.id ?? null,
-          className: cls.class_name ?? cls.className ?? cls.name,
-          subjectId: subj ? (subj.subject_id ?? subj.id) : null,
-          subjectName: subj ? (subj.name ?? subj.subject_name ?? subj.subjectName) : null,
-          isClassTeacher: assignmentForm.isClassTeacher,
-        },
-      });
-      await loadAssignmentData();
-      setShowAssign(false);
-      toast("Class assigned", "success");
-    } catch (err) {
-      toast(err.message || "Failed to assign class", "error");
-    }
-  };
-
-  const removeAssignment = async assignmentId => {
-    if (!window.confirm("Remove this class assignment?")) return;
-    try {
-      await apiFetch(`/teacherassignments/${assignmentId}`, { method: "DELETE", token: auth?.token });
-      await loadAssignmentData();
-      toast("Assignment removed", "success");
-    } catch (err) {
-      toast(err.message || "Failed to remove assignment", "error");
-    }
-  };
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Filters Container */}
@@ -277,45 +201,13 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
               <span key="phone" style={{ color: "var(--color-text-secondary)" }}>{t.phone || "-"}</span>,
               <span key="staffNo" style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{t.staffNumber || "-"}</span>,
               <span key="tscId" style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{t.tscStaffId || "-"}</span>,
-              <span key="classes" style={{ fontSize: "13px" }}>
-                {assignmentsForTeacher(t).length
-                  ? assignmentsForTeacher(t).map(a => a.class_name).filter(Boolean).join(", ")
-                  : (t.classes||[]).join(", ") || "-"}
-              </span>,
-              <span key="subjects" style={{ fontSize: "13px" }}>
-                {assignmentsForTeacher(t).length
-                  ? assignmentsForTeacher(t).map(a => a.subject_name).filter(Boolean).join(", ") || "General"
-                  : (t.subjects||[]).join(", ") || "-"}
-              </span>,
+              <span key="classes" style={{ fontSize: "13px" }}>{(t.classes||[]).join(", ") || "-"}</span>,
+              <span key="subjects" style={{ fontSize: "13px" }}>{(t.subjects||[]).join(", ") || "-"}</span>,
               <span key="timetable" style={{ color: "var(--color-text-secondary)" }}>{t.timetable || "-"}</span>,
               <Badge key="st" text={t.status} variant={t.status === "active" ? "success" : "danger"} />,
               <div key="a" style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
-                {canAssign && <Button size="sm" variant="ghost" onClick={() => openAssign(t)}>Assign Class</Button>}
                 {canEdit && <Button size="sm" variant="secondary" onClick={() => { setEditId(t.id); setF(t); setShow(true); }}>Edit</Button>}
                 {canEdit && <Button size="sm" variant="danger" onClick={() => del(t.id)}>Delete</Button>}
-                {canAssign && assignmentsForTeacher(t).length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, width: "100%", marginTop: 4 }}>
-                    {assignmentsForTeacher(t).map(a => (
-                      <button
-                        key={a.assignment_id}
-                        type="button"
-                        onClick={() => removeAssignment(a.assignment_id)}
-                        title="Click to remove assignment"
-                        style={{
-                          border: "1px solid var(--color-border)",
-                          borderRadius: 999,
-                          background: "var(--color-bg-surface)",
-                          color: "var(--color-text-secondary)",
-                          cursor: "pointer",
-                          fontSize: 11,
-                          padding: "2px 8px"
-                        }}
-                      >
-                        {a.class_name}{a.subject_name ? ` • ${a.subject_name}` : ""} ×
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             ])}
           />
@@ -442,48 +334,6 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
               </div>
             </div>
           </div>
-        </div>
-      </Modal>
-
-      <Modal isOpen={showAssign} title={`Assign Class${assigningTeacher ? ` — ${assigningTeacher.firstName} ${assigningTeacher.lastName}` : ""}`} onClose={() => setShowAssign(false)} footer={
-        <>
-          <Button variant="ghost" onClick={() => setShowAssign(false)}>Cancel</Button>
-          <Button onClick={saveAssignment}>Save Assignment</Button>
-        </>
-      }>
-        <div style={{ display: "grid", gap: "var(--space-4)" }}>
-          <Select
-            label="Class"
-            value={assignmentForm.classId}
-            onChange={e => setAssignmentForm(prev => ({ ...prev, classId: e.target.value }))}
-            options={[
-              { value: "", label: "Select class" },
-              ...classOptions.map(c => ({
-                value: String(c.class_id ?? c.id),
-                label: c.class_name ?? c.className ?? c.name
-              }))
-            ]}
-          />
-          <Select
-            label="Subject"
-            value={assignmentForm.subjectId}
-            onChange={e => setAssignmentForm(prev => ({ ...prev, subjectId: e.target.value }))}
-            options={[
-              { value: "", label: "General / class teacher only" },
-              ...subjectOptions.map(s => ({
-                value: String(s.subject_id ?? s.id),
-                label: s.name ?? s.subject_name ?? s.subjectName
-              }))
-            ]}
-          />
-          <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--color-text-secondary)", fontSize: 14 }}>
-            <input
-              type="checkbox"
-              checked={assignmentForm.isClassTeacher}
-              onChange={e => setAssignmentForm(prev => ({ ...prev, isClassTeacher: e.target.checked }))}
-            />
-            Is class teacher
-          </label>
         </div>
       </Modal>
     </div>

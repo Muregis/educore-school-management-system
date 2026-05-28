@@ -386,24 +386,6 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
             "success"
           );
         }}>Export Template</Btn>
-        <Btn variant="ghost" onClick={async () => {
-          try {
-            const token = auth?.token || sessionStorage.getItem("token");
-            const res = await fetch(`${API_BASE}/grades/template`, {
-              headers: getAuthHeaders(token),
-            });
-            if (!res.ok) throw new Error("Template download failed");
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "grades_import_template.csv";
-            a.click();
-            URL.revokeObjectURL(url);
-          } catch (err) {
-            toast(err.message || "Template download failed", "error");
-          }
-        }}>Download Import Template</Btn>
         {canEdit && (
           <>
             <label style={{ cursor: "pointer" }}>
@@ -421,10 +403,10 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                   form.append("file", file);
                   try {
                     const token = auth?.token || sessionStorage.getItem("token");
-                    const res = await fetch(`${API_BASE}/grades/import?examType=${encodeURIComponent(examType)}`, {
-                      method: "POST",
-                      headers: getAuthHeaders(token),
-                      body: form,
+                    const res = await fetch(`${API_BASE}/grades/import`, {
+                    method: "POST",
+                    headers: await getAuthHeaders(),
+                    body: form,
                     });
 
                     const data = await res.json();
@@ -432,18 +414,34 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                     if (!res.ok) {
                     throw new Error(data.message || "Import failed");
                     }
+                    if (!res.ok) {
+                      toast(data.message || "Import failed", "error");
+                      return;
+                    }
                     const imp = data.imported ?? 0;
                     const sk = data.skipped ?? 0;
                     const errs = data.errors ?? [];
-                    const totalRows = data.total ?? imp + sk;
-                    const firstErrors = errs
-                      .slice(0, 3)
-                      .map(errRow => `Row ${errRow.row}: ${errRow.reason || errRow.error || "Failed"}`)
-                      .join(" ");
-                    const detail = errs.length ? ` ${errs.length} error row(s). ${firstErrors}` : "";
-                    const tone = errs.length && imp === 0 ? "error" : errs.length ? "warn" : "success";
+                    let detail = "";
+
+                    if (errs.length > 0) {
+                    detail = ` ${errs.length} row(s) had errors.`;
+                  }
                     toast(
-                      `Imported ${imp} grade(s) across ${totalRows} row(s). Skipped ${sk}.${detail}`,
+                    `Imported ${imp} grade(s). Skipped ${sk}.${detail}`,
+                    errs.length ? "warn" : "success"
+                  );  
+                    if (nf > 0 && imp === 0) {
+                      tone = "error";
+                      detail = ` ${nf} admission number(s) did not match any student.`;
+                    } else if (nf > 0) {
+                      tone = "warn";
+                      detail = ` ${nf} row(s) had unmatched admission numbers.`;
+                    }
+                    if (sk > nf) {
+                      detail += ` ${sk - nf} other row(s) were skipped (errors).`;
+                    }
+                    toast(
+                      `Imported ${imp} grade(s) across ${rp} row(s).${detail}`,
                       tone
                     );
                     const fresh = await apiFetch("/grades", { token });

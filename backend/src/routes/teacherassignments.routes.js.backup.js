@@ -14,9 +14,9 @@ router.get('/', async (req, res, next) => {
       .from('teacher_class_assignments')
       .select(`
         assignment_id, class_name, class_id,
-        subject_name, subject_id, is_class_teacher,
+        subject_name, is_class_teacher,
         academic_year, term, is_active,
-        teacher:users(user_id, full_name, email, role)
+        teacher:users(user_id, full_name, email)
       `)
       .eq('school_id', schoolId)
       .eq('is_active', true);
@@ -61,38 +61,6 @@ router.get('/my-classes', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET all teachers with their assigned classes for admin/director UI
-router.get('/teachers-with-classes',
-  requireRoles('admin', 'director', 'superadmin'),
-  async (req, res, next) => {
-  try {
-    const { schoolId } = req.user;
-
-    const { data: teachers, error: teachersError } = await supabase
-      .from('users')
-      .select('user_id, full_name, email, role')
-      .eq('school_id', schoolId)
-      .eq('role', 'teacher')
-      .eq('is_deleted', false)
-      .order('full_name');
-    if (teachersError) throw teachersError;
-
-    const { data: assignments, error: assignmentsError } = await supabase
-      .from('teacher_class_assignments')
-      .select('assignment_id, teacher_id, class_id, class_name, subject_id, subject_name, is_class_teacher, academic_year, term')
-      .eq('school_id', schoolId)
-      .eq('is_active', true);
-    if (assignmentsError) throw assignmentsError;
-
-    const result = (teachers || []).map(t => ({
-      ...t,
-      assignments: (assignments || []).filter(a => a.teacher_id === t.user_id)
-    }));
-
-    res.json(result);
-  } catch (err) { next(err); }
-});
-
 // POST assign teacher to class
 router.post('/', requireRoles('admin','director','superadmin'),
   async (req, res, next) => {
@@ -107,20 +75,15 @@ router.post('/', requireRoles('admin','director','superadmin'),
       });
     }
 
-    let existingQuery = supabase
+    const { data: existing } = await supabase
       .from('teacher_class_assignments')
       .select('assignment_id')
       .eq('school_id', schoolId)
       .eq('teacher_id', teacherId)
       .eq('class_name', className)
-      .eq('is_active', true);
-
-    existingQuery = subjectName
-      ? existingQuery.eq('subject_name', subjectName)
-      : existingQuery.is('subject_name', null);
-
-    const { data: existing, error: existingError } = await existingQuery.maybeSingle();
-    if (existingError) throw existingError;
+      .eq('subject_name', subjectName || '')
+      .eq('is_active', true)
+      .maybeSingle();
 
     if (existing) {
       return res.status(409).json({
@@ -147,11 +110,7 @@ router.post('/', requireRoles('admin','director','superadmin'),
       .single();
 
     if (error) throw error;
-    res.status(201).json({
-      success: true,
-      assignmentId: data.assignment_id,
-      message: `Teacher assigned to ${className} successfully`
-    });
+    res.status(201).json({ success: true, assignmentId: data.assignment_id });
   } catch (err) { next(err); }
 });
 

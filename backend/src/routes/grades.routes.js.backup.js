@@ -56,61 +56,11 @@ function normalise(r) {
     className: r.class_name ?? "",
     subject: r.subject_name ?? r.subject ?? "",
     term: r.term ?? "Term 2",
-    examType: r.exam_type ?? "Mid-Term",
     marks: normaliseMarks(r.marks),
     total: Number(r.total_marks ?? 100),
     grade: r.grade ?? "",
     teacherComment: r.teacher_comment ?? "",
   };
-}
-
-const IMPORT_METADATA_COLUMNS = new Set([
-  'student_name',
-  'admission_number',
-  'term',
-  'exam_type',
-  'class_name',
-  'subject',
-  'marks',
-  'total_marks',
-  'grade',
-  'teacher_comment',
-]);
-
-function displaySubjectFromHeader(header) {
-  return String(header || '')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, char => char.toUpperCase())
-    .trim();
-}
-
-function expandImportRows(rows, fallbackExamType) {
-  const expanded = [];
-
-  for (const row of rows) {
-    if (row.subject || row.marks !== undefined) {
-      expanded.push({ ...row, exam_type: row.exam_type || fallbackExamType });
-      continue;
-    }
-
-    const subjectKeys = Object.keys(row).filter(key =>
-      !IMPORT_METADATA_COLUMNS.has(key) && String(row[key] ?? '').trim() !== ''
-    );
-
-    for (const key of subjectKeys) {
-      expanded.push({
-        admission_number: row.admission_number,
-        subject: displaySubjectFromHeader(key),
-        marks: row[key],
-        total_marks: row.total_marks || 100,
-        term: row.term,
-        exam_type: row.exam_type || fallbackExamType,
-        class_name: row.class_name,
-      });
-    }
-  }
-
-  return expanded;
 }
 
 // ─── GET /api/grades — list all ─────────────────────────────────────────────
@@ -160,19 +110,6 @@ router.get("/", async (req, res, next) => {
 });
 
 // ─── POST /api/grades/import — Simple CSV Import (per subject row) ───────────
-router.get('/template', requireRoles('admin', 'teacher', 'director', 'superadmin'), (_req, res) => {
-  const csvTemplate = [
-    'admission_number,subject,marks,total_marks,term,exam_type,class_name',
-    'RPP-001,Mathematics,78,100,Term 2,Mid-Term,Grade 5',
-    'RPP-001,English,85,100,Term 2,Mid-Term,Grade 5',
-    'RPP-002,Mathematics,62,100,Term 2,Mid-Term,Grade 5',
-  ].join('\n');
-
-  res.setHeader('Content-Type', 'text/csv');
-  res.setHeader('Content-Disposition', 'attachment; filename="grades_import_template.csv"');
-  res.send(csvTemplate);
-});
-
 router.post(
   '/import',
   requireRoles('admin', 'teacher', 'director'),
@@ -180,7 +117,6 @@ router.post(
   async (req, res, next) => {
     try {
       const { schoolId, userId } = req.user;
-      const fallbackExamType = String(req.query.examType || req.body?.examType || 'Mid-Term').trim() || 'Mid-Term';
 
       if (!req.file) {
         return res.status(400).json({ message: 'CSV file is required' });
@@ -190,11 +126,7 @@ router.post(
       const bufferStream = new stream.PassThrough();
 
       bufferStream.end(
-        req.file.buffer
-          .toString('utf-8')
-          .replace(/^\uFEFF/, '')
-          .replace(/\r\n/g, '\n')
-          .replace(/\r/g, '\n')
+        req.file.buffer.toString('utf-8').replace(/^\uFEFF/, '')
       );
 
       bufferStream
@@ -208,9 +140,7 @@ router.post(
           }
         })
         .on('end', async () => {
-          const allRows = expandImportRows(rows, fallbackExamType);
-
-          if (allRows.length === 0) {
+          if (rows.length === 0) {
             return res.status(400).json({ message: 'CSV file contains no data' });
           }
 
@@ -218,8 +148,8 @@ router.post(
           let skipped = 0;
           const errors = [];
 
-          for (let i = 0; i < allRows.length; i++) {
-            const row = allRows[i];
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
             const rowNumber = i + 2;
 
             try {
@@ -228,33 +158,33 @@ router.post(
 
               if (!admission) {
                 skipped++;
-                errors.push({ row: rowNumber, reason: 'Missing admission_number' });
+                errors.push({ row: rowNumber, error: 'Missing admission_number' });
                 continue;
               }
               if (!subject) {
                 skipped++;
-                errors.push({ row: rowNumber, admission, reason: 'Missing subject' });
+                errors.push({ row: rowNumber, admission, error: 'Missing subject' });
                 continue;
               }
 
               const { data: student, error: studentError } = await supabase
                 .from('students')
-                .select('student_id, class_name, first_name, last_name')
+                .select('student_id, class_name')
                 .eq('school_id', schoolId)
                 .ilike('admission_number', admission)
                 .eq('is_deleted', false)
-                .maybeSingle();
+                .single();
 
               if (studentError || !student) {
                 skipped++;
-                errors.push({ row: rowNumber, admission, reason: `Student not found: ${admission}` });
+                errors.push({ row: rowNumber, admission, error: 'Student not found' });
                 continue;
               }
 
               const marks = parseFloat(row.marks);
               if (isNaN(marks) && String(row.marks || '').trim() !== '') {
                 skipped++;
-                errors.push({ row: rowNumber, admission, subject, reason: 'Invalid marks value' });
+                errors.push({ row: rowNumber, admission, subject, error: 'Invalid marks value' });
                 continue;
               }
 
@@ -274,7 +204,7 @@ router.post(
                   grade: row.grade?.trim() || null,
                   teacher_comment: row.teacher_comment?.trim() || null,
                   term: row.term?.trim() || 'Term 2',
-                  exam_type: row.exam_type?.trim() || fallbackExamType,
+                  exam_type: row.exam_type?.trim() || 'Mid-Term',
                   class_name: row.class_name?.trim() || student.class_name,
                   entered_by: userId,
                   is_deleted: false
@@ -291,18 +221,17 @@ router.post(
                 row: rowNumber,
                 admission: row.admission_number,
                 subject: row.subject,
-                reason: err.message
+                error: err.message
               });
             }
           }
 
           res.json({
             success: true,
-            message: `Imported ${successCount} results. ${skipped} rows had errors.`,
+            message: `Import completed: ${successCount} imported, ${skipped} skipped`,
             imported: successCount,
             skipped,
-            total: allRows.length,
-            errors
+            errors: errors.length ? errors : undefined
           });
         })
         .on('error', (err) => next(err));

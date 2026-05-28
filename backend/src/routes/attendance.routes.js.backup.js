@@ -14,26 +14,12 @@ async function getTeacherClassIds(schoolId, userId) {
   return teacherClasses?.map(tc => tc.class_id).filter(Boolean) || [];
 }
 
-async function getClassNameById(schoolId, classId) {
-  if (!classId) return null;
-  const { data, error } = await supabase
-    .from("classes")
-    .select("class_name")
-    .eq("school_id", schoolId)
-    .eq("class_id", classId)
-    .eq("is_deleted", false)
-    .maybeSingle();
-  if (error) throw error;
-  return data?.class_name || null;
-}
-
 // Enhanced teacher validation - ensures teacher can only access assigned classes
 async function validateTeacherClassAccess(schoolId, userId, classId) {
   if (!classId) return true; // No class filter, allow access
-
-  const className = await getClassNameById(schoolId, classId);
-  const assignedClasses = await getTeacherAssignedClasses(schoolId, userId);
-  if (!className || !assignedClasses.includes(className)) {
+  
+  const teacherClassIds = await getTeacherClassIds(schoolId, userId);
+  if (!teacherClassIds.includes(Number(classId))) {
     throw new Error("Teacher can only access attendance for their assigned classes");
   }
   return true;
@@ -88,9 +74,9 @@ router.get("/", async (req, res, next) => {
       .eq("is_deleted", false);
 
     if (role === "teacher") {
-      const assignedClasses = await getTeacherAssignedClasses(schoolId, userId);
-      if (!assignedClasses.length) return res.json([]);
-      query = query.in("students.class_name", assignedClasses);
+      const allowedClassIds = await getTeacherClassIds(schoolId, userId);
+      if (!allowedClassIds.length) return res.json([]);
+      query = query.in("class_id", allowedClassIds);
     }
 
     if (classId) query = query.eq("class_id", classId);
@@ -130,6 +116,16 @@ router.post("/bulk", async (req, res, next) => {
   try {
     // OLD: const { schoolId, role, user_id } = req.user;
     const { schoolId, role, userId } = req.user;
+    if (role === 'teacher') {
+  const assignedClasses =
+    await getTeacherAssignedClasses(schoolId, userId);
+
+  if (assignedClasses.length === 0) {
+    return res.json([]);
+  }
+
+  query = query.in('class_name', assignedClasses);
+}
     const { classId, className, date, records } = req.body;
 
     if (!date || !Array.isArray(records) || records.length === 0) {
@@ -142,9 +138,8 @@ router.post("/bulk", async (req, res, next) => {
     }
 
     if (role === "teacher") {
-      const assignedClasses = await getTeacherAssignedClasses(schoolId, userId);
-      const resolvedClassName = className || await getClassNameById(schoolId, resolvedClassId);
-      if (!resolvedClassName || !assignedClasses.includes(resolvedClassName)) {
+      const allowedClassIds = await getTeacherClassIds(schoolId, userId);
+      if (!allowedClassIds.includes(resolvedClassId)) {
         return res.status(403).json({ error: "Access denied: You can only manage attendance for your assigned classes" });
       }
     }
