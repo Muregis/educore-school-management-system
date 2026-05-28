@@ -9,7 +9,7 @@ import healthRoutes        from "./routes/health.routes.js";
 import authRoutes          from "./routes/auth.routes.js";
 import studentsRoutes      from "./routes/students.routes.js";
 import teachersRoutes      from "./routes/teachers.routes.js";
-import teacherAssignmentsRoutes from "./routes/teacherAssignments.routes.js";
+import teacherAssignmentsRoutes from "./routes/teacherassignments.routes.js";
 import attendanceRoutes    from "./routes/attendance.routes.js";
 import gradesRoutes        from "./routes/grades.routes.js";
 import paymentsRoutes      from "./routes/payments.routes.js";
