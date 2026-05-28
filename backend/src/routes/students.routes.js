@@ -65,46 +65,36 @@ function normalizeDateInput(value) {
 // ─── GET / ────────────────────────────────────────────────────────────────────
 router.get("/", async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
-    const { userId, role } = req.user;
+    const { schoolId, userId, role } = req.user;
 
-let query = supabase
-  .from('students')
-  .select('*')
-  .eq('school_id', schoolId)
-  .eq('is_deleted', false);
-
-// Teachers only see assigned classes
-if (role === 'teacher') {
-  const assignedClasses = await getTeacherAssignedClasses(schoolId, userId);
-  if (assignedClasses.length === 0) return res.json([]);
-  query = query.in('class_name', assignedClasses);
-}
-
-const { data: rows, error } = await query
-  .order('class_name')
-    .eq('teacher_id', userId)
-    .eq('is_active', true);
-
-const assignedClasses = Array.isArray(assignments)
-  ? assignments.map(a => a.class_name).filter(Boolean)
-  : [];
-
-const { data: rows, error } = await query
-  .order('class_name')
-  .order('first_name');
-
-    const { data: rows, error } = await supabase
+    let query = supabase
       .from('students')
       .select('*')
       .eq('school_id', schoolId)
-      .eq('is_deleted', false)
+      .eq('is_deleted', false);
+
+    // Teachers only see assigned classes
+    if (role === 'teacher') {
+      const assignedClasses = await getTeacherAssignedClasses(schoolId, userId);
+      
+      if (assignedClasses.length === 0) {
+        return res.json([]);
+      }
+
+      query = query.in('class_name', assignedClasses);
+    }
+
+    // Execute query
+    const { data: rows, error } = await query
       .order('class_name')
       .order('first_name');
 
     if (error) throw error;
+
     res.json(rows || []);
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 // ─── GET /:id ─────────────────────────────────────────────────────────────────
@@ -297,7 +287,6 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
     const normalizedPhone = normalizePhoneNumber(phone);
     const normalizedParentPhone = normalizePhoneNumber(parentPhone);
 
-    // Verify student exists and belongs to this school
     const { data: currentStudent, error: currentError } = await supabase
       .from('students')
       .select('student_id, admission_number')
@@ -310,7 +299,6 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
       return res.status(404).json({ message: "Student not found" });
     }
 
-    // Resolve classId from className
     let resolvedClassId = classId || null;
     if (className && !classId) {
       try {
@@ -326,7 +314,6 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
       }
     }
 
-    // Build update object — admission number is NEVER changed from edit form
     const updateData = {
       first_name: firstName,
       last_name: lastName,
@@ -366,9 +353,7 @@ router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {
     logActivity(req, { action: "student.update", entity: "student", entityId: req.params.id, description: `Student updated: ${firstName} ${lastName}` });
     res.json({ updated: true });
   } catch (err) {
-    if (err.statusCode) {
-      return res.status(err.statusCode).json({ message: err.message });
-    }
+    if (err.statusCode) return res.status(err.statusCode).json({ message: err.message });
     next(err);
   }
 });
@@ -399,14 +384,10 @@ router.post("/upload-photo", requireRoles("admin", "teacher", "director", "super
   try {
     const { schoolId } = req.user;
 
-    if (!req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
     const { studentId } = req.body;
-    if (!studentId) {
-      return res.status(400).json({ message: "Student ID is required" });
-    }
+    if (!studentId) return res.status(400).json({ message: "Student ID is required" });
 
     const { data: student, error: studentError } = await supabase
       .from('students')
@@ -427,10 +408,7 @@ router.post("/upload-photo", requireRoles("admin", "teacher", "director", "super
 
     const { error: uploadError } = await supabase.storage
       .from('student-photos')
-      .upload(filename, file.buffer, {
-        contentType: file.mimetype,
-        upsert: false
-      });
+      .upload(filename, file.buffer, { contentType: file.mimetype, upsert: false });
 
     if (uploadError) throw uploadError;
 
@@ -438,13 +416,11 @@ router.post("/upload-photo", requireRoles("admin", "teacher", "director", "super
       .from('student-photos')
       .getPublicUrl(filename);
 
-    const { error: updateError } = await supabase
+    await supabase
       .from('students')
       .update({ photo_url: publicUrl })
       .eq('student_id', studentId)
       .eq('school_id', schoolId);
-
-    if (updateError) throw updateError;
 
     logActivity(req, {
       action: "student.photo_uploaded",
@@ -463,8 +439,7 @@ router.patch("/:id/fees", requireRoles("admin", "finance", "director", "superadm
     const { schoolId } = req.user;
     const {
       outstanding_balance, transport_fee, lunch_fee, breakfast_fee,
-      opening_balance, opening_balance_type,
-      transport_direction, transport_base_fee,
+      opening_balance, opening_balance_type, transport_direction, transport_base_fee,
       lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type,
       breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type,
       discount_type, discount_value, discount_is_percentage,
@@ -508,14 +483,13 @@ router.patch("/:id/fees", requireRoles("admin", "finance", "director", "superadm
   } catch (err) { next(err); }
 });
 
-// ─── GET /api/students/:studentId/ledger ───────────────────────────────────────
+// ─── GET /:studentId/ledger ───────────────────────────────────────────────────
 router.get("/:studentId/ledger", studentDataRateLimit, requireRoles("director", "admin", "finance", "staff", "parent", "student"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
     const { limit = 50, offset = 0, term, academic_year } = req.query;
 
-    // Verify student belongs to school
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('student_id, first_name, last_name, admission_number')
@@ -524,11 +498,8 @@ router.get("/:studentId/ledger", studentDataRateLimit, requireRoles("director", 
       .eq('is_deleted', false)
       .single();
 
-    if (studentError || !student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
+    if (studentError || !student) return res.status(404).json({ message: "Student not found" });
 
-    // Build query for student ledger
     let query = supabase
       .from('student_ledger')
       .select('*')
@@ -536,13 +507,8 @@ router.get("/:studentId/ledger", studentDataRateLimit, requireRoles("director", 
       .eq('student_id', studentId)
       .order('created_at', { ascending: false });
 
-    // Apply filters if provided
-    if (term) {
-      query = query.eq('term', term);
-    }
-    if (academic_year) {
-      query = query.eq('academic_year', academic_year);
-    }
+    if (term) query = query.eq('term', term);
+    if (academic_year) query = query.eq('academic_year', academic_year);
 
     const { data: ledger, error: ledgerError } = await query
       .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
@@ -567,14 +533,13 @@ router.get("/:studentId/ledger", studentDataRateLimit, requireRoles("director", 
   }
 });
 
-// ─── GET /api/students/:studentId/invoices ───────────────────────────────────────
+// ─── GET /:studentId/invoices ─────────────────────────────────────────────────
 router.get("/:studentId/invoices", studentDataRateLimit, requireRoles("director", "admin", "finance", "staff", "parent", "student"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
     const { limit = 50, offset = 0, term, academic_year } = req.query;
 
-    // Verify student belongs to school
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('student_id, first_name, last_name, admission_number')
@@ -583,11 +548,8 @@ router.get("/:studentId/invoices", studentDataRateLimit, requireRoles("director"
       .eq('is_deleted', false)
       .single();
 
-    if (studentError || !student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
+    if (studentError || !student) return res.status(404).json({ message: "Student not found" });
 
-    // Build query for student invoices
     let query = supabase
       .from('invoices')
       .select('*')
@@ -596,13 +558,8 @@ router.get("/:studentId/invoices", studentDataRateLimit, requireRoles("director"
       .eq('is_deleted', false)
       .order('created_at', { ascending: false });
 
-    // Apply filters if provided
-    if (term) {
-      query = query.eq('term', term);
-    }
-    if (academic_year) {
-      query = query.eq('academic_year', academic_year);
-    }
+    if (term) query = query.eq('term', term);
+    if (academic_year) query = query.eq('academic_year', academic_year);
 
     const { data: invoices, error: invoicesError } = await query
       .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
