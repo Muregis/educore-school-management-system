@@ -404,13 +404,16 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                   try {
                     const token = auth?.token || sessionStorage.getItem("token");
                     const res = await fetch(`${API_BASE}/grades/import`, {
-                      method: "POST",
-                      headers: await getAuthHeaders(),
-                      body: formData
-                   });
-                      body: form,
+                    method: "POST",
+                    headers: await getAuthHeaders(),
+                    body: form,
                     });
+
                     const data = await res.json();
+
+                    if (!res.ok) {
+                    throw new Error(data.message || "Import failed");
+                    }
                     if (!res.ok) {
                       toast(data.message || "Import failed", "error");
                       return;
