@@ -802,9 +802,14 @@ router.post(
         });
     }
 
-    res.status(201).json({ saved: saved.length, message: `${saved.length} result(s) saved` });
-} catch (err) { next(err); }
-});
+        try {
+        res.status(201).json({
+        saved: saved.length,
+        message: `${saved.length} result(s) saved`
+        });
+} catch (err) {
+  next(err);
+};
 
 // ─── PUT /api/grades/:id — update a single result ────────────────────────────
 router.put("/:id", requireRoles("admin", "teacher"), async (req, res, next) => {

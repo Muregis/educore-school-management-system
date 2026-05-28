@@ -86,10 +86,9 @@ const { data: rows, error } = await query
     .eq('teacher_id', userId)
     .eq('is_active', true);
 
-  const assignedClasses = (assignments || []).map(a => a.class_name);
-  if (assignedClasses.length === 0) return res.json([]);
-  query = query.in('class_name', assignedClasses);
-}
+const assignedClasses = Array.isArray(assignments)
+  ? assignments.map(a => a.class_name).filter(Boolean)
+  : [];
 
 const { data: rows, error } = await query
   .order('class_name')
