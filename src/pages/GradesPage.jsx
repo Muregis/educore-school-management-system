@@ -6,6 +6,7 @@ import Field from "../components/Field";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
 import Table from "../components/Table";
+import { supabase } from "../lib/supabase";
 import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch, API_BASE } from "../lib/api";
@@ -405,9 +406,9 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                     const token = auth?.token || sessionStorage.getItem("token");
                     const res = await fetch(`${API_BASE}/grades/import`, {
                       method: "POST",
-                      headers: {
-                      Authorization: `Bearer ${token}`
-                    },
+                      headers: await getAuthHeaders(),
+                      body: formData
+                   });
                       body: form,
                     });
                     const data = await res.json();
