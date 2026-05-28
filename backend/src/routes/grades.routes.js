@@ -513,7 +513,7 @@ router.get("/:id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── POST /api/grades/import — CSV Import (from prefilled export) ─────────────
+// ─── POST /api/grades/import — CSV Import (using csv-parser) ─────────────────
 router.post(
   '/import',
   authRequired,
@@ -573,10 +573,9 @@ router.post(
                 continue;
               }
 
-              // Fetch student (using admission_number)
               const { data: student, error: studentError } = await supabase
                 .from('students')
-                .select('student_id, class_name, first_name, last_name')
+                .select('student_id, class_name')
                 .eq('school_id', schoolId)
                 .ilike('admission_number', admission)
                 .eq('is_deleted', false)
@@ -584,25 +583,20 @@ router.post(
 
               if (studentError || !student) {
                 skipped++;
-                errors.push({
-                  row: rowNumber,
-                  admission,
-                  error: 'Student not found'
-                });
+                errors.push({ row: rowNumber, admission, error: 'Student not found' });
                 continue;
               }
 
               const marks = parseFloat(row.marks);
-              if (isNaN(marks) && row.marks !== '' && row.marks != null) {
+              if (isNaN(marks) && String(row.marks || '').trim() !== '') {
                 skipped++;
                 errors.push({ row: rowNumber, admission, subject, error: 'Invalid marks value' });
                 continue;
               }
 
-              // Skip rows with no marks (optional - user might leave empty)
-              if (isNaN(marks) || row.marks === '') {
+              if (isNaN(marks) || String(row.marks || '').trim() === '') {
                 skipped++;
-                continue; // or you can decide to save null
+                continue;
               }
 
               const { error: upsertError } = await supabase
@@ -621,8 +615,7 @@ router.post(
                   entered_by: userId,
                   is_deleted: false
                 }, {
-                  onConflict: 'school_id,student_id,subject,term',
-                  ignoreDuplicates: false
+                  onConflict: 'school_id,student_id,subject,term'
                 });
 
               if (upsertError) throw upsertError;
@@ -641,7 +634,7 @@ router.post(
 
           res.json({
             success: true,
-            message: `Import completed successfully`,
+            message: `Import completed: ${successCount} imported, ${skipped} skipped`,
             imported: successCount,
             skipped,
             errors: errors.length ? errors : undefined
@@ -653,7 +646,6 @@ router.post(
     }
   }
 );
-
     // Resolve or create a default exam for the term if not provided
     let resolvedExamId = examId;
     if (!resolvedExamId) {
