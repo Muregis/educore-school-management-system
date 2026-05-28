@@ -427,11 +427,6 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                     `Imported ${imp} grade(s). Skipped ${sk}.${detail}`,
                     errs.length ? "warn" : "success"
                   );  
-                    const sk = data.skipped ?? 0;
-                    const imp = data.imported ?? 0;
-                    const rp = data.rowsProcessed ?? 0;
-                    let tone = "success";
-                    let detail = "";
                     if (nf > 0 && imp === 0) {
                       tone = "error";
                       detail = ` ${nf} admission number(s) did not match any student.`;
