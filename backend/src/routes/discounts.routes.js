@@ -401,18 +401,20 @@ router.get('/students', requireRoles('finance', 'director', 'superadmin', 'admin
 });
 
 // GET /api/discounts/calculate/:studentId
-// Calculate discount for a student based on gross amount
+// Calculate discount for a student based on base fee ONLY
+// IMPORTANT: Discount applies ONLY to base fee (tuition + activity + misc)
+// Transport, lunch, breakfast, and opening balance are NEVER discounted
 router.get('/calculate/:studentId', requireRoles('finance', 'director', 'superadmin', 'admin'), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
-    const { grossAmount } = req.query;
+    const { baseFee } = req.query;
 
-    if (!grossAmount || isNaN(parseFloat(grossAmount))) {
-      return res.status(400).json({ message: 'grossAmount query param required' });
+    if (!baseFee || isNaN(parseFloat(baseFee))) {
+      return res.status(400).json({ message: 'baseFee query param required (discount applies only to base fee)' });
     }
 
-    const amount = parseFloat(grossAmount);
+    const amount = parseFloat(baseFee);
 
     // Get active discounts for student
     const { data: discounts } = await supabase
@@ -425,10 +427,10 @@ router.get('/calculate/:studentId', requireRoles('finance', 'director', 'superad
 
     if (!discounts || discounts.length === 0) {
       return res.json({
-        grossAmount: amount,
+        baseFee: amount,
         discountPercent: 0,
         discountAmount: 0,
-        netAmount: amount,
+        netBaseFee: amount,
         hasDiscount: false
       });
     }
@@ -438,14 +440,15 @@ router.get('/calculate/:studentId', requireRoles('finance', 'director', 'superad
       d.discount_value > best.discount_value ? d : best
     );
 
+    // CRITICAL: Discount applies ONLY to base fee
     const discountAmount = (amount * bestDiscount.discount_value) / 100;
-    const netAmount = amount - discountAmount;
+    const netBaseFee = amount - discountAmount;
 
     res.json({
-      grossAmount: amount,
+      baseFee: amount,
       discountPercent: bestDiscount.discount_value,
       discountAmount,
-      netAmount,
+      netBaseFee,
       discountType: bestDiscount.discount_type,
       discountLabel: DISCOUNT_LABELS[bestDiscount.discount_type] || bestDiscount.discount_type,
       discountId: bestDiscount.discount_id,

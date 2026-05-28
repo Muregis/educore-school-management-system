@@ -75,8 +75,10 @@ router.post("/send-reminders", requireRoles("admin", "finance", "director", "sup
     for (const s of (students || [])) {
       // Include current-term fees + carryover balance (owing or credit)
       const classFee = feeByClass.get(s.class_name) || 0;
-      const grossExpected = classFee + LedgerService.getStudentExtraCharges(s) + LedgerService.getOpeningBalanceImpact(s);
-      const expected = LedgerService.applyStudentDiscount(grossExpected, s);
+      const extraCharges = LedgerService.getStudentExtraCharges(s);
+      const openingBalanceImpact = LedgerService.getOpeningBalanceImpact(s);
+      // CRITICAL: Apply discount ONLY to base fee (classFee), then add back non-discounted components
+      const expected = LedgerService.applyStudentDiscount(classFee, s, extraCharges, openingBalanceImpact);
       if (expected <= 0) continue; // no fee structure for this class — skip
       const paid    = paidByStudent.get(s.student_id) || 0;
       const balance = expected - paid;

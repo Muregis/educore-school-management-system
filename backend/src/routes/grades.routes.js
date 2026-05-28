@@ -48,6 +48,14 @@ function normaliseMarks(raw) {
   return Number.isNaN(n) ? raw : n;
 }
 
+function getExamSequence(examType) {
+  const type = String(examType || "").toLowerCase();
+  if (type.includes("opener") || type.includes("cat1")) return 1;
+  if (type.includes("mid") || type.includes("cat2")) return 2;
+  if (type.includes("end") || type.includes("final")) return 3;
+  return 2; // Default to Mid-Term sequence
+}
+
 function normalise(r) {
   return {
     id: r.result_id,
@@ -275,11 +283,14 @@ router.post(
                   teacher_comment: row.teacher_comment?.trim() || null,
                   term: row.term?.trim() || 'Term 2',
                   exam_type: row.exam_type?.trim() || fallbackExamType,
+                  exam_sequence: getExamSequence(row.exam_type?.trim() || fallbackExamType),
+                  exam_name: row.exam_type?.trim() || fallbackExamType,
+                  academic_year: row.academic_year?.trim() || new Date().getFullYear().toString(),
                   class_name: row.class_name?.trim() || student.class_name,
                   entered_by: userId,
                   is_deleted: false
                 }, {
-                  onConflict: 'school_id,student_id,subject,term'
+                  onConflict: 'school_id,student_id,subject,term,exam_type'
                 });
 
               if (upsertError) throw upsertError;

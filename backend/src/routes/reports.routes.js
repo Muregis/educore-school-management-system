@@ -72,8 +72,9 @@ function calculateReportBalanceLikeFeesPage(student, classFee, paidAmount) {
   const transportFee = getTransportFeeLikeFeesPage(student);
   const lunchFee = getLunchFeeLikeFeesPage(student);
   const breakfastFee = getBreakfastFeeLikeFeesPage(student);
-  const grossAmount = classFee + transportFee + lunchFee + breakfastFee + openingBalance;
-  const expected = LedgerService.applyStudentDiscount(grossAmount, student);
+  const extraCharges = transportFee + lunchFee + breakfastFee;
+  // CRITICAL: Apply discount ONLY to base fee (classFee), then add back non-discounted components
+  const expected = LedgerService.applyStudentDiscount(classFee, student, extraCharges, openingBalance);
   const rawBalance = expected - toNumber(paidAmount);
 
   return {

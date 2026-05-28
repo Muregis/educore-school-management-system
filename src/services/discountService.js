@@ -102,12 +102,14 @@ export async function getStudentDiscounts(studentId, token) {
 
 /**
  * Calculate discount breakdown for a student's complete fee
+ * IMPORTANT: Discount applies ONLY to base fee (tuition + activity + misc)
+ * Transport, lunch, breakfast, and opening balance are NEVER discounted
  * @param {object} params - Fee calculation parameters
- * @param {number} params.baseFee - Base tuition fee
- * @param {number} params.transportFee - Transport fee
- * @param {number} params.lunchFee - Lunch fee
- * @param {number} params.breakfastFee - Breakfast fee
- * @param {number} params.openingBalance - Opening balance
+ * @param {number} params.baseFee - Base tuition fee (ONLY this is discounted)
+ * @param {number} params.transportFee - Transport fee (NOT discounted)
+ * @param {number} params.lunchFee - Lunch fee (NOT discounted)
+ * @param {number} params.breakfastFee - Breakfast fee (NOT discounted)
+ * @param {number} params.openingBalance - Opening balance (NOT discounted)
  * @param {Array} params.discounts - Student's active discounts
  * @returns {object} - Complete fee breakdown with discount
  */
@@ -135,8 +137,10 @@ export function calculateFeeWithDiscount({
   }
 
   const discountPercent = bestDiscount.discount_value || bestDiscount.discountPercent || 0;
-  const discountAmount = (grossAmount * discountPercent) / 100;
-  const netAmount = grossAmount - discountAmount;
+  // CRITICAL: Discount applies ONLY to base fee, not transport/meals/opening balance
+  const discountAmount = (baseFee * discountPercent) / 100;
+  const netBaseFee = baseFee - discountAmount;
+  const netAmount = netBaseFee + transportFee + lunchFee + breakfastFee + openingBalance;
 
   return {
     grossAmount,

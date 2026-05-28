@@ -233,8 +233,10 @@ router.get("/", async (req, res, next) => {
         // Count students with outstanding balance using current-term fees plus brought-forward debit/credit.
         defaultersCount = allStudents?.filter(s => {
           const classFee = feeMap[s.class_name] || 0;
-          const grossCurrentTerm = classFee + LedgerService.getStudentExtraCharges(s) + LedgerService.getOpeningBalanceImpact(s);
-          const currentTermExpected = LedgerService.applyStudentDiscount(grossCurrentTerm, s);
+          const extraCharges = LedgerService.getStudentExtraCharges(s);
+          const openingBalanceImpact = LedgerService.getOpeningBalanceImpact(s);
+          // CRITICAL: Apply discount ONLY to base fee (classFee), then add back non-discounted components
+          const currentTermExpected = LedgerService.applyStudentDiscount(classFee, s, extraCharges, openingBalanceImpact);
           const paid = paymentMap[s.student_id] || 0;
           // Outstanding = (current term charges +/- carry-forward) - current term paid
           const balance = Math.max(0, currentTermExpected - paid);

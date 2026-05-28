@@ -35,12 +35,16 @@ export class LedgerService {
   }
 
   // Helper: Apply student discount
-  static applyStudentDiscount(expected, student) {
+  // IMPORTANT: Discount applies ONLY to base fee, not transport/meals/opening balance
+  static applyStudentDiscount(baseFee, student, extraCharges = 0, openingBalanceImpact = 0) {
     const discountValue = Number(student?.discount_value || 0);
-    if (!discountValue) return expected;
+    if (!discountValue) return baseFee + extraCharges + openingBalanceImpact;
     const isPercentage = student?.discount_is_percentage !== false;
-    const discountAmount = isPercentage ? (expected * discountValue) / 100 : discountValue;
-    return Math.max(0, expected - discountAmount);
+    // CRITICAL: Discount applies ONLY to base fee
+    const discountAmount = isPercentage ? (baseFee * discountValue) / 100 : discountValue;
+    const netBaseFee = Math.max(0, baseFee - discountAmount);
+    // Add back non-discounted components
+    return netBaseFee + extraCharges + openingBalanceImpact;
   }
 
   // Helper: Get student with all fee-related fields
@@ -78,8 +82,8 @@ export class LedgerService {
         if (student) {
           const openingBalanceImpact = this.getOpeningBalanceImpact(student);
           const extraCharges = this.getStudentExtraCharges(student);
-          const grossAmount = finalAmount + openingBalanceImpact + extraCharges;
-          finalAmount = this.applyStudentDiscount(grossAmount, student);
+          // CRITICAL: Apply discount ONLY to base fee, then add back non-discounted components
+          finalAmount = this.applyStudentDiscount(finalAmount, student, extraCharges, openingBalanceImpact);
         }
       }
 

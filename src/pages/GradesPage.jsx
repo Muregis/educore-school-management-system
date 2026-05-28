@@ -71,7 +71,9 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   // Use current term from API instead of hardcoded "Term 2"
   const { term: currentTerm } = useCurrentTerm(auth);
   const [term, setTerm] = useState(""); // Will be set from currentTerm
-  const [examType, setExamType] = useState("Mid-Term");const [filterClass, setFilterClass]     = useState("all");
+  const [examType, setExamType] = useState("Mid-Term");
+  const [examTypes, setExamTypes] = useState([]);
+  const [filterClass, setFilterClass]     = useState("all");
   const [filterStudent, setFilterStudent] = useState("all");
   const [filterSubject, setFilterSubject] = useState("all");
   const [classOptions, setClassOptions] = useState([]);
@@ -89,6 +91,23 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
       apiFetch('/classes', { token })
         .then(res => setClassOptions(res.data || res || []))
         .catch(() => {});
+      // Fetch exam types
+      apiFetch('/exam-types', { token })
+        .then(res => {
+          const types = res.data || res || [];
+          setExamTypes(types.length > 0 ? types : [
+            { exam_name: "Opener", exam_sequence: 1 },
+            { exam_name: "Mid-Term", exam_sequence: 2 },
+            { exam_name: "End-Term", exam_sequence: 3 }
+          ]);
+        })
+        .catch(() => {
+          setExamTypes([
+            { exam_name: "Opener", exam_sequence: 1 },
+            { exam_name: "Mid-Term", exam_sequence: 2 },
+            { exam_name: "End-Term", exam_sequence: 3 }
+          ]);
+        });
     }
   }, [auth]);
   const [page, setPage]                   = useState(1);
@@ -323,10 +342,10 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           {subjects.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <select style={inputStyle} value={examType} onChange={e => setExamType(e.target.value)}>
-  <option value="Opener">Opener</option>
-  <option value="Mid-Term">Mid-Term</option>
-  <option value="End-Term">End-Term</option>
-</select>
+          {examTypes.map(et => (
+            <option key={et.exam_name} value={et.exam_name}>{et.exam_name}</option>
+          ))}
+        </select>
         <Btn variant="ghost" onClick={() => {
           // Columns: Student Name | Admission Number | Subject1 | … | Term
           if (filterClass === "all") {
