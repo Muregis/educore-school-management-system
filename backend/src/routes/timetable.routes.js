@@ -4,7 +4,7 @@ import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js"; 
 const router = Router();
 router.use(authRequired);
-
+import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
 // Abbreviated ENUM values used in the DB
 const DAY_MAP = {
   Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed",
@@ -32,6 +32,16 @@ function normalise(r) {
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    if (role === 'teacher') {
+  const assignedClasses =
+    await getTeacherAssignedClasses(schoolId, userId);
+
+  if (assignedClasses.length === 0) {
+    return res.json([]);
+  }
+
+  query = query.in('class_name', assignedClasses);
+}
     const { className, teacherId } = req.query;
 
     let classId = null;

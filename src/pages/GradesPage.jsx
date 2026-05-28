@@ -31,7 +31,6 @@ function displayMark(marks, total) {
   }
   return `${marks}/${total}`;
 }
-
 function gradeColor(grade) {
   // Map grades to Badge tones - uses shared utility logic
   if (!grade) return "info";
@@ -71,8 +70,8 @@ function lookupSubjectMark(existing, subject) {
 export default function GradesPage({ auth, students, results, setResults, canEdit, toast, feeBlocked = false, onGoFees}) {
   // Use current term from API instead of hardcoded "Term 2"
   const { term: currentTerm } = useCurrentTerm(auth);
-  const [term, setTerm]                   = useState(""); // Will be set from currentTerm
-  const [filterClass, setFilterClass]     = useState("all");
+  const [term, setTerm] = useState(""); // Will be set from currentTerm
+  const [examType, setExamType] = useState("Mid-Term");const [filterClass, setFilterClass]     = useState("all");
   const [filterStudent, setFilterStudent] = useState("all");
   const [filterSubject, setFilterSubject] = useState("all");
   const [classOptions, setClassOptions] = useState([]);
@@ -219,8 +218,9 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           studentId: getStudentId(s), classId, term,
           totalMarks: t,
           subjects: entered.map(sub => ({
-            subject: sub,
-            marks: Object.values(SPECIAL_MARKS).includes(bulkMarks[sub])
+          subject: sub,
+          examType,
+          marks: Object.values(SPECIAL_MARKS).includes(bulkMarks[sub])
               ? bulkMarks[sub]
               : Number(bulkMarks[sub]),
           })),
@@ -250,6 +250,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
         method: "PUT",
         body: {
           subject: editing.subject, term: editing.term,
+          examType: editing.examType || examType,
           marks: isSpecial ? editing.marks : Number(editing.marks),
           totalMarks: Number(editing.total),
           teacherComment: editing.teacherComment ?? "",
@@ -321,6 +322,11 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           <option value="all">All subjects</option>
           {subjects.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
+        <select style={inputStyle} value={examType} onChange={e => setExamType(e.target.value)}>
+  <option value="Opener">Opener</option>
+  <option value="Mid-Term">Mid-Term</option>
+  <option value="End-Term">End-Term</option>
+</select>
         <Btn variant="ghost" onClick={() => {
           // Columns: Student Name | Admission Number | Subject1 | … | Term
           if (filterClass === "all") {
@@ -399,7 +405,9 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                     const token = auth?.token || sessionStorage.getItem("token");
                     const res = await fetch(`${API_BASE}/grades/import`, {
                       method: "POST",
-                      headers: getAuthHeaders(token),
+                      headers: {
+                      Authorization: `Bearer ${token}`
+                    },
                       body: form,
                     });
                     const data = await res.json();
@@ -407,7 +415,18 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                       toast(data.message || "Import failed", "error");
                       return;
                     }
-                    const nf = data.notFound ?? 0;
+                    const imp = data.imported ?? 0;
+                    const sk = data.skipped ?? 0;
+                    const errs = data.errors ?? [];
+                    let detail = "";
+
+                    if (errs.length > 0) {
+                    detail = ` ${errs.length} row(s) had errors.`;
+                  }
+                    toast(
+                    `Imported ${imp} grade(s). Skipped ${sk}.${detail}`,
+                    errs.length ? "warn" : "success"
+                  );  
                     const sk = data.skipped ?? 0;
                     const imp = data.imported ?? 0;
                     const rp = data.rowsProcessed ?? 0;
@@ -452,10 +471,10 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
         <>
           <div style={{ overflowX:"auto" }}>
             <Table
-              headers={["Student","Class","Subject","Term","Score","Grade","Actions"]}
+              headers={["Student","Class","Subject","Term","Exam Type","Score","Grade","Actions"]}
               rows={rows.map(r => [
                 <span key={r.id} style={{ color:C.text, fontWeight:600 }}>{r.studentName}</span>,
-                r.className, r.subject, r.term,
+                r.className, r.subject, r.term, r.examType,
                 displayMark(r.marks, r.total),
                 r.marks === "na" || r.marks === "absent" || r.marks === "cheat"
                   ? <span style={{ color:C.textMuted, fontSize:12 }}>—</span>
@@ -501,12 +520,13 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           {showRankings && (
             <div style={{ overflowX: "auto" }}>
               <Table
-                headers={["Rank", "Student", "Mean Score", "Total Marks", "Grade", "Position"]} 
+                headers={["Rank", "Student", "Exam Type", "Mean Score", "Total Marks", "Grade", "Position"]} 
                 rows={rankings.students.slice(0, 20).map((s, idx) => [
                   <span key="rank" style={{ fontWeight: 700, fontSize: 16, color: idx < 3 ? '#f59e0b' : C.text }}>
                     {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${s.rank}`}
                   </span>,
                   <span key="name" style={{ color: C.text, fontWeight: 600 }}>{s.studentName}</span>,
+                  <span key="examType" style={{ color: C.text, fontWeight: 600 }}>{s.examType}</span>,
                   <span key="mean" style={{ fontWeight: 600, color: '#3B82F6' }}>{s.meanScore.toFixed(1)}%</span>,
                   <span key="total">{s.totalMarks}/{s.maxPossible}</span>,
                   <Badge key="grade" tone={getGradeHexColor(s.overallGrade)}>{s.overallGrade}</Badge>,

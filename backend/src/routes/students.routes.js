@@ -6,6 +6,7 @@ import { logActivity } from "../helpers/activity.logger.js";
 import { requireRoles, requireDirector } from "../middleware/roles.js";
 import { studentDataRateLimit } from "../middleware/rateLimit.js";
 import multer from "multer";
+import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
 
 // Configure multer for photo uploads
 const upload = multer({
@@ -65,6 +66,34 @@ function normalizeDateInput(value) {
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    const { userId, role } = req.user;
+
+let query = supabase
+  .from('students')
+  .select('*')
+  .eq('school_id', schoolId)
+  .eq('is_deleted', false);
+
+// Teachers only see assigned classes
+if (role === 'teacher') {
+  const assignedClasses = await getTeacherAssignedClasses(schoolId, userId);
+  if (assignedClasses.length === 0) return res.json([]);
+  query = query.in('class_name', assignedClasses);
+}
+
+const { data: rows, error } = await query
+  .order('class_name')
+    .eq('teacher_id', userId)
+    .eq('is_active', true);
+
+  const assignedClasses = (assignments || []).map(a => a.class_name);
+  if (assignedClasses.length === 0) return res.json([]);
+  query = query.in('class_name', assignedClasses);
+}
+
+const { data: rows, error } = await query
+  .order('class_name')
+  .order('first_name');
 
     const { data: rows, error } = await supabase
       .from('students')

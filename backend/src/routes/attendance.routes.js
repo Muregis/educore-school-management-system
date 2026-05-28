@@ -1,6 +1,6 @@
 import express from "express";
 import { supabase } from "../config/supabase.js";
-
+import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
 const router = express.Router();
 
 async function getTeacherClassIds(schoolId, userId) {
@@ -116,6 +116,16 @@ router.post("/bulk", async (req, res, next) => {
   try {
     // OLD: const { schoolId, role, user_id } = req.user;
     const { schoolId, role, userId } = req.user;
+    if (role === 'teacher') {
+  const assignedClasses =
+    await getTeacherAssignedClasses(schoolId, userId);
+
+  if (assignedClasses.length === 0) {
+    return res.json([]);
+  }
+
+  query = query.in('class_name', assignedClasses);
+}
     const { classId, className, date, records } = req.body;
 
     if (!date || !Array.isArray(records) || records.length === 0) {

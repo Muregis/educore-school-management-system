@@ -1,11 +1,13 @@
 import { Router } from "express";
 import multer from "multer";
-import { parse as parseCsv } from "csv-parse/sync";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
-
+import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
+import csv from 'csv-parser'; import stream from 'stream';
+import { uploadCsv } from "../middleware/uploadCsv.js";
+import { normalizeHeader } from "../utils/normalizeCsvHeader.js";
 const router = Router();
 router.use(authRequired);
 
@@ -93,6 +95,16 @@ router.get("/", async (req, res, next) => {
   try {
     const { schoolId, role, userId } = req.user;
     const { studentId, term, classId } = req.query;
+    if (role === 'teacher') {
+  const assignedClasses =
+    await getTeacherAssignedClasses(schoolId, userId);
+
+  if (assignedClasses.length === 0) {
+    return res.json([]);
+  }
+
+  query = query.in('class_name', assignedClasses);
+}
 
     // Validate teacher class access
     if (role === "teacher") {
@@ -498,25 +510,146 @@ router.get("/:id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─── POST /api/grades/bulk — save multiple subjects for one student ───────────
-router.post("/bulk", requireRoles("admin", "teacher"), async (req, res, next) => {
-try {
-    const { schoolId } = req.user;
-    const { studentId, classId, term = "Term 2", totalMarks = 100, subjects = [], examId } = req.body;
+// ─── POST /api/grades/import — CSV Import (from prefilled export) ─────────────
+router.post(
+  '/import',
+  authRequired,
+  requireRoles('admin', 'teacher', 'director'),
+  uploadCsv.single('file'),
+  async (req, res, next) => {
+    try {
+      const { schoolId, userId } = req.user;
 
-    if (!studentId || !subjects.length)
-    return res.status(400).json({ message: "studentId and subjects[] are required" });
+      if (!req.file) {
+        return res.status(400).json({ message: 'CSV file is required' });
+      }
 
-    // Verify student belongs to this school
-    const { data: student, error: studentError } = await supabase
-      .from('students')
-      .select('student_id, class_id')
-      .eq('student_id', studentId)
-      .eq('school_id', schoolId)
-      .eq('is_deleted', false)
-      .single();
-    if (studentError || !student) return res.status(404).json({ message: "Student not found" });
+      const rows = [];
+      const bufferStream = new stream.PassThrough();
 
+      bufferStream.end(
+        req.file.buffer.toString('utf-8').replace(/^\uFEFF/, '')
+      );
+
+      bufferStream
+        .pipe(csv({
+          mapHeaders: ({ header }) => normalizeHeader(header),
+          trim: true
+        }))
+        .on('data', (row) => {
+          if (Object.values(row).some(v => String(v).trim())) {
+            rows.push(row);
+          }
+        })
+        .on('end', async () => {
+          if (rows.length === 0) {
+            return res.status(400).json({ message: 'CSV file contains no data' });
+          }
+
+          let successCount = 0;
+          let skipped = 0;
+          const errors = [];
+
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const rowNumber = i + 2;
+
+            try {
+              const admission = row.admission_number?.toString().trim();
+              const subject = row.subject?.toString().trim();
+
+              if (!admission) {
+                skipped++;
+                errors.push({ row: rowNumber, error: 'Missing admission_number' });
+                continue;
+              }
+
+              if (!subject) {
+                skipped++;
+                errors.push({ row: rowNumber, admission, error: 'Missing subject' });
+                continue;
+              }
+
+              // Fetch student (using admission_number)
+              const { data: student, error: studentError } = await supabase
+                .from('students')
+                .select('student_id, class_name, first_name, last_name')
+                .eq('school_id', schoolId)
+                .ilike('admission_number', admission)
+                .eq('is_deleted', false)
+                .single();
+
+              if (studentError || !student) {
+                skipped++;
+                errors.push({
+                  row: rowNumber,
+                  admission,
+                  error: 'Student not found'
+                });
+                continue;
+              }
+
+              const marks = parseFloat(row.marks);
+              if (isNaN(marks) && row.marks !== '' && row.marks != null) {
+                skipped++;
+                errors.push({ row: rowNumber, admission, subject, error: 'Invalid marks value' });
+                continue;
+              }
+
+              // Skip rows with no marks (optional - user might leave empty)
+              if (isNaN(marks) || row.marks === '') {
+                skipped++;
+                continue; // or you can decide to save null
+              }
+
+              const { error: upsertError } = await supabase
+                .from('results')
+                .upsert({
+                  school_id: schoolId,
+                  student_id: student.student_id,
+                  subject: subject,
+                  marks: marks,
+                  total_marks: parseFloat(row.total_marks) || 100,
+                  grade: row.grade?.trim() || null,
+                  teacher_comment: row.teacher_comment?.trim() || null,
+                  term: row.term?.trim() || 'Term 2',
+                  exam_type: row.exam_type?.trim() || 'Mid-Term',
+                  class_name: row.class_name?.trim() || student.class_name,
+                  entered_by: userId,
+                  is_deleted: false
+                }, {
+                  onConflict: 'school_id,student_id,subject,term',
+                  ignoreDuplicates: false
+                });
+
+              if (upsertError) throw upsertError;
+
+              successCount++;
+            } catch (err) {
+              skipped++;
+              errors.push({
+                row: rowNumber,
+                admission: row.admission_number,
+                subject: row.subject,
+                error: err.message
+              });
+            }
+          }
+
+          res.json({
+            success: true,
+            message: `Import completed successfully`,
+            imported: successCount,
+            skipped,
+            errors: errors.length ? errors : undefined
+          });
+        })
+        .on('error', (err) => next(err));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
     const resolvedClassId = classId || student.class_id;
 
     // Resolve or create a default exam for the term if not provided
