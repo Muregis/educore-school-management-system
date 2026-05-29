@@ -174,7 +174,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   };
 
   const assignmentUserForTeacher = teacher =>
-    assignmentTeachers.find(t => String(t.email || "").toLowerCase() === String(teacher.email || "").toLowerCase());
+    assignmentTeachers.find(t => String(t.user_id) === String(teacher.id || teacher.teacher_id));
 
   const assignmentsForTeacher = teacher => assignmentUserForTeacher(teacher)?.assignments || [];
 

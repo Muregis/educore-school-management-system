@@ -14,9 +14,9 @@ export const DEFAULTS = {
 
 export const ROLE = {
   // Director - HIGHEST ROLE - Full control over all schools, can delegate permissions
-  director:  { pages:["dashboard","students","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true, canDelegate:true },
+  director:  { pages:["dashboard","students","teachers","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true, canDelegate:true },
   // Superadmin - System-level full access
-  superadmin:{ pages:["dashboard","students","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true },
+  superadmin:{ pages:["dashboard","students","teachers","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true },
   // Admin - School administrator with full school-level access
   admin:     { pages:["dashboard","students","teachers","subjects","attendance","grades","fees","expenditures","invoices","reportcards","discipline","transport","communication","timetable","library","lessonplans","announcements","exams","admissions"], edit:true },
   // Teacher - Classroom operations
