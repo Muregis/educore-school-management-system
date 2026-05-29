@@ -71,10 +71,10 @@ const app = express();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf', 'text/csv'];
     cb(null, allowedTypes.includes(file.mimetype));
   }
 });
@@ -102,7 +102,7 @@ app.use(cors({
   },
   optionsSuccessStatus: 204,
 }));
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "10mb" }));
 app.use(morgan("dev"));
 app.use(apiRateLimit); // Apply rate limiting to all API routes
 
