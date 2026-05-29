@@ -108,10 +108,11 @@ router.post("/", requireRoles("admin", "hr", "director"), async (req, res, next)
       console.warn("Could not sync teacher to HR staff:", e.message);
     }
 
+    // Create user account for teacher login - this is required for class assignments
     try {
       const defaultPass = email.split("@")[0];
       const hash = await bcrypt.hash(defaultPass, 10);
-      await supabase
+      const { data: userResult, error: userError } = await supabase
         .from("users")
         .upsert({
           school_id: schoolId,
@@ -120,9 +121,20 @@ router.post("/", requireRoles("admin", "hr", "director"), async (req, res, next)
           password_hash: hash,
           role: "teacher",
           status: "active",
-        }, { onConflict: "school_id,email" });
+        }, { onConflict: "school_id,email" })
+        .select("user_id")
+        .single();
+      
+      if (userError) {
+        console.error("Failed to create teacher user account:", userError);
+        throw new Error(`Failed to create teacher login: ${userError.message}`);
+      }
+      
+      console.log("Teacher user account created successfully:", userResult?.user_id);
     } catch (e) {
-      console.warn("Could not create teacher user account:", e.message);
+      console.error("Could not create teacher user account:", e.message);
+      // Don't throw - allow teacher creation to succeed but log the error
+      // The user can use the sync-hr endpoint to create the account later
     }
 
     res.status(201).json({ ...insertedTeacher, defaultPassword: email.split("@")[0] });
@@ -201,7 +213,7 @@ router.put("/:id", requireRoles("admin", "hr", "director"), async (req, res, nex
   }
 });
 
-// POST /api/teachers/sync-hr - Sync all existing teachers to HR staff table
+// POST /api/teachers/sync-hr - Sync all existing teachers to HR staff table and create user accounts
 router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -237,6 +249,7 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
     }
     
     let synced = 0;
+    let userAccountsCreated = 0;
     let errors = [];
     
     for (const teacher of (teachers || [])) {
@@ -281,16 +294,54 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
           // Column doesn't exist but HR record was created
           synced++;
         }
+        
+        // Create user account for teacher login if it doesn't exist
+        try {
+          const { data: existingUser } = await supabase
+            .from("users")
+            .select("user_id")
+            .eq("school_id", schoolId)
+            .eq("email", teacher.email)
+            .eq("role", "teacher")
+            .maybeSingle();
+          
+          if (!existingUser && teacher.email) {
+            const defaultPass = teacher.email.split("@")[0];
+            const hash = await bcrypt.hash(defaultPass, 10);
+            const { error: userError } = await supabase
+              .from("users")
+              .upsert({
+                school_id: schoolId,
+                full_name: `${teacher.first_name} ${teacher.last_name}`,
+                email: teacher.email,
+                password_hash: hash,
+                role: "teacher",
+                status: "active",
+              }, { onConflict: "school_id,email" });
+            
+            if (userError) {
+              console.error('[DEBUG] sync-hr - Failed to create user account for', teacher.email, ':', userError);
+              errors.push({ teacher: teacher.email, error: `User account creation failed: ${userError.message}` });
+            } else {
+              console.log('[DEBUG] sync-hr - Created user account for', teacher.email);
+              userAccountsCreated++;
+            }
+          }
+        } catch (e) {
+          console.error('[DEBUG] sync-hr - Error checking/creating user account for', teacher.email, ':', e.message);
+          errors.push({ teacher: teacher.email, error: `User account check failed: ${e.message}` });
+        }
       } catch (e) {
         console.error('[DEBUG] sync-hr - Exception for', teacher.email, ':', e.message);
         errors.push({ teacher: teacher.email, error: e.message });
       }
     }
     
-    console.log('[DEBUG] sync-hr - Sync complete. Synced:', synced, 'Errors:', errors.length);
+    console.log('[DEBUG] sync-hr - Sync complete. Synced:', synced, 'User accounts created:', userAccountsCreated, 'Errors:', errors.length);
     
     res.json({ 
       synced, 
+      userAccountsCreated,
       total: teachers?.length || 0,
       hasStaffIdColumn,
       errors: errors.length > 0 ? errors : undefined
