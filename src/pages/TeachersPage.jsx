@@ -23,9 +23,6 @@ function normalise(t) {
     email:     t.email       ?? "",
     phone:     t.phone       ?? "",
     gender:    t.gender      ?? "",
-    contractType: t.contract_type ?? t.contractType ?? "",
-    salary:    t.salary      ?? "",
-    notes:     t.notes       ?? "",
     status:    t.status      ?? "active",
     classes:   t.classes     ?? [],
     subjects:  t.subjects    ?? [],
@@ -52,7 +49,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const [page, setPage] = useState(1);
   const [show, setShow] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [f, setF] = useState({ firstName: "", lastName: "", email: "", phone: "", staffNumber: "", tscStaffId: "", gender: "", contractType: "", salary: "", notes: "", status: "active", classes: [], timetable: "", subjects: [] });
+  const [f, setF] = useState({ firstName: "", lastName: "", email: "", phone: "", staffNumber: "", tscStaffId: "", gender: "", status: "active", classes: [], timetable: "", subjects: [] });
   const [loading, setLoading] = useState(false);
   const [assignmentTeachers, setAssignmentTeachers] = useState([]);
   const [classOptions, setClassOptions] = useState([]);
@@ -106,7 +103,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
 
   const openAdd = () => {
     setEditId(null);
-    setF({ firstName: "", lastName: "", email: "", phone: "", staffNumber: "", tscStaffId: "", gender: "", contractType: "", salary: "", notes: "", status: "active", classes: [], timetable: "", subjects: [] });
+    setF({ firstName: "", lastName: "", email: "", phone: "", staffNumber: "", tscStaffId: "", gender: "", status: "active", classes: [], timetable: "", subjects: [] });
     setShow(true);
   };
 
@@ -124,9 +121,6 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
             staffNumber: f.staffNumber || null,
             tscStaffId: f.tscStaffId || null,
             gender: f.gender || null,
-            contractType: f.contractType || null,
-            salary: f.salary || null,
-            notes: f.notes || null,
             status: f.status,
             classes: f.classes,
             subjects: f.subjects,
@@ -146,9 +140,6 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
             staffNumber: f.staffNumber || null,
             tscStaffId: f.tscStaffId || null,
             gender: f.gender || null,
-            contractType: f.contractType || null,
-            salary: f.salary || null,
-            notes: f.notes || null,
             status: f.status,
             classes: f.classes,
             subjects: f.subjects,
@@ -395,31 +386,6 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
               { value: "active", label: "Active" },
               { value: "inactive", label: "Inactive" }
             ]}
-          />
-          <Select 
-            label="Contract Type"
-            value={f.contractType || ""} 
-            onChange={e => setF({ ...f, contractType: e.target.value })}
-            options={[
-              { value: "", label: "Select contract type" },
-              { value: "Permanent", label: "Permanent" },
-              { value: "Contract", label: "Contract" },
-              { value: "Part-time", label: "Part-time" },
-              { value: "Temporary", label: "Temporary" }
-            ]}
-          />
-          <Input 
-            label="Salary"
-            type="number"
-            value={f.salary || ""} 
-            onChange={e => setF({ ...f, salary: e.target.value })} 
-            placeholder="e.g. 50000"
-          />
-          <Input 
-            label="Notes"
-            value={f.notes || ""} 
-            onChange={e => setF({ ...f, notes: e.target.value })} 
-            placeholder="Additional notes"
           />
           <Input 
             label="Timetable"
