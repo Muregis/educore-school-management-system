@@ -12,7 +12,7 @@ router.get("/", async (req, res, next) => {
     const { schoolId } = req.user;
     const { data: rows, error } = await supabase
       .from("teachers")
-      .select("teacher_id, staff_number, national_id, first_name, last_name, email, phone, department, qualification, status, hire_date, created_at")
+      .select("teacher_id, staff_number, national_id, first_name, last_name, email, phone, gender, department, qualification, status, hire_date, contract_type, salary, notes, created_at")
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
       .order("first_name");
@@ -37,6 +37,10 @@ router.post("/", requireRoles("admin", "hr", "director"), async (req, res, next)
       qualification,
       hireDate,
       tscStaffId,
+      gender,
+      contractType,
+      salary,
+      notes,
       status = "active",
     } = req.body;
 
@@ -67,10 +71,14 @@ router.post("/", requireRoles("admin", "hr", "director"), async (req, res, next)
         phone: phone || null,
         staff_number: finalStaffNumber,
         tsc_staff_id: tscStaffId || null,
+        gender: gender || null,
         national_id: null,
         department: department || null,
         qualification: qualification || null,
         hire_date: hireDate || null,
+        contract_type: contractType || null,
+        salary: salary || null,
+        notes: notes || null,
         status,
       })
       .select("*")
@@ -159,6 +167,10 @@ router.put("/:id", requireRoles("admin", "hr", "director"), async (req, res, nex
       qualification,
       hireDate,
       tscStaffId,
+      gender,
+      contractType,
+      salary,
+      notes,
       status,
     } = req.body;
 
@@ -171,9 +183,13 @@ router.put("/:id", requireRoles("admin", "hr", "director"), async (req, res, nex
         phone: phone || null,
         staff_number: staffNumber || null,
         tsc_staff_id: tscStaffId || null,
+        gender: gender || null,
         department: department || null,
         qualification: qualification || null,
         hire_date: hireDate || null,
+        contract_type: contractType || null,
+        salary: salary || null,
+        notes: notes || null,
         status: status || "active",
         updated_at: new Date().toISOString(),
       })
@@ -229,16 +245,12 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
       hasStaffIdColumn = false;
     }
     
-    // Get all teachers (with or without staff_id filter)
+    // Get all teachers (sync all, not just ones without staff_id)
     let query = supabase
       .from("teachers")
-      .select("teacher_id, first_name, last_name, email, phone, department, qualification, hire_date, status" + (hasStaffIdColumn ? ", staff_id" : ""))
+      .select("teacher_id, first_name, last_name, email, phone, gender, department, qualification, hire_date, contract_type, salary, notes, status" + (hasStaffIdColumn ? ", staff_id" : ""))
       .eq("school_id", schoolId)
       .eq("is_deleted", false);
-    
-    if (hasStaffIdColumn) {
-      query = query.is("staff_id", null);
-    }
     
     const { data: teachers, error: teachersError } = await query;
     
@@ -265,8 +277,10 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
             phone: teacher.phone || null,
             department: teacher.department || 'Academic',
             job_title: teacher.qualification || 'Teacher',
-            contract_type: 'Permanent',
+            contract_type: teacher.contract_type || 'Permanent',
             start_date: teacher.hire_date || null,
+            salary: teacher.salary || null,
+            notes: teacher.notes || null,
             status: teacher.status || 'active',
           }, { onConflict: "school_id,email" })
           .select("staff_id")
@@ -280,11 +294,17 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
         
         console.log('[DEBUG] sync-hr - HR upsert result for', teacher.email, ':', hrStaff);
         
-        // Link teacher to hr_staff
+        // Link teacher to hr_staff and sync fields back
         if (hrStaff?.staff_id && hasStaffIdColumn) {
           const { error: updateError } = await supabase
             .from("teachers")
-            .update({ staff_id: hrStaff.staff_id })
+            .update({ 
+              staff_id: hrStaff.staff_id,
+              // Sync fields from HR back to teachers
+              contract_type: teacher.contract_type || null,
+              salary: teacher.salary || null,
+              notes: teacher.notes || null
+            })
             .eq("teacher_id", teacher.teacher_id);
           if (updateError) {
             console.error('[DEBUG] sync-hr - Failed to update staff_id for', teacher.email, ':', updateError);
