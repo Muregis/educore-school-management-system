@@ -232,11 +232,19 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
       console.log('[DEBUG] sync-hr - staff_id column not found:', e.message);
       hasStaffIdColumn = false;
     }
-    
+
+    let hasGenderColumn = true;
+    try {
+      await supabase.from("teachers").select("gender").limit(1);
+    } catch (e) {
+      console.log('[DEBUG] sync-hr - gender column not found:', e.message);
+      hasGenderColumn = false;
+    }
+
     // Get all teachers (sync all, not just ones without staff_id)
     let query = supabase
       .from("teachers")
-      .select("teacher_id, first_name, last_name, email, phone, gender, department, qualification, hire_date, status" + (hasStaffIdColumn ? ", staff_id" : ""))
+      .select("teacher_id, first_name, last_name, email, phone" + (hasGenderColumn ? ", gender" : "") + ", department, qualification, hire_date, status" + (hasStaffIdColumn ? ", staff_id" : ""))
       .eq("school_id", schoolId)
       .eq("is_deleted", false);
     
