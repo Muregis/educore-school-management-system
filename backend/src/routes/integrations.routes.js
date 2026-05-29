@@ -4,6 +4,8 @@ import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { env } from "../config/env.js";
 import crypto from "crypto";
+import csv from "csv-parser";
+import { Readable } from "stream";
 
 const router = Router();
 
@@ -37,15 +39,33 @@ async function sendKenyanPaymentReceipt({ schoolId, studentName, admissionNumber
   }
 }
 
-function parseCsvRows(csvText) {
-  const lines = String(csvText || "").trim().split(/\r?\n/).filter(Boolean);
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
-  return lines.slice(1).map(line => {
-    const values = line.split(",").map(v => v.trim());
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = values[i]; });
-    return obj;
+async function parseCsvRows(csvText) {
+  return new Promise((resolve, reject) => {
+    const rows = [];
+    
+    if (!csvText || typeof csvText !== 'string') {
+      return resolve([]);
+    }
+
+    const readableStream = Readable.from(csvText.trim());
+    
+    readableStream
+      .pipe(csv())
+      .on('data', (row) => {
+        // Convert headers to lowercase for consistency
+        const normalizedRow = {};
+        Object.keys(row).forEach(key => {
+          normalizedRow[key.toLowerCase().trim()] = row[key];
+        });
+        rows.push(normalizedRow);
+      })
+      .on('end', () => {
+        resolve(rows);
+      })
+      .on('error', (err) => {
+        console.error('CSV parsing error:', err);
+        resolve([]); // Return empty array on error instead of rejecting
+      });
   });
 }
 
@@ -199,7 +219,7 @@ router.post("/mpesa/callback", async (req, res, next) => {
 router.post("/bank/reconcile", authRequired, requireRoles("admin", "finance"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const rows = Array.isArray(req.body?.rows) ? req.body.rows : parseCsvRows(req.body?.csvText);
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : await parseCsvRows(req.body?.csvText);
 
     if (!rows.length) {
       return res.status(400).json({ message: "No reconciliation rows provided" });
