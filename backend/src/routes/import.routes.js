@@ -52,7 +52,7 @@ router.post("/students",
       ImportService.validateCSVFile(req.file);
 
       // Parse CSV
-      const { students, errors: parseErrors } = ImportService.parseCSV(req.file.buffer);
+      const { students, errors: parseErrors } = await ImportService.parseCSV(req.file.buffer);
 
       if (parseErrors.length > 0) {
         return res.status(400).json({ 
@@ -123,7 +123,7 @@ router.post("/validate",
       ImportService.validateCSVFile(req.file);
 
       // Parse CSV (without importing)
-      const { students, errors } = ImportService.parseCSV(req.file.buffer);
+      const { students, errors } = await ImportService.parseCSV(req.file.buffer);
 
       res.json({
         valid: errors.length === 0,

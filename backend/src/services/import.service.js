@@ -2,6 +2,8 @@ import { pgPool } from "../config/pg.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import { LedgerService } from "./ledger.service.js";
 import bcrypt from "bcryptjs";
+import csv from "csv-parser";
+import { Readable } from "stream";
 
 function normalizeAdmissionNumber(value) {
   return String(value ?? "").trim().toLowerCase();
@@ -38,61 +40,73 @@ function normalizeDateInput(value) {
 export class ImportService {
   // Parse CSV buffer into array of objects
   static parseCSV(buffer) {
-    const content = buffer.toString('utf8');
-    const lines = content.split('\n').filter(line => line.trim());
-    
-    if (lines.length < 2) {
-      throw new Error('CSV file must contain headers and at least one data row');
-    }
+    return new Promise((resolve, reject) => {
+      const students = [];
+      const errors = [];
+      const requiredHeaders = ['admission_number', 'first_name', 'last_name', 'gender'];
+      
+      const readableStream = Readable.from(buffer.toString('utf8'));
+      
+      readableStream
+        .pipe(csv({
+          mapHeaders: ({ header }) => header.trim().toLowerCase().replace(/\s+/g, '_')
+        }))
+        .on('data', (row) => {
+          try {
+            const student = {};
+            Object.keys(row).forEach(key => {
+              student[key] = row[key] || null;
+            });
+            student.admission_number = normalizeAdmissionNumber(student.admission_number);
 
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, '_'));
-    const requiredHeaders = ['admission_number', 'first_name', 'last_name', 'gender'];
-    
-    const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
-    if (missingHeaders.length > 0) {
-      throw new Error(`Missing required headers: ${missingHeaders.join(', ')}`);
-    }
+            // Validate required fields
+            if (!student.admission_number || !student.first_name || !student.last_name || !student.gender) {
+              errors.push({ 
+                row: students.length + errors.length + 2, 
+                message: 'Missing required fields: admission_number, first_name, last_name, gender',
+                data: student 
+              });
+              return;
+            }
 
-    const students = [];
-    const errors = [];
+            // Validate gender
+            if (!['male', 'female', 'other'].includes(student.gender.toLowerCase())) {
+              errors.push({ 
+                row: students.length + errors.length + 2, 
+                message: 'Gender must be: male, female, or other',
+                data: student 
+              });
+              return;
+            }
 
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim());
-      if (values.length !== headers.length) {
-        errors.push({ row: i + 1, message: 'Column count mismatch' });
-        continue;
-      }
+            students.push({ ...student, row: students.length + errors.length + 2 });
+          } catch (err) {
+            errors.push({ 
+              row: students.length + errors.length + 2, 
+              message: err.message 
+            });
+          }
+        })
+        .on('end', () => {
+          // Check for required headers
+          if (students.length === 0 && errors.length === 0) {
+            return reject(new Error('CSV file must contain headers and at least one data row'));
+          }
 
-      const student = {};
-      headers.forEach((header, index) => {
-        student[header] = values[index] || null;
-      });
-      student.admission_number = normalizeAdmissionNumber(student.admission_number);
+          if (students.length > 0) {
+            const headers = Object.keys(students[0]);
+            const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+            if (missingHeaders.length > 0) {
+              return reject(new Error(`Missing required headers: ${missingHeaders.join(', ')}`));
+            }
+          }
 
-      // Validate required fields
-      if (!student.admission_number || !student.first_name || !student.last_name || !student.gender) {
-        errors.push({ 
-          row: i + 1, 
-          message: 'Missing required fields: admission_number, first_name, last_name, gender',
-          data: student 
+          resolve({ students, errors });
+        })
+        .on('error', (err) => {
+          reject(err);
         });
-        continue;
-      }
-
-      // Validate gender
-      if (!['male', 'female', 'other'].includes(student.gender.toLowerCase())) {
-        errors.push({ 
-          row: i + 1, 
-          message: 'Gender must be: male, female, or other',
-          data: student 
-        });
-        continue;
-      }
-
-      students.push({ ...student, row: i + 1 });
-    }
-
-    return { students, errors };
+    });
   }
 
   // Import students from parsed data
