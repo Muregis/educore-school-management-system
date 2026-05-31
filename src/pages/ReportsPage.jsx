@@ -12,7 +12,7 @@ import Table from "../components/ui/Table";
 import EmptyState from "../components/ui/EmptyState";
 
 // Use shared grading utility instead of local definition
-const gradeInfo = (score) => {
+  const gradeInfo = (score) => {
   const grade = calculateGrade(score, 'CBC');
   return {
     label: grade.grade,
@@ -101,7 +101,89 @@ function buildInterventions(subjectRankings, streamAverages) {
 }
 
 // ─── Analysis Tab ──────────────────────────────────────────────────────────
-function AnalysisTab({ auth }) {
+import React, { useState, useEffect, useCallback } from "react";
+import PropTypes from "prop-types";
+import { apiFetch } from "../lib/api";
+
+import Card from "../components/ui/Card";
+import Button from "../components/ui/Button";
+import Select from "../components/ui/Select";
+import Badge from "../components/ui/Badge";
+import Table from "../components/ui/Table";
+import EmptyState from "../components/ui/EmptyState";
+
+// Use shared grading utility
+const gradeInfo = (score) => {
+  if (score >= 80) return { label: "EE", color: "var(--color-success)", bg: "color-mix(in srgb, var(--color-success) 15%, transparent)", text: "Exceeds Expectations" };
+  if (score >= 60) return { label: "ME", color: "var(--color-info)", bg: "color-mix(in srgb, var(--color-info) 15%, transparent)", text: "Meets Expectations" };
+  if (score >= 40) return { label: "AE", color: "var(--color-warning)", bg: "color-mix(in srgb, var(--color-warning) 15%, transparent)", text: "Approaching Expectations" };
+  return              { label: "BE", color: "var(--color-danger)", bg: "color-mix(in srgb, var(--color-danger) 15%, transparent)", text: "Below Expectations" };
+};
+
+const ScoreBar = ({ score, color }) => (
+  <div style={{ flex: 1, background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-full)", height: "8px", overflow: "hidden" }}>
+    <div style={{
+      width: `${Math.min(score, 100)}%`,
+      background: color || (score >= 70 ? "var(--color-success)" : score >= 50 ? "var(--color-warning)" : "var(--color-danger)"),
+      height: "100%", borderRadius: "var(--radius-full)", transition: "width 0.5s ease",
+    }} />
+  </div>
+);
+
+// ─── Intervention generator ────────────────────────────────────────────────
+function buildInterventions(subjectRankings, streamAverages) {
+  const out = [];
+  const byScore = [...subjectRankings].sort((a,b) => a.avg_score - b.avg_score);
+  const weak    = byScore.slice(0, Math.min(3, byScore.length));
+  const strong  = [...subjectRankings].sort((a,b) => b.avg_score - a.avg_score).slice(0, 2);
+
+  weak.forEach(s => {
+    if (s.avg_score < 50) {
+      out.push({ urgency:"high", subject:s.subject,
+        finding:`${s.subject} critically low at ${s.avg_score}%`,
+        action:"Immediate remedial classes needed. Run diagnostic tests to identify gaps. Increase lesson hours and assign targeted practice materials." });
+    } else if (s.avg_score < 65) {
+      out.push({ urgency:"medium", subject:s.subject,
+        finding:`${s.subject} at ${s.avg_score}% — needs attention`,
+        action:"Schedule weekly revision sessions. Review the teaching pace. Implement peer-tutoring pairing strong and weak students." });
+    }
+  });
+
+  strong.forEach(s => {
+    if (s.avg_score >= 75) {
+      out.push({ urgency:"maintain", subject:s.subject,
+        finding:`${s.subject} performing well at ${s.avg_score}%`,
+        action:"Maintain current approach. Document strategies and share with other subject teachers. Add enrichment activities for top students." });
+    }
+  });
+
+  if (streamAverages.length >= 2) {
+    const sorted = [...streamAverages].sort((a,b) => b.avg_score - a.avg_score);
+    const best = sorted[0]; const worst = sorted[sorted.length-1];
+    const gap  = +(best.avg_score - worst.avg_score).toFixed(1);
+    if (gap >= 15) {
+      out.push({ urgency:"high", subject:"Stream Gap",
+        finding:`${gap}% gap between ${best.stream_label} (${best.avg_score}%) and ${worst.stream_label} (${worst.avg_score}%)`,
+        action:`Study what makes ${best.stream_label} succeed and apply in ${worst.stream_label}. Equalise teacher quality, introduce cross-stream mentoring and monthly progress tracking.` });
+    } else if (gap >= 8) {
+      out.push({ urgency:"medium", subject:"Stream Gap",
+        finding:`${gap}% gap between best and weakest stream`,
+        action:"Monitor monthly. Conduct teacher peer-observations across streams. Ensure equal distribution of resources and teaching time." });
+    }
+  }
+
+  const lowestStream = [...streamAverages].sort((a,b) => a.avg_score - b.avg_score)[0];
+  if (lowestStream && lowestStream.avg_score < 60) {
+    out.push({ urgency:"high", subject:`${lowestStream.stream_label} Overall`,
+      finding:`${lowestStream.stream_label} overall average of ${lowestStream.avg_score}% is below passing threshold`,
+      action:"Hold an urgent stream review with all subject teachers. Engage parents in a performance meeting. Run a structured 8-week catch-up programme with bi-weekly tracking." });
+  }
+
+  return out;
+}
+
+// ─── Analysis Tab ──────────────────────────────────────────────────────────
+export default function AnalysisTabNew({ auth }) {
   const [data, setData]           = useState(null);
   const [loading, setLoading]     = useState(false);
   const [aiReport, setAiReport]   = useState("");
@@ -113,6 +195,11 @@ function AnalysisTab({ auth }) {
   const [availClasses, setAvailClasses] = useState([]);
   const [activeStream, setActiveStream] = useState(null);
   const [reportMode, setReportMode]     = useState("visual"); // "visual" | "ai"
+  const [trends, setTrends]             = useState(null);
+  const [topStudents, setTopStudents]   = useState(null);
+  const [topClass, setTopClass]         = useState("");
+  const [studentRankings, setStudentRankings] = useState(null);
+  const [classStats, setClassStats]     = useState(null);
 
   const load = useCallback(async () => {
     if (!auth?.token) return;
@@ -126,6 +213,18 @@ function AnalysisTab({ auth }) {
       if (result.terms?.length)   setAvailTerms(result.terms);
       if (result.classes?.length) setAvailClasses(result.classes);
       setActiveStream(null);
+
+      // Fetch trends + top students + rankings + class stats in parallel
+      const [trendRes, topRes, rankRes, statsRes] = await Promise.all([
+        apiFetch(`/analysis/trends${className ? `?class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
+        apiFetch(`/analysis/top-students?limit=10${term ? `&term=${encodeURIComponent(term)}` : ""}${className ? `&class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
+        apiFetch(`/analysis/student-rankings?term=${encodeURIComponent(term)}${className ? `&class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
+        apiFetch(`/analysis/class-stats?term=${encodeURIComponent(term)}${className ? `&class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
+      ]);
+      setTrends(trendRes);
+      setTopStudents(topRes);
+      setStudentRankings(rankRes);
+      setClassStats(statsRes);
     } catch (e) { console.error("Analysis error:", e); }
     setLoading(false);
   }, [auth, term, className]);
@@ -156,14 +255,38 @@ function AnalysisTab({ auth }) {
       }).join(" | ");
       lines.push(`  ${subj}: ${row}`);
     });
+    // Term trends
+    if (trends && trends.terms.length > 1) {
+      lines.push("");
+      lines.push("TERM PERFORMANCE TRENDS (overall avg per term):");
+      trends.overall.forEach(t => lines.push(`  ${t.term}: ${t.avg_score}%`));
+      lines.push("SUBJECT TRENDS:");
+      trends.subjects.forEach(subj => {
+        const row = trends.terms.map(t => `${t}:${trends.data[subj]?.[t] ?? "N/A"}%`).join(" → ");
+        lines.push(`  ${subj}: ${row}`);
+      });
+    }
+    // Top students
+    if (topStudents && topStudents.overall.length > 0) {
+      lines.push("");
+      lines.push("TOP 5 STUDENTS (overall):");
+      topStudents.overall.slice(0,5).forEach((s,i) =>
+        lines.push(`  ${i+1}. ${s.first_name} ${s.last_name} (${s.stream_label}): ${s.avg_score}%`)
+      );
+    }
     return lines.join("\n");
   };
 
   const generateAIReport = async () => {
-    if (!data || data.streamAverages.length === 0) return;
+    console.log("[AI] data:", data, "token:", auth?.token ? "present" : "MISSING");
+    if (!data || data.streamAverages.length === 0) {
+      setAiError("No data loaded yet. Please wait for the visual report to load first.");
+      return;
+    }
     setAiLoading(true);
     setAiReport(""); setAiError("");
     const dataset = buildDataset();
+    console.log("[AI] dataset length:", dataset.length, "first 200:", dataset.slice(0,200));
 
     const prompt = `You are an academic performance analyst for a Kenyan primary/secondary school.
 
@@ -200,26 +323,21 @@ Keep the tone professional but simple enough for a school administrator to act o
     try {
       const result = await apiFetch("/analysis/ai-report", {
         method: "POST",
-        token: auth.token,
+        token: auth?.token,
         body: { prompt },
       });
-      
-      if (result?.text) {
+      if (result.text) {
         setAiReport(result.text);
-      } else if (result?.choices?.[0]?.message?.content) {
-        setAiReport(result.choices[0].message.content);
-      } else if (result?.error) {
-        setAiError("AI service error: " + result.error);
       } else {
-        console.error("[AI Report] Unexpected response:", result);
-        setAiError("Unexpected response from AI service. Check console.");
+        setAiError("No response from AI. Try again.");
       }
     } catch (e) {
-      setAiError("Failed to reach AI service: " + e.message);
+      setAiError("Failed to generate report: " + e.message);
     }
     setAiLoading(false);
   };
 
+  // ── Render markdown-ish report (simple parser — no dependency needed)
   const renderReport = (text) => {
     const lines = text.split("\n");
     const elements = [];
@@ -278,6 +396,11 @@ Keep the tone professional but simple enough for a school administrator to act o
 
   return (
     <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+        <h1 style={{ margin: 0, fontSize: "24px", fontWeight: 700, color: "var(--color-text-primary)" }}>Academic Analysis</h1>
+      </div>
+
+      {/* ── Filters + mode toggle ── */}
       <Card style={{ padding: "var(--space-3)", marginBottom: "var(--space-4)" }}>
         <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -325,6 +448,7 @@ Keep the tone professional but simple enough for a school administrator to act o
       {/* ══════════ AI REPORT MODE ══════════ */}
       {!loading && data && reportMode === "ai" && (
         <div>
+          {/* Generate button */}
           {!aiReport && !aiLoading && (
             <Card style={{ padding: "40px", textAlign: "center", marginBottom: "var(--space-4)" }}>
               <div style={{ fontSize: "48px", marginBottom: "var(--space-3)" }}>🤖</div>
@@ -344,14 +468,16 @@ Keep the tone professional but simple enough for a school administrator to act o
             </Card>
           )}
 
+          {/* Loading */}
           {aiLoading && (
-            <Card style={{ padding: "60px var(--space-4)", textAlign: "center" }}>
+            <Card style={{ padding: "60px var(--space-4)", textAlign: "center", marginBottom: "var(--space-4)" }}>
               <div style={{ fontSize: "32px", marginBottom: "var(--space-3)", animation: "spin 1s linear infinite" }}>⚙️</div>
               <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-1)" }}>Generating Report…</div>
               <div style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>Claude is analysing your school data</div>
             </Card>
           )}
 
+          {/* Report output */}
           {aiReport && !aiLoading && (
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
@@ -383,6 +509,7 @@ Keep the tone professional but simple enough for a school administrator to act o
       {/* ══════════ VISUAL REPORT MODE ══════════ */}
       {!loading && data && reportMode === "visual" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+
           {/* SECTION 1 — Class Performance by Stream */}
           <Card style={{ padding: "var(--space-4)" }}>
             <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>1. Class Performance by Stream</h3>
@@ -421,7 +548,6 @@ Keep the tone professional but simple enough for a school administrator to act o
                     );
                   })}
                 </div>
-                
                 {/* Stream drilldown */}
                 {activeStream && streams.some(s => s.stream_label === activeStream) && (() => {
                   const sd = data.streamVsSubject.data[activeStream];
@@ -571,12 +697,268 @@ Keep the tone professional but simple enough for a school administrator to act o
               </div>
             </div>
           </Card>
+
+          {/* SECTION 5 — Student Rankings */}
+          {studentRankings && studentRankings.all_students && studentRankings.all_students.length > 0 && (
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>5. Student Rankings</h3>
+              <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
+                Students ranked by average score with position, total marks, and subject breakdown.
+              </p>
+              
+              <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                <Table 
+                  headers={["Position", "Student", "Admission No.", "Class", "Average", "Total Marks", "Subjects"]}
+                  data={studentRankings.all_students.slice(0, 50).map((s, i) => {
+                    const g = gradeInfo(s.avg_score);
+                    return [
+                      <span key="pos" style={{ fontWeight: 800, color: s.position <= 3 ? "var(--color-primary)" : "var(--color-text-secondary)" }}>#{s.position}</span>,
+                      <span key="name" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{s.first_name} {s.last_name}</span>,
+                      <span key="adm" style={{ color: "var(--color-text-secondary)" }}>{s.admission_number || "—"}</span>,
+                      <span key="cls" style={{ color: "var(--color-text-secondary)" }}>{s.stream_label || s.class_name || "—"}</span>,
+                      <div key="avg" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <ScoreBar score={s.avg_score} color={g.color} />
+                        <span style={{ fontWeight: 800, color: g.color, minWidth: "42px", textAlign: "right" }}>{s.avg_score}%</span>
+                      </div>,
+                      <span key="total" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{s.total_marks}</span>,
+                      <span key="subjs" style={{ color: "var(--color-text-secondary)" }}>{s.subjects_sat}</span>,
+                    ];
+                  })}
+                />
+              </div>
+              
+              {studentRankings.all_students.length > 50 && (
+                <div style={{ marginTop: "var(--space-3)", fontSize: "13px", color: "var(--color-text-secondary)", textAlign: "center" }}>
+                  Showing top 50 of {studentRankings.all_students.length} students
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* SECTION 6 — Class Statistics */}
+          {classStats && classStats.overall && (
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>6. Class Statistics</h3>
+              <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
+                Comprehensive class performance metrics including mean, median, and subject breakdowns.
+              </p>
+              
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+                {[
+                  ["Mean", `${classStats.overall.mean}%`, "Average score across all students"],
+                  ["Median", `${classStats.overall.median}%`, "Middle score when ranked"],
+                  ["Highest", `${classStats.overall.highest}%`, "Best student average"],
+                  ["Lowest", `${classStats.overall.lowest}%`, "Lowest student average"],
+                  ["Students", classStats.overall.student_count, "Total number of students"],
+                ].map(([label, value, desc]) => (
+                  <div key={label} style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
+                    <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>{label}</div>
+                    <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-primary)", marginBottom: "2px" }}>{value}</div>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>{desc}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Grade Distribution */}
+              {Object.keys(classStats.overall.grade_distribution || {}).length > 0 && (
+                <div style={{ marginBottom: "var(--space-4)" }}>
+                  <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-2)", fontSize: "15px" }}>Grade Distribution</div>
+                  <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+                    {Object.entries(classStats.overall.grade_distribution).map(([grade, count]) => {
+                      const g = gradeInfo(grade === "EE" ? 85 : grade === "ME" ? 65 : grade === "AE" ? 45 : 25);
+                      return (
+                        <div key={grade} style={{ background: g.bg, border: `1px solid ${g.color}`, borderRadius: "var(--radius-md)", padding: "8px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
+                          <Badge text={grade} style={{ background: g.color, color: "#fff", borderColor: "transparent" }} />
+                          <span style={{ fontWeight: 700, color: g.color }}>{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Subject Breakdown by Class */}
+              {Object.keys(classStats.by_class || {}).length > 0 && (
+                <div>
+                  <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-2)", fontSize: "15px" }}>Subject Performance by Class</div>
+                  <div style={{ display: "grid", gap: "var(--space-3)" }}>
+                    {Object.entries(classStats.by_class).map(([clsName, subjects]) => (
+                      <div key={clsName} style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
+                        <div style={{ fontWeight: 700, color: "var(--color-primary)", marginBottom: "var(--space-2)" }}>{clsName}</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "var(--space-2)" }}>
+                          {Object.entries(subjects).map(([subj, stats]) => {
+                            const g = gradeInfo(stats.mean);
+                            return (
+                              <div key={subj} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--color-bg-surface)", borderRadius: "var(--radius-sm)" }}>
+                                <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--color-text-primary)" }}>{subj}</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                  <ScoreBar score={stats.mean} color={g.color} />
+                                  <span style={{ fontWeight: 700, color: g.color, fontSize: "13px", minWidth: "40px", textAlign: "right" }}>{stats.mean}%</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* SECTION 7 — Term Performance Trends */}
+          {trends && trends.terms.length > 1 && (
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>7. Term Performance Trends</h3>
+              <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
+                How overall and subject performance has changed across terms.
+              </p>
+              
+              {/* Overall trend bar */}
+              <div style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+                <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-4)", fontSize: "15px" }}>📈 Overall Average by Term</div>
+                <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "flex-end", height: "120px" }}>
+                  {trends.overall.map((t, i) => {
+                    const g = gradeInfo(t.avg_score);
+                    const h = Math.max(20, (t.avg_score / 100) * 100);
+                    return (
+                      <div key={t.term} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                        <div style={{ fontSize: "13px", fontWeight: 800, color: g.color }}>{t.avg_score}%</div>
+                        <div style={{ width: "100%", height: `${h}px`, background: g.color, borderRadius: "6px 6px 0 0",
+                          opacity: 0.8 + i * 0.1, transition: "height 0.3s",
+                          boxShadow: `0 -4px 12px color-mix(in srgb, ${g.color} 30%, transparent)` }} />
+                        <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", textAlign: "center", fontWeight: 500 }}>{t.term}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              {/* Subject trend table */}
+              <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                <Table 
+                  headers={["Subject", ...trends.terms, "Trend"]}
+                  data={trends.subjects.map(subj => {
+                    const scores = trends.terms.map(t => trends.data[subj]?.[t] ?? null);
+                    const valid  = scores.filter(s => s !== null);
+                    const first  = valid[0] ?? 0;
+                    const last   = valid[valid.length - 1] ?? 0;
+                    const diff   = last - first;
+                    const trendIcon = diff > 2 ? "📈" : diff < -2 ? "📉" : "➡️";
+                    const trendColor = diff > 2 ? "var(--color-success)" : diff < -2 ? "var(--color-danger)" : "var(--color-text-secondary)";
+                    
+                    const row = [
+                      <span key="subject" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{subj}</span>
+                    ];
+                    
+                    trends.terms.forEach(t => {
+                      const sc = trends.data[subj]?.[t];
+                      if (sc == null) {
+                        row.push(<span key={t} style={{ color: "var(--color-text-muted)", textAlign: "center" }}>—</span>);
+                      } else {
+                        const g = gradeInfo(sc);
+                        row.push(<Badge key={t} text={`${sc}%`} style={{ background: g.bg, color: g.color, borderColor: "transparent", fontWeight: 700 }} />);
+                      }
+                    });
+                    
+                    row.push(
+                      <span key="trend" style={{ color: trendColor, fontWeight: 700, fontSize: "14px" }}>
+                        {trendIcon} {diff > 0 ? "+" : ""}{diff !== 0 ? diff.toFixed(1)+"%" : "Stable"}
+                      </span>
+                    );
+                    
+                    return row;
+                  })}
+                />
+              </div>
+            </Card>
+          )}
+
+          {/* SECTION 8 — Top Students */}
+          {topStudents && topStudents.overall.length > 0 && (
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>8. Top Performing Students</h3>
+              <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
+                Highest average scores across all subjects for the selected term.
+              </p>
+
+              {/* Class filter for top students */}
+              <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-3)", flexWrap: "wrap", padding: "var(--space-2)", background: "var(--color-bg-base)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
+                {["", ...[...new Set(topStudents.byClass.map(s => s.class_name))]].map(cls => (
+                  <Button 
+                    key={cls} 
+                    variant={topClass === cls ? "primary" : "ghost"}
+                    size="sm"
+                    onClick={() => setTopClass(cls)}
+                  >
+                    {cls || "🏆 Overall Top 10"}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Leaderboard */}
+              <div style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
+                {(topClass
+                  ? topStudents.byClass.filter(s => s.class_name === topClass)
+                  : topStudents.overall
+                ).map((s, i) => {
+                  const g = gradeInfo(s.avg_score);
+                  const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
+                  return (
+                    <div key={s.student_id} style={{
+                      display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-3)",
+                      borderBottom: `1px solid var(--color-border)`,
+                      background: i < 3 ? `color-mix(in srgb, ${g.color} 5%, transparent)` : "var(--color-bg-surface)",
+                    }}>
+                      {/* Rank */}
+                      <div style={{ width: "36px", textAlign: "center", flexShrink: 0 }}>
+                        {medal
+                          ? <span style={{ fontSize: "20px" }}>{medal}</span>
+                          : <span style={{ fontWeight: 800, color: "var(--color-text-muted)", fontSize: "14px" }}>#{s.rank ?? i+1}</span>
+                        }
+                      </div>
+                      {/* Avatar */}
+                      <div style={{
+                        width: "40px", height: "40px", borderRadius: "10px", flexShrink: 0,
+                        background: g.bg, border: `1px solid color-mix(in srgb, ${g.color} 30%, transparent)`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontWeight: 800, fontSize: "14px", color: g.color,
+                      }}>
+                        {s.first_name?.[0]}{s.last_name?.[0]}
+                      </div>
+                      {/* Name */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, color: "var(--color-text-primary)", fontSize: "15px" }}>
+                          {s.first_name} {s.last_name}
+                        </div>
+                        <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "2px" }}>
+                          {s.stream_label} · <span style={{ fontFamily: "var(--font-mono)" }}>{s.admission_number}</span>
+                        </div>
+                      </div>
+                      {/* Score bar */}
+                      <div style={{ width: "120px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <ScoreBar score={s.avg_score} color={g.color} />
+                      </div>
+                      {/* Score */}
+                      <div style={{ width: "60px", textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontWeight: 900, fontSize: "18px", color: g.color }}>{s.avg_score}%</div>
+                        <div style={{ fontSize: "10px", color: "var(--color-text-secondary)", marginTop: "2px", fontWeight: 500 }}>{s.subjects_sat} subjects</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
         </div>
       )}
     </div>
   );
 }
-AnalysisTab.propTypes = { auth: PropTypes.object };
+
+AnalysisTabNew.propTypes = { auth: PropTypes.object };
 
 // ─── Main ReportsPage ──────────────────────────────────────────────────────
 export default function ReportsPage({ auth }) {
