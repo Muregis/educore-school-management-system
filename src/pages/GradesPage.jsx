@@ -425,6 +425,24 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
         }}>Download Import Template</Btn>
         {canEdit && (
           <>
+            <Btn variant="ghost" onClick={async () => {
+              try {
+                if (!window.confirm("Recalculate all grades based on marks? This will update grade values for all results.")) return;
+                toast("Recalculating grades...", "info");
+                const token = auth?.token || sessionStorage.getItem("token");
+                const res = await fetch(`${API_BASE}/grades/recalculate`, {
+                  method: "POST",
+                  headers: getAuthHeaders(token),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || "Recalculation failed");
+                toast(`Recalculated grades for ${data.updated} results`, "success");
+                const fresh = await apiFetch("/grades", { token });
+                setResults(fresh);
+              } catch (err) {
+                toast(err.message || "Recalculation failed", "error");
+              }
+            }}>Recalculate Grades</Btn>
             <label style={{ cursor: "pointer" }}>
               <span style={{ display:"inline-block", padding:"6px 16px", borderRadius:8, border:`1px solid ${C.border}`, background:C.card, color:C.accent, fontSize:13, fontWeight:500 }}>
                 Import CSV

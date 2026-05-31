@@ -9,6 +9,7 @@ import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
 import { uploadCsv } from "../middleware/uploadCsv.js";
 import { normalizeHeader } from "../utils/normalizeCsvHeader.js";
+import { knecGrade } from "../utils/knecGrading.js";
 
 const router = Router();
 router.use(authRequired);
@@ -322,13 +323,17 @@ router.post(
                   }
                 }
 
+                const totalMarks = parseFloat(row.total_marks) || 100;
+                const percentage = totalMarks > 0 ? (marks / totalMarks) * 100 : 0;
+                const calculatedGrade = knecGrade(percentage);
+
                 resultsToInsert.push({
                   school_id: schoolId,
                   student_id: student.student_id,
                   subject: subject,
                   marks: marks,
-                  total_marks: parseFloat(row.total_marks) || 100,
-                  grade: row.grade?.trim() || null,
+                  total_marks: totalMarks,
+                  grade: calculatedGrade.level, // Store EE, ME, AE, BE
                   teacher_comment: row.teacher_comment?.trim() || null,
                   term: row.term?.trim() || 'Term 2',
                   exam_type: row.exam_type?.trim() || fallbackExamType,
@@ -404,6 +409,49 @@ router.post(
     }
   }
 );
+
+// ─── POST /api/grades/recalculate — Recalculate grades for existing results ───
+router.post('/recalculate', requireRoles('admin', 'director', 'superadmin'), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { term, classId, studentId } = req.query;
+
+    let query = supabase
+      .from('results')
+      .select('result_id, marks, total_marks')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
+
+    if (term) query = query.eq('term', term);
+    if (classId) query = query.eq('class_id', classId);
+    if (studentId) query = query.eq('student_id', studentId);
+
+    const { data: results, error } = await query;
+    if (error) throw error;
+
+    let updated = 0;
+    for (const result of results || []) {
+      const totalMarks = result.total_marks || 100;
+      const percentage = totalMarks > 0 ? (result.marks / totalMarks) * 100 : 0;
+      const calculatedGrade = knecGrade(percentage);
+
+      const { error: updateError } = await supabase
+        .from('results')
+        .update({ grade: calculatedGrade.level })
+        .eq('result_id', result.result_id);
+
+      if (!updateError) updated++;
+    }
+
+    res.json({
+      success: true,
+      message: `Recalculated grades for ${updated} results`,
+      updated
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─── GET /:id ───────────────────────────────────────────────────────────────
 router.get("/:id", async (req, res, next) => {
