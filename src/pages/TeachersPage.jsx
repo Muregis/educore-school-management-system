@@ -176,12 +176,22 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
 
     try {
       console.log("[SYNC] About to call apiFetch");
-      const res = await apiFetch("/teachers/sync-hr", {
+      // Try using native fetch directly to bypass apiFetch wrapper
+      const headers = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${auth?.token}`
+      };
+      const fetchRes = await fetch("https://educore-school-management-system.onrender.com/api/teachers/sync-hr", {
         method: "POST",
-        token: auth?.token,
-        timeoutMs: 900000,
-        retries: 2
+        headers,
+        body: JSON.stringify({})
       });
+      console.log("[SYNC] fetch completed, status:", fetchRes.status);
+      if (!fetchRes.ok) {
+        const text = await fetchRes.text();
+        throw new Error(text || `HTTP ${fetchRes.status}`);
+      }
+      const res = await fetchRes.json();
       console.log("[SYNC] apiFetch completed successfully");
       
       const { syncedToHR, userAccountsCreated, userAccountsLinked, total, errors } = res;
