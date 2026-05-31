@@ -88,7 +88,7 @@ export default function AnalysisTabNew({ auth }) {
   const [aiReport, setAiReport]   = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError]     = useState("");
-  const [term, setTerm]           = useState(currentTerm || "");
+  const [term, setTerm]           = useState(currentTerm || "Term 1");
   const [className, setClassName] = useState("");
   const [availTerms, setAvailTerms]     = useState([]);
   const [availClasses, setAvailClasses] = useState([]);

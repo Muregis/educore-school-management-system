@@ -563,41 +563,36 @@ async function processSyncJob(jobId, schoolId) {
   }
 }
 
-// POST /api/teachers/sync-hr - Legacy endpoint (deprecated, kept for backward compatibility)
+// POST /api/teachers/sync-hr - Legacy endpoint (deprecated, redirects to new job-based approach)
 router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     
     console.log('[SYNC] Legacy sync endpoint called, redirecting to job-based sync');
     
-    // Start job and wait for completion (for backward compatibility)
-    const { jobId } = await new Promise((resolve, reject) => {
-      const jobReq = { ...req, user: req.user };
-      router.post("/sync-hr/start")(jobReq, { json: resolve, status: (s) => ({ json: resolve }) }, reject);
+    // Create job directly
+    const jobId = `sync-${schoolId}-${Date.now()}`;
+    
+    syncJobs.set(jobId, {
+      status: 'processing',
+      progress: { processed: 0, total: 0 },
+      result: null,
+      error: null,
+      startedAt: new Date().toISOString()
     });
     
-    // Poll for completion
-    let attempts = 0;
-    const maxAttempts = 60;
+    // Return job ID immediately
+    res.json({ jobId, message: "Please use the new sync endpoint. This endpoint is deprecated." });
     
-    while (attempts < maxAttempts) {
-      await new Promise(r => setTimeout(r, 1000));
-      
+    // Process in background
+    processSyncJob(jobId, schoolId).catch(err => {
+      console.error('[SYNC] Job failed:', jobId, err);
       const job = syncJobs.get(jobId);
-      if (!job) {
-        return res.status(404).json({ message: "Job not found" });
+      if (job) {
+        job.status = 'failed';
+        job.error = err.message;
       }
-      
-      if (job.status === 'completed') {
-        return res.json(job.result);
-      } else if (job.status === 'failed') {
-        return res.status(500).json({ message: job.error || "Sync failed" });
-      }
-      
-      attempts++;
-    }
-    
-    res.status(202).json({ message: "Sync still in progress", jobId });
+    });
   } catch (err) {
     next(err);
   }

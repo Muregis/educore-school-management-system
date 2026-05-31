@@ -109,7 +109,7 @@ function AnalysisTab({ auth }) {
   const [aiReport, setAiReport]   = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError]     = useState("");
-  const [term, setTerm]           = useState(currentTerm || "");
+  const [term, setTerm]           = useState(currentTerm || "Term 1");
   const [className, setClassName] = useState("");
   const [availTerms, setAvailTerms]     = useState([]);
   const [availClasses, setAvailClasses] = useState([]);
@@ -1200,7 +1200,7 @@ export default function ReportsPage({ auth }) {
             {/* Grade Averages by Subject */}
             <Card style={{ padding: "var(--space-4)" }}>
               <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Grade Averages by Subject</h3>
-              {grades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
+              {!grades || grades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
                 <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
                   <Table 
                     headers={["Class", "Subject", "Average", "Highest", "Lowest", "Entries"]}
@@ -1223,7 +1223,7 @@ export default function ReportsPage({ auth }) {
             {/* Grade Distribution by Class */}
             <Card style={{ padding: "var(--space-4)" }}>
               <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Grade Distribution by Class</h3>
-              {grades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
+              {!grades || grades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
                 <div style={{ display: "grid", gap: "var(--space-3)" }}>
                   {[...new Set(grades.map(g => g.class_name))].map(clsName => {
                     const classGrades = grades.filter(g => g.class_name === clsName);
@@ -1285,7 +1285,7 @@ export default function ReportsPage({ auth }) {
             {/* Grade Distribution by Subject */}
             <Card style={{ padding: "var(--space-4)" }}>
               <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Grade Distribution by Subject</h3>
-              {grades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
+              {!grades || grades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
                 <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
                   <Table 
                     headers={["Subject", "Exam Type", "EE Count", "EE %", "ME Count", "ME %", "AE Count", "AE %", "BE Count", "BE %"]}
