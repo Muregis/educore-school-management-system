@@ -173,7 +173,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
     toast("Syncing teachers... This may take a moment.", "info");
     
     try {
-      const res = await apiFetch("/teachers/sync-hr", { method: "POST", token: auth?.token });
+      const res = await apiFetch("/teachers/sync-hr", { method: "POST", token: auth?.token, timeoutMs: 300000 });
       
       const { syncedToHR, userAccountsCreated, userAccountsLinked, total, errors } = res;
       

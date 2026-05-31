@@ -288,23 +288,37 @@ router.post(
                   continue;
                 }
 
-                // Normalize marks to handle special values (absent, cheat, na, etc.)
-                const normalizedMarks = normaliseMarks(row.marks);
+                // Handle marks - be more permissive
+                let marks = row.marks;
                 
-                // Skip if marks is empty/null after normalization
-                if (normalizedMarks === null || normalizedMarks === undefined || String(normalizedMarks).trim() === '') {
+                // If marks is empty, skip the row
+                if (marks === null || marks === undefined || String(marks).trim() === '') {
                   skipped++;
                   continue;
                 }
                 
-                // Convert to number if it's a numeric string
-                let marks = normalizedMarks;
-                if (typeof normalizedMarks === 'string' && normalizedMarks !== 'absent' && normalizedMarks !== 'cheat' && normalizedMarks !== 'na') {
-                  marks = parseFloat(normalizedMarks);
-                  if (isNaN(marks)) {
+                // Try to convert to number
+                const numMarks = Number(marks);
+                if (!isNaN(numMarks)) {
+                  marks = numMarks;
+                } else {
+                  // If not a number, check for special values
+                  const s = String(marks).trim().toLowerCase();
+                  if (s === 'absent' || s === 'x' || s === '-') {
+                    marks = 0; // Treat absent as 0 for now
+                  } else if (s === 'na' || s === 'n/a') {
                     skipped++;
-                    errors.push({ row: rowNumber, admission, subject, reason: `Invalid marks value: ${row.marks}` });
-                    continue;
+                    continue; // Skip NA values
+                  } else {
+                    // Try to extract number from string (e.g., "80/100" -> 80)
+                    const match = s.match(/(\d+)/);
+                    if (match) {
+                      marks = Number(match[1]);
+                    } else {
+                      skipped++;
+                      errors.push({ row: rowNumber, admission, subject, reason: `Invalid marks value: ${row.marks}` });
+                      continue;
+                    }
                   }
                 }
 
