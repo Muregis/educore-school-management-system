@@ -59,6 +59,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const [assignmentForm, setAssignmentForm] = useState({ classId: "", subjectId: "", isClassTeacher: false });
   const canAssign = ["admin", "director", "superadmin"].includes(auth?.role);
   const isSyncingRef = useRef(false);
+  const syncControllerRef = useRef(null);
 
   const loadAssignmentData = async () => {
     if (!auth?.token || !canAssign) return;
@@ -95,6 +96,17 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
       }
     };
   }, [auth, setTeachers, toast, canAssign]);
+
+  // Cleanup effect to abort sync on unmount
+  useEffect(() => {
+    return () => {
+      if (syncControllerRef.current) {
+        console.log("[SYNC] Component unmounting, aborting sync");
+        syncControllerRef.current.abort();
+        syncControllerRef.current = null;
+      }
+    };
+  }, []);
 
   const normalised = teachers.map(t => t.first_name ? normalise(t) : t);
 
@@ -181,6 +193,8 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
     toast("Syncing teachers... This may take a few minutes. Please wait.", "info");
 
     isSyncingRef.current = true;
+    const syncController = new AbortController();
+    syncControllerRef.current = syncController;
 
     try {
       console.log("[SYNC] About to call apiFetch");
@@ -188,7 +202,8 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
         method: "POST",
         token: auth?.token,
         timeoutMs: 300000,
-        retries: 0
+        retries: 0,
+        signal: syncController.signal
       });
       console.log("[SYNC] apiFetch completed successfully");
       
@@ -228,6 +243,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
       }
     } finally {
       isSyncingRef.current = false;
+      syncControllerRef.current = null;
     }
   };
 
