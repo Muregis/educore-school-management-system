@@ -436,8 +436,20 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
+                  
+                  // Validate file size (max 5MB)
+                  if (file.size > 5 * 1024 * 1024) {
+                    toast("File too large. Maximum size is 5MB.", "error");
+                    e.target.value = "";
+                    return;
+                  }
+                  
                   const form = new FormData();
                   form.append("file", file);
+                  
+                  // Show loading state
+                  toast("Importing grades... This may take a moment for large files.", "info");
+                  
                   try {
                     const token = auth?.token || sessionStorage.getItem("token");
                     const res = await fetch(`${API_BASE}/grades/import?examType=${encodeURIComponent(examType)}`, {
@@ -449,26 +461,39 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                     const data = await res.json();
 
                     if (!res.ok) {
-                    throw new Error(data.message || "Import failed");
+                      throw new Error(data.message || data.error || "Import failed");
                     }
+                    
                     const imp = data.imported ?? 0;
                     const sk = data.skipped ?? 0;
                     const errs = data.errors ?? [];
                     const totalRows = data.total ?? imp + sk;
-                    const firstErrors = errs
-                      .slice(0, 3)
-                      .map(errRow => `Row ${errRow.row}: ${errRow.reason || errRow.error || "Failed"}`)
-                      .join(" ");
-                    const detail = errs.length ? ` ${errs.length} error row(s). ${firstErrors}` : "";
-                    const tone = errs.length && imp === 0 ? "error" : errs.length ? "warn" : "success";
-                    toast(
-                      `Imported ${imp} grade(s) across ${totalRows} row(s). Skipped ${sk}.${detail}`,
-                      tone
-                    );
+                    
+                    if (imp === 0 && sk === 0) {
+                      toast("No valid data found in CSV file. Check the format.", "error");
+                    } else if (imp === 0) {
+                      const firstErrors = errs
+                        .slice(0, 3)
+                        .map(errRow => `Row ${errRow.row}: ${errRow.reason || errRow.error || "Failed"}`)
+                        .join("; ");
+                      toast(`Imported 0 grades. ${sk} rows skipped. First errors: ${firstErrors}`, "error");
+                    } else if (errs.length > 0) {
+                      const firstErrors = errs
+                        .slice(0, 3)
+                        .map(errRow => `Row ${errRow.row}: ${errRow.reason || errRow.error || "Failed"}`)
+                        .join("; ");
+                      const moreErrors = errs.length > 3 ? ` (+${errs.length - 3} more errors)` : "";
+                      toast(`Imported ${imp} grade(s). Skipped ${sk}. Errors: ${firstErrors}${moreErrors}`, "warn");
+                    } else {
+                      toast(`Successfully imported ${imp} grade(s) across ${totalRows} row(s).`, "success");
+                    }
+                    
+                    // Refresh results
                     const fresh = await apiFetch("/grades", { token });
                     setResults(fresh);
                   } catch (err) {
-                    toast(err.message || "Import failed", "error");
+                    console.error("Import error:", err);
+                    toast(err.message || "Import failed. Please check the file format and try again.", "error");
                   }
                   e.target.value = "";
                 }}

@@ -168,12 +168,36 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   };
 
   const syncToHR = async () => {
-    if (!window.confirm("Sync all teachers to HR staff table?\n\nThis will create HR records for any teachers that don't have them yet.")) return;
+    if (!window.confirm("Sync all teachers to HR staff table and create user accounts?\n\nThis will:\n- Create HR records for teachers without them\n- Create user login accounts for teachers\n- Link teachers to their user accounts\n\nDefault password will be the part before @ in their email.")) return;
+    
+    toast("Syncing teachers... This may take a moment.", "info");
+    
     try {
       const res = await apiFetch("/teachers/sync-hr", { method: "POST", token: auth?.token });
-      toast(`Synced ${res.synced} of ${res.total} teachers to HR`, res.errors ? "warning" : "success");
-      if (res.errors) console.warn("Sync errors:", res.errors);
-    } catch (err) { toast(err.message || "Sync failed", "error"); }
+      
+      const { syncedToHR, userAccountsCreated, userAccountsLinked, total, errors } = res;
+      
+      let message = `Synced ${syncedToHR}/${total} teachers to HR. `;
+      message += `Created ${userAccountsCreated} user accounts. `;
+      message += `Linked ${userAccountsLinked} teachers to accounts.`;
+      
+      if (errors && errors.length > 0) {
+        toast(`${message} ${errors.length} errors occurred. Check console for details.`, "warning");
+        console.warn("Sync errors:", errors);
+      } else {
+        toast(message, "success");
+      }
+      
+      // Refresh teacher data to get updated user_id links
+      const refreshed = await apiFetch("/teachers", { token: auth.token });
+      setTeachers(refreshed.map(normalise));
+      
+      // Refresh assignment data
+      if (canAssign) await loadAssignmentData();
+    } catch (err) {
+      console.error("Sync error:", err);
+      toast(err.message || "Sync failed. Please try again.", "error");
+    }
   };
 
   const assignmentUserForTeacher = teacher =>
@@ -184,7 +208,10 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const openAssign = teacher => {
     const userTeacher = assignmentUserForTeacher(teacher);
     if (!userTeacher?.user_id) {
-      return toast("Teacher user account not found. Try Sync to HR or recreate the teacher login first.", "error");
+      return toast(
+        "Teacher user account not found. Click 'Sync to HR' button above to create login accounts for all teachers, then try again.",
+        "error"
+      );
     }
     setAssigningTeacher({ ...teacher, userId: userTeacher.user_id });
     setAssignmentForm({ classId: "", subjectId: "", isClassTeacher: false });

@@ -29,6 +29,18 @@ function normalizeAdmissionNumber(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
+function normalizeGender(value) {
+  if (!value || value === "" || value === null || value === undefined) return null;
+  const s = String(value).trim().toLowerCase();
+  if (s === 'm' || s === 'male') return 'male';
+  if (s === 'f' || s === 'female') return 'female';
+  if (s === 'o' || s === 'other') return 'other';
+  // If it's already a valid value, return it
+  if (['male', 'female', 'other'].includes(s)) return s;
+  // Default to null for unrecognized values
+  return null;
+}
+
 const INPUT_SPECIAL_MAP = {
   'absent': -1, 'x': -1,
   'cheat': -3, 'y': -3,
@@ -216,64 +228,79 @@ router.post(
           }
         })
         .on('end', async () => {
-          const allRows = expandImportRows(rows, fallbackExamType);
+          try {
+            const allRows = expandImportRows(rows, fallbackExamType);
 
-          if (allRows.length === 0) {
-            return res.status(400).json({ message: 'CSV file contains no data' });
-          }
+            if (allRows.length === 0) {
+              return res.status(400).json({ message: 'CSV file contains no data' });
+            }
 
-          let successCount = 0;
-          let skipped = 0;
-          const errors = [];
+            // Phase 1: Collect all unique admission numbers
+            const admissionNumbers = [...new Set(allRows.map(r => r.admission_number?.toString().trim()).filter(Boolean))];
+            
+            // Phase 2: Batch fetch all students in one query
+            const { data: students, error: studentsError } = await supabase
+              .from('students')
+              .select('student_id, admission_number, class_name, first_name, last_name')
+              .eq('school_id', schoolId)
+              .eq('is_deleted', false)
+              .in('admission_number', admissionNumbers);
 
-          for (let i = 0; i < allRows.length; i++) {
-            const row = allRows[i];
-            const rowNumber = i + 2;
+            if (studentsError) {
+              console.error('Error fetching students:', studentsError);
+              return res.status(500).json({ message: 'Failed to fetch student data', error: studentsError.message });
+            }
 
-            try {
-              const admission = row.admission_number?.toString().trim();
-              const subject = row.subject?.toString().trim();
+            // Create a map for quick lookup
+            const studentMap = new Map();
+            (students || []).forEach(s => {
+              studentMap.set(s.admission_number.toLowerCase().trim(), s);
+            });
 
-              if (!admission) {
-                skipped++;
-                errors.push({ row: rowNumber, reason: 'Missing admission_number' });
-                continue;
-              }
-              if (!subject) {
-                skipped++;
-                errors.push({ row: rowNumber, admission, reason: 'Missing subject' });
-                continue;
-              }
+            // Phase 3: Process rows and prepare batch inserts
+            const resultsToInsert = [];
+            const errors = [];
+            let skipped = 0;
 
-              const { data: student, error: studentError } = await supabase
-                .from('students')
-                .select('student_id, class_name, first_name, last_name')
-                .eq('school_id', schoolId)
-                .ilike('admission_number', admission)
-                .eq('is_deleted', false)
-                .maybeSingle();
+            for (let i = 0; i < allRows.length; i++) {
+              const row = allRows[i];
+              const rowNumber = i + 2;
 
-              if (studentError || !student) {
-                skipped++;
-                errors.push({ row: rowNumber, admission, reason: `Student not found: ${admission}` });
-                continue;
-              }
+              try {
+                const admission = row.admission_number?.toString().trim();
+                const subject = row.subject?.toString().trim();
 
-              const marks = parseFloat(row.marks);
-              if (isNaN(marks) && String(row.marks || '').trim() !== '') {
-                skipped++;
-                errors.push({ row: rowNumber, admission, subject, reason: 'Invalid marks value' });
-                continue;
-              }
+                if (!admission) {
+                  skipped++;
+                  errors.push({ row: rowNumber, reason: 'Missing admission_number' });
+                  continue;
+                }
+                if (!subject) {
+                  skipped++;
+                  errors.push({ row: rowNumber, admission, reason: 'Missing subject' });
+                  continue;
+                }
 
-              if (isNaN(marks) || String(row.marks || '').trim() === '') {
-                skipped++;
-                continue;
-              }
+                const student = studentMap.get(admission.toLowerCase());
+                if (!student) {
+                  skipped++;
+                  errors.push({ row: rowNumber, admission, reason: `Student not found: ${admission}` });
+                  continue;
+                }
 
-              const { error: upsertError } = await supabase
-                .from('results')
-                .upsert({
+                const marks = parseFloat(row.marks);
+                if (isNaN(marks) && String(row.marks || '').trim() !== '') {
+                  skipped++;
+                  errors.push({ row: rowNumber, admission, subject, reason: 'Invalid marks value' });
+                  continue;
+                }
+
+                if (isNaN(marks) || String(row.marks || '').trim() === '') {
+                  skipped++;
+                  continue;
+                }
+
+                resultsToInsert.push({
                   school_id: schoolId,
                   student_id: student.student_id,
                   subject: subject,
@@ -289,35 +316,73 @@ router.post(
                   class_name: row.class_name?.trim() || student.class_name,
                   entered_by: userId,
                   is_deleted: false
-                }, {
-                  onConflict: 'school_id,student_id,subject,term,exam_type'
                 });
-
-              if (upsertError) throw upsertError;
-
-              successCount++;
-            } catch (err) {
-              skipped++;
-              errors.push({
-                row: rowNumber,
-                admission: row.admission_number,
-                subject: row.subject,
-                reason: err.message
-              });
+              } catch (err) {
+                skipped++;
+                errors.push({
+                  row: rowNumber,
+                  admission: row.admission_number,
+                  subject: row.subject,
+                  reason: err.message
+                });
+              }
             }
-          }
 
-          res.json({
-            success: true,
-            message: `Imported ${successCount} results. ${skipped} rows had errors.`,
-            imported: successCount,
-            skipped,
-            total: allRows.length,
-            errors
-          });
+            // Phase 4: Batch insert all results
+            let successCount = 0;
+            if (resultsToInsert.length > 0) {
+              // Insert in batches of 100 to avoid payload size limits
+              const batchSize = 100;
+              for (let i = 0; i < resultsToInsert.length; i += batchSize) {
+                const batch = resultsToInsert.slice(i, i + batchSize);
+                const { error: insertError } = await supabase
+                  .from('results')
+                  .upsert(batch, {
+                    onConflict: 'school_id,student_id,subject,term,exam_type',
+                    ignoreDuplicates: false
+                  });
+
+                if (insertError) {
+                  console.error('Batch insert error:', insertError);
+                  // If batch fails, try individual inserts for this batch
+                  for (const record of batch) {
+                    try {
+                      const { error: singleError } = await supabase
+                        .from('results')
+                        .upsert(record, {
+                          onConflict: 'school_id,student_id,subject,term,exam_type'
+                        });
+                      if (!singleError) successCount++;
+                      else errors.push({ reason: singleError.message, record });
+                    } catch (e) {
+                      errors.push({ reason: e.message, record });
+                    }
+                  }
+                } else {
+                  successCount += batch.length;
+                }
+              }
+            }
+
+            res.json({
+              success: true,
+              message: `Imported ${successCount} results. ${skipped} rows had errors.`,
+              imported: successCount,
+              skipped,
+              total: allRows.length,
+              errors: errors.length > 100 ? errors.slice(0, 100).concat({ message: `... and ${errors.length - 100} more errors` }) : errors
+            });
+          } catch (err) {
+            console.error('Import processing error:', err);
+            next(err);
+          }
         })
-        .on('error', (err) => next(err));
+        .on('error', (err) => {
+          console.error('CSV parsing error:', err);
+          next(err);
+        });
     } catch (err) {
+      console.error('Import endpoint error:', err);
       next(err);
     }
   }
