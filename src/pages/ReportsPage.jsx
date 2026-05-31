@@ -931,7 +931,7 @@ export default function ReportsPage({ auth }) {
       apiFetch("/reports/monthly-fee-collection", { token }),
       apiFetch("/reports/attendance-rate",        { token }),
       apiFetch("/reports/fee-defaulters",         { token }),
-      apiFetch("/reports/grade-distribution",     { token }),
+      apiFetch(`/reports/grade-distribution${filterClass !== "all" ? `?class_name=${encodeURIComponent(filterClass)}` : ""}`, { token }),
       apiFetch("/reports/class-fee-summary",      { token }), // New endpoint for class-wise fees
       apiFetch("/reports/expenditure-summary",    { token }),
     ]).then(([s, m, a, d, g, cfs, es]) => {
@@ -968,7 +968,7 @@ export default function ReportsPage({ auth }) {
     return () => {
       ignore = true;
     };
-  }, [auth?.token]);
+  }, [auth?.token, filterClass]);
 
   const tabBtn = id => (
     <button key={id} onClick={() => setTab(id)} style={{
@@ -982,7 +982,7 @@ export default function ReportsPage({ auth }) {
     </button>
   );
 
-  const filteredGrades     = filterClass === "all" ? grades     : grades.filter(g => g.class_name === filterClass);
+  // Grades are now filtered server-side, defaulters are still filtered locally
   const filteredDefaulters = filterClass === "all" ? defaulters : defaulters.filter(d => d.class_name === filterClass);
 
   // Defaulters pagination state
@@ -1200,11 +1200,11 @@ export default function ReportsPage({ auth }) {
             {/* Grade Averages by Subject */}
             <Card style={{ padding: "var(--space-4)" }}>
               <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Grade Averages by Subject</h3>
-              {filteredGrades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
+              {grades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
                 <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
                   <Table 
                     headers={["Class", "Subject", "Average", "Highest", "Lowest", "Entries"]}
-                    data={filteredGrades.map((g, i) => {
+                    data={grades.map((g, i) => {
                       const gInfo = gradeInfo(g.avg_score);
                       return [
                         <span key="class" style={{ color: "var(--color-text-primary)" }}>{g.class_name}</span>,
@@ -1223,10 +1223,10 @@ export default function ReportsPage({ auth }) {
             {/* Grade Distribution by Class */}
             <Card style={{ padding: "var(--space-4)" }}>
               <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Grade Distribution by Class</h3>
-              {filteredGrades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
+              {grades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
                 <div style={{ display: "grid", gap: "var(--space-3)" }}>
-                  {[...new Set(filteredGrades.map(g => g.class_name))].map(clsName => {
-                    const classGrades = filteredGrades.filter(g => g.class_name === clsName);
+                  {[...new Set(grades.map(g => g.class_name))].map(clsName => {
+                    const classGrades = grades.filter(g => g.class_name === clsName);
                     const totalStudents = classGrades.reduce((sum, g) => sum + (g.entries || 0), 0);
                     
                     // Use grade_counts from backend if available, otherwise calculate from avg_score
@@ -1285,13 +1285,13 @@ export default function ReportsPage({ auth }) {
             {/* Grade Distribution by Subject */}
             <Card style={{ padding: "var(--space-4)" }}>
               <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Grade Distribution by Subject</h3>
-              {filteredGrades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
+              {grades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
                 <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
                   <Table 
                     headers={["Subject", "Exam Type", "EE Count", "EE %", "ME Count", "ME %", "AE Count", "AE %", "BE Count", "BE %"]}
-                    data={[...new Set(filteredGrades.map(g => `${g.subject}|${g.exam_type || "All Exams"}`))].map(key => {
+                    data={[...new Set(grades.map(g => `${g.subject}|${g.exam_type || "All Exams"}`))].map(key => {
                       const [subject, examType] = key.split("|");
-                      const subjectData = filteredGrades.filter(g => g.subject === subject && (g.exam_type || "All Exams") === examType);
+                      const subjectData = grades.filter(g => g.subject === subject && (g.exam_type || "All Exams") === examType);
                       const totalEntries = subjectData.reduce((sum, g) => sum + (g.entries || 0), 0);
                       
                       // Use grade_counts from backend if available, otherwise calculate from avg_score

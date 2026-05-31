@@ -94,21 +94,51 @@ router.post("/", requireRoles("admin", "hr", "director"), async (req, res, next)
 
     // Sync to HR staff table
     try {
-      const { data: hrStaff } = await supabase
+      // Check if HR staff exists by email
+      const { data: existingHrStaff } = await supabase
         .from("hr_staff")
-        .upsert({
-          school_id: schoolId,
-          full_name: `${firstName} ${lastName}`,
-          email: email || null,
-          phone: phone || null,
-          department: department || 'Academic',
-          job_title: qualification || 'Teacher',
-          contract_type: 'Permanent',
-          start_date: hireDate || null,
-          status: status || 'active',
-        }, { onConflict: "school_id,email" })
         .select("staff_id")
-        .single();
+        .eq("school_id", schoolId)
+        .eq("email", email)
+        .maybeSingle();
+
+      let hrStaff;
+      if (existingHrStaff) {
+        // Update existing
+        const { data } = await supabase
+          .from("hr_staff")
+          .update({
+            full_name: `${firstName} ${lastName}`,
+            phone: phone || null,
+            department: department || 'Academic',
+            job_title: qualification || 'Teacher',
+            start_date: hireDate || null,
+            status: status || 'active',
+            updated_at: new Date().toISOString(),
+          })
+          .eq("staff_id", existingHrStaff.staff_id)
+          .select("staff_id")
+          .single();
+        hrStaff = data;
+      } else {
+        // Insert new
+        const { data } = await supabase
+          .from("hr_staff")
+          .insert({
+            school_id: schoolId,
+            full_name: `${firstName} ${lastName}`,
+            email: email || null,
+            phone: phone || null,
+            department: department || 'Academic',
+            job_title: qualification || 'Teacher',
+            contract_type: 'Permanent',
+            start_date: hireDate || null,
+            status: status || 'active',
+          })
+          .select("staff_id")
+          .single();
+        hrStaff = data;
+      }
       
       if (hrStaff?.staff_id) {
         // Link teacher record to hr_staff
@@ -236,19 +266,44 @@ router.put("/:id", requireRoles("admin", "hr", "director"), async (req, res, nex
     // Sync updates to HR staff table
     if (email) {
       try {
-        await supabase
+        // Check if HR staff exists by email
+        const { data: existingHrStaff } = await supabase
           .from("hr_staff")
-          .upsert({
-            school_id: schoolId,
-            full_name: `${firstName || ''} ${lastName || ''}`.trim(),
-            email: email,
-            phone: phone || null,
-            department: department || 'Academic',
-            job_title: qualification || 'Teacher',
-            start_date: hireDate || null,
-            status: status || 'active',
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "school_id,email" });
+          .select("staff_id")
+          .eq("school_id", schoolId)
+          .eq("email", email)
+          .maybeSingle();
+
+        if (existingHrStaff) {
+          // Update existing
+          await supabase
+            .from("hr_staff")
+            .update({
+              full_name: `${firstName || ''} ${lastName || ''}`.trim(),
+              phone: phone || null,
+              department: department || 'Academic',
+              job_title: qualification || 'Teacher',
+              start_date: hireDate || null,
+              status: status || 'active',
+              updated_at: new Date().toISOString(),
+            })
+            .eq("staff_id", existingHrStaff.staff_id);
+        } else {
+          // Insert new
+          await supabase
+            .from("hr_staff")
+            .insert({
+              school_id: schoolId,
+              full_name: `${firstName || ''} ${lastName || ''}`.trim(),
+              email: email,
+              phone: phone || null,
+              department: department || 'Academic',
+              job_title: qualification || 'Teacher',
+              contract_type: 'Permanent',
+              start_date: hireDate || null,
+              status: status || 'active',
+            });
+        }
       } catch (e) {
         console.warn("Could not sync teacher update to HR staff:", e.message);
       }
@@ -260,15 +315,66 @@ router.put("/:id", requireRoles("admin", "hr", "director"), async (req, res, nex
   }
 });
 
-// POST /api/teachers/sync-hr - Sync all existing teachers to HR staff table and create user accounts
-router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
+// In-memory job storage (for production, use Redis or database)
+const syncJobs = new Map();
+
+// POST /api/teachers/sync-hr/start - Start sync job and return job ID
+router.post("/sync-hr/start", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    const jobId = `sync-${schoolId}-${Date.now()}`;
     
-    console.log('[SYNC] Starting teacher sync for school:', schoolId);
+    console.log('[SYNC] Starting sync job:', jobId);
     
-    // Increase timeout for long-running sync operations
-    req.setTimeout(600000); // 10 minutes
+    // Initialize job status
+    syncJobs.set(jobId, {
+      status: 'processing',
+      progress: { processed: 0, total: 0 },
+      result: null,
+      error: null,
+      startedAt: new Date().toISOString()
+    });
+    
+    // Return job ID immediately
+    res.json({ jobId });
+    
+    // Process sync in background (fire and forget)
+    processSyncJob(jobId, schoolId).catch(err => {
+      console.error('[SYNC] Job failed:', jobId, err);
+      const job = syncJobs.get(jobId);
+      if (job) {
+        job.status = 'failed';
+        job.error = err.message;
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/teachers/sync-hr/status/:jobId - Get sync job status
+router.get("/sync-hr/status/:jobId", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
+  try {
+    const { jobId } = req.params;
+    const job = syncJobs.get(jobId);
+    
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+    
+    res.json(job);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Background sync job processor
+async function processSyncJob(jobId, schoolId) {
+  const job = syncJobs.get(jobId);
+  if (!job) return;
+  
+  try {
+    console.log('[SYNC] Processing job:', jobId, 'for school:', schoolId);
     
     // Get all teachers
     const { data: teachers, error: teachersError } = await supabase
@@ -278,82 +384,99 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
       .eq("is_deleted", false);
     
     if (teachersError) {
-      console.error('[SYNC] Error fetching teachers:', teachersError);
       throw teachersError;
     }
     
-    console.log('[SYNC] Found', teachers?.length || 0, 'teachers to sync');
+    job.progress.total = teachers?.length || 0;
+    console.log('[SYNC] Found', job.progress.total, 'teachers to sync');
     
     let syncedToHR = 0;
     let userAccountsCreated = 0;
     let userAccountsLinked = 0;
     const errors = [];
     
-    // Process teachers in smaller batches to avoid timeouts
-    const batchSize = 10;
+    // Process teachers in smaller batches
+    const batchSize = 5;
     for (let i = 0; i < (teachers || []).length; i += batchSize) {
       const batch = (teachers || []).slice(i, i + batchSize);
-      console.log(`[SYNC] Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(teachers.length/batchSize)}`);
       
       for (const teacher of batch) {
-        console.log('[SYNC] Processing teacher:', teacher.email);
         try {
           // Step 1: Sync to HR staff table
-          const { data: hrStaff, error: hrError } = await supabase
+          // First check if HR staff exists by email
+          const { data: existingHrStaff } = await supabase
             .from("hr_staff")
-            .upsert({
-              school_id: schoolId,
-              full_name: `${teacher.first_name} ${teacher.last_name}`,
-              email: teacher.email || null,
-              phone: teacher.phone || null,
-              department: teacher.department || 'Academic',
-              job_title: teacher.qualification || 'Teacher',
-              contract_type: 'Permanent',
-              start_date: teacher.hire_date || null,
-              status: teacher.status || 'active',
-            }, { onConflict: "school_id,email" })
             .select("staff_id")
+            .eq("school_id", schoolId)
+            .eq("email", teacher.email)
             .maybeSingle();
+
+          let hrStaff;
+          if (existingHrStaff) {
+            // Update existing
+            const { data, error } = await supabase
+              .from("hr_staff")
+              .update({
+                full_name: `${teacher.first_name} ${teacher.last_name}`,
+                phone: teacher.phone || null,
+                department: teacher.department || 'Academic',
+                job_title: teacher.qualification || 'Teacher',
+                start_date: teacher.hire_date || null,
+                status: teacher.status || 'active',
+                updated_at: new Date().toISOString(),
+              })
+              .eq("staff_id", existingHrStaff.staff_id)
+              .select("staff_id")
+              .single();
+            hrStaff = data;
+            if (error) throw error;
+          } else {
+            // Insert new
+            const { data, error } = await supabase
+              .from("hr_staff")
+              .insert({
+                school_id: schoolId,
+                full_name: `${teacher.first_name} ${teacher.last_name}`,
+                email: teacher.email || null,
+                phone: teacher.phone || null,
+                department: teacher.department || 'Academic',
+                job_title: teacher.qualification || 'Teacher',
+                contract_type: 'Permanent',
+                start_date: teacher.hire_date || null,
+                status: teacher.status || 'active',
+              })
+              .select("staff_id")
+              .single();
+            hrStaff = data;
+            if (error) throw error;
+          }
           
-          if (hrError) {
-            console.error('[SYNC] HR upsert error for', teacher.email, ':', hrError);
-            errors.push({ teacher: teacher.email, error: `HR sync failed: ${hrError.message}` });
-          } else if (hrStaff) {
+          if (hrStaff) {
             syncedToHR++;
           }
           
-          // Step 2: Create or update user account for teacher login
+          // Step 2: Create or update user account
           if (!teacher.email) {
             errors.push({ teacher: `${teacher.first_name} ${teacher.last_name}`, error: 'No email address provided' });
+            job.progress.processed++;
             continue;
           }
           
           const defaultPass = teacher.email.split("@")[0];
           const hash = await bcrypt.hash(defaultPass, 10);
           
-          // Check if user account exists
-          const { data: existingUser, error: userCheckError } = await supabase
+          const { data: existingUser } = await supabase
             .from("users")
             .select("user_id")
             .eq("school_id", schoolId)
             .eq("email", teacher.email)
             .maybeSingle();
           
-          if (userCheckError && userCheckError.code !== 'PGRST116') {
-            console.error('[SYNC] Error checking user account for', teacher.email, ':', userCheckError);
-            errors.push({ teacher: teacher.email, error: `User check failed: ${userCheckError.message}` });
-            continue;
-          }
-          
           let userId;
           
           if (existingUser) {
-            // User exists, update if needed
             userId = existingUser.user_id;
-            console.log('[SYNC] User account exists for', teacher.email);
-            
-            // Update role to teacher if not already
-            const { error: updateError } = await supabase
+            await supabase
               .from("users")
               .update({ 
                 role: "teacher",
@@ -362,13 +485,7 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
                 updated_at: new Date().toISOString()
               })
               .eq("user_id", userId);
-            
-            if (updateError) {
-              console.error('[SYNC] Error updating user account for', teacher.email, ':', updateError);
-              errors.push({ teacher: teacher.email, error: `User update failed: ${updateError.message}` });
-            }
           } else {
-            // Create new user account
             const { data: newUser, error: userError } = await supabase
               .from("users")
               .insert({
@@ -383,14 +500,13 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
               .single();
             
             if (userError) {
-              console.error('[SYNC] Failed to create user account for', teacher.email, ':', userError);
               errors.push({ teacher: teacher.email, error: `User creation failed: ${userError.message}` });
+              job.progress.processed++;
               continue;
             }
             
             userId = newUser.user_id;
             userAccountsCreated++;
-            console.log('[SYNC] Created user account for', teacher.email);
           }
           
           // Step 3: Link teacher to user account
@@ -401,33 +517,88 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
               .eq("teacher_id", teacher.teacher_id);
             
             if (linkError) {
-              console.error('[SYNC] Failed to link teacher to user account for', teacher.email, ':', linkError);
               errors.push({ teacher: teacher.email, error: `Teacher-user link failed: ${linkError.message}` });
             } else {
               userAccountsLinked++;
-              console.log('[SYNC] Linked teacher to user account for', teacher.email);
             }
           }
           
         } catch (e) {
-          console.error('[SYNC] Exception for', teacher.email, ':', e.message);
           errors.push({ teacher: teacher.email, error: e.message });
         }
+        
+        job.progress.processed++;
       }
+      
+      // Update job status in storage
+      syncJobs.set(jobId, { ...job });
     }
     
-    console.log('[SYNC] Sync complete. HR synced:', syncedToHR, 'User accounts created:', userAccountsCreated, 'User accounts linked:', userAccountsLinked, 'Errors:', errors.length);
-    
-    res.json({ 
-      success: true,
+    // Mark job as completed
+    job.status = 'completed';
+    job.result = {
       syncedToHR,
       userAccountsCreated,
       userAccountsLinked,
       total: teachers?.length || 0,
       errors: errors.length > 0 ? errors : undefined
-    });
+    };
+    syncJobs.set(jobId, job);
+    
+    console.log('[SYNC] Job completed:', jobId, 'HR synced:', syncedToHR, 'Users created:', userAccountsCreated);
+    
+    // Clean up old jobs (keep only last 10)
+    if (syncJobs.size > 10) {
+      const keys = Array.from(syncJobs.keys()).slice(0, -10);
+      keys.forEach(key => syncJobs.delete(key));
+    }
   } catch (err) {
-    console.error('[SYNC] Sync endpoint error:', err);
+    console.error('[SYNC] Job processing error:', jobId, err);
+    const job = syncJobs.get(jobId);
+    if (job) {
+      job.status = 'failed';
+      job.error = err.message;
+      syncJobs.set(jobId, job);
+    }
+  }
+}
+
+// POST /api/teachers/sync-hr - Legacy endpoint (deprecated, kept for backward compatibility)
+router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    
+    console.log('[SYNC] Legacy sync endpoint called, redirecting to job-based sync');
+    
+    // Start job and wait for completion (for backward compatibility)
+    const { jobId } = await new Promise((resolve, reject) => {
+      const jobReq = { ...req, user: req.user };
+      router.post("/sync-hr/start")(jobReq, { json: resolve, status: (s) => ({ json: resolve }) }, reject);
+    });
+    
+    // Poll for completion
+    let attempts = 0;
+    const maxAttempts = 60;
+    
+    while (attempts < maxAttempts) {
+      await new Promise(r => setTimeout(r, 1000));
+      
+      const job = syncJobs.get(jobId);
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      
+      if (job.status === 'completed') {
+        return res.json(job.result);
+      } else if (job.status === 'failed') {
+        return res.status(500).json({ message: job.error || "Sync failed" });
+      }
+      
+      attempts++;
+    }
+    
+    res.status(202).json({ message: "Sync still in progress", jobId });
+  } catch (err) {
     next(err);
   }
 });

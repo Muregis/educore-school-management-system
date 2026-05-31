@@ -525,7 +525,8 @@ router.get("/class-fee-summary", async (req, res, next) => {
 router.get("/grade-distribution", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    
+    const { class_name } = req.query;
+
     let grades = null;
     try {
       const { data } = await supabase.rpc('get_grade_distribution', { p_school_id: schoolId });
@@ -533,14 +534,32 @@ router.get("/grade-distribution", async (req, res, next) => {
     } catch {
       grades = null;
     }
-    
+
     // Fallback to simpler query if RPC not available
     if (!grades) {
-      const { data: results, error } = await supabase
+      let query = supabase
         .from('results')
         .select('subject, marks, total_marks, class_id, term, exam_type')
         .eq('school_id', schoolId)
         .eq('is_deleted', false);
+
+      // If class filter is provided, filter by class_id
+      if (class_name) {
+        // First get the class_id for the given class_name
+        const { data: classData } = await supabase
+          .from('classes')
+          .select('class_id')
+          .eq('school_id', schoolId)
+          .eq('class_name', class_name)
+          .eq('is_deleted', false)
+          .single();
+
+        if (classData?.class_id) {
+          query = query.eq('class_id', classData.class_id);
+        }
+      }
+
+      const { data: results, error } = await query;
       if (error) throw error;
 
       // Get class information

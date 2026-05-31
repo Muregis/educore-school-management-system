@@ -110,11 +110,19 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
 
   const normalised = teachers.map(t => t.first_name ? normalise(t) : t);
 
-  const filtered = normalised.filter(t =>
-    `${t.firstName} ${t.lastName} ${t.email} ${(t.subjects||[]).join(" ")} ${(t.classes||[]).join(" ")}`
+  const filtered = normalised.filter(t => {
+    const assignments = assignmentsForTeacher(t);
+    const classNames = assignments.length
+      ? assignments.map(a => a.class_name).filter(Boolean).join(" ")
+      : (t.classes||[]).join(" ");
+    const subjectNames = assignments.length
+      ? assignments.map(a => a.subject_name).filter(Boolean).join(" ")
+      : (t.subjects||[]).join(" ");
+    
+    return `${t.firstName} ${t.lastName} ${t.email} ${subjectNames} ${classNames}`
       .toLowerCase().includes(q.toLowerCase()) &&
-    (status === "all" || t.status === status)
-  );
+      (status === "all" || t.status === status);
+  });
 
   const { pages, rows } = pager(filtered, page);
   useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
@@ -186,58 +194,93 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   };
 
   const syncToHR = async () => {
-    if (!window.confirm("Sync all teachers to HR staff table and create user accounts?\n\nThis will:\n- Create HR records for teachers without them\n- Create user login accounts for teachers\n- Link teachers to their user accounts\n\nDefault password will be the part before @ in their email.\n\nThis may take several minutes. Please do not navigate away.")) return;
+    if (!window.confirm("Sync all teachers to HR staff table and create user accounts?\n\nThis will:\n- Create HR records for teachers without them\n- Create user login accounts for teachers\n- Link teachers to their user accounts\n\nDefault password will be the part before @ in their email.\n\nThis will process teachers in small batches to avoid timeouts.")) return;
 
     console.log("[SYNC] Starting sync, token present:", !!auth?.token);
-    console.log("[SYNC] API_BASE:", (await import("../lib/api.js")).API_BASE);
-    toast("Syncing teachers... This may take a few minutes. Please wait.", "info");
+    toast("Starting sync... This will process teachers in batches.", "info");
 
     isSyncingRef.current = true;
     const syncController = new AbortController();
     syncControllerRef.current = syncController;
 
     try {
-      console.log("[SYNC] About to call apiFetch");
-      const res = await apiFetch("/teachers/sync-hr", {
+      // Start the sync job (returns immediately with a job ID)
+      const { jobId } = await apiFetch("/teachers/sync-hr/start", {
         method: "POST",
         token: auth?.token,
-        timeoutMs: 300000,
-        retries: 0,
+        timeoutMs: 30000,
+        retries: 2,
         signal: syncController.signal
       });
-      console.log("[SYNC] apiFetch completed successfully");
+
+      console.log("[SYNC] Job started with ID:", jobId);
+      toast("Sync job started. Processing teachers...", "info");
+
+      // Poll for job status
+      let pollCount = 0;
+      const maxPolls = 120; // 2 minutes max (1s intervals)
       
-      const { syncedToHR, userAccountsCreated, userAccountsLinked, total, errors } = res;
-      
-      let message = `Synced ${syncedToHR}/${total} teachers to HR. `;
-      message += `Created ${userAccountsCreated} user accounts. `;
-      message += `Linked ${userAccountsLinked} teachers to accounts.`;
-      
-      if (errors && errors.length > 0) {
-        toast(`${message} ${errors.length} errors occurred. Check console for details.`, "warning");
-        console.warn("Sync errors:", errors);
-      } else {
-        toast(message, "success");
+      while (pollCount < maxPolls) {
+        if (syncController.signal.aborted) {
+          throw new Error("Request cancelled.");
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s between polls
+        
+        const status = await apiFetch(`/teachers/sync-hr/status/${jobId}`, {
+          token: auth?.token,
+          timeoutMs: 10000,
+          retries: 1,
+          signal: syncController.signal
+        });
+
+        console.log("[SYNC] Job status:", status);
+
+        if (status.status === 'completed') {
+          const { syncedToHR, userAccountsCreated, userAccountsLinked, total, errors } = status.result;
+          
+          let message = `Synced ${syncedToHR}/${total} teachers to HR. `;
+          message += `Created ${userAccountsCreated} user accounts. `;
+          message += `Linked ${userAccountsLinked} teachers to accounts.`;
+          
+          if (errors && errors.length > 0) {
+            toast(`${message} ${errors.length} errors occurred. Check console for details.`, "warning");
+            console.warn("Sync errors:", errors);
+          } else {
+            toast(message, "success");
+          }
+          
+          // Refresh teacher data
+          const refreshed = await apiFetch("/teachers", { token: auth.token });
+          setTeachers(refreshed.map(normalise));
+          
+          if (canAssign) await loadAssignmentData();
+          break;
+        } else if (status.status === 'failed') {
+          throw new Error(status.error || "Sync failed");
+        } else if (status.status === 'processing') {
+          // Update progress
+          const progress = status.progress || { processed: 0, total: 0 };
+          if (pollCount % 5 === 0) { // Update toast every 5 seconds
+            toast(`Processing teachers: ${progress.processed}/${progress.total}...`, "info");
+          }
+        }
+
+        pollCount++;
       }
-      
-      // Refresh teacher data to get updated user_id links
-      const refreshed = await apiFetch("/teachers", { token: auth.token });
-      setTeachers(refreshed.map(normalise));
-      
-      // Refresh assignment data
-      if (canAssign) await loadAssignmentData();
+
+      if (pollCount >= maxPolls) {
+        toast("Sync is taking longer than expected. It may still be running in the background.", "warning");
+      }
     } catch (err) {
       console.error("Sync error:", err);
       console.error("Error code:", err.code);
       console.error("Error message:", err.message);
-      console.error("Error name:", err.name);
-      console.error("Error stack:", err.stack);
       
-      // Handle AbortError specifically (error code 20 is DOMException.ABORT_ERR)
       if (err.name === 'AbortError' || err.code === 20 || err.code === 'EABORT' || err.message.includes('cancelled') || err.message.includes('aborted')) {
-        toast("Sync was interrupted. This may be due to network issues or page navigation. Please try again.", "error");
+        toast("Sync was interrupted. Please try again.", "error");
       } else if (err.code === 'ETIMEOUT') {
-        toast("Sync timed out. The operation may still be running in the background. Please check your teacher records.", "warning");
+        toast("Request timed out. Please try again.", "error");
       } else {
         toast(err.message || "Sync failed. Please try again.", "error");
       }
