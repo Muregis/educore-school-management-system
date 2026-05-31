@@ -170,10 +170,13 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const syncToHR = async () => {
     if (!window.confirm("Sync all teachers to HR staff table and create user accounts?\n\nThis will:\n- Create HR records for teachers without them\n- Create user login accounts for teachers\n- Link teachers to their user accounts\n\nDefault password will be the part before @ in their email.\n\nThis may take several minutes. Please do not navigate away.")) return;
     
+    console.log("[SYNC] Starting sync, token present:", !!auth?.token);
     toast("Syncing teachers... This may take a few minutes. Please wait.", "info");
     
     try {
+      console.log("[SYNC] About to call apiFetch");
       const res = await apiFetch("/teachers/sync-hr", { method: "POST", token: auth?.token, timeoutMs: 600000, retries: 3 });
+      console.log("[SYNC] apiFetch completed successfully");
       
       const { syncedToHR, userAccountsCreated, userAccountsLinked, total, errors } = res;
       

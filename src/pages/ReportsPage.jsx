@@ -1269,24 +1269,122 @@ export default function ReportsPage({ auth }) {
 
         {/* ── Grades ── */}
         {tab === "grades" && (
-          <Card style={{ padding: "var(--space-4)" }}>
-            <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Grade Averages by Subject</h3>
-            {filteredGrades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
-              <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
-                <Table 
-                  headers={["Class", "Subject", "Average", "Highest", "Lowest", "Entries"]}
-                  data={filteredGrades.map((g, i) => [
-                    <span key="class" style={{ color: "var(--color-text-primary)" }}>{g.class_name}</span>,
-                    <span key="subject" style={{ color: "var(--color-text-secondary)" }}>{g.subject}</span>,
-                    <span key="avg" style={{ fontWeight: 700, color: Number(g.avg_score) >= 70 ? "var(--color-success)" : Number(g.avg_score) >= 50 ? "var(--color-warning)" : "var(--color-danger)" }}>{g.avg_score}</span>,
-                    <span key="high" style={{ color: "var(--color-success)", fontWeight: 600 }}>{g.highest}</span>,
-                    <span key="low" style={{ color: "var(--color-danger)", fontWeight: 600 }}>{g.lowest}</span>,
-                    <span key="entries" style={{ color: "var(--color-text-muted)" }}>{g.entries}</span>
-                  ])}
-                />
-              </div>
-            )}
-          </Card>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+            {/* Grade Averages by Subject */}
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Grade Averages by Subject</h3>
+              {filteredGrades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
+                <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                  <Table 
+                    headers={["Class", "Subject", "Average", "Highest", "Lowest", "Entries"]}
+                    data={filteredGrades.map((g, i) => {
+                      const gInfo = gradeInfo(g.avg_score);
+                      return [
+                        <span key="class" style={{ color: "var(--color-text-primary)" }}>{g.class_name}</span>,
+                        <span key="subject" style={{ color: "var(--color-text-secondary)" }}>{g.subject}</span>,
+                        <span key="avg" style={{ fontWeight: 700, color: gInfo.color }}>{g.avg_score}</span>,
+                        <span key="high" style={{ color: "var(--color-success)", fontWeight: 600 }}>{g.highest}</span>,
+                        <span key="low" style={{ color: "var(--color-danger)", fontWeight: 600 }}>{g.lowest}</span>,
+                        <span key="entries" style={{ color: "var(--color-text-muted)" }}>{g.entries}</span>
+                      ];
+                    })}
+                  />
+                </div>
+              )}
+            </Card>
+
+            {/* Grade Distribution by Class */}
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Grade Distribution by Class</h3>
+              {filteredGrades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
+                <div style={{ display: "grid", gap: "var(--space-3)" }}>
+                  {[...new Set(filteredGrades.map(g => g.class_name))].map(clsName => {
+                    const classGrades = filteredGrades.filter(g => g.class_name === clsName);
+                    const totalStudents = classGrades.reduce((sum, g) => sum + (g.entries || 0), 0);
+                    
+                    // Calculate grade distribution
+                    const gradeCounts = { EE: 0, ME: 0, AE: 0, BE: 0 };
+                    classGrades.forEach(g => {
+                      if (g.avg_score >= 80) gradeCounts.EE += g.entries || 0;
+                      else if (g.avg_score >= 60) gradeCounts.ME += g.entries || 0;
+                      else if (g.avg_score >= 40) gradeCounts.AE += g.entries || 0;
+                      else gradeCounts.BE += g.entries || 0;
+                    });
+
+                    return (
+                      <div key={clsName} style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
+                          <div style={{ fontWeight: 700, color: "var(--color-text-primary)", fontSize: "16px" }}>{clsName}</div>
+                          <div style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>{totalStudents} total entries</div>
+                        </div>
+                        
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "var(--space-2)" }}>
+                          {[
+                            { grade: "EE", label: "Exceeds Expectations", color: "var(--color-success)", count: gradeCounts.EE },
+                            { grade: "ME", label: "Meets Expectations", color: "var(--color-info)", count: gradeCounts.ME },
+                            { grade: "AE", label: "Approaching Expectations", color: "var(--color-warning)", count: gradeCounts.AE },
+                            { grade: "BE", label: "Below Expectations", color: "var(--color-danger)", count: gradeCounts.BE },
+                          ].map(({ grade, label, color, count }) => {
+                            const pct = totalStudents > 0 ? (count / totalStudents * 100).toFixed(1) : 0;
+                            return (
+                              <div key={grade} style={{ background: "var(--color-bg-surface)", border: `1px solid ${color}`, borderRadius: "var(--radius-md)", padding: "var(--space-2)" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                                  <Badge text={grade} style={{ background: color, color: "#fff", borderColor: "transparent" }} />
+                                  <span style={{ fontWeight: 700, color, fontSize: "14px" }}>{count}</span>
+                                </div>
+                                <div style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>{pct}%</div>
+                                <div style={{ height: "4px", background: "var(--color-bg-base)", borderRadius: "var(--radius-full)", marginTop: "6px", overflow: "hidden" }}>
+                                  <div style={{ width: `${pct}%`, background: color, height: "100%", borderRadius: "var(--radius-full)" }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+
+            {/* Grade Distribution by Subject */}
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Grade Distribution by Subject</h3>
+              {filteredGrades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
+                <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                  <Table 
+                    headers={["Subject", "EE Count", "EE %", "ME Count", "ME %", "AE Count", "AE %", "BE Count", "BE %"]}
+                    data={[...new Set(filteredGrades.map(g => g.subject))].map(subject => {
+                      const subjectData = filteredGrades.filter(g => g.subject === subject);
+                      const totalEntries = subjectData.reduce((sum, g) => sum + (g.entries || 0), 0);
+                      
+                      const gradeCounts = { EE: 0, ME: 0, AE: 0, BE: 0 };
+                      subjectData.forEach(g => {
+                        if (g.avg_score >= 80) gradeCounts.EE += g.entries || 0;
+                        else if (g.avg_score >= 60) gradeCounts.ME += g.entries || 0;
+                        else if (g.avg_score >= 40) gradeCounts.AE += g.entries || 0;
+                        else gradeCounts.BE += g.entries || 0;
+                      });
+
+                      const pct = (count) => totalEntries > 0 ? (count / totalEntries * 100).toFixed(1) + "%" : "0%";
+
+                      return [
+                        <span key="subject" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{subject}</span>,
+                        <span key="ee_count" style={{ color: "var(--color-success)", fontWeight: 600 }}>{gradeCounts.EE}</span>,
+                        <span key="ee_pct" style={{ color: "var(--color-text-secondary)" }}>{pct(gradeCounts.EE)}</span>,
+                        <span key="me_count" style={{ color: "var(--color-info)", fontWeight: 600 }}>{gradeCounts.ME}</span>,
+                        <span key="me_pct" style={{ color: "var(--color-text-secondary)" }}>{pct(gradeCounts.ME)}</span>,
+                        <span key="ae_count" style={{ color: "var(--color-warning)", fontWeight: 600 }}>{gradeCounts.AE}</span>,
+                        <span key="ae_pct" style={{ color: "var(--color-text-secondary)" }}>{pct(gradeCounts.AE)}</span>,
+                        <span key="be_count" style={{ color: "var(--color-danger)", fontWeight: 600 }}>{gradeCounts.BE}</span>,
+                        <span key="be_pct" style={{ color: "var(--color-text-secondary)" }}>{pct(gradeCounts.BE)}</span>,
+                      ];
+                    })}
+                  />
+                </div>
+              )}
+            </Card>
+          </div>
         )}
 
         {/* ── Defaulters ── */}
