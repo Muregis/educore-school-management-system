@@ -96,7 +96,7 @@ router.get("/summary", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { term } = req.query; // Allow term filtering via query param
-    const currentTerm = term || 'Term 2'; // Default to Term 2 if not specified
+    const currentTerm = term; // No default - require term parameter
     const expenditureSummary = await getExpenditureSummary(schoolId);
     
     // Get student counts by gender
@@ -361,7 +361,7 @@ router.get("/fee-defaulters", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { term } = req.query; // Allow term filtering via query param
-    const currentTerm = term || 'Term 2'; // Default to Term 2 if not specified
+    const currentTerm = term; // No default - require term parameter
 
     const { data: allStudents, error: stuErr } = await supabase
       .from('students')
@@ -443,7 +443,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { term } = req.query; // Allow term filtering via query param
-    const currentTerm = term || 'Term 2'; // Default to Term 2 if not specified
+    const currentTerm = term; // No default - require term parameter
     
     // Get all students
     const { data: allStudents, error: stuErr } = await supabase

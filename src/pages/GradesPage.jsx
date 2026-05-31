@@ -633,7 +633,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
               </select>
             </Field>
             <Field label="Term">
-              <select style={inputStyle} value={term === "all" ? "Term 2" : term} onChange={e => setTerm(e.target.value)}>
+              <select style={inputStyle} value={term === "all" ? (currentTerm || "Term 1") : term} onChange={e => setTerm(e.target.value)}>
                 <option value="Term 1">Term 1</option>
                 <option value="Term 2">Term 2</option>
                 <option value="Term 3">Term 3</option>

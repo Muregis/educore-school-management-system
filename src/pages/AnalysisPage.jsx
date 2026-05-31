@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
+import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -81,14 +82,15 @@ function buildInterventions(subjectRankings, streamAverages) {
 
 // ─── Analysis Tab ──────────────────────────────────────────────────────────
 export default function AnalysisTabNew({ auth }) {
+  const { term: currentTerm } = useCurrentTerm(auth);
   const [data, setData]           = useState(null);
   const [loading, setLoading]     = useState(false);
   const [aiReport, setAiReport]   = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError]     = useState("");
-  const [term, setTerm]           = useState("Term 2");
+  const [term, setTerm]           = useState(currentTerm || "");
   const [className, setClassName] = useState("");
-  const [availTerms, setAvailTerms]     = useState(["Term 1","Term 2","Term 3"]);
+  const [availTerms, setAvailTerms]     = useState([]);
   const [availClasses, setAvailClasses] = useState([]);
   const [activeStream, setActiveStream] = useState(null);
   const [reportMode, setReportMode]     = useState("visual"); // "visual" | "ai"
@@ -127,6 +129,13 @@ export default function AnalysisTabNew({ auth }) {
   }, [auth, term, className]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Update term when currentTerm changes
+  useEffect(() => {
+    if (currentTerm && currentTerm !== term) {
+      setTerm(currentTerm);
+    }
+  }, [currentTerm, term]);
 
   // Build a compact dataset string to send to Claude
   const buildDataset = () => {

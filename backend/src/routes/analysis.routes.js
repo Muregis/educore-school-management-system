@@ -9,8 +9,12 @@ const router = Router();
 router.get("/streams", authRequired, async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const term = req.query.term || "Term 2";
+    const term = req.query.term;
     const className = req.query.class_name || null;
+
+    if (!term) {
+      return res.status(400).json({ error: "Term parameter is required" });
+    }
 
     // Pull the minimal raw rows and aggregate in JS.
     // This avoids pgPool + auth.jwt() failures (Tenant or user not found).
@@ -433,8 +437,12 @@ router.get("/top-students", authRequired, async (req, res, next) => {
 router.get("/student-rankings", authRequired, async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const term = req.query.term || "Term 2";
+    const term = req.query.term;
     const className = req.query.class_name || null;
+
+    if (!term) {
+      return res.status(400).json({ error: "Term parameter is required" });
+    }
 
     const { data: raw, error: resultsErr } = await supabase
       .from("results")
@@ -546,8 +554,12 @@ router.get("/student-rankings", authRequired, async (req, res, next) => {
 router.get("/class-stats", authRequired, async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const term = req.query.term || "Term 2";
+    const term = req.query.term;
     const className = req.query.class_name || null;
+
+    if (!term) {
+      return res.status(400).json({ error: "Term parameter is required" });
+    }
 
     const { data: raw, error: resultsErr } = await supabase
       .from("results")
