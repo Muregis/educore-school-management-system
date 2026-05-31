@@ -35,12 +35,13 @@ export async function apiFetch(
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
     if (signal) {
-      if (signal.aborted) controller.abort();
+      if (signal.aborted) { console.log('[apiFetch] Signal already aborted, throwing EABORT'); const e = new Error('Request cancelled.'); e.code = 'EABORT'; throw e; }
       else signal.addEventListener("abort", () => controller.abort(), { once: true });
     }
 
     const timeoutId = setTimeout(() => {
       timedOut = true;
+      console.log('[apiFetch] Timeout reached, aborting controller');
       controller.abort();
     }, timeoutMs);
     
@@ -104,3 +105,6 @@ export async function apiFetch(
     }
   }
 }
+
+
+
