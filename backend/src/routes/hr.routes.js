@@ -597,30 +597,65 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
     const teacherRegex = /teacher|tutor|instructor|lecturer/i;
     const teachersToSync = staff.filter(s => teacherRegex.test(s.job_title || s.department || ""));
     
-    let synced = 0;
-    for (const s of teachersToSync) {
+    // Prepare batch data for upsert
+    const teachersData = teachersToSync.map(s => {
       const firstName = s.full_name.split(' ')[0] || s.full_name;
       const lastName = s.full_name.split(' ').slice(1).join(' ') || '';
-      const teacherEmail = s.email || `hr-teacher-${s.staff_id}@local.invalid`;
-      
-      let { error: upsertError } = await supabase
-        .from('teachers')
-        .upsert({
+      const teacherEmail = s.email || 'hr-teacher-' + s.staff_id + '@local.invalid';
+
+      return {
+        school_id: schoolId,
+        first_name: firstName,
+        last_name: lastName,
+        email: teacherEmail,
+        phone: s.phone || null,
+        staff_number: s.staff_number || 'HR-' + s.staff_id,
+        national_id: s.national_id || null,
+        qualification: s.job_title,
+        status: s.status,
+        hire_date: s.start_date || null,
+        department: s.department || null,
+      };
+    });
+
+    // Try batch upsert first
+    let { error: upsertError } = await supabase
+      .from('teachers')
+      .upsert(teachersData, { onConflict: 'school_id,email' });
+
+    // If batch fails due to missing columns, try simplified batch
+    if (upsertError && isMissingColumnError(upsertError)) {
+      const simplifiedData = teachersToSync.map(s => {
+        const firstName = s.full_name.split(' ')[0] || s.full_name;
+        const lastName = s.full_name.split(' ').slice(1).join(' ') || '';
+        const teacherEmail = s.email || 'hr-teacher-' + s.staff_id + '@local.invalid';
+
+        return {
           school_id: schoolId,
           first_name: firstName,
           last_name: lastName,
           email: teacherEmail,
           phone: s.phone || null,
-          staff_number: s.staff_number || `HR-${s.staff_id}`,
-          national_id: s.national_id || null,
-          qualification: s.job_title,
-          status: s.status,
-          hire_date: s.start_date || null,
-          department: s.department || null,
-        }, { onConflict: 'school_id,email' }); 
+          qualification: s.job_title || s.department || 'Teacher',
+          status: s.status || 'active',
+        };
+      });
 
-      if (upsertError && isMissingColumnError(upsertError)) {
-        ({ error: upsertError } = await supabase
+      ({ error: upsertError } = await supabase
+        .from('teachers')
+        .upsert(simplifiedData, { onConflict: 'school_id,email' }));
+    }
+
+    if (upsertError) {
+      console.error('Batch sync error:', upsertError.message);
+      // Fall back to sequential if batch fails
+      let synced = 0;
+      for (const s of teachersToSync) {
+        const firstName = s.full_name.split(' ')[0] || s.full_name;
+        const lastName = s.full_name.split(' ').slice(1).join(' ') || '';
+        const teacherEmail = s.email || 'hr-teacher-' + s.staff_id + '@local.invalid';
+
+        let { error: singleError } = await supabase
           .from('teachers')
           .upsert({
             school_id: schoolId,
@@ -630,14 +665,15 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
             phone: s.phone || null,
             qualification: s.job_title || s.department || 'Teacher',
             status: s.status || 'active',
-          }, { onConflict: 'school_id,email' }));
+          }, { onConflict: 'school_id,email' });
+
+        if (!singleError) synced++;
+        else console.error('Sync error for ' + s.full_name + ':', singleError.message);
       }
-      
-      if (!upsertError) synced++;
-      else console.error(`Sync error for ${s.full_name}:`, upsertError.message);
+      return res.json({ synced, message: 'Sync completed with fallback to sequential processing' });
     }
-    
-    res.json({ synced });
+
+    res.json({ synced: teachersToSync.length, message: 'Successfully synced ' + teachersToSync.length + ' teachers' });
   } catch (err) { next(err); }
 });
 
