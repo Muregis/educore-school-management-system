@@ -878,6 +878,7 @@ Keep the tone professional but simple enough for a school administrator to act o
                     </div>
                   );
                 })}
+              )}
               </div>
             </Card>
           )}
