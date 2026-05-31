@@ -479,4 +479,73 @@ router.get("/:id", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ─── PUT /:id ───────────────────────────────────────────────────────────────
+router.put("/:id", async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { subject, term, examType, marks, totalMarks, teacherComment } = req.body;
+
+    // Calculate grade from marks
+    const total = Number(totalMarks) || 100;
+    const percentage = total > 0 ? (Number(marks) / total) * 100 : 0;
+    const calculatedGrade = knecGrade(percentage);
+
+    const { data: result, error: fetchError } = await supabase
+      .from('results')
+      .select('result_id')
+      .eq('result_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (fetchError || !result) return res.status(404).json({ message: "Result not found" });
+
+    const { error: updateError } = await supabase
+      .from('results')
+      .update({
+        subject: subject,
+        term: term,
+        exam_type: examType,
+        marks: marks,
+        total_marks: total,
+        grade: calculatedGrade.level,
+        teacher_comment: teacherComment || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('result_id', req.params.id)
+      .eq('school_id', schoolId);
+
+    if (updateError) throw updateError;
+
+    res.json({ updated: true });
+  } catch (err) { next(err); }
+});
+
+// ─── DELETE /:id ───────────────────────────────────────────────────────────
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+
+    const { data: result, error: fetchError } = await supabase
+      .from('results')
+      .select('result_id')
+      .eq('result_id', req.params.id)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (fetchError || !result) return res.status(404).json({ message: "Result not found" });
+
+    const { error: deleteError } = await supabase
+      .from('results')
+      .update({ is_deleted: true, updated_at: new Date().toISOString() })
+      .eq('result_id', req.params.id)
+      .eq('school_id', schoolId);
+
+    if (deleteError) throw deleteError;
+
+    res.json({ deleted: true });
+  } catch (err) { next(err); }
+});
+
 export default router;
