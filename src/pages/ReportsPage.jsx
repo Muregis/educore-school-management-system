@@ -13,7 +13,7 @@ import Table from "../components/ui/Table";
 import EmptyState from "../components/ui/EmptyState";
 
 // Use shared grading utility instead of local definition
-  const gradeInfo = (score) => {
+const gradeInfo = (score) => {
   const grade = calculateGrade(score, 'CBC');
   return {
     label: grade.grade,
@@ -826,10 +826,13 @@ Keep the tone professional but simple enough for a school administrator to act o
 
               {/* Leaderboard */}
               <div style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
-                {(topClass
-                  ? topStudents.byClass.filter(s => s.class_name === topClass)
-                  : topStudents.overall
-                ).map((s, i) => {
+                {(!topStudents || (!topStudents.overall && !topStudents.byClass)) ? (
+                  <p style={{ padding: "var(--space-3)", color: "var(--color-text-muted)" }}>No student data yet.</p>
+                ) : (
+                  (topClass
+                    ? (topStudents.byClass || []).filter(s => s.class_name === topClass)
+                    : (topStudents.overall || [])
+                  ).map((s, i) => {
                   const g = gradeInfo(s.avg_score);
                   const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
                   return (
@@ -983,7 +986,8 @@ export default function ReportsPage({ auth }) {
   );
 
   // Grades are now filtered server-side, defaulters are still filtered locally
-  const filteredDefaulters = filterClass === "all" ? defaulters : defaulters.filter(d => d.class_name === filterClass);
+  const filteredDefaulters = (!defaulters || defaulters.length === 0) ? [] : 
+    (filterClass === "all" ? defaulters : defaulters.filter(d => d.class_name === filterClass));
 
   // Defaulters pagination state
   const [defaultersPage, setDefaultersPage] = useState(1);
