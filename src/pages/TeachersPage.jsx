@@ -168,12 +168,12 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   };
 
   const syncToHR = async () => {
-    if (!window.confirm("Sync all teachers to HR staff table and create user accounts?\n\nThis will:\n- Create HR records for teachers without them\n- Create user login accounts for teachers\n- Link teachers to their user accounts\n\nDefault password will be the part before @ in their email.")) return;
+    if (!window.confirm("Sync all teachers to HR staff table and create user accounts?\n\nThis will:\n- Create HR records for teachers without them\n- Create user login accounts for teachers\n- Link teachers to their user accounts\n\nDefault password will be the part before @ in their email.\n\nThis may take several minutes. Please do not navigate away.")) return;
     
-    toast("Syncing teachers... This may take a moment.", "info");
+    toast("Syncing teachers... This may take a few minutes. Please wait.", "info");
     
     try {
-      const res = await apiFetch("/teachers/sync-hr", { method: "POST", token: auth?.token, timeoutMs: 300000 });
+      const res = await apiFetch("/teachers/sync-hr", { method: "POST", token: auth?.token, timeoutMs: 600000, retries: 3 });
       
       const { syncedToHR, userAccountsCreated, userAccountsLinked, total, errors } = res;
       
@@ -196,7 +196,13 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
       if (canAssign) await loadAssignmentData();
     } catch (err) {
       console.error("Sync error:", err);
-      toast(err.message || "Sync failed. Please try again.", "error");
+      if (err.code === 'EABORT' || err.message.includes('cancelled')) {
+        toast("Sync was cancelled. Please try again and do not navigate away.", "error");
+      } else if (err.code === 'ETIMEOUT') {
+        toast("Sync timed out. The operation may still be running in the background. Please check your teacher records.", "warning");
+      } else {
+        toast(err.message || "Sync failed. Please try again.", "error");
+      }
     }
   };
 
