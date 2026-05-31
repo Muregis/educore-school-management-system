@@ -336,7 +336,6 @@ router.post(
                   exam_name: row.exam_type?.trim() || fallbackExamType,
                   academic_year: row.academic_year?.trim() || new Date().getFullYear().toString(),
                   class_name: row.class_name?.trim() || student.class_name,
-                  entered_by: userId,
                   is_deleted: false
                 });
               } catch (err) {
