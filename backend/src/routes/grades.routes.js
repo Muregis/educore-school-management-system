@@ -108,15 +108,8 @@ function displaySubjectFromHeader(header) {
 function expandImportRows(rows, fallbackExamType) {
   const expanded = [];
 
-  // If fallback is 'all', require exam_type to be specified in CSV
-  const requireExamType = fallbackExamType === 'all';
-
   for (const row of rows) {
     if (row.subject || row.marks !== undefined) {
-      if (requireExamType && !row.exam_type) {
-        // Skip rows without exam_type when fallback is 'all'
-        continue;
-      }
       expanded.push({ ...row, exam_type: row.exam_type || fallbackExamType });
       continue;
     }
@@ -126,10 +119,6 @@ function expandImportRows(rows, fallbackExamType) {
     );
 
     for (const key of subjectKeys) {
-      if (requireExamType && !row.exam_type) {
-        // Skip rows without exam_type when fallback is 'all'
-        continue;
-      }
       expanded.push({
         admission_number: row.admission_number,
         subject: displaySubjectFromHeader(key),
@@ -213,7 +202,6 @@ router.post(
     try {
       const { schoolId, userId } = req.user;
       const fallbackExamType = String(req.query.examType || req.body?.examType || 'Mid-Term').trim() || 'Mid-Term';
-      console.log('[CSV Import] Exam type from query:', req.query.examType, 'Fallback:', fallbackExamType);
 
       if (!req.file) {
         return res.status(400).json({ message: 'CSV file is required' });

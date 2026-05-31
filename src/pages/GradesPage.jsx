@@ -472,7 +472,6 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                   
                   try {
                     const token = auth?.token || sessionStorage.getItem("token");
-                    console.log('[CSV Import] Exam type being sent:', examType);
                     const res = await fetch(`${API_BASE}/grades/import?examType=${encodeURIComponent(examType)}`, {
                       method: "POST",
                       headers: getAuthHeaders(token),
