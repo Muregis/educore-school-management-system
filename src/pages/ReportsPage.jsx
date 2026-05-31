@@ -183,7 +183,7 @@ function buildInterventions(subjectRankings, streamAverages) {
 }
 
 // ─── Analysis Tab ──────────────────────────────────────────────────────────
-export default function AnalysisTabNew({ auth }) {
+function AnalysisTab({ auth }) {
   const [data, setData]           = useState(null);
   const [loading, setLoading]     = useState(false);
   const [aiReport, setAiReport]   = useState("");
@@ -958,7 +958,7 @@ Keep the tone professional but simple enough for a school administrator to act o
   );
 }
 
-AnalysisTabNew.propTypes = { auth: PropTypes.object };
+AnalysisTab.propTypes = { auth: PropTypes.object };
 
 // ─── Main ReportsPage ──────────────────────────────────────────────────────
 export default function ReportsPage({ auth }) {
