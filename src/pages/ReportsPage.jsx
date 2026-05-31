@@ -125,26 +125,21 @@ function AnalysisTab({ auth }) {
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Computed values - use useMemo to ensure proper initialization
-  const streamSorted = useMemo(() => 
-    (data && data.streamAverages) ? [...data.streamAverages].sort((a,b) => b.avg_score - a.avg_score) : [],
-    [data]
-  );
-  
-  const byClass = useMemo(() => {
-    const result = {};
-    streamSorted.forEach(s => {
-      if (!result[s.class_name]) result[s.class_name] = [];
-      result[s.class_name].push(s);
+  const { streamSorted, byClass, interventions } = useMemo(() => {
+    const sorted = (data && data.streamAverages) ? [...data.streamAverages].sort((a,b) => b.avg_score - a.avg_score) : [];
+    
+    const classMap = {};
+    sorted.forEach(s => {
+      if (!classMap[s.class_name]) classMap[s.class_name] = [];
+      classMap[s.class_name].push(s);
     });
-    return result;
-  }, [streamSorted]);
-  
-  const interventions = useMemo(() =>
-    (data && data.subjectRankings && data.streamAverages) 
+    
+    const ints = (data && data.subjectRankings && data.streamAverages) 
       ? buildInterventions(data.subjectRankings || [], data.streamAverages || []) 
-      : [],
-    [data]
-  );
+      : [];
+    
+    return { streamSorted: sorted, byClass: classMap, interventions: ints };
+  }, [data]);
 
   const load = useCallback(async () => {
     if (!auth?.token) return;

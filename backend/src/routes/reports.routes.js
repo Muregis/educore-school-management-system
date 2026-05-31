@@ -549,16 +549,26 @@ router.get("/grade-distribution", async (req, res, next) => {
       // If class filter is provided, filter by class_id
       if (class_name) {
         // First get the class_id for the given class_name
-        const { data: classData } = await supabase
+        console.log(`[grade-distribution] Looking up class: ${class_name}`);
+        const { data: classData, error: classError } = await supabase
           .from('classes')
           .select('class_id')
           .eq('school_id', schoolId)
           .eq('class_name', class_name)
           .eq('is_deleted', false)
-          .single();
+          .maybeSingle(); // Use maybeSingle to avoid error if not found
+
+        if (classError) {
+          console.error('[grade-distribution] Error fetching class:', classError);
+        }
 
         if (classData?.class_id) {
+          console.log(`[grade-distribution] Found class_id: ${classData.class_id}`);
           query = query.eq('class_id', classData.class_id);
+        } else {
+          console.log(`[grade-distribution] Class not found: ${class_name}, returning empty results`);
+          // Return empty results if class not found
+          return res.json([]);
         }
       }
 
