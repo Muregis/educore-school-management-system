@@ -267,6 +267,9 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
     
     console.log('[SYNC] Starting teacher sync for school:', schoolId);
     
+    // Increase timeout for long-running sync operations
+    req.setTimeout(300000); // 5 minutes
+    
     // Get all teachers
     const { data: teachers, error: teachersError } = await supabase
       .from("teachers")
@@ -286,123 +289,130 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
     let userAccountsLinked = 0;
     const errors = [];
     
-    for (const teacher of (teachers || [])) {
-      console.log('[SYNC] Processing teacher:', teacher.email);
-      try {
-        // Step 1: Sync to HR staff table
-        const { data: hrStaff, error: hrError } = await supabase
-          .from("hr_staff")
-          .upsert({
-            school_id: schoolId,
-            full_name: `${teacher.first_name} ${teacher.last_name}`,
-            email: teacher.email || null,
-            phone: teacher.phone || null,
-            department: teacher.department || 'Academic',
-            job_title: teacher.qualification || 'Teacher',
-            contract_type: 'Permanent',
-            start_date: teacher.hire_date || null,
-            status: teacher.status || 'active',
-          }, { onConflict: "school_id,email" })
-          .select("staff_id")
-          .maybeSingle();
-        
-        if (hrError) {
-          console.error('[SYNC] HR upsert error for', teacher.email, ':', hrError);
-          errors.push({ teacher: teacher.email, error: `HR sync failed: ${hrError.message}` });
-        } else if (hrStaff) {
-          syncedToHR++;
-        }
-        
-        // Step 2: Create or update user account for teacher login
-        if (!teacher.email) {
-          errors.push({ teacher: `${teacher.first_name} ${teacher.last_name}`, error: 'No email address provided' });
-          continue;
-        }
-        
-        const defaultPass = teacher.email.split("@")[0];
-        const hash = await bcrypt.hash(defaultPass, 10);
-        
-        // Check if user account exists
-        const { data: existingUser, error: userCheckError } = await supabase
-          .from("users")
-          .select("user_id")
-          .eq("school_id", schoolId)
-          .eq("email", teacher.email)
-          .maybeSingle();
-        
-        if (userCheckError && userCheckError.code !== 'PGRST116') {
-          console.error('[SYNC] Error checking user account for', teacher.email, ':', userCheckError);
-          errors.push({ teacher: teacher.email, error: `User check failed: ${userCheckError.message}` });
-          continue;
-        }
-        
-        let userId;
-        
-        if (existingUser) {
-          // User exists, update if needed
-          userId = existingUser.user_id;
-          console.log('[SYNC] User account exists for', teacher.email);
-          
-          // Update role to teacher if not already
-          const { error: updateError } = await supabase
-            .from("users")
-            .update({ 
-              role: "teacher",
-              status: "active",
-              full_name: `${teacher.first_name} ${teacher.last_name}`,
-              updated_at: new Date().toISOString()
-            })
-            .eq("user_id", userId);
-          
-          if (updateError) {
-            console.error('[SYNC] Error updating user account for', teacher.email, ':', updateError);
-            errors.push({ teacher: teacher.email, error: `User update failed: ${updateError.message}` });
-          }
-        } else {
-          // Create new user account
-          const { data: newUser, error: userError } = await supabase
-            .from("users")
-            .insert({
+    // Process teachers in smaller batches to avoid timeouts
+    const batchSize = 10;
+    for (let i = 0; i < (teachers || []).length; i += batchSize) {
+      const batch = (teachers || []).slice(i, i + batchSize);
+      console.log(`[SYNC] Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(teachers.length/batchSize)}`);
+      
+      for (const teacher of batch) {
+        console.log('[SYNC] Processing teacher:', teacher.email);
+        try {
+          // Step 1: Sync to HR staff table
+          const { data: hrStaff, error: hrError } = await supabase
+            .from("hr_staff")
+            .upsert({
               school_id: schoolId,
               full_name: `${teacher.first_name} ${teacher.last_name}`,
-              email: teacher.email,
-              password_hash: hash,
-              role: "teacher",
-              status: "active",
-            })
-            .select("user_id")
-            .single();
+              email: teacher.email || null,
+              phone: teacher.phone || null,
+              department: teacher.department || 'Academic',
+              job_title: teacher.qualification || 'Teacher',
+              contract_type: 'Permanent',
+              start_date: teacher.hire_date || null,
+              status: teacher.status || 'active',
+            }, { onConflict: "school_id,email" })
+            .select("staff_id")
+            .maybeSingle();
           
-          if (userError) {
-            console.error('[SYNC] Failed to create user account for', teacher.email, ':', userError);
-            errors.push({ teacher: teacher.email, error: `User creation failed: ${userError.message}` });
+          if (hrError) {
+            console.error('[SYNC] HR upsert error for', teacher.email, ':', hrError);
+            errors.push({ teacher: teacher.email, error: `HR sync failed: ${hrError.message}` });
+          } else if (hrStaff) {
+            syncedToHR++;
+          }
+          
+          // Step 2: Create or update user account for teacher login
+          if (!teacher.email) {
+            errors.push({ teacher: `${teacher.first_name} ${teacher.last_name}`, error: 'No email address provided' });
             continue;
           }
           
-          userId = newUser.user_id;
-          userAccountsCreated++;
-          console.log('[SYNC] Created user account for', teacher.email);
-        }
-        
-        // Step 3: Link teacher to user account
-        if (userId && teacher.user_id !== userId) {
-          const { error: linkError } = await supabase
-            .from("teachers")
-            .update({ user_id: userId })
-            .eq("teacher_id", teacher.teacher_id);
+          const defaultPass = teacher.email.split("@")[0];
+          const hash = await bcrypt.hash(defaultPass, 10);
           
-          if (linkError) {
-            console.error('[SYNC] Failed to link teacher to user account for', teacher.email, ':', linkError);
-            errors.push({ teacher: teacher.email, error: `Teacher-user link failed: ${linkError.message}` });
-          } else {
-            userAccountsLinked++;
-            console.log('[SYNC] Linked teacher to user account for', teacher.email);
+          // Check if user account exists
+          const { data: existingUser, error: userCheckError } = await supabase
+            .from("users")
+            .select("user_id")
+            .eq("school_id", schoolId)
+            .eq("email", teacher.email)
+            .maybeSingle();
+          
+          if (userCheckError && userCheckError.code !== 'PGRST116') {
+            console.error('[SYNC] Error checking user account for', teacher.email, ':', userCheckError);
+            errors.push({ teacher: teacher.email, error: `User check failed: ${userCheckError.message}` });
+            continue;
           }
+          
+          let userId;
+          
+          if (existingUser) {
+            // User exists, update if needed
+            userId = existingUser.user_id;
+            console.log('[SYNC] User account exists for', teacher.email);
+            
+            // Update role to teacher if not already
+            const { error: updateError } = await supabase
+              .from("users")
+              .update({ 
+                role: "teacher",
+                status: "active",
+                full_name: `${teacher.first_name} ${teacher.last_name}`,
+                updated_at: new Date().toISOString()
+              })
+              .eq("user_id", userId);
+            
+            if (updateError) {
+              console.error('[SYNC] Error updating user account for', teacher.email, ':', updateError);
+              errors.push({ teacher: teacher.email, error: `User update failed: ${updateError.message}` });
+            }
+          } else {
+            // Create new user account
+            const { data: newUser, error: userError } = await supabase
+              .from("users")
+              .insert({
+                school_id: schoolId,
+                full_name: `${teacher.first_name} ${teacher.last_name}`,
+                email: teacher.email,
+                password_hash: hash,
+                role: "teacher",
+                status: "active",
+              })
+              .select("user_id")
+              .single();
+            
+            if (userError) {
+              console.error('[SYNC] Failed to create user account for', teacher.email, ':', userError);
+              errors.push({ teacher: teacher.email, error: `User creation failed: ${userError.message}` });
+              continue;
+            }
+            
+            userId = newUser.user_id;
+            userAccountsCreated++;
+            console.log('[SYNC] Created user account for', teacher.email);
+          }
+          
+          // Step 3: Link teacher to user account
+          if (userId && teacher.user_id !== userId) {
+            const { error: linkError } = await supabase
+              .from("teachers")
+              .update({ user_id: userId })
+              .eq("teacher_id", teacher.teacher_id);
+            
+            if (linkError) {
+              console.error('[SYNC] Failed to link teacher to user account for', teacher.email, ':', linkError);
+              errors.push({ teacher: teacher.email, error: `Teacher-user link failed: ${linkError.message}` });
+            } else {
+              userAccountsLinked++;
+              console.log('[SYNC] Linked teacher to user account for', teacher.email);
+            }
+          }
+          
+        } catch (e) {
+          console.error('[SYNC] Exception for', teacher.email, ':', e.message);
+          errors.push({ teacher: teacher.email, error: e.message });
         }
-        
-      } catch (e) {
-        console.error('[SYNC] Exception for', teacher.email, ':', e.message);
-        errors.push({ teacher: teacher.email, error: e.message });
       }
     }
     

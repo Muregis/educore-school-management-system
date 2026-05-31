@@ -288,16 +288,24 @@ router.post(
                   continue;
                 }
 
-                const marks = parseFloat(row.marks);
-                if (isNaN(marks) && String(row.marks || '').trim() !== '') {
+                // Normalize marks to handle special values (absent, cheat, na, etc.)
+                const normalizedMarks = normaliseMarks(row.marks);
+                
+                // Skip if marks is empty/null after normalization
+                if (normalizedMarks === null || normalizedMarks === undefined || String(normalizedMarks).trim() === '') {
                   skipped++;
-                  errors.push({ row: rowNumber, admission, subject, reason: 'Invalid marks value' });
                   continue;
                 }
-
-                if (isNaN(marks) || String(row.marks || '').trim() === '') {
-                  skipped++;
-                  continue;
+                
+                // Convert to number if it's a numeric string
+                let marks = normalizedMarks;
+                if (typeof normalizedMarks === 'string' && normalizedMarks !== 'absent' && normalizedMarks !== 'cheat' && normalizedMarks !== 'na') {
+                  marks = parseFloat(normalizedMarks);
+                  if (isNaN(marks)) {
+                    skipped++;
+                    errors.push({ row: rowNumber, admission, subject, reason: `Invalid marks value: ${row.marks}` });
+                    continue;
+                  }
                 }
 
                 resultsToInsert.push({
