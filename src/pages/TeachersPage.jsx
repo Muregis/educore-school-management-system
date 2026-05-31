@@ -58,6 +58,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const [assigningTeacher, setAssigningTeacher] = useState(null);
   const [assignmentForm, setAssignmentForm] = useState({ classId: "", subjectId: "", isClassTeacher: false });
   const canAssign = ["admin", "director", "superadmin"].includes(auth?.role);
+  const isSyncingRef = useRef(false);
 
   const loadAssignmentData = async () => {
     if (!auth?.token || !canAssign) return;
@@ -81,13 +82,18 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
         if (canAssign) await loadAssignmentData();
         setLoading(false);
       })
-      .catch(e => { 
+      .catch(e => {
         if (e?.code !== "EABORT") {
           toast("Failed to fetch teachers", "error");
           setLoading(false);
         }
       });
-    return () => ac.abort();
+    return () => {
+      // Don't abort if sync is in progress
+      if (!isSyncingRef.current) {
+        ac.abort();
+      }
+    };
   }, [auth, setTeachers, toast, canAssign]);
 
   const normalised = teachers.map(t => t.first_name ? normalise(t) : t);
@@ -174,25 +180,16 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
     console.log("[SYNC] API_BASE:", (await import("../lib/api.js")).API_BASE);
     toast("Syncing teachers... This may take a few minutes. Please wait.", "info");
 
+    isSyncingRef.current = true;
+
     try {
       console.log("[SYNC] About to call apiFetch");
-      // Try using native fetch directly to bypass apiFetch wrapper
-      const { getAuthHeaders } = await import("../lib/auth.js");
-      const headers = {
-        "Content-Type": "application/json",
-        ...getAuthHeaders(auth?.token)
-      };
-      const fetchRes = await fetch("https://educore-school-management-system.onrender.com/api/teachers/sync-hr", {
+      const res = await apiFetch("/teachers/sync-hr", {
         method: "POST",
-        headers,
-        body: JSON.stringify({})
+        token: auth?.token,
+        timeoutMs: 900000,
+        retries: 2
       });
-      console.log("[SYNC] fetch completed, status:", fetchRes.status);
-      if (!fetchRes.ok) {
-        const text = await fetchRes.text();
-        throw new Error(text || `HTTP ${fetchRes.status}`);
-      }
-      const res = await fetchRes.json();
       console.log("[SYNC] apiFetch completed successfully");
       
       const { syncedToHR, userAccountsCreated, userAccountsLinked, total, errors } = res;
@@ -227,6 +224,8 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
       } else {
         toast(err.message || "Sync failed. Please try again.", "error");
       }
+    } finally {
+      isSyncingRef.current = false;
     }
   };
 

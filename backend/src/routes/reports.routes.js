@@ -538,7 +538,7 @@ router.get("/grade-distribution", async (req, res, next) => {
     if (!grades) {
       const { data: results, error } = await supabase
         .from('results')
-        .select('subject, marks, total_marks, class_id')
+        .select('subject, marks, total_marks, class_id, term, exam_type')
         .eq('school_id', schoolId)
         .eq('is_deleted', false);
       if (error) throw error;
@@ -559,15 +559,18 @@ router.get("/grade-distribution", async (req, res, next) => {
       // Calculate grade distribution by class and subject
       const classSubjectStats = {};
       results?.forEach(result => {
-        const className = classById.get(result.class_id) || 'Unknown';
-        const key = `${className}|${result.subject}`;
+        const className = classById.get(result.class_id) || 'All Classes';
+        const examType = result.exam_type || 'All Exams';
+        const key = `${className}|${result.subject}|${examType}`;
         
         if (!classSubjectStats[key]) {
           classSubjectStats[key] = {
             class_name: className,
             subject: result.subject,
+            exam_type: examType,
             scores: [],
-            entries: 0
+            entries: 0,
+            terms: new Set()
           };
         }
         
@@ -575,6 +578,7 @@ router.get("/grade-distribution", async (req, res, next) => {
         const percentage = total > 0 ? (Number(result.marks) / total) * 100 : 0;
         classSubjectStats[key].scores.push(percentage);
         classSubjectStats[key].entries++;
+        if (result.term) classSubjectStats[key].terms.add(result.term);
       });
 
       const distribution = Object.values(classSubjectStats).map(stats => {
@@ -595,11 +599,13 @@ router.get("/grade-distribution", async (req, res, next) => {
         return {
           class_name: stats.class_name,
           subject: stats.subject,
+          exam_type: stats.exam_type,
           avg_score,
           highest,
           lowest,
           entries: stats.entries,
-          grade_counts: gradeCounts
+          grade_counts: gradeCounts,
+          terms: Array.from(stats.terms)
         };
       });
 

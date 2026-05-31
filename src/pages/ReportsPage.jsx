@@ -1279,7 +1279,7 @@ export default function ReportsPage({ auth }) {
               {filteredGrades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
                 <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
                   <Table 
-                    headers={["Subject", "EE Count", "EE %", "ME Count", "ME %", "AE Count", "AE %", "BE Count", "BE %"]}
+                    headers={["Subject", "Exam Type", "EE Count", "EE %", "ME Count", "ME %", "AE Count", "AE %", "BE Count", "BE %"]}
                     data={[...new Set(filteredGrades.map(g => g.subject))].map(subject => {
                       const subjectData = filteredGrades.filter(g => g.subject === subject);
                       const totalEntries = subjectData.reduce((sum, g) => sum + (g.entries || 0), 0);
