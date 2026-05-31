@@ -268,7 +268,7 @@ router.post("/sync-hr", requireRoles("admin", "director", "superadmin"), async (
     console.log('[SYNC] Starting teacher sync for school:', schoolId);
     
     // Increase timeout for long-running sync operations
-    req.setTimeout(600000); // 10 minutes
+    req.setTimeout(900000); // 15 minutes
     
     // Get all teachers
     const { data: teachers, error: teachersError } = await supabase

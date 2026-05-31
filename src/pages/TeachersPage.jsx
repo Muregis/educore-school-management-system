@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
 import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
@@ -57,6 +57,8 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const [showAssign, setShowAssign] = useState(false);
   const [assigningTeacher, setAssigningTeacher] = useState(null);
   const [assignmentForm, setAssignmentForm] = useState({ classId: "", subjectId: "", isClassTeacher: false });
+  const [isSyncing, setIsSyncing] = useState(false);
+  const isSyncingRef = useRef(false);
   const canAssign = ["admin", "director", "superadmin"].includes(auth?.role);
 
   const loadAssignmentData = async () => {
@@ -87,7 +89,12 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
           setLoading(false);
         }
       });
-    return () => ac.abort();
+    return () => {
+      // Don't abort if sync is in progress to prevent cancelling the sync request
+      if (!isSyncingRef.current) {
+        ac.abort();
+      }
+    };
   }, [auth, setTeachers, toast, canAssign]);
 
   const normalised = teachers.map(t => t.first_name ? normalise(t) : t);
@@ -170,10 +177,19 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const syncToHR = async () => {
     if (!window.confirm("Sync all teachers to HR staff table and create user accounts?\n\nThis will:\n- Create HR records for teachers without them\n- Create user login accounts for teachers\n- Link teachers to their user accounts\n\nDefault password will be the part before @ in their email.\n\nThis may take several minutes. Please do not navigate away.")) return;
     
+    setIsSyncing(true);
+    isSyncingRef.current = true;
     toast("Syncing teachers... This may take a few minutes. Please wait.", "info");
     
+    console.log("[SYNC] Starting sync request, token:", auth?.token ? "present" : "missing");
+    
     try {
-      const res = await apiFetch("/teachers/sync-hr", { method: "POST", token: auth?.token, timeoutMs: 600000, retries: 3 });
+      // Create a dedicated AbortController for this sync operation to prevent interference
+      const syncController = new AbortController();
+      console.log("[SYNC] AbortController created, signal:", syncController.signal.aborted);
+      // Increase timeout to 15 minutes to handle large teacher counts
+      const res = await apiFetch("/teachers/sync-hr", { method: "POST", token: auth?.token, timeoutMs: 900000, retries: 2, signal: syncController.signal });
+      console.log("[SYNC] Request completed successfully");
       
       const { syncedToHR, userAccountsCreated, userAccountsLinked, total, errors } = res;
       
@@ -203,6 +219,9 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
       } else {
         toast(err.message || "Sync failed. Please try again.", "error");
       }
+    } finally {
+      setIsSyncing(false);
+      isSyncingRef.current = false;
     }
   };
 

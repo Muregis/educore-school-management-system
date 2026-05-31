@@ -9,8 +9,7 @@ import Badge from "../components/ui/Badge";
 import Table from "../components/ui/Table";
 import EmptyState from "../components/ui/EmptyState";
 
-// ─── Shared helpers ────────────────────────────────────────────────────────
-
+// Use shared grading utility
 const gradeInfo = (score) => {
   if (score >= 80) return { label: "EE", color: "var(--color-success)", bg: "color-mix(in srgb, var(--color-success) 15%, transparent)", text: "Exceeds Expectations" };
   if (score >= 60) return { label: "ME", color: "var(--color-info)", bg: "color-mix(in srgb, var(--color-info) 15%, transparent)", text: "Meets Expectations" };
@@ -81,11 +80,7 @@ function buildInterventions(subjectRankings, streamAverages) {
 }
 
 // ─── Analysis Tab ──────────────────────────────────────────────────────────
-export default function AnalysisPage({ auth }) {
-  return <AnalysisPageInner auth={auth} />;
-}
-
-function AnalysisPageInner({ auth }) {
+export default function AnalysisTabNew({ auth }) {
   const [data, setData]           = useState(null);
   const [loading, setLoading]     = useState(false);
   const [aiReport, setAiReport]   = useState("");
@@ -777,10 +772,10 @@ Keep the tone professional but simple enough for a school administrator to act o
             </Card>
           )}
 
-          {/* SECTION 6 — Top Students */}
+          {/* SECTION 8 — Top Students */}
           {topStudents && topStudents.overall.length > 0 && (
             <Card style={{ padding: "var(--space-4)" }}>
-              <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>6. Top Performing Students</h3>
+              <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>8. Top Performing Students</h3>
               <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
                 Highest average scores across all subjects for the selected term.
               </p>
@@ -859,6 +854,5 @@ Keep the tone professional but simple enough for a school administrator to act o
     </div>
   );
 }
-AnalysisPageInner.propTypes = { auth: PropTypes.object };
 
-AnalysisPage.propTypes = { auth: PropTypes.object };
+AnalysisTabNew.propTypes = { auth: PropTypes.object };
