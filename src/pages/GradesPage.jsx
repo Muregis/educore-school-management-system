@@ -213,7 +213,8 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
     (term === "all" || r.term === term) &&
     (filterClass === "all" || r.className === filterClass) &&
     (filterStudent === "all" || String(r.studentId) === String(filterStudent)) &&
-    (filterSubject === "all" || r.subject === filterSubject)
+    (filterSubject === "all" || r.subject === filterSubject) &&
+    (examType === "all" || r.examType === examType)
   );
 
   const { pages, rows } = pager(filtered, page);
