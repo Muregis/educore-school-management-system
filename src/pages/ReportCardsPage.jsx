@@ -23,6 +23,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
   const [term, setTerm]               = useState("Term 2");
   const [year, setYear]               = useState("2026");
   const [filterClass, setFilterClass] = useState("all");
+  const [examType, setExamType]       = useState("all");
   const [form, setForm] = useState({ studentId: "", classTeacherComment: "", principalComment: "", conduct: "Good", daysPresent: "", daysAbsent: "", classPosition: "", outOf: "" });
   const [formClass, setFormClass] = useState("");
 
@@ -35,11 +36,14 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
   };
 
   useEffect(() => { load(); }, [auth, term, year]);
+  useEffect(() => { if (selected) viewFull(selected); }, [examType]);
 
   const viewFull = async (studentId) => {
     setLoading(true);
     try {
-      const data = await apiFetch(`/reportcards/${studentId}/full?term=${term}&academicYear=${year}`, { token: auth.token });
+      const qs = new URLSearchParams({ term, academicYear: year });
+      if (examType !== "all") qs.set("examType", examType);
+      const data = await apiFetch(`/reportcards/${studentId}/full?${qs}`, { token: auth.token });
       setFullData(data);
       setSelected(studentId);
       const pos = data.classPosition ?? data.reportCard?.class_position;
@@ -217,6 +221,16 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
             options={[
               { value: "all", label: "All classes" },
               ...ALL_CLASSES.map(c => ({ value: c, label: c }))
+            ]}
+          />
+          <Select 
+            value={examType} 
+            onChange={e => setExamType(e.target.value)}
+            options={[
+              { value: "all", label: "All Exam Types" },
+              { value: "Opener", label: "Opener" },
+              { value: "Mid-Term", label: "Mid-Term" },
+              { value: "End-Term", label: "End-Term" }
             ]}
           />
           <div style={{ marginLeft: "auto" }}>

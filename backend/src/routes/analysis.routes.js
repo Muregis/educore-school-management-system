@@ -428,4 +428,252 @@ router.get("/top-students", authRequired, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/analysis/student-rankings?term=Term+2&class_name=Grade+7
+// Returns all students in a class with their positions, total marks, and averages
+router.get("/student-rankings", authRequired, async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const term = req.query.term || "Term 2";
+    const className = req.query.class_name || null;
+
+    const { data: raw, error: resultsErr } = await supabase
+      .from("results")
+      .select("term,subject,marks,total_marks,student_id,class_id,is_deleted,school_id")
+      .eq("school_id", schoolId)
+      .eq("term", term)
+      .eq("is_deleted", false)
+      .not("class_id", "is", null);
+    if (resultsErr) throw resultsErr;
+
+    const classIds = [...new Set((raw || []).map(r => r.class_id).filter(Boolean))];
+    const studentIds = [...new Set((raw || []).map(r => r.student_id).filter(Boolean))];
+
+    const [{ data: classesRows, error: classesErr }, { data: studentsRows, error: studentsErr }] = await Promise.all([
+      classIds.length
+        ? supabase.from("classes").select("class_id,class_name,section,is_deleted,status").in("class_id", classIds)
+        : Promise.resolve({ data: [], error: null }),
+      studentIds.length
+        ? supabase.from("students").select("student_id,first_name,last_name,admission_number,is_deleted,status").in("student_id", studentIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (classesErr) throw classesErr;
+    if (studentsErr) throw studentsErr;
+
+    const classById = new Map((classesRows || []).map(c => [c.class_id, c]));
+    const studentById = new Map((studentsRows || []).map(s => [s.student_id, s]));
+
+    const pct = (r) => {
+      const denom = Number(r.total_marks || 0);
+      if (!denom) return null;
+      return (Number(r.marks || 0) / denom) * 100;
+    };
+
+    const cleanRows = (raw || []).filter(r => {
+      const c = classById.get(r.class_id);
+      if (!c || c.is_deleted || c.status !== "active") return false;
+      if (className && c.class_name !== className) return false;
+      const s = studentById.get(r.student_id);
+      if (!s || s.is_deleted || s.status !== "active") return false;
+      return true;
+    });
+
+    // Aggregate per student
+    const studentAgg = new Map(); // student_id -> { sum,count,totalMarks,subjects:Set, class_id, subjectScores }
+    for (const r of cleanRows) {
+      const p = pct(r);
+      if (p == null) continue;
+      if (!studentAgg.has(r.student_id)) studentAgg.set(r.student_id, { sum: 0, count: 0, totalMarks: 0, subjects: new Set(), class_id: r.class_id, subjectScores: new Map() });
+      const a = studentAgg.get(r.student_id);
+      a.sum += p;
+      a.count += 1;
+      a.totalMarks += Number(r.marks || 0);
+      if (r.subject) {
+        a.subjects.add(r.subject);
+        a.subjectScores.set(r.subject, { marks: r.marks, total: r.total_marks, percentage: p });
+      }
+      a.class_id = r.class_id || a.class_id;
+    }
+
+    const scored = [...studentAgg.entries()]
+      .map(([student_id, a]) => {
+        const s = studentById.get(student_id) || {};
+        const c = classById.get(a.class_id) || {};
+        return {
+          student_id,
+          first_name: s.first_name,
+          last_name: s.last_name,
+          admission_number: s.admission_number,
+          class_name: c.class_name,
+          stream: c.section,
+          stream_label: c.class_name && c.section ? `${c.class_name} ${c.section}` : "",
+          avg_score: a.count ? Number((a.sum / a.count).toFixed(1)) : 0,
+          total_marks: a.totalMarks,
+          subjects_sat: a.subjects.size,
+          subject_scores: Object.fromEntries(a.subjectScores),
+        };
+      })
+      .sort((a, b) => b.avg_score - a.avg_score);
+
+    // Assign positions with tie handling
+    let currentRank = 1;
+    let prevScore = null;
+    const ranked = scored.map((s, idx) => {
+      if (prevScore !== null && s.avg_score < prevScore - 0.01) {
+        currentRank = idx + 1;
+      }
+      prevScore = s.avg_score;
+      return { ...s, position: currentRank };
+    });
+
+    // Group by class
+    const byClass = new Map();
+    for (const r of ranked) {
+      if (!r.class_name) continue;
+      if (!byClass.has(r.class_name)) byClass.set(r.class_name, []);
+      byClass.get(r.class_name).push(r);
+    }
+
+    res.json({
+      all_students: ranked,
+      by_class: Object.fromEntries(byClass),
+      meta: { term, class_name: className },
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /api/analysis/class-stats?term=Term+2&class_name=Grade+7
+// Returns comprehensive class statistics: mean, median, subject breakdowns, grade distribution
+router.get("/class-stats", authRequired, async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const term = req.query.term || "Term 2";
+    const className = req.query.class_name || null;
+
+    const { data: raw, error: resultsErr } = await supabase
+      .from("results")
+      .select("term,subject,marks,total_marks,student_id,class_id,is_deleted,school_id,grade")
+      .eq("school_id", schoolId)
+      .eq("term", term)
+      .eq("is_deleted", false)
+      .not("class_id", "is", null);
+    if (resultsErr) throw resultsErr;
+
+    const classIds = [...new Set((raw || []).map(r => r.class_id).filter(Boolean))];
+    const studentIds = [...new Set((raw || []).map(r => r.student_id).filter(Boolean))];
+
+    const [{ data: classesRows, error: classesErr }, { data: studentsRows, error: studentsErr }] = await Promise.all([
+      classIds.length
+        ? supabase.from("classes").select("class_id,class_name,section,is_deleted,status").in("class_id", classIds)
+        : Promise.resolve({ data: [], error: null }),
+      studentIds.length
+        ? supabase.from("students").select("student_id,first_name,last_name,admission_number,is_deleted,status").in("student_id", studentIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (classesErr) throw classesErr;
+    if (studentsErr) throw studentsErr;
+
+    const classById = new Map((classesRows || []).map(c => [c.class_id, c]));
+    const studentById = new Map((studentsRows || []).map(s => [s.student_id, s]));
+
+    const pct = (r) => {
+      const denom = Number(r.total_marks || 0);
+      if (!denom) return null;
+      return (Number(r.marks || 0) / denom) * 100;
+    };
+
+    const cleanRows = (raw || []).filter(r => {
+      const c = classById.get(r.class_id);
+      if (!c || c.is_deleted || c.status !== "active") return false;
+      if (className && c.class_name !== className) return false;
+      const s = studentById.get(r.student_id);
+      if (!s || s.is_deleted || s.status !== "active") return false;
+      return true;
+    });
+
+    // Aggregate per student
+    const studentAgg = new Map();
+    for (const r of cleanRows) {
+      const p = pct(r);
+      if (p == null) continue;
+      if (!studentAgg.has(r.student_id)) studentAgg.set(r.student_id, { sum: 0, count: 0, class_id: r.class_id });
+      const a = studentAgg.get(r.student_id);
+      a.sum += p;
+      a.count += 1;
+      a.class_id = r.class_id || a.class_id;
+    }
+
+    const studentScores = [...studentAgg.values()]
+      .map(a => a.count ? a.sum / a.count : 0)
+      .filter(s => s > 0)
+      .sort((a, b) => a - b);
+
+    // Calculate statistics
+    const mean = studentScores.length ? Number((studentScores.reduce((a, b) => a + b, 0) / studentScores.length).toFixed(1)) : 0;
+    const median = studentScores.length ? (
+      studentScores.length % 2 === 0
+        ? Number(((studentScores[studentScores.length / 2 - 1] + studentScores[studentScores.length / 2]) / 2).toFixed(1))
+        : Number(studentScores[Math.floor(studentScores.length / 2)].toFixed(1))
+    ) : 0;
+    const highest = studentScores.length ? Number(studentScores[studentScores.length - 1].toFixed(1)) : 0;
+    const lowest = studentScores.length ? Number(studentScores[0].toFixed(1)) : 0;
+
+    // Subject breakdowns per class
+    const subjectByClass = new Map(); // class_name -> { subject -> { sum, count, grades } }
+    for (const r of cleanRows) {
+      const c = classById.get(r.class_id);
+      if (!c) continue;
+      const subject = String(r.subject || "").trim();
+      if (!subject) continue;
+      const p = pct(r);
+      if (p == null) continue;
+
+      const key = c.class_name;
+      if (!subjectByClass.has(key)) subjectByClass.set(key, new Map());
+      const bySubj = subjectByClass.get(key);
+      if (!bySubj.has(subject)) bySubj.set(subject, { sum: 0, count: 0, grades: [] });
+      const a = bySubj.get(subject);
+      a.sum += p;
+      a.count += 1;
+      if (r.grade) a.grades.push(r.grade);
+    }
+
+    const subjectStats = {};
+    for (const [className, bySubj] of subjectByClass.entries()) {
+      subjectStats[className] = {};
+      for (const [subject, data] of bySubj.entries()) {
+        const gradeCounts = {};
+        data.grades.forEach(g => {
+          gradeCounts[g] = (gradeCounts[g] || 0) + 1;
+        });
+        subjectStats[className][subject] = {
+          mean: Number((data.sum / data.count).toFixed(1)),
+          entries: data.count,
+          grade_distribution: gradeCounts,
+        };
+      }
+    }
+
+    // Grade distribution overall
+    const gradeCounts = {};
+    cleanRows.forEach(r => {
+      if (r.grade) {
+        gradeCounts[r.grade] = (gradeCounts[r.grade] || 0) + 1;
+      }
+    });
+
+    res.json({
+      overall: {
+        mean,
+        median,
+        highest,
+        lowest,
+        student_count: studentScores.length,
+        grade_distribution: gradeCounts,
+      },
+      by_class: subjectStats,
+      meta: { term, class_name: className },
+    });
+  } catch (err) { next(err); }
+});
+
 export default router;

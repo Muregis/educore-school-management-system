@@ -538,7 +538,7 @@ router.get("/grade-distribution", async (req, res, next) => {
     if (!grades) {
       const { data: results, error } = await supabase
         .from('results')
-        .select('subject, marks')
+        .select('subject, marks, total_marks')
         .eq('school_id', schoolId)
         .eq('is_deleted', false);
       if (error) throw error;
@@ -548,15 +548,17 @@ router.get("/grade-distribution", async (req, res, next) => {
         if (!subjectStats[result.subject]) {
           subjectStats[result.subject] = { scores: [], entries: 0 };
         }
-        subjectStats[result.subject].scores.push(Number(result.marks));
+        const total = Number(result.total_marks) || 100;
+        const percentage = total > 0 ? (Number(result.marks) / total) * 100 : 0;
+        subjectStats[result.subject].scores.push(percentage);
         subjectStats[result.subject].entries++;
       });
       
       const distribution = Object.entries(subjectStats).map(([subject, stats]) => ({
         subject,
-        avgScore: stats.scores.length > 0 ? Math.round(stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length) : 0,
-        highest: stats.scores.length > 0 ? Math.max(...stats.scores) : 0,
-        lowest: stats.scores.length > 0 ? Math.min(...stats.scores) : 0,
+        avg_score: stats.scores.length > 0 ? Number((stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length).toFixed(1)) : 0,
+        highest: stats.scores.length > 0 ? Number(Math.max(...stats.scores).toFixed(1)) : 0,
+        lowest: stats.scores.length > 0 ? Number(Math.min(...stats.scores).toFixed(1)) : 0,
         entries: stats.entries
       }));
       

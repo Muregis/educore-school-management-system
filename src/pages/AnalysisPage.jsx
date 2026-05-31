@@ -100,6 +100,8 @@ function AnalysisPageInner({ auth }) {
   const [trends, setTrends]             = useState(null);
   const [topStudents, setTopStudents]   = useState(null);
   const [topClass, setTopClass]         = useState("");
+  const [studentRankings, setStudentRankings] = useState(null);
+  const [classStats, setClassStats]     = useState(null);
 
   const load = useCallback(async () => {
     if (!auth?.token) return;
@@ -114,13 +116,17 @@ function AnalysisPageInner({ auth }) {
       if (result.classes?.length) setAvailClasses(result.classes);
       setActiveStream(null);
 
-      // Fetch trends + top students in parallel
-      const [trendRes, topRes] = await Promise.all([
+      // Fetch trends + top students + rankings + class stats in parallel
+      const [trendRes, topRes, rankRes, statsRes] = await Promise.all([
         apiFetch(`/analysis/trends${className ? `?class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
         apiFetch(`/analysis/top-students?limit=10${term ? `&term=${encodeURIComponent(term)}` : ""}${className ? `&class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
+        apiFetch(`/analysis/student-rankings?term=${encodeURIComponent(term)}${className ? `&class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
+        apiFetch(`/analysis/class-stats?term=${encodeURIComponent(term)}${className ? `&class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
       ]);
       setTrends(trendRes);
       setTopStudents(topRes);
+      setStudentRankings(rankRes);
+      setClassStats(statsRes);
     } catch (e) { console.error("Analysis error:", e); }
     setLoading(false);
   }, [auth, term, className]);
@@ -594,10 +600,119 @@ Keep the tone professional but simple enough for a school administrator to act o
             </div>
           </Card>
 
-          {/* SECTION 5 — Term Performance Trends */}
+          {/* SECTION 5 — Student Rankings */}
+          {studentRankings && studentRankings.all_students && studentRankings.all_students.length > 0 && (
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>5. Student Rankings</h3>
+              <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
+                Students ranked by average score with position, total marks, and subject breakdown.
+              </p>
+              
+              <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                <Table 
+                  headers={["Position", "Student", "Admission No.", "Class", "Average", "Total Marks", "Subjects"]}
+                  data={studentRankings.all_students.slice(0, 50).map((s, i) => {
+                    const g = gradeInfo(s.avg_score);
+                    return [
+                      <span key="pos" style={{ fontWeight: 800, color: s.position <= 3 ? "var(--color-primary)" : "var(--color-text-secondary)" }}>#{s.position}</span>,
+                      <span key="name" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{s.first_name} {s.last_name}</span>,
+                      <span key="adm" style={{ color: "var(--color-text-secondary)" }}>{s.admission_number || "—"}</span>,
+                      <span key="cls" style={{ color: "var(--color-text-secondary)" }}>{s.stream_label || s.class_name || "—"}</span>,
+                      <div key="avg" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <ScoreBar score={s.avg_score} color={g.color} />
+                        <span style={{ fontWeight: 800, color: g.color, minWidth: "42px", textAlign: "right" }}>{s.avg_score}%</span>
+                      </div>,
+                      <span key="total" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{s.total_marks}</span>,
+                      <span key="subjs" style={{ color: "var(--color-text-secondary)" }}>{s.subjects_sat}</span>,
+                    ];
+                  })}
+                />
+              </div>
+              
+              {studentRankings.all_students.length > 50 && (
+                <div style={{ marginTop: "var(--space-3)", fontSize: "13px", color: "var(--color-text-secondary)", textAlign: "center" }}>
+                  Showing top 50 of {studentRankings.all_students.length} students
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* SECTION 6 — Class Statistics */}
+          {classStats && classStats.overall && (
+            <Card style={{ padding: "var(--space-4)" }}>
+              <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>6. Class Statistics</h3>
+              <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
+                Comprehensive class performance metrics including mean, median, and subject breakdowns.
+              </p>
+              
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+                {[
+                  ["Mean", `${classStats.overall.mean}%`, "Average score across all students"],
+                  ["Median", `${classStats.overall.median}%`, "Middle score when ranked"],
+                  ["Highest", `${classStats.overall.highest}%`, "Best student average"],
+                  ["Lowest", `${classStats.overall.lowest}%`, "Lowest student average"],
+                  ["Students", classStats.overall.student_count, "Total number of students"],
+                ].map(([label, value, desc]) => (
+                  <div key={label} style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
+                    <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>{label}</div>
+                    <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-primary)", marginBottom: "2px" }}>{value}</div>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>{desc}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Grade Distribution */}
+              {Object.keys(classStats.overall.grade_distribution || {}).length > 0 && (
+                <div style={{ marginBottom: "var(--space-4)" }}>
+                  <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-2)", fontSize: "15px" }}>Grade Distribution</div>
+                  <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+                    {Object.entries(classStats.overall.grade_distribution).map(([grade, count]) => {
+                      const g = gradeInfo(grade === "EE" ? 85 : grade === "ME" ? 65 : grade === "AE" ? 45 : 25);
+                      return (
+                        <div key={grade} style={{ background: g.bg, border: `1px solid ${g.color}`, borderRadius: "var(--radius-md)", padding: "8px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
+                          <Badge text={grade} style={{ background: g.color, color: "#fff", borderColor: "transparent" }} />
+                          <span style={{ fontWeight: 700, color: g.color }}>{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Subject Breakdown by Class */}
+              {Object.keys(classStats.by_class || {}).length > 0 && (
+                <div>
+                  <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-2)", fontSize: "15px" }}>Subject Performance by Class</div>
+                  <div style={{ display: "grid", gap: "var(--space-3)" }}>
+                    {Object.entries(classStats.by_class).map(([clsName, subjects]) => (
+                      <div key={clsName} style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
+                        <div style={{ fontWeight: 700, color: "var(--color-primary)", marginBottom: "var(--space-2)" }}>{clsName}</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "var(--space-2)" }}>
+                          {Object.entries(subjects).map(([subj, stats]) => {
+                            const g = gradeInfo(stats.mean);
+                            return (
+                              <div key={subj} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--color-bg-surface)", borderRadius: "var(--radius-sm)" }}>
+                                <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--color-text-primary)" }}>{subj}</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                  <ScoreBar score={stats.mean} color={g.color} />
+                                  <span style={{ fontWeight: 700, color: g.color, fontSize: "13px", minWidth: "40px", textAlign: "right" }}>{stats.mean}%</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* SECTION 7 — Term Performance Trends */}
           {trends && trends.terms.length > 1 && (
             <Card style={{ padding: "var(--space-4)" }}>
-              <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>5. Term Performance Trends</h3>
+              <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>7. Term Performance Trends</h3>
               <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
                 How overall and subject performance has changed across terms.
               </p>

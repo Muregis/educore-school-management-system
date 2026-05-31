@@ -144,7 +144,7 @@ router.get("/", async (req, res, next) => {
 router.get("/:studentId/full", async (req, res, next) => {
   try {
     const { schoolId, role } = req.user;
-    const { term = "Term 2", academicYear = "2026" } = req.query;
+    const { term = "Term 2", academicYear = "2026", examType } = req.query;
     const { studentId } = req.params;
 
     const { data: studentRow, error: studentErr } = await supabase
@@ -201,19 +201,26 @@ router.get("/:studentId/full", async (req, res, next) => {
       rcQuery = rcQuery.eq("is_published", true).eq("is_approved", true);
     }
 
-    const { data: resultsRows, error: resultsErr } = await supabase
+    let resultsQuery = supabase
       .from("results")
-      .select("subject, marks, total_marks, grade, teacher_comment, teacher_id, teachers(first_name,last_name)")
+      .select("subject, marks, total_marks, grade, teacher_comment, teacher_id, exam_type, teachers(first_name,last_name)")
       .eq("school_id", schoolId)
       .eq("student_id", studentId)
       .eq("term", term)
       .eq("is_deleted", false);
+    
+    if (examType && examType !== "all") {
+      resultsQuery = resultsQuery.eq("exam_type", examType);
+    }
+    
+    const { data: resultsRows, error: resultsErr } = await resultsQuery;
     if (resultsErr) throw resultsErr;
     const results = (resultsRows || []).map(r => ({
       subject: r.subject,
       marks: r.marks,
       grade: r.grade,
       teacher_comment: r.teacher_comment,
+      exam_type: r.exam_type,
       teacher_first: r.teachers?.first_name ?? null,
       teacher_last: r.teachers?.last_name ?? null,
     }));

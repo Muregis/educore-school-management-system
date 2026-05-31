@@ -71,7 +71,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   // Use current term from API instead of hardcoded "Term 2"
   const { term: currentTerm } = useCurrentTerm(auth);
   const [term, setTerm] = useState(""); // Will be set from currentTerm
-  const [examType, setExamType] = useState("Mid-Term");
+  const [examType, setExamType] = useState("all");
   const [examTypes, setExamTypes] = useState([]);
   const [filterClass, setFilterClass]     = useState("all");
   const [filterStudent, setFilterStudent] = useState("all");
@@ -343,6 +343,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           {subjects.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <select style={inputStyle} value={examType} onChange={e => setExamType(e.target.value)}>
+          <option value="all">All Exam Types</option>
           {examTypes.map(et => (
             <option key={et.exam_name} value={et.exam_name}>{et.exam_name}</option>
           ))}
