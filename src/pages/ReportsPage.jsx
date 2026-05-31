@@ -1302,13 +1302,21 @@ export default function ReportsPage({ auth }) {
                     const classGrades = filteredGrades.filter(g => g.class_name === clsName);
                     const totalStudents = classGrades.reduce((sum, g) => sum + (g.entries || 0), 0);
                     
-                    // Calculate grade distribution
+                    // Use grade_counts from backend if available, otherwise calculate from avg_score
                     const gradeCounts = { EE: 0, ME: 0, AE: 0, BE: 0 };
                     classGrades.forEach(g => {
-                      if (g.avg_score >= 80) gradeCounts.EE += g.entries || 0;
-                      else if (g.avg_score >= 60) gradeCounts.ME += g.entries || 0;
-                      else if (g.avg_score >= 40) gradeCounts.AE += g.entries || 0;
-                      else gradeCounts.BE += g.entries || 0;
+                      if (g.grade_counts) {
+                        gradeCounts.EE += g.grade_counts.EE || 0;
+                        gradeCounts.ME += g.grade_counts.ME || 0;
+                        gradeCounts.AE += g.grade_counts.AE || 0;
+                        gradeCounts.BE += g.grade_counts.BE || 0;
+                      } else {
+                        // Fallback to avg_score calculation
+                        if (g.avg_score >= 80) gradeCounts.EE += g.entries || 0;
+                        else if (g.avg_score >= 60) gradeCounts.ME += g.entries || 0;
+                        else if (g.avg_score >= 40) gradeCounts.AE += g.entries || 0;
+                        else gradeCounts.BE += g.entries || 0;
+                      }
                     });
 
                     return (
@@ -1358,12 +1366,21 @@ export default function ReportsPage({ auth }) {
                       const subjectData = filteredGrades.filter(g => g.subject === subject);
                       const totalEntries = subjectData.reduce((sum, g) => sum + (g.entries || 0), 0);
                       
+                      // Use grade_counts from backend if available, otherwise calculate from avg_score
                       const gradeCounts = { EE: 0, ME: 0, AE: 0, BE: 0 };
                       subjectData.forEach(g => {
-                        if (g.avg_score >= 80) gradeCounts.EE += g.entries || 0;
-                        else if (g.avg_score >= 60) gradeCounts.ME += g.entries || 0;
-                        else if (g.avg_score >= 40) gradeCounts.AE += g.entries || 0;
-                        else gradeCounts.BE += g.entries || 0;
+                        if (g.grade_counts) {
+                          gradeCounts.EE += g.grade_counts.EE || 0;
+                          gradeCounts.ME += g.grade_counts.ME || 0;
+                          gradeCounts.AE += g.grade_counts.AE || 0;
+                          gradeCounts.BE += g.grade_counts.BE || 0;
+                        } else {
+                          // Fallback to avg_score calculation
+                          if (g.avg_score >= 80) gradeCounts.EE += g.entries || 0;
+                          else if (g.avg_score >= 60) gradeCounts.ME += g.entries || 0;
+                          else if (g.avg_score >= 40) gradeCounts.AE += g.entries || 0;
+                          else gradeCounts.BE += g.entries || 0;
+                        }
                       });
 
                       const pct = (count) => totalEntries > 0 ? (count / totalEntries * 100).toFixed(1) + "%" : "0%";

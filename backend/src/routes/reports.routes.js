@@ -538,30 +538,71 @@ router.get("/grade-distribution", async (req, res, next) => {
     if (!grades) {
       const { data: results, error } = await supabase
         .from('results')
-        .select('subject, marks, total_marks')
+        .select('subject, marks, total_marks, class_id')
         .eq('school_id', schoolId)
         .eq('is_deleted', false);
       if (error) throw error;
-      
-      const subjectStats = {};
-      results?.forEach(result => {
-        if (!subjectStats[result.subject]) {
-          subjectStats[result.subject] = { scores: [], entries: 0 };
+
+      // Get class information
+      const classIds = [...new Set((results || []).map(r => r.class_id).filter(Boolean))];
+      let classById = new Map();
+      if (classIds.length > 0) {
+        const { data: classes } = await supabase
+          .from('classes')
+          .select('class_id, class_name')
+          .in('class_id', classIds);
+        if (classes) {
+          classById = new Map(classes.map(c => [c.class_id, c.class_name]));
         }
+      }
+
+      // Calculate grade distribution by class and subject
+      const classSubjectStats = {};
+      results?.forEach(result => {
+        const className = classById.get(result.class_id) || 'Unknown';
+        const key = `${className}|${result.subject}`;
+        
+        if (!classSubjectStats[key]) {
+          classSubjectStats[key] = {
+            class_name: className,
+            subject: result.subject,
+            scores: [],
+            entries: 0
+          };
+        }
+        
         const total = Number(result.total_marks) || 100;
         const percentage = total > 0 ? (Number(result.marks) / total) * 100 : 0;
-        subjectStats[result.subject].scores.push(percentage);
-        subjectStats[result.subject].entries++;
+        classSubjectStats[key].scores.push(percentage);
+        classSubjectStats[key].entries++;
       });
-      
-      const distribution = Object.entries(subjectStats).map(([subject, stats]) => ({
-        subject,
-        avg_score: stats.scores.length > 0 ? Number((stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length).toFixed(1)) : 0,
-        highest: stats.scores.length > 0 ? Number(Math.max(...stats.scores).toFixed(1)) : 0,
-        lowest: stats.scores.length > 0 ? Number(Math.min(...stats.scores).toFixed(1)) : 0,
-        entries: stats.entries
-      }));
-      
+
+      const distribution = Object.values(classSubjectStats).map(stats => {
+        const scores = stats.scores;
+        const avg_score = scores.length > 0 ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)) : 0;
+        const highest = scores.length > 0 ? Number(Math.max(...scores).toFixed(1)) : 0;
+        const lowest = scores.length > 0 ? Number(Math.min(...scores).toFixed(1)) : 0;
+        
+        // Calculate grade counts
+        const gradeCounts = { EE: 0, ME: 0, AE: 0, BE: 0 };
+        scores.forEach(score => {
+          if (score >= 80) gradeCounts.EE++;
+          else if (score >= 60) gradeCounts.ME++;
+          else if (score >= 40) gradeCounts.AE++;
+          else gradeCounts.BE++;
+        });
+
+        return {
+          class_name: stats.class_name,
+          subject: stats.subject,
+          avg_score,
+          highest,
+          lowest,
+          entries: stats.entries,
+          grade_counts: gradeCounts
+        };
+      });
+
       return res.json(distribution);
     }
     
