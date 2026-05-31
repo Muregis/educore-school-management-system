@@ -826,59 +826,61 @@ Keep the tone professional but simple enough for a school administrator to act o
 
               {/* Leaderboard */}
               <div style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
-                {(!topStudents || (!topStudents.overall && !topStudents.byClass)) ? (
+                {!topStudents || (!topStudents.overall && !topStudents.byClass) ? (
                   <p style={{ padding: "var(--space-3)", color: "var(--color-text-muted)" }}>No student data yet.</p>
                 ) : (
-                  (topClass
-                    ? (topStudents.byClass || []).filter(s => s.class_name === topClass)
-                    : (topStudents.overall || [])
-                  ).map((s, i) => {
-                  const g = gradeInfo(s.avg_score);
-                  const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
-                  return (
-                    <div key={s.student_id} style={{
-                      display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-3)",
-                      borderBottom: `1px solid var(--color-border)`,
-                      background: i < 3 ? `color-mix(in srgb, ${g.color} 5%, transparent)` : "var(--color-bg-surface)",
-                    }}>
-                      {/* Rank */}
-                      <div style={{ width: "36px", textAlign: "center", flexShrink: 0 }}>
-                        {medal
-                          ? <span style={{ fontSize: "20px" }}>{medal}</span>
-                          : <span style={{ fontWeight: 800, color: "var(--color-text-muted)", fontSize: "14px" }}>#{s.rank ?? i+1}</span>
-                        }
-                      </div>
-                      {/* Avatar */}
-                      <div style={{
-                        width: "40px", height: "40px", borderRadius: "10px", flexShrink: 0,
-                        background: g.bg, border: `1px solid color-mix(in srgb, ${g.color} 30%, transparent)`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontWeight: 800, fontSize: "14px", color: g.color,
-                      }}>
-                        {s.first_name?.[0]}{s.last_name?.[0]}
-                      </div>
-                      {/* Name */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, color: "var(--color-text-primary)", fontSize: "15px" }}>
-                          {s.first_name} {s.last_name}
+                  <>
+                    {(topClass
+                      ? (topStudents.byClass || []).filter(s => s.class_name === topClass)
+                      : (topStudents.overall || [])
+                    ).map((s, i) => {
+                      const g = gradeInfo(s.avg_score);
+                      const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
+                      return (
+                        <div key={s.student_id} style={{
+                          display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-3)",
+                          borderBottom: `1px solid var(--color-border)`,
+                          background: i < 3 ? `color-mix(in srgb, ${g.color} 5%, transparent)` : "var(--color-bg-surface)",
+                        }}>
+                          {/* Rank */}
+                          <div style={{ width: "36px", textAlign: "center", flexShrink: 0 }}>
+                            {medal
+                              ? <span style={{ fontSize: "20px" }}>{medal}</span>
+                              : <span style={{ fontWeight: 800, color: "var(--color-text-muted)", fontSize: "14px" }}>#{s.rank ?? i+1}</span>
+                            }
+                          </div>
+                          {/* Avatar */}
+                          <div style={{
+                            width: "40px", height: "40px", borderRadius: "10px", flexShrink: 0,
+                            background: g.bg, border: `1px solid color-mix(in srgb, ${g.color} 30%, transparent)`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontWeight: 800, fontSize: "14px", color: g.color,
+                          }}>
+                            {s.first_name?.[0]}{s.last_name?.[0]}
+                          </div>
+                          {/* Name */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, color: "var(--color-text-primary)", fontSize: "15px" }}>
+                              {s.first_name} {s.last_name}
+                            </div>
+                            <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "2px" }}>
+                              {s.stream_label} · <span style={{ fontFamily: "var(--font-mono)" }}>{s.admission_number}</span>
+                            </div>
+                          </div>
+                          {/* Score bar */}
+                          <div style={{ width: "120px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <ScoreBar score={s.avg_score} color={g.color} />
+                          </div>
+                          {/* Score */}
+                          <div style={{ width: "60px", textAlign: "right", flexShrink: 0 }}>
+                            <div style={{ fontWeight: 900, fontSize: "18px", color: g.color }}>{s.avg_score}%</div>
+                            <div style={{ fontSize: "10px", color: "var(--color-text-secondary)", marginTop: "2px", fontWeight: 500 }}>{s.subjects_sat} subjects</div>
+                          </div>
                         </div>
-                        <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "2px" }}>
-                          {s.stream_label} · <span style={{ fontFamily: "var(--font-mono)" }}>{s.admission_number}</span>
-                        </div>
-                      </div>
-                      {/* Score bar */}
-                      <div style={{ width: "120px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                        <ScoreBar score={s.avg_score} color={g.color} />
-                      </div>
-                      {/* Score */}
-                      <div style={{ width: "60px", textAlign: "right", flexShrink: 0 }}>
-                        <div style={{ fontWeight: 900, fontSize: "18px", color: g.color }}>{s.avg_score}%</div>
-                        <div style={{ fontSize: "10px", color: "var(--color-text-secondary)", marginTop: "2px", fontWeight: 500 }}>{s.subjects_sat} subjects</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              )}
+                      );
+                    })}
+                  </>
+                )}
               </div>
             </Card>
           )}
