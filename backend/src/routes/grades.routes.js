@@ -332,10 +332,6 @@ router.post(
                   teacher_comment: row.teacher_comment?.trim() || null,
                   term: row.term?.trim() || 'Term 2',
                   exam_type: row.exam_type?.trim() || fallbackExamType,
-                  exam_sequence: getExamSequence(row.exam_type?.trim() || fallbackExamType),
-                  exam_name: row.exam_type?.trim() || fallbackExamType,
-                  academic_year: row.academic_year?.trim() || new Date().getFullYear().toString(),
-                  class_name: row.class_name?.trim() || student.class_name,
                   is_deleted: false
                 });
               } catch (err) {
