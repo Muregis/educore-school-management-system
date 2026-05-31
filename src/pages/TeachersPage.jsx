@@ -177,9 +177,10 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
     try {
       console.log("[SYNC] About to call apiFetch");
       // Try using native fetch directly to bypass apiFetch wrapper
+      const { getAuthHeaders } = await import("../lib/auth.js");
       const headers = {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${auth?.token}`
+        ...getAuthHeaders(auth?.token)
       };
       const fetchRes = await fetch("https://educore-school-management-system.onrender.com/api/teachers/sync-hr", {
         method: "POST",
