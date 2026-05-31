@@ -1280,8 +1280,9 @@ export default function ReportsPage({ auth }) {
                 <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
                   <Table 
                     headers={["Subject", "Exam Type", "EE Count", "EE %", "ME Count", "ME %", "AE Count", "AE %", "BE Count", "BE %"]}
-                    data={[...new Set(filteredGrades.map(g => g.subject))].map(subject => {
-                      const subjectData = filteredGrades.filter(g => g.subject === subject);
+                    data={[...new Set(filteredGrades.map(g => `${g.subject}|${g.exam_type || "All Exams"}`))].map(key => {
+                      const [subject, examType] = key.split("|");
+                      const subjectData = filteredGrades.filter(g => g.subject === subject && (g.exam_type || "All Exams") === examType);
                       const totalEntries = subjectData.reduce((sum, g) => sum + (g.entries || 0), 0);
                       
                       // Use grade_counts from backend if available, otherwise calculate from avg_score
@@ -1305,6 +1306,7 @@ export default function ReportsPage({ auth }) {
 
                       return [
                         <span key="subject" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{subject}</span>,
+                        <span key="exam_type" style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>{examType}</span>,
                         <span key="ee_count" style={{ color: "var(--color-success)", fontWeight: 600 }}>{gradeCounts.EE}</span>,
                         <span key="ee_pct" style={{ color: "var(--color-text-secondary)" }}>{pct(gradeCounts.EE)}</span>,
                         <span key="me_count" style={{ color: "var(--color-info)", fontWeight: 600 }}>{gradeCounts.ME}</span>,

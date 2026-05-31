@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
 import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
@@ -187,8 +187,8 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
       const res = await apiFetch("/teachers/sync-hr", {
         method: "POST",
         token: auth?.token,
-        timeoutMs: 900000,
-        retries: 2
+        timeoutMs: 300000,
+        retries: 0
       });
       console.log("[SYNC] apiFetch completed successfully");
       
@@ -217,8 +217,10 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
       console.error("Error message:", err.message);
       console.error("Error name:", err.name);
       console.error("Error stack:", err.stack);
-      if (err.code === 'EABORT' || err.message.includes('cancelled')) {
-        toast("Sync was cancelled. Please try again and do not navigate away.", "error");
+      
+      // Handle AbortError specifically (error code 20 is DOMException.ABORT_ERR)
+      if (err.name === 'AbortError' || err.code === 20 || err.code === 'EABORT' || err.message.includes('cancelled') || err.message.includes('aborted')) {
+        toast("Sync was interrupted. This may be due to network issues or page navigation. Please try again.", "error");
       } else if (err.code === 'ETIMEOUT') {
         toast("Sync timed out. The operation may still be running in the background. Please check your teacher records.", "warning");
       } else {
