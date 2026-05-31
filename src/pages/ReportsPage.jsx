@@ -947,7 +947,7 @@ export default function ReportsPage({ auth }) {
       setGrades((g || []).map(row => ({
         ...row,
         avg_score:  row.avg_score  ?? row.avgScore  ?? 0,
-        class_name: row.class_name ?? row.subject   ?? "",
+        class_name: row.class_name ?? "",
       })));
     }).catch(e => {
       if (!ignore && e?.code !== "EABORT") {
