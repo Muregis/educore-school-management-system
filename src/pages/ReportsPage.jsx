@@ -120,6 +120,7 @@ function AnalysisTab({ auth }) {
   const [topClass, setTopClass]         = useState("");
   const [studentRankings, setStudentRankings] = useState(null);
   const [classStats, setClassStats]     = useState(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const load = useCallback(async () => {
     if (!auth?.token) return;
@@ -145,6 +146,7 @@ function AnalysisTab({ auth }) {
       setTopStudents(topRes);
       setStudentRankings(rankRes);
       setClassStats(statsRes);
+      setIsInitialized(true);
     } catch (e) { console.error("Analysis error:", e); }
     setLoading(false);
   }, [auth, term, className]);

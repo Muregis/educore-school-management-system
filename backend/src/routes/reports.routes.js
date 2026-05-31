@@ -528,14 +528,17 @@ router.get("/grade-distribution", async (req, res, next) => {
     const { class_name } = req.query;
 
     let grades = null;
-    try {
-      const { data } = await supabase.rpc('get_grade_distribution', { p_school_id: schoolId });
-      grades = data;
-    } catch {
-      grades = null;
+    // Only use RPC if no class filter is provided (RPC doesn't support class filtering)
+    if (!class_name) {
+      try {
+        const { data } = await supabase.rpc('get_grade_distribution', { p_school_id: schoolId });
+        grades = data;
+      } catch {
+        grades = null;
+      }
     }
 
-    // Fallback to simpler query if RPC not available
+    // Fallback to simpler query if RPC not available or class filter is provided
     if (!grades) {
       let query = supabase
         .from('results')
