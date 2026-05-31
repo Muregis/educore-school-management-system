@@ -584,6 +584,7 @@ router.get("/payslips/export", requireRoles(...HR_ROLES), async (req, res, next)
 // Sync all staff matching teacher titles to the teachers table
 router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
+    console.log('[HR Sync] Starting sync for school:', req.user.schoolId);
     const { schoolId } = req.user;
     const { data: staff, error: staffError } = await supabase
       .from('hr_staff')
@@ -593,9 +594,11 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
       .eq('status', 'active');
     
     if (staffError) throw staffError;
+    console.log('[HR Sync] Found staff records:', staff?.length || 0);
 
     const teacherRegex = /teacher|tutor|instructor|lecturer/i;
     const teachersToSync = staff.filter(s => teacherRegex.test(s.job_title || s.department || ""));
+    console.log('[HR Sync] Teachers to sync:', teachersToSync.length);
     
     // Prepare batch data for upsert
     const teachersData = teachersToSync.map(s => {
@@ -619,9 +622,11 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
     });
 
     // Try batch upsert first
+    console.log('[HR Sync] Starting batch upsert of', teachersData.length, 'teachers');
     let { error: upsertError } = await supabase
       .from('teachers')
       .upsert(teachersData, { onConflict: 'school_id,email' });
+    console.log('[HR Sync] Batch upsert completed. Error:', upsertError?.message);
 
     // If batch fails due to missing columns, try simplified batch
     if (upsertError && isMissingColumnError(upsertError)) {
@@ -673,8 +678,12 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
       return res.json({ synced, message: 'Sync completed with fallback to sequential processing' });
     }
 
+    console.log('[HR Sync] Sync completed successfully. Synced:', teachersToSync.length);
     res.json({ synced: teachersToSync.length, message: 'Successfully synced ' + teachersToSync.length + ' teachers' });
-  } catch (err) { next(err); }
+  } catch (err) { 
+    console.error('[HR Sync] Error:', err);
+    next(err); 
+  }
 });
 
 // Transfer staff member to another branch
