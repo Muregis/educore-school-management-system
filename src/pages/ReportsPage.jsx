@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import PropTypes from "prop-types";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
@@ -52,9 +52,11 @@ const StatCard = ({ label, value, tone = "default" }) => {
 // ─── Intervention generator ────────────────────────────────────────────────
 function buildInterventions(subjectRankings, streamAverages) {
   const out = [];
-  const byScore = [...subjectRankings].sort((a,b) => a.avg_score - b.avg_score);
+  const rankings = subjectRankings || [];
+  const streams = streamAverages || [];
+  const byScore = [...rankings].sort((a,b) => a.avg_score - b.avg_score);
   const weak    = byScore.slice(0, Math.min(3, byScore.length));
-  const strong  = [...subjectRankings].sort((a,b) => b.avg_score - a.avg_score).slice(0, 2);
+  const strong  = [...rankings].sort((a,b) => b.avg_score - a.avg_score).slice(0, 2);
 
   weak.forEach(s => {
     if (s.avg_score < 50) {
@@ -76,8 +78,8 @@ function buildInterventions(subjectRankings, streamAverages) {
     }
   });
 
-  if (streamAverages.length >= 2) {
-    const sorted = [...streamAverages].sort((a,b) => b.avg_score - a.avg_score);
+  if (streams.length >= 2) {
+    const sorted = [...streams].sort((a,b) => b.avg_score - a.avg_score);
     const best = sorted[0]; const worst = sorted[sorted.length-1];
     const gap  = +(best.avg_score - worst.avg_score).toFixed(1);
     if (gap >= 15) {
@@ -91,7 +93,7 @@ function buildInterventions(subjectRankings, streamAverages) {
     }
   }
 
-  const lowestStream = [...streamAverages].sort((a,b) => a.avg_score - b.avg_score)[0];
+  const lowestStream = [...streams].sort((a,b) => a.avg_score - b.avg_score)[0];
   if (lowestStream && lowestStream.avg_score < 60) {
     out.push({ urgency:"high", subject:`${lowestStream.stream_label} Overall`,
       finding:`${lowestStream.stream_label} overall average of ${lowestStream.avg_score}% is below passing threshold`,
@@ -121,6 +123,28 @@ function AnalysisTab({ auth }) {
   const [studentRankings, setStudentRankings] = useState(null);
   const [classStats, setClassStats]     = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Computed values - use useMemo to ensure proper initialization
+  const streamSorted = useMemo(() => 
+    (data && data.streamAverages) ? [...data.streamAverages].sort((a,b) => b.avg_score - a.avg_score) : [],
+    [data]
+  );
+  
+  const byClass = useMemo(() => {
+    const result = {};
+    streamSorted.forEach(s => {
+      if (!result[s.class_name]) result[s.class_name] = [];
+      result[s.class_name].push(s);
+    });
+    return result;
+  }, [streamSorted]);
+  
+  const interventions = useMemo(() =>
+    (data && data.subjectRankings && data.streamAverages) 
+      ? buildInterventions(data.subjectRankings || [], data.streamAverages || []) 
+      : [],
+    [data]
+  );
 
   const load = useCallback(async () => {
     if (!auth?.token) return;
@@ -305,17 +329,9 @@ Keep the tone professional but simple enough for a school administrator to act o
     return elements;
   };
 
-  const streamSorted = data ? [...data.streamAverages].sort((a,b) => b.avg_score - a.avg_score) : [];
-  const byClass = {};
-  streamSorted.forEach(s => {
-    if (!byClass[s.class_name]) byClass[s.class_name] = [];
-    byClass[s.class_name].push(s);
-  });
-  
   const urgencyColor = { high:"var(--color-danger)", medium:"var(--color-warning)", maintain:"var(--color-success)" };
   const urgencyBg    = { high:"color-mix(in srgb, var(--color-danger) 10%, transparent)", medium:"color-mix(in srgb, var(--color-warning) 10%, transparent)", maintain:"color-mix(in srgb, var(--color-success) 10%, transparent)" };
   const urgencyLabel = { high:"🔴 High Priority", medium:"🟡 Medium Priority", maintain:"🟢 Maintain" };
-  const interventions = data ? buildInterventions(data.subjectRankings, data.streamAverages) : [];
 
   if (!loading && data && data.streamAverages.length === 0) return (
     <Card style={{ textAlign: "center", padding: "60px var(--space-4)" }}>
@@ -765,42 +781,46 @@ Keep the tone professional but simple enough for a school administrator to act o
               </div>
               
               {/* Subject trend table */}
-              <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
-                <Table 
-                  headers={["Subject", ...trends.terms, "Trend"]}
-                  data={trends.subjects.map(subj => {
-                    const scores = trends.terms.map(t => trends.data[subj]?.[t] ?? null);
-                    const valid  = scores.filter(s => s !== null);
-                    const first  = valid[0] ?? 0;
-                    const last   = valid[valid.length - 1] ?? 0;
-                    const diff   = last - first;
-                    const trendIcon = diff > 2 ? "📈" : diff < -2 ? "📉" : "➡️";
-                    const trendColor = diff > 2 ? "var(--color-success)" : diff < -2 ? "var(--color-danger)" : "var(--color-text-secondary)";
-                    
-                    const row = [
-                      <span key="subject" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{subj}</span>
-                    ];
-                    
-                    trends.terms.forEach(t => {
-                      const sc = trends.data[subj]?.[t];
-                      if (sc == null) {
-                        row.push(<span key={t} style={{ color: "var(--color-text-muted)", textAlign: "center" }}>—</span>);
-                      } else {
-                        const g = gradeInfo(sc);
-                        row.push(<Badge key={t} text={`${sc}%`} style={{ background: g.bg, color: g.color, borderColor: "transparent", fontWeight: 700 }} />);
-                      }
-                    });
-                    
-                    row.push(
-                      <span key="trend" style={{ color: trendColor, fontWeight: 700, fontSize: "14px" }}>
-                        {trendIcon} {diff > 0 ? "+" : ""}{diff !== 0 ? diff.toFixed(1)+"%" : "Stable"}
-                      </span>
-                    );
-                    
-                    return row;
-                  })}
-                />
-              </div>
+              {!trends || !trends.subjects || !trends.terms ? (
+                <p style={{ padding: "var(--space-3)", color: "var(--color-text-muted)" }}>No trend data yet.</p>
+              ) : (
+                <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                  <Table 
+                    headers={["Subject", ...trends.terms, "Trend"]}
+                    data={trends.subjects.map(subj => {
+                      const scores = trends.terms.map(t => trends.data[subj]?.[t] ?? null);
+                      const valid  = scores.filter(s => s !== null);
+                      const first  = valid[0] ?? 0;
+                      const last   = valid[valid.length - 1] ?? 0;
+                      const diff   = last - first;
+                      const trendIcon = diff > 2 ? "📈" : diff < -2 ? "📉" : "➡️";
+                      const trendColor = diff > 2 ? "var(--color-success)" : diff < -2 ? "var(--color-danger)" : "var(--color-text-secondary)";
+                      
+                      const row = [
+                        <span key="subject" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{subj}</span>
+                      ];
+                      
+                      trends.terms.forEach(t => {
+                        const sc = trends.data[subj]?.[t];
+                        if (sc == null) {
+                          row.push(<span key={t} style={{ color: "var(--color-text-muted)", textAlign: "center" }}>—</span>);
+                        } else {
+                          const g = gradeInfo(sc);
+                          row.push(<Badge key={t} text={`${sc}%`} style={{ background: g.bg, color: g.color, borderColor: "transparent", fontWeight: 700 }} />);
+                        }
+                      });
+                      
+                      row.push(
+                        <span key="trend" style={{ color: trendColor, fontWeight: 700, fontSize: "14px" }}>
+                          {trendIcon} {diff > 0 ? "+" : ""}{diff !== 0 ? diff.toFixed(1)+"%" : "Stable"}
+                        </span>
+                      );
+                      
+                      return row;
+                    })}
+                  />
+                </div>
+              )}
             </Card>
           )}
 
