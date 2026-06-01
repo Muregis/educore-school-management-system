@@ -52,6 +52,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   const [lessonPlans, setLessonPlans] = useState([]);
   const [lessonPlansLoading, setLessonPlansLoading] = useState(false);
   const [lessonPlansError, setLessonPlansError] = useState("");
+  const [teacherClasses, setTeacherClasses] = useState([]);
 
   // Load library data for librarian
   useEffect(() => {
@@ -90,6 +91,21 @@ export default function DashboardPage({ auth, school, students, teachers, attend
         }
       })
       .finally(() => setLessonPlansLoading(false));
+
+    return () => ac.abort();
+  }, [auth?.token, auth?.role]);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    if (auth.role !== "teacher") return;
+
+    const ac = new AbortController();
+    apiFetch("/teacherassignments/my-classes", { token: auth.token, signal: ac.signal })
+      .then(data => {
+        if (!Array.isArray(data)) return setTeacherClasses([]);
+        setTeacherClasses(data.map(c => c.class_name).filter(Boolean));
+      })
+      .catch(() => setTeacherClasses([]));
 
     return () => ac.abort();
   }, [auth?.token, auth?.role]);
@@ -395,9 +411,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
 
 // Teacher dashboard  
   if (auth?.role === "teacher") {
-    const myClasses = teachers.find(t => t.email === auth.email)?.classes || [];
-    const myStudents = students.filter(s => myClasses.includes(s.className));
-    const myAttendance = attendance.filter(a => myStudents.some(s => (s.id ?? s.student_id) === (a.studentId ?? a.student_id)));
+    const myClasses = Array.isArray(teacherClasses) ? teacherClasses : [];
     const myResults = results.filter(r => myStudents.some(s => (s.id ?? s.student_id) === (r.studentId ?? r.student_id)));
      
     const attendanceByDate = Object.entries(

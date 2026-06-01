@@ -7,6 +7,7 @@ import { requireRoles, requireDirector } from "../middleware/roles.js";
 import { studentDataRateLimit } from "../middleware/rateLimit.js";
 import multer from "multer";
 import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
+import { getPortalStudentIds, requirePortalStudentAccess } from "../utils/portalAccess.js";
 
 // Configure multer for photo uploads
 const upload = multer({
@@ -84,6 +85,12 @@ router.get("/", async (req, res, next) => {
       query = query.in('class_name', assignedClasses);
     }
 
+    if (role === "parent" || role === "student") {
+      const portalStudentIds = await getPortalStudentIds(req, supabase);
+      if (!portalStudentIds.length) return res.json([]);
+      query = query.in("student_id", portalStudentIds);
+    }
+
     // Execute query
     const { data: rows, error } = await query
       .order('class_name')
@@ -101,6 +108,9 @@ router.get("/", async (req, res, next) => {
 router.get("/:id", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    const canAccess = await requirePortalStudentAccess(req, supabase, req.params.id);
+    if (!canAccess) return res.status(403).json({ message: "Forbidden" });
+
     const { data, error } = await supabase
       .from('students')
       .select('*')
@@ -488,6 +498,8 @@ router.get("/:studentId/ledger", studentDataRateLimit, requireRoles("director", 
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
+    const canAccess = await requirePortalStudentAccess(req, supabase, studentId);
+    if (!canAccess) return res.status(403).json({ message: "Forbidden" });
     const { limit = 50, offset = 0, term, academic_year } = req.query;
 
     const { data: student, error: studentError } = await supabase
@@ -538,6 +550,8 @@ router.get("/:studentId/invoices", studentDataRateLimit, requireRoles("director"
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
+    const canAccess = await requirePortalStudentAccess(req, supabase, studentId);
+    if (!canAccess) return res.status(403).json({ message: "Forbidden" });
     const { limit = 50, offset = 0, term, academic_year } = req.query;
 
     const { data: student, error: studentError } = await supabase

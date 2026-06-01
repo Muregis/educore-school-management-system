@@ -1,6 +1,7 @@
 import express from "express";
 import { supabase } from "../config/supabase.js";
 import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
+import { getPortalStudentIds } from "../utils/portalAccess.js";
 const router = express.Router();
 
 async function getTeacherClassIds(schoolId, userId) {
@@ -93,8 +94,22 @@ router.get("/", async (req, res, next) => {
       query = query.in("students.class_name", assignedClasses);
     }
 
+    if (role === "parent" || role === "student") {
+      const portalStudentIds = await getPortalStudentIds(req, supabase);
+      if (!portalStudentIds.length) return res.json([]);
+      query = query.in("student_id", portalStudentIds);
+    }
+
     if (classId) query = query.eq("class_id", classId);
-    if (studentId) query = query.eq("student_id", studentId);
+    if (studentId) {
+      if ((role === "parent" || role === "student")) {
+        const portalStudentIds = await getPortalStudentIds(req, supabase);
+        if (!portalStudentIds.map(String).includes(String(studentId))) {
+          return res.status(403).json({ message: "Forbidden" });
+        }
+      }
+      query = query.eq("student_id", studentId);
+    }
     if (date) query = query.eq("attendance_date", date);
     if (from) query = query.gte("attendance_date", from);
     if (to) query = query.lte("attendance_date", to);

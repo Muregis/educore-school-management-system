@@ -8,6 +8,7 @@ import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import { env } from "../config/env.js";
 import { sendWhatsAppPaymentReceipt } from "../services/whatsappService.js";
 import { LedgerService } from "../services/ledger.service.js";
+import { getPortalStudentIds } from "../utils/portalAccess.js";
 import multer from "multer";
 
 // Configure multer for file uploads
@@ -28,9 +29,9 @@ router.use(authRequired);
 // ─── GET all payments (with student name) ────────────────────────────────────
 router.get("/", async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
+    const { schoolId, role } = req.user;
 
-    const { data: rows, error } = await supabase
+    let query = supabase
       .from('payments')
       .select(`
         payment_id, student_id, amount, fee_type, payment_method,
@@ -42,7 +43,15 @@ router.get("/", async (req, res, next) => {
         )
       `)
       .eq('school_id', schoolId)
-      .eq('is_deleted', false)
+      .eq('is_deleted', false);
+
+    if (role === "parent" || role === "student") {
+      const portalStudentIds = await getPortalStudentIds(req, supabase);
+      if (!portalStudentIds.length) return res.json([]);
+      query = query.in("student_id", portalStudentIds);
+    }
+
+    const { data: rows, error } = await query
       .order('payment_date', { ascending: false })
       .order('payment_id', { ascending: false });
 

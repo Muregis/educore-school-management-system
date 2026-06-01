@@ -10,6 +10,7 @@ import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
 import { uploadCsv } from "../middleware/uploadCsv.js";
 import { normalizeHeader } from "../utils/normalizeCsvHeader.js";
 import { knecGrade } from "../utils/knecGrading.js";
+import { getPortalStudentIds, requirePortalStudentAccess } from "../utils/portalAccess.js";
 
 const router = Router();
 router.use(authRequired);
@@ -153,7 +154,17 @@ router.get("/", async (req, res, next) => {
       query = query.in('class_name', assignedClasses);
     }
 
-    if (studentId) query = query.eq("student_id", studentId);
+    if (role === "parent" || role === "student") {
+      const portalStudentIds = await getPortalStudentIds(req, supabase);
+      if (!portalStudentIds.length) return res.json([]);
+      query = query.in("student_id", portalStudentIds);
+    }
+
+    if (studentId) {
+      const canAccess = await requirePortalStudentAccess(req, supabase, studentId);
+      if (!canAccess) return res.status(403).json({ message: "Forbidden" });
+      query = query.eq("student_id", studentId);
+    }
     if (term) query = query.eq("term", term);
     if (classId) query = query.eq("class_id", classId);
 
@@ -493,6 +504,9 @@ router.get("/:id", async (req, res, next) => {
       .single();
 
     if (error || !result) return res.status(404).json({ message: "Result not found" });
+
+    const canAccess = await requirePortalStudentAccess(req, supabase, result.student_id);
+    if (!canAccess) return res.status(403).json({ message: "Forbidden" });
 
     const row = {
       ...result,
