@@ -328,7 +328,14 @@ Keep the tone professional but simple enough for a school administrator to act o
   const urgencyBg    = { high:"color-mix(in srgb, var(--color-danger) 10%, transparent)", medium:"color-mix(in srgb, var(--color-warning) 10%, transparent)", maintain:"color-mix(in srgb, var(--color-success) 10%, transparent)" };
   const urgencyLabel = { high:"🔴 High Priority", medium:"🟡 Medium Priority", maintain:"🟢 Maintain" };
 
-  if (!loading && data && data.streamAverages.length === 0) return (
+  // Prevent rendering until data is loaded to avoid temporal dead zone errors
+  if (loading || !data || !isInitialized) return (
+    <Card style={{ textAlign: "center", padding: "60px var(--space-4)" }}>
+      <EmptyState icon="📊" title="Loading analysis..." description="Please wait while we fetch the data." />
+    </Card>
+  );
+
+  if (data.streamAverages.length === 0) return (
     <Card style={{ textAlign: "center", padding: "60px var(--space-4)" }}>
       <EmptyState icon="📊" title="No results data yet" description="Enter results in the Grades page to see stream analysis." />
     </Card>
