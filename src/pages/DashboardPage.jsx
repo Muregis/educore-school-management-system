@@ -412,7 +412,10 @@ export default function DashboardPage({ auth, school, students, teachers, attend
 // Teacher dashboard  
   if (auth?.role === "teacher") {
     const myClasses = Array.isArray(teacherClasses) ? teacherClasses : [];
-    const myStudents = students.filter(s => myClasses.includes(s.className));
+    const myStudents = students.filter(s => {
+      const cls = (s.className ?? s.class_name ?? "").toString().trim();
+      return myClasses.includes(cls);
+    });
     const myAttendance = attendance.filter(a => myStudents.some(s => (s.id ?? s.student_id) === (a.studentId ?? a.student_id)));
     const myResults = results.filter(r => myStudents.some(s => (s.id ?? s.student_id) === (r.studentId ?? r.student_id)));
      
