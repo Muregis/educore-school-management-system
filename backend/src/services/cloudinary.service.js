@@ -31,15 +31,14 @@ export const uploadBufferToCloudinary = async (buffer, fileName, options = {}) =
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
       {
-        folder: 'educore',
         resource_type: 'auto',
-        public_id: fileName,
         ...options,
       },
       (error, result) => {
         if (error) {
           console.error('Cloudinary buffer upload error:', error);
-          reject(new Error('Failed to upload buffer to Cloudinary'));
+          console.error('Error details:', JSON.stringify(error, null, 2));
+          reject(new Error(`Failed to upload buffer to Cloudinary: ${error.message || error}`));
         } else {
           resolve(result);
         }
