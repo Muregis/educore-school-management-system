@@ -58,6 +58,7 @@ import discountsRoutes         from "./routes/discounts.routes.js";  // NEW: Fee
 import expendituresRoutes     from "./routes/expenditures.routes.js";
 import examTypesRoutes         from "./routes/exam-types.routes.js";  // NEW: Exam types management
 import compiledResultsRoutes   from "./routes/compiled-results.routes.js";  // NEW: Compiled results endpoint
+import uploadRoutes           from "./routes/upload.routes.js";  // NEW: Cloudinary upload routes
 // import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }         from "./middleware/error.js";
 import { authRequired }         from "./middleware/auth.js";
@@ -173,6 +174,7 @@ app.use("/api/discounts",         discountsRoutes);           // NEW: Fee discou
 app.use("/api/expenditures",      expendituresRoutes);
 app.use("/api/exam-types",        examTypesRoutes);           // NEW: Exam types management
 app.use("/api/grades/compiled",   compiledResultsRoutes);     // NEW: Compiled results endpoint
+app.use("/api/upload",            uploadRoutes);              // NEW: Cloudinary upload routes
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
 

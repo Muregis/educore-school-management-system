@@ -41,6 +41,11 @@ export const env = {
   supabaseServiceKey:   clean(process.env.SUPABASE_SERVICE_KEY),
   supabaseAnonKey:      clean(process.env.SUPABASE_ANON_KEY),
 
+  // Cloudinary
+  cloudinaryCloudName:  clean(process.env.CLOUDINARY_CLOUD_NAME),
+  cloudinaryApiKey:     clean(process.env.CLOUDINARY_API_KEY),
+  cloudinaryApiSecret:  clean(process.env.CLOUDINARY_API_SECRET),
+
   // Email (SMTP)
   smtpHost:     process.env.SMTP_HOST     || "smtp.gmail.com",
   smtpPort:     Number(process.env.SMTP_PORT || 587),
