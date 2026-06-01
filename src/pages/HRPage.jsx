@@ -387,8 +387,8 @@ export default function HRPage({ auth, canEdit, toast, school }) {
               <option value="all">All Departments</option>
               {DEPARTMENTS.map(d=><option key={d}>{d}</option>)}
             </select>
-            {canEdit && <Btn tone="secondary" size="sm" onClick={async () => { 
-              const btn = event.target;
+            {canEdit && <Btn tone="secondary" size="sm" onClick={useCallback(async (e) => { 
+              const btn = e.target;
               btn.disabled = true;
               btn.textContent = "Syncing...";
               try { 
@@ -401,7 +401,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
                 btn.disabled = false;
                 btn.textContent = "🔄 Sync to Teachers";
               }
-            }}>🔄 Sync to Teachers</Btn>}
+            }, [auth.token, toast])}>🔄 Sync to Teachers</Btn>}
             {canEdit && <Btn onClick={()=>{ setEditStaff(null); setStaffForm(BLANK_STAFF); setErr(""); setShowStaff(true); }}>+ Add Staff</Btn>}
           </div>
           {filteredStaff.length===0 ? <Msg text="No staff found." /> : (

@@ -149,13 +149,7 @@ export function TermManagementPage({ auth }) {
 function TermClosureChecklist({ term, onClose, show, onHide, loading }) {
   const [checklist, setChecklist] = useState([]);
 
-  useEffect(() => {
-    if (show && term) {
-      loadChecklist();
-    }
-  }, [show, term]);
-
-  const loadChecklist = async () => {
+  const loadChecklist = useCallback(async () => {
     try {
       const res = await apiFetch(`/academic/terms/${term.term_id}/can-close`);
       const eligibility = res.data;
@@ -183,7 +177,19 @@ function TermClosureChecklist({ term, onClose, show, onHide, loading }) {
     } catch (error) {
       console.error('Error loading checklist:', error);
     }
-  };
+  }, [term?.term_id]);
+
+  useEffect(() => {
+    if (show && term) {
+      loadChecklist();
+    }
+  }, [show, term, loadChecklist]);
+
+  useEffect(() => {
+    if (show && term) {
+      loadChecklist();
+    }
+  }, [show, term, loadChecklist]);
 
   const canProceed = checklist.every(item => item.status);
 
@@ -375,6 +381,7 @@ export function EnhancedFeesPage({ auth, students, feeStructures, setFeeStructur
   const [ledgerView, setLedgerView] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [ledgerEntries, setLedgerEntries] = useState([]);
+  const [tab, setTab] = useState('payments');
 
   // Check if new system is available
   useEffect(() => {
@@ -463,7 +470,7 @@ export function EnhancedFeesPage({ auth, students, feeStructures, setFeeStructur
       )}
 
       {tab === 'analytics' && (
-        <FeeAnalyticsView />
+        <FeeAnalyticsView auth={auth} />
       )}
 
       {/* Existing tab content for payments and structures */}
@@ -478,10 +485,10 @@ export function EnhancedFeesPage({ auth, students, feeStructures, setFeeStructur
 
 function FeeLedgerView({ students, selectedStudent, setSelectedStudent, ledgerEntries, loadLedger }) {
   useEffect(() => {
-    if (selectedStudent) {
+    if (selectedStudent && loadLedger) {
       loadLedger(selectedStudent);
     }
-  }, [selectedStudent]);
+  }, [selectedStudent, loadLedger]);
 
   return (
     <div className="fee-ledger-view">
@@ -604,21 +611,22 @@ function UpcomingTermsList({ terms }) {
   );
 }
 
-function FeeAnalyticsView() {
+function FeeAnalyticsView({ auth }) {
   const [analytics, setAnalytics] = useState({});
 
-  useEffect(() => {
-    loadAnalytics();
-  }, []);
-
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
+    if (!auth?.token) return;
     try {
-      const res = await apiFetch('/finance/analytics', { token: auth?.token });
+      const res = await apiFetch('/finance/analytics', { token: auth.token });
       setAnalytics(res.data || {});
     } catch (error) {
       console.error('Error loading fee analytics:', error);
     }
-  };
+  }, [auth?.token]);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
 
   return (
     <div className="fee-analytics">
@@ -686,6 +694,7 @@ export function PermissionGuard({ permission, children, fallback = null }) {
 // =====================================================
 
 export function useFeatureFlags() {
+  const { auth } = useContext(AuthContext) || {};
   const [flags, setFlags] = useState({
     newAcademicSystem: false,
     ledgerSystem: false,
@@ -693,13 +702,9 @@ export function useFeatureFlags() {
     promotionWorkflow: false
   });
 
-  useEffect(() => {
-    checkFeatureAvailability();
-  }, []);
-
-  const checkFeatureAvailability = async () => {
+  const checkFeatureAvailability = useCallback(async () => {
+    if (!auth?.token) return;
     try {
-      // Check which new features are available
       const checks = await Promise.allSettled([
         apiFetch('/academic/years/current', { token: auth?.token }),
         apiFetch('/finance/ledger/_check', { token: auth?.token }),
@@ -710,12 +715,16 @@ export function useFeatureFlags() {
         newAcademicSystem: checks[0].status === 'fulfilled',
         ledgerSystem: checks[1].status === 'fulfilled',
         promotionWorkflow: checks[2].status === 'fulfilled',
-        dualWrite: true // Assume dual write is enabled
+        dualWrite: true
       });
     } catch {
       // Features not available
     }
-  };
+  }, [auth?.token]);
+
+  useEffect(() => {
+    checkFeatureAvailability();
+  }, [checkFeatureAvailability]);
 
   return flags;
 }

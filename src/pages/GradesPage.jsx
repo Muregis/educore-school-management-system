@@ -407,7 +407,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
             "success"
           );
         }}>Export Template</Btn>
-        <Btn variant="ghost" onClick={async () => {
+        <Btn variant="ghost" onClick={useCallback(async () => {
           try {
             const token = auth?.token || sessionStorage.getItem("token");
             const res = await fetch(`${API_BASE}/grades/template`, {
@@ -424,10 +424,10 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           } catch (err) {
             toast(err.message || "Template download failed", "error");
           }
-        }}>Download Import Template</Btn>
+        }, [auth?.token, toast])}>Download Import Template</Btn>
         {canEdit && (
           <>
-            <Btn variant="ghost" onClick={async () => {
+            <Btn variant="ghost" onClick={useCallback(async () => {
               try {
                 if (!window.confirm("Recalculate all grades based on marks? This will update grade values for all results.")) return;
                 toast("Recalculating grades...", "info");
@@ -444,7 +444,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
               } catch (err) {
                 toast(err.message || "Recalculation failed", "error");
               }
-            }}>Recalculate Grades</Btn>
+            }, [auth?.token, toast, setResults])}>Recalculate Grades</Btn>
             <label style={{ cursor: "pointer" }}>
               <span style={{ display:"inline-block", padding:"6px 16px", borderRadius:8, border:`1px solid ${C.border}`, background:C.card, color:C.accent, fontSize:13, fontWeight:500 }}>
                 Import CSV
@@ -453,7 +453,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                 type="file"
                 accept=".csv"
                 style={{ display: "none" }}
-                onChange={async (e) => {
+                onChange={useCallback(async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
                   
@@ -516,7 +516,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
                     toast(err.message || "Import failed. Please check the file format and try again.", "error");
                   }
                   e.target.value = "";
-                }}
+                }, [auth?.token, toast, examType, setResults])}
               />
             </label>
             <Btn onClick={() => {
