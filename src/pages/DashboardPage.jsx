@@ -411,13 +411,12 @@ export default function DashboardPage({ auth, school, students, teachers, attend
 
 // Teacher dashboard  
   if (auth?.role === "teacher") {
-    const myClasses = Array.isArray(teacherClasses) ? teacherClasses : [];
-    const myStudents = students.filter(s => {
-      const cls = (s.className ?? s.class_name ?? "").toString().trim();
-      return myClasses.includes(cls);
-    });
-    const myAttendance = attendance.filter(a => myStudents.some(s => (s.id ?? s.student_id) === (a.studentId ?? a.student_id)));
-    const myResults = results.filter(r => myStudents.some(s => (s.id ?? s.student_id) === (r.studentId ?? r.student_id)));
+    const normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
+    const myClasses = Array.isArray(teacherClasses) ? teacherClasses.map(normalizeClassName) : [];
+    const myStudents = students.filter(s => myClasses.includes(normalizeClassName(s.className ?? s.class_name)));
+    const myStudentIds = new Set(myStudents.map(s => String(s.id ?? s.student_id ?? s.studentId ?? "")));
+    const myAttendance = attendance.filter(a => myStudentIds.has(String(a.studentId ?? a.student_id ?? "")));
+    const myResults = results.filter(r => myStudentIds.has(String(r.studentId ?? r.student_id ?? "")));
      
     const attendanceByDate = Object.entries(
       myAttendance.reduce((acc, row) => {
