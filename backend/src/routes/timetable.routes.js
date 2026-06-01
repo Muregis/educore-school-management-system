@@ -84,7 +84,18 @@ router.get("/", async (req, res, next) => {
         return res.json([]);
       }
 
-      q = q.in("class_id", assignedClasses);
+      const { data: classRows, error: classRowsErr } = await supabase
+        .from("classes")
+        .select("class_id")
+        .eq("school_id", schoolId)
+        .in("class_name", assignedClasses)
+        .eq("is_deleted", false);
+
+      if (classRowsErr) throw classRowsErr;
+      const classIds = (classRows || []).map(c => c.class_id).filter(Boolean);
+      if (classIds.length === 0) return res.json([]);
+
+      q = q.in("class_id", classIds);
     }
 
     // execute query
