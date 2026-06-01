@@ -16,6 +16,7 @@ import Table from "../components/ui/Table";
 function normalise(t) {
   return {
     id:        t.teacher_id  ?? t.id,
+    userId:    t.user_id     ?? t.userId ?? null,
     staffNumber: t.staff_number ?? t.staffNumber ?? "",
     tscStaffId: t.tsc_staff_id ?? t.tscStaffId ?? "",
     firstName: t.first_name  ?? t.firstName,
@@ -63,7 +64,10 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
 
   // Move these to the top to avoid temporal dead zone errors
   const assignmentUserForTeacher = teacher =>
-    assignmentTeachers.find(t => String(t.user_id) === String(teacher.id || teacher.teacher_id));
+    assignmentTeachers.find(t =>
+      String(t.user_id) === String(teacher.userId || teacher.user_id) ||
+      (t.email && teacher.email && String(t.email).toLowerCase() === String(teacher.email).toLowerCase())
+    );
 
   const assignmentsForTeacher = teacher => assignmentUserForTeacher(teacher)?.assignments || [];
 
