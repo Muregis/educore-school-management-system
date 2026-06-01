@@ -3,6 +3,7 @@ import multer from "multer";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
+import { uploadBufferToCloudinary } from "../services/cloudinary.service.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -492,59 +493,46 @@ router.patch("/school/whatsapp", requireRoles("admin"), async (req, res, next) =
   }
 });
 
-// POST /api/settings/upload-logo - Upload school logo to Supabase storage
+// POST /api/settings/upload-logo - Upload school logo to Cloudinary
 router.post("/upload-logo", requireRoles("admin", "director", "superadmin"), upload.single("file"), async (req, res, next) => {
   try {
-    const { schoolId } = req.user;
+    const schoolId = req.user?.school_id || req.user?.schoolId || req.schoolId;
+
+    if (!schoolId) {
+      return res.status(400).json({ message: "School context required" });
+    }
 
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    const file = req.file;
-    const fileExt = file.originalname.split(".").pop();
-    const timestamp = Date.now();
-    const filename = `school-logo-${schoolId}-${timestamp}.${fileExt}`;
-
-    // Upload to Supabase storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("school-logos")
-      .upload(filename, file.buffer, {
-        contentType: file.mimetype,
-        upsert: false,
-      });
-
-    if (uploadError) {
-      // If bucket doesn't exist, try creating it
-      if (uploadError.message?.includes("not found") || uploadError.statusCode === 404) {
-        await supabase.storage.createBucket("school-logos", { public: true });
-        const retry = await supabase.storage
-          .from("school-logos")
-          .upload(filename, file.buffer, { contentType: file.mimetype, upsert: false });
-        if (retry.error) throw retry.error;
-      } else {
-        throw uploadError;
+    // Upload to Cloudinary with school-specific folder
+    const result = await uploadBufferToCloudinary(
+      req.file.buffer,
+      req.file.originalname,
+      {
+        folder: `educore/school_${schoolId}`,
+        public_id: `school-logo-${schoolId}`,
+        transformation: [
+          { quality: 'auto', fetch_format: 'auto' },
+          { width: 200, height: 200, crop: 'limit' }
+        ]
       }
-    }
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from("school-logos")
-      .getPublicUrl(filename);
+    );
 
     // Save logo_url to schools table
     const { error: updateError } = await supabase
       .from("schools")
-      .update({ logo_url: publicUrl, updated_at: new Date().toISOString() })
+      .update({ logo_url: result.secure_url, updated_at: new Date().toISOString() })
       .eq("school_id", schoolId)
       .eq("is_deleted", false);
 
     if (updateError) throw updateError;
 
     // Also save to school_settings for redundancy
-    await upsertSchoolSettings(schoolId, { logo_url: publicUrl });
+    await upsertSchoolSettings(schoolId, { logo_url: result.secure_url });
 
-    res.json({ logo_url: publicUrl, message: "Logo uploaded successfully" });
+    res.json({ logo_url: result.secure_url, message: "Logo uploaded successfully" });
   } catch (err) {
     console.error("[DEBUG] Logo upload error:", err);
     next(err);

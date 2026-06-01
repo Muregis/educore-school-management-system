@@ -24,6 +24,7 @@ const upload = multer({
 /**
  * Upload an image to Cloudinary
  * POST /api/upload/image
+ * Tenant-aware: uploads to school-specific folder
  */
 router.post("/image", authRequired, upload.single('file'), async (req, res) => {
   try {
@@ -31,11 +32,19 @@ router.post("/image", authRequired, upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
+    const schoolId = req.user?.school_id || req.user?.schoolId || req.schoolId;
+    if (!schoolId) {
+      return res.status(400).json({ error: "School context required" });
+    }
+
+    // Organize uploads by school for multi-tenant isolation
+    const schoolFolder = `educore/school_${schoolId}`;
+    
     const result = await uploadBufferToCloudinary(
       req.file.buffer,
       req.file.originalname,
       {
-        folder: 'educore',
+        folder: schoolFolder,
         transformation: [
           { quality: 'auto', fetch_format: 'auto' }
         ]
@@ -49,6 +58,7 @@ router.post("/image", authRequired, upload.single('file'), async (req, res) => {
       width: result.width,
       height: result.height,
       format: result.format,
+      schoolId: schoolId,
     });
   } catch (error) {
     console.error("Upload error:", error);
@@ -59,6 +69,7 @@ router.post("/image", authRequired, upload.single('file'), async (req, res) => {
 /**
  * Delete an image from Cloudinary
  * DELETE /api/upload/image/:publicId
+ * Tenant-aware: only allows deletion of images from user's school
  */
 router.delete("/image/:publicId", authRequired, async (req, res) => {
   try {
@@ -66,6 +77,17 @@ router.delete("/image/:publicId", authRequired, async (req, res) => {
     
     if (!publicId) {
       return res.status(400).json({ error: "Public ID is required" });
+    }
+
+    const schoolId = req.user?.school_id || req.user?.schoolId || req.schoolId;
+    if (!schoolId) {
+      return res.status(400).json({ error: "School context required" });
+    }
+
+    // Verify the image belongs to the user's school
+    const expectedFolder = `educore/school_${schoolId}`;
+    if (!publicId.includes(expectedFolder)) {
+      return res.status(403).json({ error: "Unauthorized: can only delete images from your school" });
     }
 
     const result = await deleteFromCloudinary(publicId);
