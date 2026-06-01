@@ -5,6 +5,10 @@ import { supabase } from "../config/supabaseClient.js";
 
 const router = Router();
 
+function classKey(name) {
+  return String(name || "").trim().toLowerCase();
+}
+
 // GET /api/analysis/streams
 router.get("/streams", authRequired, async (req, res, next) => {
   try {
@@ -23,25 +27,26 @@ router.get("/streams", authRequired, async (req, res, next) => {
       .select("result_id,school_id,term,subject,marks,total_marks,student_id,class_id,is_deleted")
       .eq("school_id", schoolId)
       .eq("term", term)
-      .eq("is_deleted", false)
-      .not("class_id", "is", null);
+      .eq("is_deleted", false);
     if (resultsErr) throw resultsErr;
 
     const classIds = [...new Set((resultRows || []).map(r => r.class_id).filter(Boolean))];
     const studentIds = [...new Set((resultRows || []).map(r => r.student_id).filter(Boolean))];
 
     const [{ data: classesRows, error: classesErr }, { data: studentsRows, error: studentsErr }] = await Promise.all([
-      classIds.length
-        ? supabase.from("classes").select("class_id,class_name,section,is_deleted,status").in("class_id", classIds)
-        : Promise.resolve({ data: [], error: null }),
+      supabase.from("classes").select("class_id,class_name,section,is_deleted,status,school_id")
+        .eq("school_id", schoolId)
+        .eq("is_deleted", false)
+        .eq("status", "active"),
       studentIds.length
-        ? supabase.from("students").select("student_id,is_deleted,status").in("student_id", studentIds)
+        ? supabase.from("students").select("student_id,class_name,is_deleted,status").eq("school_id", schoolId).in("student_id", studentIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
     if (classesErr) throw classesErr;
     if (studentsErr) throw studentsErr;
 
     const classById = new Map((classesRows || []).map(c => [c.class_id, c]));
+    const classByName = new Map((classesRows || []).map(c => [classKey(c.class_name), c]));
     const studentById = new Map((studentsRows || []).map(s => [s.student_id, s]));
 
     const isActiveStudent = (sid) => {
@@ -56,8 +61,14 @@ router.get("/streams", authRequired, async (req, res, next) => {
       return c;
     };
 
+    const pickResultClass = (r) => {
+      const c = pickClass(r.class_id) || classByName.get(classKey(studentById.get(r.student_id)?.class_name));
+      if (!c || (className && c.class_name !== className)) return null;
+      return c;
+    };
+
     const cleanRows = (resultRows || []).filter(r => {
-      const c = pickClass(r.class_id);
+      const c = pickResultClass(r);
       if (!c) return false;
       if (!isActiveStudent(r.student_id)) return false;
       return true;
@@ -72,7 +83,7 @@ router.get("/streams", authRequired, async (req, res, next) => {
     // Stream averages
     const streamAgg = new Map(); // class_id -> { class_name, stream, stream_label, class_id, studentIds:Set, sum, count }
     for (const r of cleanRows) {
-      const c = classById.get(r.class_id);
+      const c = pickResultClass(r);
       if (!c) continue;
       const p = pct(r);
       if (p == null) continue;
@@ -141,7 +152,7 @@ const classOrderIndex = (name) => {
     const matrixAgg = new Map(); // stream_label -> subject -> {sum,count}
     const streamMeta = new Map(); // stream_label -> {class_name, stream}
     for (const r of cleanRows) {
-      const c = classById.get(r.class_id);
+      const c = pickResultClass(r);
       if (!c) continue;
       const subject = String(r.subject || "").trim();
       if (!subject) continue;
@@ -252,21 +263,33 @@ router.get("/trends", authRequired, async (req, res, next) => {
       .from("results")
       .select("term,subject,marks,total_marks,student_id,class_id,is_deleted,school_id")
       .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .not("class_id", "is", null);
+      .eq("is_deleted", false);
     if (resultsErr) throw resultsErr;
 
     const classIds = [...new Set((resultsRows || []).map(r => r.class_id).filter(Boolean))];
-    const { data: classesRows, error: classesErr } = classIds.length
-      ? await supabase.from("classes").select("class_id,class_name,is_deleted,status").in("class_id", classIds)
-      : { data: [], error: null };
+    const studentIds = [...new Set((resultsRows || []).map(r => r.student_id).filter(Boolean))];
+    const [{ data: classesRows, error: classesErr }, { data: studentsRows, error: studentsErr }] = await Promise.all([
+      supabase.from("classes").select("class_id,class_name,is_deleted,status")
+        .eq("school_id", schoolId)
+        .eq("is_deleted", false)
+        .eq("status", "active"),
+      studentIds.length
+        ? supabase.from("students").select("student_id,class_name,is_deleted,status").eq("school_id", schoolId).in("student_id", studentIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
     if (classesErr) throw classesErr;
+    if (studentsErr) throw studentsErr;
     const classById = new Map((classesRows || []).map(c => [c.class_id, c]));
+    const classByName = new Map((classesRows || []).map(c => [classKey(c.class_name), c]));
+    const studentById = new Map((studentsRows || []).map(s => [s.student_id, s]));
+    const getClass = (r) => classById.get(r.class_id) || classByName.get(classKey(studentById.get(r.student_id)?.class_name));
 
     const cleanRows = (resultsRows || []).filter(r => {
-      const c = classById.get(r.class_id);
+      const c = getClass(r);
       if (!c || c.is_deleted || c.status !== "active") return false;
       if (className && c.class_name !== className) return false;
+      const s = studentById.get(r.student_id);
+      if (!s || s.is_deleted || s.status !== "active") return false;
       return true;
     });
 
@@ -342,26 +365,28 @@ router.get("/top-students", authRequired, async (req, res, next) => {
       .from("results")
       .select("term,subject,marks,total_marks,student_id,class_id,is_deleted,school_id")
       .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .not("class_id", "is", null);
+      .eq("is_deleted", false);
     if (resultsErr) throw resultsErr;
 
     const classIds = [...new Set((raw || []).map(r => r.class_id).filter(Boolean))];
     const studentIds = [...new Set((raw || []).map(r => r.student_id).filter(Boolean))];
 
     const [{ data: classesRows, error: classesErr }, { data: studentsRows, error: studentsErr }] = await Promise.all([
-      classIds.length
-        ? supabase.from("classes").select("class_id,class_name,section,is_deleted,status").in("class_id", classIds)
-        : Promise.resolve({ data: [], error: null }),
+      supabase.from("classes").select("class_id,class_name,section,is_deleted,status")
+        .eq("school_id", schoolId)
+        .eq("is_deleted", false)
+        .eq("status", "active"),
       studentIds.length
-        ? supabase.from("students").select("student_id,first_name,last_name,admission_number,is_deleted,status").in("student_id", studentIds)
+        ? supabase.from("students").select("student_id,first_name,last_name,admission_number,class_name,is_deleted,status").eq("school_id", schoolId).in("student_id", studentIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
     if (classesErr) throw classesErr;
     if (studentsErr) throw studentsErr;
 
     const classById = new Map((classesRows || []).map(c => [c.class_id, c]));
+    const classByName = new Map((classesRows || []).map(c => [classKey(c.class_name), c]));
     const studentById = new Map((studentsRows || []).map(s => [s.student_id, s]));
+    const getClass = (r) => classById.get(r.class_id) || classByName.get(classKey(studentById.get(r.student_id)?.class_name));
 
     const pct = (r) => {
       const denom = Number(r.total_marks || 0);
@@ -371,7 +396,7 @@ router.get("/top-students", authRequired, async (req, res, next) => {
 
     const cleanRows = (raw || []).filter(r => {
       if (term && r.term !== term) return false;
-      const c = classById.get(r.class_id);
+      const c = getClass(r);
       if (!c || c.is_deleted || c.status !== "active") return false;
       if (className && c.class_name !== className) return false;
       const s = studentById.get(r.student_id);
@@ -384,18 +409,19 @@ router.get("/top-students", authRequired, async (req, res, next) => {
     for (const r of cleanRows) {
       const p = pct(r);
       if (p == null) continue;
-      if (!studentAgg.has(r.student_id)) studentAgg.set(r.student_id, { sum: 0, count: 0, subjects: new Set(), class_id: r.class_id });
+      if (!studentAgg.has(r.student_id)) studentAgg.set(r.student_id, { sum: 0, count: 0, subjects: new Set(), class_id: r.class_id, class_ref: getClass(r) });
       const a = studentAgg.get(r.student_id);
       a.sum += p;
       a.count += 1;
       if (r.subject) a.subjects.add(r.subject);
       a.class_id = r.class_id || a.class_id;
+      a.class_ref = getClass(r) || a.class_ref;
     }
 
     const scored = [...studentAgg.entries()]
       .map(([student_id, a]) => {
         const s = studentById.get(student_id) || {};
-        const c = classById.get(a.class_id) || {};
+        const c = a.class_ref || classById.get(a.class_id) || classByName.get(classKey(s.class_name)) || {};
         return {
           student_id,
           first_name: s.first_name,
@@ -449,26 +475,28 @@ router.get("/student-rankings", authRequired, async (req, res, next) => {
       .select("term,subject,marks,total_marks,student_id,class_id,is_deleted,school_id")
       .eq("school_id", schoolId)
       .eq("term", term)
-      .eq("is_deleted", false)
-      .not("class_id", "is", null);
+      .eq("is_deleted", false);
     if (resultsErr) throw resultsErr;
 
     const classIds = [...new Set((raw || []).map(r => r.class_id).filter(Boolean))];
     const studentIds = [...new Set((raw || []).map(r => r.student_id).filter(Boolean))];
 
     const [{ data: classesRows, error: classesErr }, { data: studentsRows, error: studentsErr }] = await Promise.all([
-      classIds.length
-        ? supabase.from("classes").select("class_id,class_name,section,is_deleted,status").in("class_id", classIds)
-        : Promise.resolve({ data: [], error: null }),
+      supabase.from("classes").select("class_id,class_name,section,is_deleted,status")
+        .eq("school_id", schoolId)
+        .eq("is_deleted", false)
+        .eq("status", "active"),
       studentIds.length
-        ? supabase.from("students").select("student_id,first_name,last_name,admission_number,is_deleted,status").in("student_id", studentIds)
+        ? supabase.from("students").select("student_id,first_name,last_name,admission_number,class_name,is_deleted,status").eq("school_id", schoolId).in("student_id", studentIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
     if (classesErr) throw classesErr;
     if (studentsErr) throw studentsErr;
 
     const classById = new Map((classesRows || []).map(c => [c.class_id, c]));
+    const classByName = new Map((classesRows || []).map(c => [classKey(c.class_name), c]));
     const studentById = new Map((studentsRows || []).map(s => [s.student_id, s]));
+    const getClass = (r) => classById.get(r.class_id) || classByName.get(classKey(studentById.get(r.student_id)?.class_name));
 
     const pct = (r) => {
       const denom = Number(r.total_marks || 0);
@@ -477,7 +505,7 @@ router.get("/student-rankings", authRequired, async (req, res, next) => {
     };
 
     const cleanRows = (raw || []).filter(r => {
-      const c = classById.get(r.class_id);
+      const c = getClass(r);
       if (!c || c.is_deleted || c.status !== "active") return false;
       if (className && c.class_name !== className) return false;
       const s = studentById.get(r.student_id);
@@ -490,7 +518,7 @@ router.get("/student-rankings", authRequired, async (req, res, next) => {
     for (const r of cleanRows) {
       const p = pct(r);
       if (p == null) continue;
-      if (!studentAgg.has(r.student_id)) studentAgg.set(r.student_id, { sum: 0, count: 0, totalMarks: 0, subjects: new Set(), class_id: r.class_id, subjectScores: new Map() });
+      if (!studentAgg.has(r.student_id)) studentAgg.set(r.student_id, { sum: 0, count: 0, totalMarks: 0, subjects: new Set(), class_id: r.class_id, class_ref: getClass(r), subjectScores: new Map() });
       const a = studentAgg.get(r.student_id);
       a.sum += p;
       a.count += 1;
@@ -500,12 +528,13 @@ router.get("/student-rankings", authRequired, async (req, res, next) => {
         a.subjectScores.set(r.subject, { marks: r.marks, total: r.total_marks, percentage: p });
       }
       a.class_id = r.class_id || a.class_id;
+      a.class_ref = getClass(r) || a.class_ref;
     }
 
     const scored = [...studentAgg.entries()]
       .map(([student_id, a]) => {
         const s = studentById.get(student_id) || {};
-        const c = classById.get(a.class_id) || {};
+        const c = a.class_ref || classById.get(a.class_id) || classByName.get(classKey(s.class_name)) || {};
         return {
           student_id,
           first_name: s.first_name,
@@ -566,26 +595,28 @@ router.get("/class-stats", authRequired, async (req, res, next) => {
       .select("term,subject,marks,total_marks,student_id,class_id,is_deleted,school_id,grade")
       .eq("school_id", schoolId)
       .eq("term", term)
-      .eq("is_deleted", false)
-      .not("class_id", "is", null);
+      .eq("is_deleted", false);
     if (resultsErr) throw resultsErr;
 
     const classIds = [...new Set((raw || []).map(r => r.class_id).filter(Boolean))];
     const studentIds = [...new Set((raw || []).map(r => r.student_id).filter(Boolean))];
 
     const [{ data: classesRows, error: classesErr }, { data: studentsRows, error: studentsErr }] = await Promise.all([
-      classIds.length
-        ? supabase.from("classes").select("class_id,class_name,section,is_deleted,status").in("class_id", classIds)
-        : Promise.resolve({ data: [], error: null }),
+      supabase.from("classes").select("class_id,class_name,section,is_deleted,status")
+        .eq("school_id", schoolId)
+        .eq("is_deleted", false)
+        .eq("status", "active"),
       studentIds.length
-        ? supabase.from("students").select("student_id,first_name,last_name,admission_number,is_deleted,status").in("student_id", studentIds)
+        ? supabase.from("students").select("student_id,first_name,last_name,admission_number,class_name,is_deleted,status").eq("school_id", schoolId).in("student_id", studentIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
     if (classesErr) throw classesErr;
     if (studentsErr) throw studentsErr;
 
     const classById = new Map((classesRows || []).map(c => [c.class_id, c]));
+    const classByName = new Map((classesRows || []).map(c => [classKey(c.class_name), c]));
     const studentById = new Map((studentsRows || []).map(s => [s.student_id, s]));
+    const getClass = (r) => classById.get(r.class_id) || classByName.get(classKey(studentById.get(r.student_id)?.class_name));
 
     const pct = (r) => {
       const denom = Number(r.total_marks || 0);
@@ -594,7 +625,7 @@ router.get("/class-stats", authRequired, async (req, res, next) => {
     };
 
     const cleanRows = (raw || []).filter(r => {
-      const c = classById.get(r.class_id);
+      const c = getClass(r);
       if (!c || c.is_deleted || c.status !== "active") return false;
       if (className && c.class_name !== className) return false;
       const s = studentById.get(r.student_id);
@@ -607,11 +638,12 @@ router.get("/class-stats", authRequired, async (req, res, next) => {
     for (const r of cleanRows) {
       const p = pct(r);
       if (p == null) continue;
-      if (!studentAgg.has(r.student_id)) studentAgg.set(r.student_id, { sum: 0, count: 0, class_id: r.class_id });
+      if (!studentAgg.has(r.student_id)) studentAgg.set(r.student_id, { sum: 0, count: 0, class_id: r.class_id, class_ref: getClass(r) });
       const a = studentAgg.get(r.student_id);
       a.sum += p;
       a.count += 1;
       a.class_id = r.class_id || a.class_id;
+      a.class_ref = getClass(r) || a.class_ref;
     }
 
     const studentScores = [...studentAgg.values()]
@@ -632,7 +664,7 @@ router.get("/class-stats", authRequired, async (req, res, next) => {
     // Subject breakdowns per class
     const subjectByClass = new Map(); // class_name -> { subject -> { sum, count, grades } }
     for (const r of cleanRows) {
-      const c = classById.get(r.class_id);
+      const c = getClass(r);
       if (!c) continue;
       const subject = String(r.subject || "").trim();
       if (!subject) continue;

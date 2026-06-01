@@ -1320,43 +1320,44 @@ export default function ReportsPage({ auth }) {
                 <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
                   <Table 
                     headers={["Subject", "Exam Type", "EE Count", "EE %", "ME Count", "ME %", "AE Count", "AE %", "BE Count", "BE %"]}
-                    data={[...new Set(grades.map(g => `${g.subject}|${g.exam_type || "All Exams"}`))].map(key => {
-                      const [subject, examType] = key.split("|");
-                      const subjectData = grades.filter(g => g.subject === subject && (g.exam_type || "All Exams") === examType);
-                      const totalEntries = subjectData.reduce((sum, g) => sum + (g.entries || 0), 0);
-                      
-                      // Use grade_counts from backend if available, otherwise calculate from avg_score
-                      const gradeCounts = { EE: 0, ME: 0, AE: 0, BE: 0 };
-                      subjectData.forEach(g => {
-                        if (g.grade_counts) {
-                          gradeCounts.EE += g.grade_counts.EE || 0;
-                          gradeCounts.ME += g.grade_counts.ME || 0;
-                          gradeCounts.AE += g.grade_counts.AE || 0;
-                          gradeCounts.BE += g.grade_counts.BE || 0;
-                        } else {
-                          // Fallback to avg_score calculation
-                          if (g.avg_score >= 80) gradeCounts.EE += g.entries || 0;
-                          else if (g.avg_score >= 60) gradeCounts.ME += g.entries || 0;
-                          else if (g.avg_score >= 40) gradeCounts.AE += g.entries || 0;
-                          else gradeCounts.BE += g.entries || 0;
-                        }
+                    data={(() => {
+                      const pct = (count, total) => total > 0 ? (count / total * 100).toFixed(1) + "%" : "0%";
+                      return [...new Set(grades.map(g => `${g.subject}|${g.exam_type || "All Exams"}`))].map(key => {
+                        const [subject, examType] = key.split("|");
+                        const subjectData = grades.filter(g => g.subject === subject && (g.exam_type || "All Exams") === examType);
+                        const totalEntries = subjectData.reduce((sum, g) => sum + (g.entries || 0), 0);
+                        
+                        // Use grade_counts from backend if available, otherwise calculate from avg_score
+                        const gradeCounts = { EE: 0, ME: 0, AE: 0, BE: 0 };
+                        subjectData.forEach(g => {
+                          if (g.grade_counts) {
+                            gradeCounts.EE += g.grade_counts.EE || 0;
+                            gradeCounts.ME += g.grade_counts.ME || 0;
+                            gradeCounts.AE += g.grade_counts.AE || 0;
+                            gradeCounts.BE += g.grade_counts.BE || 0;
+                          } else {
+                            // Fallback to avg_score calculation
+                            if (g.avg_score >= 80) gradeCounts.EE += g.entries || 0;
+                            else if (g.avg_score >= 60) gradeCounts.ME += g.entries || 0;
+                            else if (g.avg_score >= 40) gradeCounts.AE += g.entries || 0;
+                            else gradeCounts.BE += g.entries || 0;
+                          }
+                        });
+
+                        return [
+                          <span key="subject" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{subject}</span>,
+                          <span key="exam_type" style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>{examType}</span>,
+                          <span key="ee_count" style={{ color: "var(--color-success)", fontWeight: 600 }}>{gradeCounts.EE}</span>,
+                          <span key="ee_pct" style={{ color: "var(--color-text-secondary)" }}>{pct(gradeCounts.EE, totalEntries)}</span>,
+                          <span key="me_count" style={{ color: "var(--color-info)", fontWeight: 600 }}>{gradeCounts.ME}</span>,
+                          <span key="me_pct" style={{ color: "var(--color-text-secondary)" }}>{pct(gradeCounts.ME, totalEntries)}</span>,
+                          <span key="ae_count" style={{ color: "var(--color-warning)", fontWeight: 600 }}>{gradeCounts.AE}</span>,
+                          <span key="ae_pct" style={{ color: "var(--color-text-secondary)" }}>{pct(gradeCounts.AE, totalEntries)}</span>,
+                          <span key="be_count" style={{ color: "var(--color-danger)", fontWeight: 600 }}>{gradeCounts.BE}</span>,
+                          <span key="be_pct" style={{ color: "var(--color-text-secondary)" }}>{pct(gradeCounts.BE, totalEntries)}</span>,
+                        ];
                       });
-
-                      const pct = (count) => totalEntries > 0 ? (count / totalEntries * 100).toFixed(1) + "%" : "0%";
-
-                      return [
-                        <span key="subject" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{subject}</span>,
-                        <span key="exam_type" style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>{examType}</span>,
-                        <span key="ee_count" style={{ color: "var(--color-success)", fontWeight: 600 }}>{gradeCounts.EE}</span>,
-                        <span key="ee_pct" style={{ color: "var(--color-text-secondary)" }}>{pct(gradeCounts.EE)}</span>,
-                        <span key="me_count" style={{ color: "var(--color-info)", fontWeight: 600 }}>{gradeCounts.ME}</span>,
-                        <span key="me_pct" style={{ color: "var(--color-text-secondary)" }}>{pct(gradeCounts.ME)}</span>,
-                        <span key="ae_count" style={{ color: "var(--color-warning)", fontWeight: 600 }}>{gradeCounts.AE}</span>,
-                        <span key="ae_pct" style={{ color: "var(--color-text-secondary)" }}>{pct(gradeCounts.AE)}</span>,
-                        <span key="be_count" style={{ color: "var(--color-danger)", fontWeight: 600 }}>{gradeCounts.BE}</span>,
-                        <span key="be_pct" style={{ color: "var(--color-text-secondary)" }}>{pct(gradeCounts.BE)}</span>,
-                      ];
-                    })}
+                    })()}
                   />
                 </div>
               )}

@@ -61,6 +61,12 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const isSyncingRef = useRef(false);
   const syncControllerRef = useRef(null);
 
+  // Move these to the top to avoid temporal dead zone errors
+  const assignmentUserForTeacher = teacher =>
+    assignmentTeachers.find(t => String(t.user_id) === String(teacher.id || teacher.teacher_id));
+
+  const assignmentsForTeacher = teacher => assignmentUserForTeacher(teacher)?.assignments || [];
+
   const loadAssignmentData = async () => {
     if (!auth?.token || !canAssign) return;
     const [teacherRows, classRows, subjectRows] = await Promise.all([
@@ -289,11 +295,6 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
       syncControllerRef.current = null;
     }
   };
-
-  const assignmentUserForTeacher = teacher =>
-    assignmentTeachers.find(t => String(t.user_id) === String(teacher.id || teacher.teacher_id));
-
-  const assignmentsForTeacher = teacher => assignmentUserForTeacher(teacher)?.assignments || [];
 
   const openAssign = teacher => {
     const userTeacher = assignmentUserForTeacher(teacher);

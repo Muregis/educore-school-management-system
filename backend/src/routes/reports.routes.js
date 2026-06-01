@@ -542,56 +542,35 @@ router.get("/grade-distribution", async (req, res, next) => {
     if (!grades) {
       let query = supabase
         .from('results')
-        .select('subject, marks, total_marks, class_id, term, exam_type')
+        .select('subject, marks, total_marks, class_id, student_id, term, exam_type')
         .eq('school_id', schoolId)
         .eq('is_deleted', false);
-
-      // If class filter is provided, filter by class_id
-      if (class_name) {
-        // First get the class_id for the given class_name
-        console.log(`[grade-distribution] Looking up class: ${class_name}`);
-        const { data: classData, error: classError } = await supabase
-          .from('classes')
-          .select('class_id')
-          .eq('school_id', schoolId)
-          .eq('class_name', class_name)
-          .eq('is_deleted', false)
-          .maybeSingle(); // Use maybeSingle to avoid error if not found
-
-        if (classError) {
-          console.error('[grade-distribution] Error fetching class:', classError);
-        }
-
-        if (classData?.class_id) {
-          console.log(`[grade-distribution] Found class_id: ${classData.class_id}`);
-          query = query.eq('class_id', classData.class_id);
-        } else {
-          console.log(`[grade-distribution] Class not found: ${class_name}, returning empty results`);
-          // Return empty results if class not found
-          return res.json([]);
-        }
-      }
 
       const { data: results, error } = await query;
       if (error) throw error;
 
-      // Get class information
       const classIds = [...new Set((results || []).map(r => r.class_id).filter(Boolean))];
+      const studentIds = [...new Set((results || []).map(r => r.student_id).filter(Boolean))];
       let classById = new Map();
-      if (classIds.length > 0) {
-        const { data: classes } = await supabase
-          .from('classes')
-          .select('class_id, class_name')
-          .in('class_id', classIds);
-        if (classes) {
-          classById = new Map(classes.map(c => [c.class_id, c.class_name]));
-        }
-      }
+      let studentById = new Map();
+
+      const [{ data: classes }, { data: students }] = await Promise.all([
+        classIds.length
+          ? supabase.from('classes').select('class_id, class_name').in('class_id', classIds)
+          : Promise.resolve({ data: [] }),
+        studentIds.length
+          ? supabase.from('students').select('student_id, class_name').eq('school_id', schoolId).eq('is_deleted', false).in('student_id', studentIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      if (classes) classById = new Map(classes.map(c => [c.class_id, c.class_name]));
+      if (students) studentById = new Map(students.map(s => [s.student_id, s]));
 
       // Calculate grade distribution by class and subject
       const classSubjectStats = {};
       results?.forEach(result => {
-        const className = classById.get(result.class_id) || 'All Classes';
+        const className = classById.get(result.class_id) || studentById.get(result.student_id)?.class_name || 'All Classes';
+        if (class_name && className !== class_name) return;
         const examType = result.exam_type || 'All Exams';
         const key = `${className}|${result.subject}|${examType}`;
         

@@ -242,7 +242,7 @@ router.post(
             // Phase 2: Batch fetch all students in one query
             const { data: students, error: studentsError } = await supabase
               .from('students')
-              .select('student_id, admission_number, class_name, first_name, last_name')
+              .select('student_id, admission_number, class_id, class_name, first_name, last_name')
               .eq('school_id', schoolId)
               .eq('is_deleted', false)
               .in('admission_number', admissionNumbers);
@@ -256,6 +256,30 @@ router.post(
             const studentMap = new Map();
             (students || []).forEach(s => {
               studentMap.set(s.admission_number.toLowerCase().trim(), s);
+            });
+
+            const classNames = [...new Set([
+              ...(students || []).map(s => s.class_name),
+              ...allRows.map(r => r.class_name)
+            ].map(name => String(name || '').trim()).filter(Boolean))];
+
+            const { data: classes, error: classesError } = classNames.length
+              ? await supabase
+                  .from('classes')
+                  .select('class_id, class_name')
+                  .eq('school_id', schoolId)
+                  .eq('is_deleted', false)
+                  .in('class_name', classNames)
+              : { data: [], error: null };
+
+            if (classesError) {
+              console.error('Error fetching classes:', classesError);
+              return res.status(500).json({ message: 'Failed to fetch class data', error: classesError.message });
+            }
+
+            const classMap = new Map();
+            (classes || []).forEach(c => {
+              classMap.set(String(c.class_name || '').trim().toLowerCase(), c.class_id);
             });
 
             // Phase 3: Process rows and prepare batch inserts
@@ -326,10 +350,13 @@ router.post(
                 const totalMarks = parseFloat(row.total_marks) || 100;
                 const percentage = totalMarks > 0 ? (marks / totalMarks) * 100 : 0;
                 const calculatedGrade = knecGrade(percentage);
+                const className = String(row.class_name || student.class_name || '').trim();
+                const classId = student.class_id || classMap.get(className.toLowerCase()) || null;
 
                 resultsToInsert.push({
                   school_id: schoolId,
                   student_id: student.student_id,
+                  class_id: classId,
                   subject: subject,
                   marks: marks,
                   total_marks: totalMarks,
