@@ -25,6 +25,7 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
   const [form, setForm] = useState({
     discountType: "custom",
     discountValue: "",
+    discountValueType: "percentage", // 'percentage' | 'fixed'
     reason: "",
     expiresAt: ""
   });
@@ -71,7 +72,7 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
 
   const handleAddDiscount = async () => {
     if (!form.discountValue || parseFloat(form.discountValue) <= 0) {
-      return toast("Please enter a valid discount percentage", "error");
+      return toast(`Please enter a valid discount ${form.discountValueType === "percentage" ? "percentage" : "amount"}`, "error");
     }
 
     setLoading(true);
@@ -83,15 +84,17 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
           studentId: parseInt(studentId),
           discountType: form.discountType,
           discountValue: parseFloat(form.discountValue),
+          discountValueType: form.discountValueType,
           reason: form.reason || DISCOUNT_LABELS[form.discountType] || "Manual discount",
           expiresAt: form.expiresAt || null
         }
       });
 
-      toast(`${form.discountValue}% discount applied`, "success");
+      const valueLabel = form.discountValueType === "percentage" ? `${form.discountValue}%` : `KES ${Number(form.discountValue).toLocaleString()}`;
+      toast(`${valueLabel} discount applied`, "success");
       await loadActiveDiscounts();
       setShowAddForm(false);
-      setForm({ discountType: "custom", discountValue: "", reason: "", expiresAt: "" });
+      setForm({ discountType: "custom", discountValue: "", discountValueType: "percentage", reason: "", expiresAt: "" });
 
       if (onDiscountChange) onDiscountChange();
     } catch (err) {
@@ -134,7 +137,7 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
                 HIGHEST DISCOUNT APPLIES
               </div>
               <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>
-                {highestDiscount.discount_value}% {DISCOUNT_LABELS[highestDiscount.discount_type] || highestDiscount.discount_type}
+                {highestDiscount.discount_value_type === "fixed" ? `KES ${Number(highestDiscount.discount_value).toLocaleString()}` : `${highestDiscount.discount_value}%`} {DISCOUNT_LABELS[highestDiscount.discount_type] || highestDiscount.discount_type}
               </div>
               <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
                 {highestDiscount.reason}
@@ -259,15 +262,36 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
 
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: "block", color: C.textMuted, fontSize: 12, marginBottom: 6 }}>
-                Discount % *
+                Discount Type *
+              </label>
+              <select
+                value={form.discountValueType}
+                onChange={(e) => setForm({ ...form, discountValueType: e.target.value })}
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  background: C.surface,
+                  color: C.text
+                }}
+              >
+                <option value="percentage">Percentage (%)</option>
+                <option value="fixed">Fixed Amount (KES)</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", color: C.textMuted, fontSize: 12, marginBottom: 6 }}>
+                {form.discountValueType === "percentage" ? "Discount %" : "Discount Amount (KES)"} *
               </label>
               <input
                 type="number"
                 min="1"
-                max="100"
+                max={form.discountValueType === "percentage" ? 100 : undefined}
                 value={form.discountValue}
                 onChange={(e) => setForm({ ...form, discountValue: e.target.value })}
-                placeholder="e.g. 25"
+                placeholder={form.discountValueType === "percentage" ? "e.g. 25" : "e.g. 5000"}
                 style={{
                   width: "100%",
                   padding: "8px 12px",

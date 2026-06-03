@@ -255,6 +255,7 @@ router.post('/apply', requireRoles('finance', 'director', 'superadmin'), async (
       studentId,
       discountType,
       discountValue,
+      discountValueType = 'percentage',
       reason,
       expiresAt
     } = req.body;
@@ -281,6 +282,8 @@ router.post('/apply', requireRoles('finance', 'director', 'superadmin'), async (
         student_id: studentId,
         discount_type: discountType,
         discount_value: discountValue,
+        discount_value_type: discountValueType,
+        discount_amount: discountValueType === 'fixed' ? discountValue : null,
         reason: reason || DISCOUNT_LABELS[discountType] || null,
         approved_by: userId,
         approved_at: new Date().toISOString(),
@@ -292,13 +295,14 @@ router.post('/apply', requireRoles('finance', 'director', 'superadmin'), async (
 
     if (error) throw error;
 
+    const valueLabel = discountValueType === 'fixed' ? `KES ${Number(discountValue).toLocaleString()}` : `${discountValue}%`;
     // Log activity
-    await logActivity(req, 'APPLY_DISCOUNT', `Applied ${discountValue}% ${discountType} discount to student ${studentId}`, { schoolId, studentId });
+    await logActivity(req, 'APPLY_DISCOUNT', `Applied ${valueLabel} ${discountType} discount to student ${studentId}`, { schoolId, studentId });
 
     res.status(201).json({
       success: true,
       discountId: data.discount_id,
-      message: `${discountValue}% ${DISCOUNT_LABELS[discountType] || discountType} discount applied successfully`
+      message: `${valueLabel} ${DISCOUNT_LABELS[discountType] || discountType} discount applied successfully`
     });
 
   } catch (err) { next(err); }
@@ -419,7 +423,7 @@ router.get('/calculate/:studentId', requireRoles('finance', 'director', 'superad
     // Get active discounts for student
     const { data: discounts } = await supabase
       .from('student_discounts')
-      .select('discount_id, discount_type, discount_value')
+      .select('discount_id, discount_type, discount_value, discount_value_type, discount_amount')
       .eq('student_id', studentId)
       .eq('school_id', schoolId)
       .eq('is_active', true)
@@ -436,20 +440,44 @@ router.get('/calculate/:studentId', requireRoles('finance', 'director', 'superad
     }
 
     // Apply highest discount only (not stacked)
-    const bestDiscount = discounts.reduce((best, d) =>
-      d.discount_value > best.discount_value ? d : best
-    );
+    // For fixed amount, compare actual discount amounts
+    // For percentage, compare percentage values
+    const bestDiscount = discounts.reduce((best, d) => {
+      if (d.discount_value_type === 'fixed') {
+        const dAmount = d.discount_amount || d.discount_value;
+        const bestAmount = best.discount_value_type === 'fixed' ? (best.discount_amount || best.discount_value) : (amount * best.discount_value / 100);
+        return dAmount > bestAmount ? d : best;
+      } else {
+        if (best.discount_value_type === 'fixed') {
+          const bestAmount = best.discount_amount || best.discount_value;
+          const dAmount = amount * d.discount_value / 100;
+          return dAmount > bestAmount ? d : best;
+        }
+        return d.discount_value > best.discount_value ? d : best;
+      }
+    });
 
     // CRITICAL: Discount applies ONLY to base fee
-    const discountAmount = (amount * bestDiscount.discount_value) / 100;
+    let discountAmount;
+    let discountPercent;
+    
+    if (bestDiscount.discount_value_type === 'fixed') {
+      discountAmount = bestDiscount.discount_amount || bestDiscount.discount_value;
+      discountPercent = (discountAmount / amount) * 100;
+    } else {
+      discountPercent = bestDiscount.discount_value;
+      discountAmount = (amount * discountPercent) / 100;
+    }
+    
     const netBaseFee = amount - discountAmount;
 
     res.json({
       baseFee: amount,
-      discountPercent: bestDiscount.discount_value,
-      discountAmount,
-      netBaseFee,
+      discountPercent: Math.round(discountPercent * 100) / 100,
+      discountAmount: Math.round(discountAmount * 100) / 100,
+      netBaseFee: Math.round(netBaseFee * 100) / 100,
       discountType: bestDiscount.discount_type,
+      discountValueType: bestDiscount.discount_value_type,
       discountLabel: DISCOUNT_LABELS[bestDiscount.discount_type] || bestDiscount.discount_type,
       discountId: bestDiscount.discount_id,
       hasDiscount: true

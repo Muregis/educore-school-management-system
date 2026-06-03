@@ -104,6 +104,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [editingPayment, setEditingPayment] = useState(null);
   const [filterClass, setFilterClass] = useState("all");
   const [filterDate, setFilterDate] = useState("all"); // 'all' | 'today'
+  const [filterStudent, setFilterStudent] = useState("all"); // 'all' | studentId
   const [page, setPage]               = useState(1);
   const [paymentForm, setPaymentForm] = useState({ studentId: "", amount: "", feeType: "tuition", method: "cash", date: new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
   const [paymentClass, setPaymentClass] = useState("");
@@ -273,9 +274,13 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   };
 
   const balances = students.map(s => calculateLedgerBalance(s, studentDiscounts[s.id ?? s.student_id] || []))
-    .filter(b => filterClass === "all" || b.className === filterClass);
+    .filter(b => filterClass === "all" || b.className === filterClass)
+    .filter(b => filterStudent === "all" || String(b.studentId) === String(filterStudent));
 
-  const filteredPayments = normalisedPayments.filter(p => filterClass === "all" || p.className === filterClass);
+  const filteredPayments = normalisedPayments.filter(p => 
+    (filterClass === "all" || p.className === filterClass) &&
+    (filterStudent === "all" || String(p.studentId) === String(filterStudent))
+  );
   const { pages, rows }  = pager(filteredPayments, page);
   useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
 
@@ -603,6 +608,18 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 { value: "all", label: "All classes" },
                 ...ALL_CLASSES.map(c => ({ value: c, label: c }))
               ]}
+            />
+            <Select 
+              value={filterStudent} 
+              onChange={e => setFilterStudent(e.target.value)}
+              options={[
+                { value: "all", label: "All students" },
+                ...students.map(s => ({ 
+                  value: String(s.id ?? s.student_id), 
+                  label: `${s.first_name} ${s.last_name} (${s.admission ?? s.admission_number ?? 'N/A'})` 
+                }))
+              ]}
+              style={{ minWidth: "200px" }}
             />
           </div>
 

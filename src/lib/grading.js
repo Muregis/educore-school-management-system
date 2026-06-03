@@ -95,9 +95,10 @@ export function getGradeColor(grade) {
 /**
  * Calculate mean score from array of results
  * @param {Array} results - Array of { marks, total_marks }
+ * @param {number} totalSubjects - Total number of subjects for this class (optional, defaults to subjects taken)
  * @returns {Object} { mean, total, count, percentage }
  */
-export function calculateMeanScore(results) {
+export function calculateMeanScore(results, totalSubjects = null) {
   if (!results || results.length === 0) {
     return { mean: 0, total: 0, count: 0, percentage: 0 };
   }
@@ -128,7 +129,9 @@ export function calculateMeanScore(results) {
     return { mean: 0, total: 0, count: 0, percentage: 0 };
   }
 
-  const mean = sumPercentages / validCount; // average of per-entry percentages
+  // Calculate mean based on total subjects if provided, otherwise use subjects taken
+  const subjectsCount = totalSubjects || validCount;
+  const mean = sumPercentages / subjectsCount; // average of per-entry percentages
   const percentage = (totalMarks / totalPossible) * 100; // weighted percentage across entries
 
   return {
@@ -136,6 +139,7 @@ export function calculateMeanScore(results) {
     total: totalMarks,
     count: validCount,
     percentage: parseFloat(percentage.toFixed(2)),
+    totalSubjects: subjectsCount,
   };
 }
 

@@ -17,7 +17,8 @@ router.get("/", async (req, res, next) => {
       .select(`
         announcement_id, title, message, type, status, priority, 
         target_audience, pinned, publish_date, expiry_date, created_at,
-        author_user_id
+        author_user_id,
+        users(full_name)
       `)
       .eq('school_id', schoolId)
       .eq('is_deleted', false)

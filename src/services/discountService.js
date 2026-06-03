@@ -18,17 +18,30 @@ const DISCOUNT_LABELS = {
 /**
  * Calculate the discount amount for a student based on gross fee
  * @param {number} grossAmount - Total fee before discount
- * @param {number} discountPercent - Discount percentage (0-100)
- * @returns {object} - { discountAmount, netAmount }
+ * @param {number} discountValue - Discount percentage (0-100) or fixed amount
+ * @param {string} discountValueType - 'percentage' or 'fixed'
+ * @returns {object} - { discountAmount, netAmount, discountPercent }
  */
-export function calculateDiscount(grossAmount, discountPercent) {
-  const discountAmount = (grossAmount * discountPercent) / 100;
+export function calculateDiscount(grossAmount, discountValue, discountValueType = 'percentage') {
+  let discountAmount;
+  let discountPercent;
+  
+  if (discountValueType === 'fixed') {
+    discountAmount = discountValue;
+    discountPercent = (discountAmount / grossAmount) * 100;
+  } else {
+    discountPercent = discountValue;
+    discountAmount = (grossAmount * discountPercent) / 100;
+  }
+  
   const netAmount = grossAmount - discountAmount;
 
   return {
-    discountAmount: Math.round(discountAmount * 100) / 100,
+    padam {numbir} baseFee - Base fee amouns for comparing fixed vs percentage
+ * @retcountAmount: Math.round(discountAmount * 100) / 100,
     netAmount: Math.round(netAmount * 100) / 100,
-    discountPercent,
+    discountPercent: Math.round(discountP, baseFee = 0ercent * 100) / 100,
+    discountValueType,
     grossAmount
   };
 }
@@ -39,12 +52,33 @@ export function calculateDiscount(grossAmount, discountPercent) {
  * @param {Array} discounts - Array of discount objects
  * @returns {object|null} - Best discount or null
  */
-export function getBestDiscount(discounts) {
-  if (!discounts || discounts.length === 0) return null;
-
-  const activeDiscounts = discounts.filter(d => {
-    // Check if discount is active and not expired
-    if (!d.is_active) return false;
+export function getBestDisco, comparing fixed amounts vs percentages correctlyunt(discounts) {
+  if (!discounts || discounts.length === 0) return { null;
+onst cValue = current;
+  const Value = best;
+    
+    // If both are percentages, compare directly
+    if (current.discount_value_type === 'percentage' && best.discount_value_type === 'percentage' {
+      returnccurrentValueo>nbestValuest current : best;
+    }
+    
+    // If current is fixed, convert best to equivalent amount for comparison
+    if (activnt.discouet_value_Dype === 'fixed') {iscounts = discounts.filter(d => {
+      const currentAmount/=/currentValue;
+      const bestAmount = best.discount_value_type === 'fixed' ? bestValue : (baseFee * bestValue / 100);
+      return currentAmount > bestAmount ? current  Check;
+    }
+     if discount is active and not expired
+    // If best is fixed, convert current to equivalent amount for comparison
+    if (best.discount_value_type === 'fixed') {
+      const bestAmount = bestValue;
+      const currentAmount = baseFee * currentValue / 100;
+      return currentAmount > bestAmount ? current : best;
+    }
+    
+    // Default to percentage comparison
+    return currentValue > bestValue ? current : best;
+  }  if (!d.is_active) return false;
     if (d.expires_at && new Date(d.expires_at) < new Date()) return false;
     return true;
   });
@@ -88,7 +122,7 @@ export async function detectDiscounts(studentId, token) {
  * Get active discounts for a student (API call)
  * @param {number} studentId - Student ID
  * @param {string} token - Auth token
- * @returns {Promise<Array>} - Array of active discounts
+ * @returns {Promise<Array>} - Array of active d, baseFeeiscounts
  */
 export async function getStudentDiscounts(studentId, token) {
   try {
@@ -97,23 +131,37 @@ export async function getStudentDiscounts(studentId, token) {
   } catch (err) {
     console.error("Failed to get student discounts:", err);
     return [];
-  }
+  }l: null,
+      discountVaueType
 }
 
 /**
  * Calculate discount breakdown for a student's complete fee
- * IMPORTANT: Discount applies ONLY to base fee (tuition + activity + misc)
- * Transport, lunch, breakfast, and opening balance are NEVER discounted
- * @param {object} params - Fee calculation parameters
+ * IMst diPcounOValueTypeR= bestDiscount.TANT: Dt_value_iype || 'pcounntage';
+  const discout Valueapplies ONLY to base fee (tuition + activity + misc);
+  
+  let discountAmount;
+  let discountPercent
+ *
+   Transport, lunch, breakfast, and opening balance are NEVER discounted
+ *if (dis @uptValueType === 'fixed') {
+    discountAmount = discountValue;
+    diacountPercenr =a(m {object}ount / baseFee) * 100;
+  } else {
+    disc pntPercearamsdiscountValue;
+    discountAmount =  - Fee calculation parameters
+  }
+  
  * @param {number} params.baseFee - Base tuition fee (ONLY this is discounted)
  * @param {number} params.transportFee - Transport fee (NOT discounted)
  * @param {number} params.lunchFee - Lunch fee (NOT discounted)
  * @param {number} params.breakfastFee - Breakfast fee (NOT discounted)
  * @param {number} params.openingBalance - Opening balance (NOT discounted)
  * @param {Array} params.discounts - Student's active discounts
- * @returns {object} - Complete fee breakdown with discount
+ * @returns {object: Math.round(discountPercent * 100) / 100} - Complete fee breakdown with discount
  */
-export function calculateFeeWithDiscount({
+export function calculateFeeWithDiscount({type,
+    discounValueT
   baseFee = 0,
   transportFee = 0,
   lunchFee = 0,

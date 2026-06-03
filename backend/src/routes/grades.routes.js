@@ -150,8 +150,12 @@ router.get("/", async (req, res, next) => {
 
     if (role === 'teacher') {
       const assignedClasses = await getTeacherAssignedClasses(schoolId, userId);
-      if (assignedClasses.length === 0) return res.json([]);
-      query = query.in('class_name', assignedClasses);
+      // If teacher has no assigned classes, allow them to see all grades (fallback)
+      // This handles cases where teachers haven't been assigned to classes yet
+      if (assignedClasses.length > 0) {
+        query = query.in('class_name', assignedClasses);
+      }
+      // If no assignments, don't filter - teacher can see all grades
     }
 
     if (role === "parent" || role === "student") {

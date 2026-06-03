@@ -86,7 +86,7 @@ export default function AttendancePage({
     if (showBulk) {
       setBulk(classStudents.map(s => ({ 
         studentId: s.id ?? s.student_id, 
-        status: "present" 
+        status: "" // Default to empty instead of hardcoded "present"
       })));
     }
   }, [showBulk, classStudents]);

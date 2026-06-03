@@ -29,9 +29,10 @@ export function knecGrade(percentage) {
  * Rank students within a class by mean score.
  *
  * @param {Array} students - each: { student_id, name, subjects: [{ subject, marks, total_marks }] }
+ * @param {number} totalSubjects - Total number of subjects for this class (optional, defaults to subjects taken)
  * @returns Array sorted position 1..N with KNEC grades per subject and overall
  */
-export function classRanking(students = []) {
+export function classRanking(students = [], totalSubjects = null) {
   const scored = students.map(s => {
     const subjectScores = (s.subjects || []).map(r => {
       const pct = r.total_marks > 0 ? (Number(r.marks) / Number(r.total_marks)) * 100 : 0;
@@ -44,8 +45,10 @@ export function classRanking(students = []) {
       };
     });
 
+    // Calculate mean based on total subjects if provided, otherwise use subjects taken
+    const subjectsCount = totalSubjects || subjectScores.length;
     const mean = subjectScores.length
-      ? subjectScores.reduce((a, b) => a + b.percentage, 0) / subjectScores.length
+      ? subjectScores.reduce((a, b) => a + b.percentage, 0) / subjectsCount
       : 0;
 
     return {
@@ -56,6 +59,7 @@ export function classRanking(students = []) {
       subjectScores,
       mean:          +mean.toFixed(1),
       subjectsTaken: subjectScores.length,
+      totalSubjects: subjectsCount,
       ...knecGrade(mean),
     };
   });

@@ -20,7 +20,7 @@ function isMissingColumnError(error) {
 // ═══════════════════════════════════════════════════════════════════
 // STAFF RECORDS
 // ═══════════════════════════════════════════════════════════════════
-router.get("/staff", requireRoles(...HR_ROLES), requireDirector(), async (req, res, next) => {
+router.get("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { data: rows, error } = await supabase
@@ -63,7 +63,9 @@ router.post("/staff", requireRoles(...HR_ROLES), requireDirector(), async (req, 
     // Sync to teachers table if job title indicates teacher OR department is Academic
     const isTeacherRole = jobTitle && /teacher|tutor|instructor|lecturer/i.test(jobTitle);
     const isAcademicDept = department && /academic/i.test(department);
-    if (isTeacherRole || isAcademicDept) {
+    const isTeacherDept = department && /teacher|tutor|instructor|lecturer/i.test(department);
+    const nonTeachingRole = jobTitle && /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress/i.test(jobTitle);
+    if ((isTeacherRole || isAcademicDept || isTeacherDept) && !nonTeachingRole) {
       try {
         await supabase.from('teachers').upsert({
           school_id: schoolId,
@@ -124,7 +126,9 @@ router.put("/staff/:id", requireRoles(...HR_ROLES), requireDirector(), async (re
     // Sync updates to teachers table if academic department or teacher role
     const isTeacherRole = jobTitle && /teacher|tutor|instructor|lecturer/i.test(jobTitle);
     const isAcademicDept = department && /academic/i.test(department);
-    if ((isTeacherRole || isAcademicDept) && email) {
+    const isTeacherDept = department && /teacher|tutor|instructor|lecturer/i.test(department);
+    const nonTeachingRole = jobTitle && /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress/i.test(jobTitle);
+    if ((isTeacherRole || isAcademicDept || isTeacherDept) && !nonTeachingRole && email) {
       try {
         await supabase.from('teachers').upsert({
           school_id: schoolId,
@@ -147,7 +151,7 @@ router.put("/staff/:id", requireRoles(...HR_ROLES), requireDirector(), async (re
   } catch (err) { next(err); }
 });
 
-router.delete("/staff/:id", requireRoles(...HR_ROLES), requireDirector(), async (req, res, next) => {
+router.delete("/staff/:id", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { error } = await supabase
@@ -597,7 +601,12 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
     console.log('[HR Sync] Found staff records:', staff?.length || 0);
 
     const teacherRegex = /teacher|tutor|instructor|lecturer/i;
-    const teachersToSync = staff.filter(s => teacherRegex.test(s.job_title || s.department || ""));
+    const academicDeptRegex = /academic/i;
+    const nonTeachingRoles = /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress/i;
+    const teachersToSync = staff.filter(s => 
+      (teacherRegex.test(s.job_title || "") || academicDeptRegex.test(s.department || "")) &&
+      !nonTeachingRoles.test(s.job_title || "")
+    );
     console.log('[HR Sync] Teachers to sync:', teachersToSync.length);
     
     // Prepare batch data for upsert
