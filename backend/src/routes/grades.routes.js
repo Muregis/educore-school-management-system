@@ -143,7 +143,7 @@ router.get("/", async (req, res, next) => {
 
     let query = supabase
       .from("results")
-      .select("result_id,student_id,class_id,marks,total_marks,grade,teacher_comment,term,subject,school_id,is_deleted")
+      .select("result_id,student_id,class_id,marks,total_marks,grade,teacher_comment,term,subject,school_id,is_deleted,students!inner(class_name)")
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
       .order("result_id", { ascending: false });
@@ -153,7 +153,8 @@ router.get("/", async (req, res, next) => {
       // If teacher has no assigned classes, allow them to see all grades (fallback)
       // This handles cases where teachers haven't been assigned to classes yet
       if (assignedClasses.length > 0) {
-        query = query.in('class_name', assignedClasses);
+        // Filter by class_name from the joined students table
+        query = query.in('students.class_name', assignedClasses);
       }
       // If no assignments, don't filter - teacher can see all grades
     }

@@ -35,7 +35,7 @@ router.get("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post("/staff", requireRoles(...HR_ROLES), requireDirector(), async (req, res, next) => {
+router.post("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { fullName, email, phone, department, jobTitle, contractType, startDate, salary, status, nationalId, notes } = req.body;
