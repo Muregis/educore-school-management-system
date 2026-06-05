@@ -600,9 +600,9 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
     if (staffError) throw staffError;
     console.log('[HR Sync] Found staff records:', staff?.length || 0);
 
-    const teacherRegex = /teacher|tutor|instructor|lecturer/i;
+    const teacherRegex = /teacher|tutor|instructor|lecturer|professor|educator|class teacher|subject teacher/i;
     const academicDeptRegex = /academic/i;
-    const nonTeachingRoles = /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress/i;
+    const nonTeachingRoles = /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress|bursar|finance/i;
     const teachersToSync = staff.filter(s => 
       (teacherRegex.test(s.job_title || "") || academicDeptRegex.test(s.department || "")) &&
       !nonTeachingRoles.test(s.job_title || "")

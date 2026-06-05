@@ -69,19 +69,33 @@ export default function HRPage({ auth, canEdit, toast, school }) {
     try {
       const s = await apiFetch("/hr/staff", { token: auth.token, signal });
       setStaff(Array.isArray(s) ? s : []);
-    } catch (e) { if (e?.code !== "EABORT") toast(e.message, "error"); }
+    } catch (e) { 
+      if (e?.code !== "EABORT") {
+        console.error("Failed to load staff:", e);
+        toast(e.message || "Failed to load staff data", "error");
+      }
+    }
     try {
       const l = await apiFetch("/hr/leave", { token: auth.token, signal });
       setLeave(Array.isArray(l) ? l : []);
-    } catch { /* table may not exist yet */ }
+    } catch (e) { 
+      console.error("Failed to load leave:", e);
+      /* table may not exist yet */ 
+    }
     try {
       const a = await apiFetch("/hr/attendance", { token: auth.token, signal });
       setAtt(Array.isArray(a) ? a : []);
-    } catch { /* table may not exist yet */ }
+    } catch (e) { 
+      console.error("Failed to load attendance:", e);
+      /* table may not exist yet */ 
+    }
     try {
       const p = await apiFetch("/hr/payslips", { token: auth.token, signal });
       setPayslips(Array.isArray(p) ? p : []);
-    } catch { /* table may not exist yet */ }
+    } catch (e) { 
+      console.error("Failed to load payslips:", e);
+      /* table may not exist yet */ 
+    }
     setLoading(false);
   };
 

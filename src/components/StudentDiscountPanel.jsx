@@ -170,7 +170,7 @@ export default function StudentDiscountPanel({ studentId, student, auth, toast, 
             >
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: "#4ade80" }}>
-                  {discount.discount_value}% {discount.label}
+                  {discount.discount_value_type === "fixed" ? `KES ${Number(discount.discount_value).toLocaleString()}` : `${discount.discount_value}%`} {discount.label}
                 </div>
                 <div style={{ fontSize: 12, color: C.textMuted }}>{discount.reason}</div>
                 {discount.expires_at && (

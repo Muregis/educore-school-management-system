@@ -197,6 +197,7 @@ export default function AnnouncementsPage({ auth, toast }) {
       const data = await apiFetch(`/announcements?${params}`, { token: auth.token });
       setAnnouncements(data || []);
     } catch (err) {
+      console.error("Failed to load announcements:", err);
       toast(err.message || "Failed to load announcements", "error");
     } finally {
       setLoading(false);
