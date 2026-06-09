@@ -61,10 +61,10 @@ router.post("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
     if (insertError) throw insertError;
 
     // Sync to teachers table if job title indicates teacher OR department is Academic
-    const isTeacherRole = jobTitle && /teacher|tutor|instructor|lecturer/i.test(jobTitle);
-    const isAcademicDept = department && /academic/i.test(department);
+    const isTeacherRole = jobTitle && /teacher|tutor|instructor|lecturer|professor|educator|class teacher|subject teacher|teaching assistant|ta|graduate assistant/i.test(jobTitle);
+    const isAcademicDept = department && /academic|teaching|education|curriculum/i.test(department);
     const isTeacherDept = department && /teacher|tutor|instructor|lecturer/i.test(department);
-    const nonTeachingRole = jobTitle && /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress/i.test(jobTitle);
+    const nonTeachingRole = jobTitle && /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress|bursar|finance|bursary|human resources|hr|operations|logistics|procurement|marketing|sales|legal|compliance|audit|internal audit|external audit|quality assurance|qa|health and safety|hse|environmental|sustainability|communications|public relations|pr|events|fundraising|development|alumni|admissions|enrollment|registration|records|archives|research|innovation|technology|ict|information technology|data|analytics|business intelligence|bi|strategy|planning|performance|risk|compliance|governance|board|trustee|council|committee/i.test(jobTitle);
     if ((isTeacherRole || isAcademicDept || isTeacherDept) && !nonTeachingRole) {
       try {
         await supabase.from('teachers').upsert({
@@ -124,10 +124,10 @@ router.put("/staff/:id", requireRoles(...HR_ROLES), requireDirector(), async (re
     if (!updated) return res.status(404).json({ message: "Staff not found" });
 
     // Sync updates to teachers table if academic department or teacher role
-    const isTeacherRole = jobTitle && /teacher|tutor|instructor|lecturer/i.test(jobTitle);
-    const isAcademicDept = department && /academic/i.test(department);
+    const isTeacherRole = jobTitle && /teacher|tutor|instructor|lecturer|professor|educator|class teacher|subject teacher|teaching assistant|ta|graduate assistant/i.test(jobTitle);
+    const isAcademicDept = department && /academic|teaching|education|curriculum/i.test(department);
     const isTeacherDept = department && /teacher|tutor|instructor|lecturer/i.test(department);
-    const nonTeachingRole = jobTitle && /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress/i.test(jobTitle);
+    const nonTeachingRole = jobTitle && /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress|bursar|finance|bursary|human resources|hr|operations|logistics|procurement|marketing|sales|legal|compliance|audit|internal audit|external audit|quality assurance|qa|health and safety|hse|environmental|sustainability|communications|public relations|pr|events|fundraising|development|alumni|admissions|enrollment|registration|records|archives|research|innovation|technology|ict|information technology|data|analytics|business intelligence|bi|strategy|planning|performance|risk|compliance|governance|board|trustee|council|committee/i.test(jobTitle);
     if ((isTeacherRole || isAcademicDept || isTeacherDept) && !nonTeachingRole && email) {
       try {
         await supabase.from('teachers').upsert({
@@ -600,9 +600,9 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
     if (staffError) throw staffError;
     console.log('[HR Sync] Found staff records:', staff?.length || 0);
 
-    const teacherRegex = /teacher|tutor|instructor|lecturer|professor|educator|class teacher|subject teacher/i;
-    const academicDeptRegex = /academic/i;
-    const nonTeachingRoles = /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress|bursar|finance/i;
+    const teacherRegex = /teacher|tutor|instructor|lecturer|professor|educator|class teacher|subject teacher|teaching assistant|ta|graduate assistant/i;
+    const academicDeptRegex = /academic|teaching|education|curriculum/i;
+    const nonTeachingRoles = /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress|bursar|finance|bursary|human resources|hr|operations|logistics|procurement|marketing|sales|legal|compliance|audit|internal audit|external audit|quality assurance|qa|health and safety|hse|environmental|sustainability|communications|public relations|pr|events|fundraising|development|alumni|admissions|enrollment|registration|records|archives|research|innovation|technology|ict|information technology|data|analytics|business intelligence|bi|strategy|planning|performance|risk|compliance|governance|board|trustee|council|committee/i;
     const teachersToSync = staff.filter(s => 
       (teacherRegex.test(s.job_title || "") || academicDeptRegex.test(s.department || "")) &&
       !nonTeachingRoles.test(s.job_title || "")
