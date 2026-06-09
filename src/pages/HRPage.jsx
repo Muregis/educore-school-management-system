@@ -242,9 +242,25 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       toast(`Transferred ${transferStaff.full_name} to new branch`, "success");
       setShowTransfer(false);
       load();
-    } catch (e) { toast(e.message, "error"); }
+    } catch(e) { toast(e.message, "error"); }
     setTransferring(false);
   };
+
+  const syncTeachers = useCallback(async (e) => {
+    const btn = e.target;
+    btn.disabled = true;
+    btn.textContent = "Syncing...";
+    try {
+      const res = await apiFetch("/hr/sync-teachers", { method:"POST", token:auth.token, timeoutMs: 300000, retries: 2 });
+      toast(`Synced ${res.synced} teachers`, "success");
+    } catch (err) {
+      toast(err.message || "Sync failed", "error");
+      console.error("Teacher sync error:", err);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "🔄 Sync to Teachers";
+    }
+  }, [auth.token, toast]);
 
   // Print single payslip with school branding
   const printPayslip = (p) => {
@@ -401,21 +417,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
               <option value="all">All Departments</option>
               {DEPARTMENTS.map(d=><option key={d}>{d}</option>)}
             </select>
-            {canEdit && <Btn tone="secondary" size="sm" onClick={useCallback(async (e) => { 
-              const btn = e.target;
-              btn.disabled = true;
-              btn.textContent = "Syncing...";
-              try { 
-                const res = await apiFetch("/hr/sync-teachers", { method:"POST", token:auth.token, timeoutMs: 300000, retries: 2 }); 
-                toast(`Synced ${res.synced} teachers`, "success"); 
-              } catch (e) { 
-                toast(e.message || "Sync failed", "error"); 
-                console.error("Teacher sync error:", e); 
-              } finally {
-                btn.disabled = false;
-                btn.textContent = "🔄 Sync to Teachers";
-              }
-            }, [auth.token, toast])}>🔄 Sync to Teachers</Btn>}
+            {canEdit && <Btn tone="secondary" size="sm" onClick={syncTeachers}>🔄 Sync to Teachers</Btn>}
             {canEdit && <Btn onClick={()=>{ setEditStaff(null); setStaffForm(BLANK_STAFF); setErr(""); setShowStaff(true); }}>+ Add Staff</Btn>}
           </div>
           {filteredStaff.length===0 ? <Msg text="No staff found." /> : (
