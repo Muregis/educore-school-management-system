@@ -648,45 +648,85 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         filteredPayments.length === 0 ? (
           <EmptyState icon="💳" title="No Payments" description="There are no payment records matching the selected criteria." />
         ) : (
-          <Card style={{ padding: 0, overflow: "hidden" }}>
-            <Table
-              headers={["Date", "Student", "Class", "Amount", "Method", "Paid By", "Status", "Ref", "Actions"]}
-              data={rows.map(p => [
-                p.date,
-                <span key={p.id} style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{p.studentName}</span>,
-                p.className,
-                money(p.amount),
-                p.method,
-                <span key="pb" style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{p.paidBy || "—"}</span>,
-                <Badge key="st" text={p.status} variant={p.status==="paid" ? "success" : p.status==="pending" ? "warning" : "danger"} />,
-                <span key="ref" style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>{p.reference || "—"}</span>,
-                <div key="actions" style={{ display: "flex", gap: "var(--space-2)" }}>
-                  {["admin", "director", "superadmin"].includes(auth?.role) && (
-                    <Button size="sm" variant="secondary" onClick={() => setEditingPayment({
-                      id: p.id,
-                      studentId: p.studentId,
-                      studentName: p.studentName,
-                      className: p.className,
-                      amount: p.amount,
-                      feeType: p.feeType,
-                      method: p.method,
-                      date: p.date,
-                      status: p.status,
-                      reference: p.reference,
-                      paidBy: p.paidBy
-                    })}>Edit</Button>
-                  )}
-                  {canDeletePayments && (
-                    <Button size="sm" variant="danger" onClick={() => delPayment(p.id)}>Delete</Button>
-                  )}
-                  {!["admin", "director", "superadmin"].includes(auth?.role) && !canDeletePayments && "—"}
+          <>
+            {filterStudent !== "all" && (
+              <Card style={{ marginBottom: "var(--space-4)", background: "var(--color-info-muted)", borderColor: "var(--color-info-border)" }}>
+                <div style={{ fontWeight: 700, marginBottom: "var(--space-2)", color: "var(--color-info)" }}>
+                  📊 Payment Progress for {students.find(s => String(s.id ?? s.student_id) === String(filterStudent))?.first_name} {students.find(s => String(s.id ?? s.student_id) === String(filterStudent))?.last_name}
                 </div>
-              ])}
-            />
-            <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
-              <Pager page={page} pages={pages} setPage={setPage} />
-            </div>
-          </Card>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "var(--space-3)" }}>
+                  <div>
+                    <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Total Paid</div>
+                    <div style={{ fontWeight: 600, color: "var(--color-info)" }}>
+                      {money(filteredPayments.reduce((sum, p) => sum + Number(p.amount), 0))}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Payment Count</div>
+                    <div style={{ fontWeight: 600, color: "var(--color-info)" }}>
+                      {filteredPayments.length} payments
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Outstanding Balance</div>
+                    <div style={{ fontWeight: 600, color: "var(--color-info)" }}>
+                      {money(balances.find(b => String(b.studentId) === String(filterStudent))?.balance || 0)}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Completion</div>
+                    <div style={{ fontWeight: 600, color: "var(--color-info)" }}>
+                      {(() => {
+                        const studentBal = balances.find(b => String(b.studentId) === String(filterStudent));
+                        if (!studentBal || studentBal.expected === 0) return "0%";
+                        const percent = Math.round((studentBal.paid / studentBal.expected) * 100);
+                        return `${percent}%`;
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+            <Card style={{ padding: 0, overflow: "hidden" }}>
+              <Table
+                headers={["Date", "Student", "Class", "Amount", "Method", "Paid By", "Status", "Ref", "Actions"]}
+                data={rows.map(p => [
+                  p.date,
+                  <span key={p.id} style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{p.studentName}</span>,
+                  p.className,
+                  money(p.amount),
+                  p.method,
+                  <span key="pb" style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{p.paidBy || "—"}</span>,
+                  <Badge key="st" text={p.status} variant={p.status==="paid" ? "success" : p.status==="pending" ? "warning" : "danger"} />,
+                  <span key="ref" style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>{p.reference || "—"}</span>,
+                  <div key="actions" style={{ display: "flex", gap: "var(--space-2)" }}>
+                    {["admin", "director", "superadmin"].includes(auth?.role) && (
+                      <Button size="sm" variant="secondary" onClick={() => setEditingPayment({
+                        id: p.id,
+                        studentId: p.studentId,
+                        studentName: p.studentName,
+                        className: p.className,
+                        amount: p.amount,
+                        feeType: p.feeType,
+                        method: p.method,
+                        date: p.date,
+                        status: p.status,
+                        reference: p.reference,
+                        paidBy: p.paidBy
+                      })}>Edit</Button>
+                    )}
+                    {canDeletePayments && (
+                      <Button size="sm" variant="danger" onClick={() => delPayment(p.id)}>Delete</Button>
+                    )}
+                    {!["admin", "director", "superadmin"].includes(auth?.role) && !canDeletePayments && "—"}
+                  </div>
+                ])}
+              />
+              <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
+                <Pager page={page} pages={pages} setPage={setPage} />
+              </div>
+            </Card>
+          </>
         )
       )}
 

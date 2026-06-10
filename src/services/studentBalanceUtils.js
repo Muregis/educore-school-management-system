@@ -56,11 +56,13 @@ export function getStudentBreakfastFee(student) {
 function getFallbackDiscounts(student) {
   const discountValue = toNumber(student?.discount_value ?? student?.discountValue);
   if (!discountValue) return [];
+  const discountValueType = student?.discount_value_type ?? student?.discountValueType ?? 'percentage';
   return [{
     is_active: true,
     discount_value: discountValue,
+    discount_value_type: discountValueType,
     discount_type: student?.discount_type ?? student?.discountType ?? "custom",
-    discountPercent: student?.discount_is_percentage ?? student?.discountIsPercentage ? discountValue : 0
+    discountPercent: discountValueType === 'percentage' ? discountValue : 0
   }];
 }
 

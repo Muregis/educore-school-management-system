@@ -607,10 +607,32 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
       (teacherRegex.test(s.job_title || "") || academicDeptRegex.test(s.department || "")) &&
       !nonTeachingRoles.test(s.job_title || "")
     );
-    console.log('[HR Sync] Teachers to sync:', teachersToSync.length);
+    
+    // Also include staff that are explicitly marked as teachers in the teachers table
+    const existingTeacherEmails = new Set();
+    try {
+      const { data: existingTeachers } = await supabase
+        .from('teachers')
+        .select('email')
+        .eq('school_id', schoolId);
+      existingTeachers?.forEach(t => {
+        if (t.email) existingTeacherEmails.add(t.email.toLowerCase());
+      });
+    } catch (e) {
+      console.log('Could not fetch existing teachers:', e.message);
+    }
+    
+    // Add staff that are already in teachers table but not caught by the regex
+    const staffInTeachers = staff.filter(s => 
+      s.email && existingTeacherEmails.has(s.email.toLowerCase())
+    );
+    
+    // Combine both sets
+    const allToSync = [...new Set([...teachersToSync, ...staffInTeachers])];
+    console.log('[HR Sync] Teachers to sync:', allToSync.length);
     
     // Prepare batch data for upsert
-    const teachersData = teachersToSync.map(s => {
+    const teachersData = allToSync.map(s => {
       const firstName = s.full_name.split(' ')[0] || s.full_name;
       const lastName = s.full_name.split(' ').slice(1).join(' ') || '';
       const teacherEmail = s.email || 'hr-teacher-' + s.staff_id + '@local.invalid';
@@ -639,7 +661,7 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
 
     // If batch fails due to missing columns, try simplified batch
     if (upsertError && isMissingColumnError(upsertError)) {
-      const simplifiedData = teachersToSync.map(s => {
+      const simplifiedData = allToSync.map(s => {
         const firstName = s.full_name.split(' ')[0] || s.full_name;
         const lastName = s.full_name.split(' ').slice(1).join(' ') || '';
         const teacherEmail = s.email || 'hr-teacher-' + s.staff_id + '@local.invalid';
@@ -664,7 +686,7 @@ router.post("/sync-teachers", requireRoles(...HR_ROLES), async (req, res, next) 
       console.error('Batch sync error:', upsertError.message);
       // Fall back to sequential if batch fails
       let synced = 0;
-      for (const s of teachersToSync) {
+      for (const s of allToSync) {
         const firstName = s.full_name.split(' ')[0] || s.full_name;
         const lastName = s.full_name.split(' ').slice(1).join(' ') || '';
         const teacherEmail = s.email || 'hr-teacher-' + s.staff_id + '@local.invalid';
