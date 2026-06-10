@@ -56,7 +56,9 @@ export function getStudentBreakfastFee(student) {
 function getFallbackDiscounts(student) {
   const discountValue = toNumber(student?.discount_value ?? student?.discountValue);
   if (!discountValue) return [];
-  const discountValueType = student?.discount_value_type ?? student?.discountValueType ?? 'percentage';
+  // Use discount_value_type if available, otherwise fall back to discount_is_percentage for backward compatibility
+  const discountValueType = student?.discount_value_type ?? student?.discountValueType ?? 
+    (student?.discount_is_percentage === false ? 'fixed' : 'percentage');
   return [{
     is_active: true,
     discount_value: discountValue,

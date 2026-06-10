@@ -30,7 +30,53 @@ router.get("/", async (req, res, next) => {
       .order("first_name");
 
     if (error) throw error;
-    res.json(rows || []);
+
+    // Also fetch staff members with teacher job titles who aren't in teachers table
+    const { data: staffTeachers, error: staffError } = await supabase
+      .from("hr_staff")
+      .select("staff_id, full_name, email, phone, department, job_title, status, start_date")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .eq("status", "active");
+
+    if (staffError) {
+      console.error("Error fetching staff teachers:", staffError);
+    }
+
+    // Filter staff members who are teachers based on job title
+    const teacherRegex = /teacher|tutor|instructor|lecturer|professor|educator|class teacher|subject teacher|teaching assistant|ta|graduate assistant/i;
+    const academicDeptRegex = /academic|teaching|education|curriculum/i;
+    const nonTeachingRoles = /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress|bursar|finance|bursary|human resources|hr|operations|logistics|procurement|marketing|sales|legal|compliance|audit|internal audit|external audit|quality assurance|qa|health and safety|hse|environmental|sustainability|communications|public relations|pr|events|fundraising|development|alumni|admissions|enrollment|registration|records|archives|research|innovation|technology|ict|information technology|data|analytics|business intelligence|bi|strategy|planning|performance|risk|compliance|governance|board|trustee|council|committee/i;
+
+    const staffAsTeachers = (staffTeachers || []).filter(s =>
+      (teacherRegex.test(s.job_title || "") || academicDeptRegex.test(s.department || "")) &&
+      !nonTeachingRoles.test(s.job_title || "")
+    );
+
+    // Get existing teacher emails to avoid duplicates
+    const existingEmails = new Set((rows || []).map(t => t.email?.toLowerCase()).filter(Boolean));
+
+    // Add staff teachers who aren't already in teachers table
+    const additionalTeachers = staffAsTeachers
+      .filter(s => s.email && !existingEmails.has(s.email.toLowerCase()))
+      .map(s => ({
+        teacher_id: `staff-${s.staff_id}`,
+        user_id: null,
+        staff_number: `HR-${s.staff_id}`,
+        national_id: null,
+        first_name: s.full_name.split(' ')[0] || s.full_name,
+        last_name: s.full_name.split(' ').slice(1).join(' ') || '',
+        email: s.email,
+        phone: s.phone,
+        gender: null,
+        department: s.department,
+        qualification: s.job_title,
+        status: s.status,
+        hire_date: s.start_date,
+        created_at: s.created_at || new Date().toISOString()
+      }));
+
+    res.json([...(rows || []), ...additionalTeachers]);
   } catch (err) {
     next(err);
   }
