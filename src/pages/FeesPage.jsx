@@ -616,7 +616,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 { value: "all", label: "All students" },
                 ...students.map(s => ({ 
                   value: String(s.id ?? s.student_id), 
-                  label: `${s.first_name} ${s.last_name} (${s.admission ?? s.admission_number ?? 'N/A'})` 
+                  label: `${s.first_name ?? s.firstName ?? ''} ${s.last_name ?? s.lastName ?? ''} (${s.admission ?? s.admission_number ?? 'N/A'})` 
                 }))
               ]}
               style={{ minWidth: "200px" }}

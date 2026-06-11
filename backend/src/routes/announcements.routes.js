@@ -48,7 +48,7 @@ router.get("/", async (req, res, next) => {
 // ─── Create announcement ───────────────────────────────────────────────────
 router.post("/", requireRoles("admin","teacher","director"), async (req, res, next) => {
   try {
-    const { schoolId, user } = req.user;
+    const { schoolId, userId } = req.user;
     const { title, message, type = 'general', priority = 'normal', target_audience = 'all', pinned = false, publish_date, expiry_date } = req.body;
 
     if (!title || !message) {
@@ -68,7 +68,7 @@ router.post("/", requireRoles("admin","teacher","director"), async (req, res, ne
         pinned,
         publish_date: publish_date || null,
         expiry_date: expiry_date || null,
-        author_user_id: user.id
+        author_user_id: userId
       })
       .select()
       .single();
