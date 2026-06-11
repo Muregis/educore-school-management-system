@@ -232,12 +232,27 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   const boys = students.filter(s => s.gender === "male").length;
   const girls = students.filter(s => s.gender === "female").length;
   const totalStudents = students.length;
-  const present = attendance.filter(a => a.status === "present").length;
   
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  
+  // Filter attendance for today only
+  const todayAttendance = attendance.filter(a => {
+    const attendanceDate = a.date;
+    if (!attendanceDate) return false;
+    const ad = new Date(attendanceDate);
+    if (isNaN(ad.getTime())) return false;
+    return ad.toISOString().slice(0, 10) === todayStr;
+  });
+  const present = todayAttendance.filter(a => a.status === "present").length;
+  
   const todayPayments = payments.filter(p => {
     const paymentDate = p.date || p.payment_date;
-    return p.status === "paid" && paymentDate && paymentDate.startsWith(today);
+    if (!paymentDate || p.status !== "paid") return false;
+    // Handle various date formats by parsing and comparing dates
+    const pd = new Date(paymentDate);
+    if (isNaN(pd.getTime())) return false;
+    return pd.toISOString().slice(0, 10) === todayStr;
   });
   const todayCollection = todayPayments.reduce((s, p) => s + Number(p.amount), 0);
   
