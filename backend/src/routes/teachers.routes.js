@@ -48,10 +48,15 @@ router.get("/", async (req, res, next) => {
     const academicDeptRegex = /academic|teaching|education|curriculum/i;
     const nonTeachingRoles = /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress|bursar|finance|bursary|human resources|hr|operations|logistics|procurement|marketing|sales|legal|compliance|audit|internal audit|external audit|quality assurance|qa|health and safety|hse|environmental|sustainability|communications|public relations|pr|events|fundraising|development|alumni|admissions|enrollment|registration|records|archives|research|innovation|technology|ict|information technology|data|analytics|business intelligence|bi|strategy|planning|performance|risk|compliance|governance|board|trustee|council|committee/i;
 
-    const staffAsTeachers = (staffTeachers || []).filter(s =>
-      (teacherRegex.test(s.job_title || "") || academicDeptRegex.test(s.department || "")) &&
-      !nonTeachingRoles.test(s.job_title || "")
-    );
+    const staffAsTeachers = (staffTeachers || []).filter(s => {
+      const jobTitle = (s.job_title || "").toLowerCase();
+      const dept = (s.department || "").toLowerCase();
+      // Include if job title contains teacher-related terms OR department is academic/teaching
+      // Exclude if job title contains non-teaching roles
+      const isTeachingRole = teacherRegex.test(jobTitle) || academicDeptRegex.test(dept);
+      const isNonTeaching = nonTeachingRoles.test(jobTitle);
+      return isTeachingRole && !isNonTeaching;
+    });
 
     // Get existing teacher emails to avoid duplicates
     const existingEmails = new Set((rows || []).map(t => t.email?.toLowerCase()).filter(Boolean));

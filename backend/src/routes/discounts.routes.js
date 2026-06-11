@@ -225,7 +225,7 @@ router.get('/detect/:studentId', requireRoles('finance', 'director', 'superadmin
     // CHECK 3 — Existing manual discounts
     const { data: existing } = await supabase
       .from('student_discounts')
-      .select('discount_id, discount_type, discount_value, reason, expires_at, approved_at, is_active')
+      .select('discount_id, discount_type, discount_value, discount_value_type, reason, expires_at, approved_at, is_active')
       .eq('student_id', studentId)
       .eq('school_id', schoolId)
       .eq('is_active', true)
@@ -349,7 +349,7 @@ router.get('/student/:studentId', requireRoles('finance', 'director', 'superadmi
     const { data, error } = await supabase
       .from('student_discounts')
       .select(`
-        discount_id, discount_type, discount_value, discount_amount,
+        discount_id, discount_type, discount_value, discount_value_type, discount_amount,
         reason, is_active, approved_at, expires_at, starts_at,
         approver:users(full_name)
       `)

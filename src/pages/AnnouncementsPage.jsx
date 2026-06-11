@@ -142,7 +142,7 @@ function AnnouncementCard({ announcement, onEdit, onDelete, onPublish, canEdit }
           Target: <strong>{AUDIENCE_OPTIONS.find(a => a.value === announcement.target_audience)?.label || "All"}</strong>
         </div>
         <div>
-          By: <strong>{announcement.users?.full_name || "Unknown"}</strong>
+          By: <strong>System</strong>
         </div>
         <div>
           {announcement.publish_date ? `Published: ${new Date(announcement.publish_date).toLocaleDateString()}` : `Created: ${new Date(announcement.created_at).toLocaleDateString()}`}
