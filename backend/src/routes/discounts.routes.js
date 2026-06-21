@@ -405,20 +405,20 @@ router.get('/students', requireRoles('finance', 'director', 'superadmin', 'admin
 });
 
 // GET /api/discounts/calculate/:studentId
-// Calculate discount for a student based on base fee ONLY
-// IMPORTANT: Discount applies ONLY to base fee (tuition + activity + misc)
-// Transport, lunch, breakfast, and opening balance are NEVER discounted
+// Calculate discount for a student based on tuition fee ONLY
+// IMPORTANT: Discount applies ONLY to tuition fee
+// Activity, misc, transport, lunch, breakfast, and opening balance are NEVER discounted
 router.get('/calculate/:studentId', requireRoles('finance', 'director', 'superadmin', 'admin'), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
-    const { baseFee } = req.query;
+    const { tuition } = req.query;
 
-    if (!baseFee || isNaN(parseFloat(baseFee))) {
-      return res.status(400).json({ message: 'baseFee query param required (discount applies only to base fee)' });
+    if (!tuition || isNaN(parseFloat(tuition))) {
+      return res.status(400).json({ message: 'tuition query param required (discount applies only to tuition fee)' });
     }
 
-    const amount = parseFloat(baseFee);
+    const amount = parseFloat(tuition);
 
     // Get active discounts for student
     const { data: discounts } = await supabase
@@ -431,10 +431,10 @@ router.get('/calculate/:studentId', requireRoles('finance', 'director', 'superad
 
     if (!discounts || discounts.length === 0) {
       return res.json({
-        baseFee: amount,
+        tuition: amount,
         discountPercent: 0,
         discountAmount: 0,
-        netBaseFee: amount,
+        netTuition: amount,
         hasDiscount: false
       });
     }
@@ -457,7 +457,7 @@ router.get('/calculate/:studentId', requireRoles('finance', 'director', 'superad
       }
     });
 
-    // CRITICAL: Discount applies ONLY to base fee
+    // CRITICAL: Discount applies ONLY to tuition fee
     let discountAmount;
     let discountPercent;
     
@@ -469,13 +469,13 @@ router.get('/calculate/:studentId', requireRoles('finance', 'director', 'superad
       discountAmount = (amount * discountPercent) / 100;
     }
     
-    const netBaseFee = amount - discountAmount;
+    const netTuition = amount - discountAmount;
 
     res.json({
-      baseFee: amount,
+      tuition: amount,
       discountPercent: Math.round(discountPercent * 100) / 100,
       discountAmount: Math.round(discountAmount * 100) / 100,
-      netBaseFee: Math.round(netBaseFee * 100) / 100,
+      netTuition: Math.round(netTuition * 100) / 100,
       discountType: bestDiscount.discount_type,
       discountValueType: bestDiscount.discount_value_type,
       discountLabel: DISCOUNT_LABELS[bestDiscount.discount_type] || bestDiscount.discount_type,

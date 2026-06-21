@@ -105,6 +105,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [filterClass, setFilterClass] = useState("all");
   const [filterDate, setFilterDate] = useState("all"); // 'all' | 'today'
   const [filterStudent, setFilterStudent] = useState("all"); // 'all' | studentId
+  const [studentSearch, setStudentSearch] = useState("");
   const [page, setPage]               = useState(1);
   const [paymentForm, setPaymentForm] = useState({ studentId: "", amount: "", feeType: "tuition", method: "cash", date: new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
   const [paymentClass, setPaymentClass] = useState("");
@@ -609,18 +610,36 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 ...ALL_CLASSES.map(c => ({ value: c, label: c }))
               ]}
             />
-            <Select 
-              value={filterStudent} 
-              onChange={e => setFilterStudent(e.target.value)}
-              options={[
-                { value: "all", label: "All students" },
-                ...students.map(s => ({ 
-                  value: String(s.id ?? s.student_id), 
-                  label: `${s.first_name ?? s.firstName ?? ''} ${s.last_name ?? s.lastName ?? ''} (${s.admission ?? s.admission_number ?? 'N/A'})` 
-                }))
-              ]}
-              style={{ minWidth: "200px" }}
-            />
+            <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+              <Input
+                placeholder="Search students..."
+                value={studentSearch}
+                onChange={e => setStudentSearch(e.target.value)}
+                style={{ minWidth: "200px" }}
+              />
+              <Select 
+                value={filterStudent} 
+                onChange={e => {
+                  setFilterStudent(e.target.value);
+                  setStudentSearch("");
+                }}
+                options={[
+                  { value: "all", label: "All students" },
+                  ...students
+                    .filter(s => {
+                      const searchLower = studentSearch.toLowerCase();
+                      const name = `${s.first_name ?? s.firstName ?? ''} ${s.last_name ?? s.lastName ?? ''}`.toLowerCase();
+                      const admission = String(s.admission ?? s.admission_number ?? '').toLowerCase();
+                      return name.includes(searchLower) || admission.includes(searchLower);
+                    })
+                    .map(s => ({ 
+                      value: String(s.id ?? s.student_id), 
+                      label: `${s.first_name ?? s.firstName ?? ''} ${s.last_name ?? s.lastName ?? ''} (${s.admission ?? s.admission_number ?? 'N/A'})` 
+                    }))
+                ]}
+                style={{ minWidth: "200px" }}
+              />
+            </div>
           </div>
 
           <div style={{ display: "flex", gap: "var(--space-2)" }}>

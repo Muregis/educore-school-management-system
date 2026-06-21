@@ -49,10 +49,10 @@ export function calculateDiscount(grossAmount, discountValue, discountValueType 
  * Get the best discount from a list of discounts
  * Only the highest discount applies (no stacking)
  * @param {Array} discounts - Array of discount objects
- * @param {number} baseFee - Base fee for comparing fixed vs percentage
+ * @param {number} tuition - Tuition fee for comparing fixed vs percentage
  * @returns {object|null} - Best discount or null
  */
-export function getBestDiscount(discounts, baseFee = 0) {
+export function getBestDiscount(discounts, tuition = 0) {
   if (!discounts || discounts.length === 0) return null;
 
   // Filter active discounts
@@ -77,14 +77,14 @@ export function getBestDiscount(discounts, baseFee = 0) {
     // If current is fixed, convert best to equivalent amount for comparison
     if (current.discount_value_type === 'fixed') {
       const currentAmount = currentValue;
-      const bestAmount = best.discount_value_type === 'fixed' ? bestValue : (baseFee * bestValue / 100);
+      const bestAmount = best.discount_value_type === 'fixed' ? bestValue : (tuition * bestValue / 100);
       return currentAmount > bestAmount ? current : best;
     }
     
     // If best is fixed, convert current to equivalent amount for comparison
     if (best.discount_value_type === 'fixed') {
       const bestAmount = bestValue;
-      const currentAmount = baseFee * currentValue / 100;
+      const currentAmount = tuition * currentValue / 100;
       return currentAmount > bestAmount ? current : best;
     }
     
@@ -136,11 +136,12 @@ export async function getStudentDiscounts(studentId, token) {
 
 /**
  * Calculate discount breakdown for a student's complete fee
- * IMPORTANT: Discount applies ONLY to base fee (tuition + activity + misc);
- * Transport, lunch, breakfast, and opening balance are NEVER discounted
+ * IMPORTANT: Discount applies ONLY to tuition fee;
+ * Activity, misc, transport, lunch, breakfast, and opening balance are NEVER discounted
  * 
  * @param {object} params - Fee calculation parameters
- * @param {number} params.baseFee - Base tuition fee (ONLY this is discounted)
+ * @param {number} params.baseFee - Base fee (tuition + activity + misc)
+ * @param {number} params.tuition - Tuition fee (ONLY this is discounted)
  * @param {number} params.transportFee - Transport fee (NOT discounted)
  * @param {number} params.lunchFee - Lunch fee (NOT discounted)
  * @param {number} params.breakfastFee - Breakfast fee (NOT discounted)
@@ -150,6 +151,7 @@ export async function getStudentDiscounts(studentId, token) {
  */
 export function calculateFeeWithDiscount({
   baseFee = 0,
+  tuition = 0,
   transportFee = 0,
   lunchFee = 0,
   breakfastFee = 0,
@@ -157,7 +159,7 @@ export function calculateFeeWithDiscount({
   discounts = []
 }) {
   const grossAmount = baseFee + transportFee + lunchFee + breakfastFee + openingBalance;
-  const bestDiscount = getBestDiscount(discounts, baseFee);
+  const bestDiscount = getBestDiscount(discounts, tuition);
 
   if (!bestDiscount) {
     return {
@@ -177,16 +179,19 @@ export function calculateFeeWithDiscount({
   let discountAmount;
   let discountPercent;
   
-  // CRITICAL: Discount applies ONLY to base fee, not transport/meals/opening balance
+  // CRITICAL: Discount applies ONLY to tuition fee, not activity/misc/transport/meals/opening balance
   if (discountValueType === 'fixed') {
     discountAmount = discountValue;
-    discountPercent = (discountAmount / baseFee) * 100;
+    discountPercent = (discountAmount / tuition) * 100;
   } else {
     discountPercent = discountValue;
-    discountAmount = (baseFee * discountPercent) / 100;
+    discountAmount = (tuition * discountPercent) / 100;
   }
   
-  const netBaseFee = baseFee - discountAmount;
+  // Calculate net fees: discount is subtracted from tuition portion only
+  const netTuition = tuition - discountAmount;
+  const activityMisc = baseFee - tuition; // activity + misc
+  const netBaseFee = netTuition + activityMisc;
   const netAmount = netBaseFee + transportFee + lunchFee + breakfastFee + openingBalance;
 
   return {

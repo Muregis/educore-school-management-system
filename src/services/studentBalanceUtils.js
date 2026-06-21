@@ -77,6 +77,8 @@ export function calculateStudentBalanceLocal({
   const studentId = getStudentId(student);
   const className = getStudentClassName(student);
   const baseFee = getStudentBaseFee(student, feeStructures);
+  const structure = feeStructures.find(f => (f?.className ?? f?.class_name) === className);
+  const tuition = structure ? toNumber(structure.tuition) : 0;
   const transportFee = getStudentTransportFee(student);
   const lunchFee = getStudentLunchFee(student);
   const breakfastFee = getStudentBreakfastFee(student);
@@ -85,6 +87,7 @@ export function calculateStudentBalanceLocal({
 
   const discountCalc = discountService.calculateFeeWithDiscount({
     baseFee,
+    tuition,
     transportFee,
     lunchFee,
     breakfastFee,
