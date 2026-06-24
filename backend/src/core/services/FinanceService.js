@@ -1,5 +1,15 @@
 import { ChartOfAccountsRepository, JournalEntriesRepository, JournalEntryLinesRepository } from '../repositories/FinanceRepository.js';
 
+function isOptionalFinanceDataError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.code === '42P01'
+    || error?.code === '42703'
+    || error?.code === 'PGRST205'
+    || message.includes('does not exist')
+    || message.includes('could not find the table')
+    || message.includes('could not find the column');
+}
+
 /**
  * Finance Service
  * Implements enterprise-grade accounting functionality
@@ -50,9 +60,15 @@ export class FinanceService {
   }
 
   async getAccounts(schoolId, type = null) {
-    const savedResult = type
-      ? await this.chartOfAccountsRepository.findByType(schoolId, type)
-      : await this.chartOfAccountsRepository.findAll({ school_id: schoolId });
+    let savedResult;
+    try {
+      savedResult = type
+        ? await this.chartOfAccountsRepository.findByType(schoolId, type)
+        : await this.chartOfAccountsRepository.findAll({ school_id: schoolId });
+    } catch (error) {
+      if (!isOptionalFinanceDataError(error)) throw error;
+      savedResult = [];
+    }
     const savedAccounts = Array.isArray(savedResult) ? savedResult : savedResult.data || [];
     const operationalAccounts = this.getOperationalAccounts(schoolId)
       .filter(account => !type || account.account_type === type);
@@ -79,21 +95,27 @@ export class FinanceService {
       return scopedQuery;
     };
 
-    const [paymentsResult, expendituresResult] = await Promise.all([
-      applyDateRange(paymentsQuery, 'payment_date'),
-      applyDateRange(expendituresQuery, 'expense_date')
-    ]);
+    const safeQuery = async (query) => {
+      const result = await query;
+      if (result.error) {
+        if (isOptionalFinanceDataError(result.error)) return [];
+        throw result.error;
+      }
+      return result.data || [];
+    };
 
-    if (paymentsResult.error) throw paymentsResult.error;
-    if (expendituresResult.error) throw expendituresResult.error;
+    const [paymentsRows, expendituresRows] = await Promise.all([
+      safeQuery(applyDateRange(paymentsQuery, 'payment_date')),
+      safeQuery(applyDateRange(expendituresQuery, 'expense_date'))
+    ]);
 
     const paidStatuses = new Set(['paid', 'completed', 'success', 'successful']);
 
     return {
-      payments: (paymentsResult.data || []).filter(payment => (
+      payments: paymentsRows.filter(payment => (
         !payment.status || paidStatuses.has(String(payment.status).toLowerCase())
       )),
-      expenditures: expendituresResult.data || []
+      expenditures: expendituresRows
     };
   }
 
@@ -389,7 +411,7 @@ export class FinanceService {
   async getGeneralLedger(schoolId, accountId, startDate, endDate) {
     const allAccounts = await this.getAccounts(schoolId);
     const accounts = accountId
-      ? [allAccounts.find(account => account.id === accountId) || await this.chartOfAccountsRepository.findById(accountId)]
+      ? [allAccounts.find(account => account.id === accountId) || await this.chartOfAccountsRepository.findById(accountId)].filter(Boolean)
       : allAccounts;
     
     const accountData = Array.isArray(accounts) ? accounts.data || accounts : [accounts];

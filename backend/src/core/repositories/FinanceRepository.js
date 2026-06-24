@@ -1,5 +1,13 @@
 import { BaseRepository } from '../BaseRepository.js';
 
+function isMissingFinanceTable(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.code === '42P01'
+    || error?.code === 'PGRST205'
+    || message.includes('does not exist')
+    || message.includes('could not find the table');
+}
+
 /**
  * Chart of Accounts Repository
  */
@@ -17,7 +25,10 @@ export class ChartOfAccountsRepository extends BaseRepository {
       .eq('is_active', true)
       .order('account_code');
     
-    if (error) throw error;
+    if (error) {
+      if (isMissingFinanceTable(error)) return [];
+      throw error;
+    }
     return data || [];
   }
 
@@ -29,7 +40,10 @@ export class ChartOfAccountsRepository extends BaseRepository {
       .eq('account_code', accountCode)
       .maybeSingle();
     
-    if (error) throw error;
+    if (error) {
+      if (isMissingFinanceTable(error)) return null;
+      throw error;
+    }
     return data;
   }
 
@@ -40,7 +54,10 @@ export class ChartOfAccountsRepository extends BaseRepository {
       .eq('id', id)
       .single();
     
-    if (error) throw error;
+    if (error) {
+      if (isMissingFinanceTable(error)) return null;
+      throw error;
+    }
     return data;
   }
 }
@@ -70,7 +87,10 @@ export class JournalEntriesRepository extends BaseRepository {
 
     const { data, error } = await query;
     
-    if (error) throw error;
+    if (error) {
+      if (isMissingFinanceTable(error)) return [];
+      throw error;
+    }
     return (data || []).map(entry => ({
       ...entry,
       lines: entry.journal_entry_lines || []
@@ -86,7 +106,10 @@ export class JournalEntriesRepository extends BaseRepository {
       .eq('reference_id', referenceId)
       .single();
     
-    if (error) throw error;
+    if (error) {
+      if (isMissingFinanceTable(error)) return null;
+      throw error;
+    }
     return data;
   }
 }
@@ -119,7 +142,10 @@ export class JournalEntryLinesRepository extends BaseRepository {
 
     const { data, error } = await query;
     
-    if (error) throw error;
+    if (error) {
+      if (isMissingFinanceTable(error)) return [];
+      throw error;
+    }
     return data || [];
   }
 }

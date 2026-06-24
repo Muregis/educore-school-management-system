@@ -7,6 +7,7 @@ import StatCard from "../components/ui/StatCard";
 import EmptyState from "../components/ui/EmptyState";
 import { apiFetch } from "../lib/api";
 import { money } from "../lib/utils";
+import { exportCsv, localDateInputValue, printReport } from "../utils/reportExport";
 
 export default function GeneralLedgerPage({ auth, toast }) {
   const [transactions, setTransactions] = useState([]);
@@ -22,8 +23,8 @@ export default function GeneralLedgerPage({ auth, toast }) {
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    setStartDate(firstDay.toISOString().split('T')[0]);
-    setEndDate(lastDay.toISOString().split('T')[0]);
+    setStartDate(localDateInputValue(firstDay));
+    setEndDate(localDateInputValue(lastDay));
   }, []);
 
   useEffect(() => {
@@ -71,6 +72,22 @@ export default function GeneralLedgerPage({ auth, toast }) {
   const totalDebits = transactions.reduce((sum, t) => sum + (t.debit || 0), 0);
   const totalCredits = transactions.reduce((sum, t) => sum + (t.credit || 0), 0);
   const runningBalance = transactions.length > 0 ? transactions[transactions.length - 1].running_balance || 0 : 0;
+
+  const exportLedger = () => {
+    exportCsv(
+      `general-ledger-${selectedAccountData?.account_code || "account"}-${startDate || "all"}-${endDate || "all"}.csv`,
+      ["Date", "Account", "Reference", "Description", "Debit", "Credit", "Running Balance"],
+      transactions.map(t => [
+        t.transaction_date || t.date || "",
+        selectedAccountData?.account_name || "",
+        t.reference || "",
+        t.description || "",
+        Number(t.debit || 0).toFixed(2),
+        Number(t.credit || 0).toFixed(2),
+        Number(t.running_balance || 0).toFixed(2)
+      ])
+    );
+  };
 
   if (loading) {
     return (
