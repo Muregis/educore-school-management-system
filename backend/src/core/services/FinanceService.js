@@ -155,4 +155,41 @@ export class FinanceService {
 
     return result;
   }
+
+  /**
+   * Get balance sheet
+   */
+  async getBalanceSheet(schoolId, asOfDate) {
+    const assetAccounts = await this.chartOfAccountsRepository.findByType(schoolId, 'asset');
+    const liabilityAccounts = await this.chartOfAccountsRepository.findByType(schoolId, 'liability');
+    const equityAccounts = await this.chartOfAccountsRepository.findByType(schoolId, 'equity');
+
+    const assets = await this.calculateAccountBalances(assetAccounts, null, asOfDate);
+    const liabilities = await this.calculateAccountBalances(liabilityAccounts, null, asOfDate);
+    const equity = await this.calculateAccountBalances(equityAccounts, null, asOfDate);
+
+    const totalAssets = assets.reduce((sum, a) => sum + a.balance, 0);
+    const totalLiabilities = liabilities.reduce((sum, a) => sum + a.balance, 0);
+    const totalEquity = equity.reduce((sum, a) => sum + a.balance, 0);
+
+    // Calculate retained earnings (net income accumulated)
+    const revenueAccounts = await this.chartOfAccountsRepository.findByType(schoolId, 'revenue');
+    const expenseAccounts = await this.chartOfAccountsRepository.findByType(schoolId, 'expense');
+    const revenue = await this.calculateAccountBalances(revenueAccounts, null, asOfDate);
+    const expenses = await this.calculateAccountBalances(expenseAccounts, null, asOfDate);
+    const totalRevenue = revenue.reduce((sum, a) => sum + a.balance, 0);
+    const totalExpenses = expenses.reduce((sum, a) => sum + a.balance, 0);
+    const retainedEarnings = totalRevenue - totalExpenses;
+
+    return {
+      assets,
+      liabilities,
+      equity,
+      total_assets: totalAssets,
+      total_liabilities: totalLiabilities,
+      total_equity: totalEquity + retainedEarnings,
+      retained_earnings: retainedEarnings,
+      is_balanced: Math.abs(totalAssets - (totalLiabilities + totalEquity + retainedEarnings)) < 0.01
+    };
+  }
 }

@@ -14,15 +14,15 @@ export const DEFAULTS = {
 
 export const ROLE = {
   // Director - HIGHEST ROLE - Full control over all schools, can delegate permissions
-  director:  { pages:["dashboard","students","teachers","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true, canDelegate:true },
+  director:  { pages:["dashboard","students","teachers","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","financial-reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true, canDelegate:true },
   // Superadmin - System-level full access
-  superadmin:{ pages:["dashboard","students","teachers","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true },
+  superadmin:{ pages:["dashboard","students","teachers","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","financial-reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true },
   // Admin - School administrator with full school-level access
   admin:     { pages:["dashboard","students","subjects","attendance","grades","fees","expenditures","invoices","reportcards","discipline","transport","communication","timetable","library","lessonplans","announcements","exams","admissions"], edit:true },
   // Teacher - Classroom operations
   teacher:   { pages:["dashboard","subjects","attendance","grades","reportcards","discipline","timetable","communication","library","analysis","lessonplans","announcements","exams"], edit:true },
   // Finance - Fee operations
-  finance:   { pages:["dashboard","fees","expenditures","mpesa-reconcile","invoices","announcements","reports"], edit:true },
+  finance:   { pages:["dashboard","fees","expenditures","mpesa-reconcile","invoices","announcements","reports","financial-reports"], edit:true },
   // HR - Staff management
   hr:        { pages:["dashboard","hr","staff","expenditures","announcements"], edit:true },
   // Librarian - Library management
@@ -52,6 +52,7 @@ export const NAV = [
   { id:"communication",   label:"Communication",  icon:"\u{1F4AC}" },
   { id:"timetable",       label:"Timetable",      icon:"\u{1F5D3}" },
   { id:"reports",         label:"Reports",        icon:"\u{1F4CA}" },
+  { id:"financial-reports",label:"Financial Reports",icon:"\u{1F4B0}" },
   { id:"analytics",       label:"Analytics",      icon:"\u{1F4C8}" },
   { id:"analysis",        label:"Analysis",       icon:"\u{1F50D}" },
   { id:"accounts",        label:"Accounts",       icon:"\u{1F511}" },

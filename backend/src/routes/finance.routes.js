@@ -82,4 +82,16 @@ router.get("/reports/income-statement", async (req, res) => {
   }
 });
 
+// Get balance sheet
+router.get("/reports/balance-sheet", async (req, res) => {
+  try {
+    const schoolId = req.user.schoolId;
+    const { as_of_date } = req.query;
+    const result = await financeService.getBalanceSheet(schoolId, as_of_date);
+    res.success(result);
+  } catch (error) {
+    res.error('FINANCE_ERROR', error.message, {}, 500);
+  }
+});
+
 export default router;

@@ -36,6 +36,7 @@ import SubjectsPage from "./pages/SubjectsPage";
 import MpesaReconciliationPage from "./pages/MpesaReconciliationPage";
 import BulkImportPage from "./pages/BulkImportPage";
 import ExamsPage from "./pages/ExamsPage";
+import FinancialReportsPage from "./pages/FinancialReportsPage";
 import QRVerificationPage from "./pages/QRVerificationPage";
 import UpdateRequestsPage from "./pages/UpdateRequestsPage";
 import OfflineStatusBar from "./components/OfflineStatusBar"; // NEW: Offline/sync status indicator
@@ -512,6 +513,7 @@ export default function App() {
     announcements: perms?.pages.includes("announcements") ? <AnnouncementsPage auth={auth} toast={toast} /> : <Forbidden />,
     analytics: ["director","superadmin"].includes(auth.role) ? <AnalyticsPage auth={auth} students={students} teachers={teachers} payments={payments} results={results} attendance={attendance} feeStructures={feeStructures} toast={toast} /> : <Forbidden />,
     reports: ["finance","director","superadmin"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
+    "financial-reports": ["finance","director","superadmin"].includes(auth.role) ? <FinancialReportsPage auth={auth} toast={toast} /> : <Forbidden />,
     analysis: ["admin","teacher","director","superadmin"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,
     "update-requests": ["admin","parent"].includes(auth.role) ? <UpdateRequestsPage auth={auth} students={students} pendingUpdates={pendingUpdates} setPendingUpdates={setPendingUpdates} toast={toast} /> : <Forbidden />,
     settings: ["director","superadmin"].includes(auth.role)
