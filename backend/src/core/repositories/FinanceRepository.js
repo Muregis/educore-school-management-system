@@ -1,16 +1,6 @@
 import { BaseRepository } from '../BaseRepository.js';
+import { isMissingTableError } from '../../utils/missingTableError.js';
 
-function isMissingFinanceTable(error) {
-  const message = String(error?.message || '').toLowerCase();
-  return error?.code === '42P01'
-    || error?.code === 'PGRST205'
-    || message.includes('does not exist')
-    || message.includes('could not find the table');
-}
-
-/**
- * Chart of Accounts Repository
- */
 export class ChartOfAccountsRepository extends BaseRepository {
   constructor() {
     super('chart_of_accounts');
@@ -24,9 +14,9 @@ export class ChartOfAccountsRepository extends BaseRepository {
       .eq('account_type', accountType)
       .eq('is_active', true)
       .order('account_code');
-    
+
     if (error) {
-      if (isMissingFinanceTable(error)) return [];
+      if (isMissingTableError(error)) return [];
       throw error;
     }
     return data || [];
@@ -36,12 +26,11 @@ export class ChartOfAccountsRepository extends BaseRepository {
     const { data, error } = await this.client
       .from(this.tableName)
       .select('*')
-      .eq('school_id', schoolId)
       .eq('account_code', accountCode)
       .maybeSingle();
-    
+
     if (error) {
-      if (isMissingFinanceTable(error)) return null;
+      if (isMissingTableError(error)) return null;
       throw error;
     }
     return data;
@@ -53,9 +42,9 @@ export class ChartOfAccountsRepository extends BaseRepository {
       .select('*')
       .eq('id', id)
       .single();
-    
+
     if (error) {
-      if (isMissingFinanceTable(error)) return null;
+      if (isMissingTableError(error)) return null;
       throw error;
     }
     return data;
@@ -86,9 +75,9 @@ export class JournalEntriesRepository extends BaseRepository {
     }
 
     const { data, error } = await query;
-    
+
     if (error) {
-      if (isMissingFinanceTable(error)) return [];
+      if (isMissingTableError(error)) return [];
       throw error;
     }
     return (data || []).map(entry => ({
@@ -101,13 +90,12 @@ export class JournalEntriesRepository extends BaseRepository {
     const { data, error } = await this.client
       .from(this.tableName)
       .select('*, journal_entry_lines(*)')
-      .eq('school_id', schoolId)
       .eq('reference_type', referenceType)
       .eq('reference_id', referenceId)
       .single();
-    
+
     if (error) {
-      if (isMissingFinanceTable(error)) return null;
+      if (isMissingTableError(error)) return null;
       throw error;
     }
     return data;
@@ -141,9 +129,9 @@ export class JournalEntryLinesRepository extends BaseRepository {
     }
 
     const { data, error } = await query;
-    
+
     if (error) {
-      if (isMissingFinanceTable(error)) return [];
+      if (isMissingTableError(error)) return [];
       throw error;
     }
     return data || [];

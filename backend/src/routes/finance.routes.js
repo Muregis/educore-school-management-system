@@ -4,6 +4,23 @@ import { FinanceService } from "../core/services/FinanceService.js";
 const router = Router();
 const financeService = new FinanceService();
 
+function isMissingFinanceTable(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.code === '42P01'
+    || error?.code === '42703'
+    || error?.code === 'PGRST205'
+    || message.includes('does not exist')
+    || message.includes('could not find the table')
+    || message.includes('could not find the column');
+}
+
+function handleFinanceError(res, error, emptyResult) {
+  if (isMissingFinanceTable(error)) {
+    return res.json(emptyResult);
+  }
+  res.error('FINANCE_ERROR', error.message, {}, 500);
+}
+
 function formatDate(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -69,7 +86,7 @@ router.get("/accounts", async (req, res) => {
     const accounts = await financeService.getAccounts(schoolId, type);
     res.json(accounts);
   } catch (error) {
-    res.error('FINANCE_ERROR', error.message, {}, 500);
+    handleFinanceError(res, error, []);
   }
 });
 
@@ -95,7 +112,7 @@ router.get("/journal-entries", async (req, res) => {
     const entries = await financeService.journalEntriesRepository.findByDateRange(schoolId, start_date, end_date);
     res.json(entries);
   } catch (error) {
-    res.error('FINANCE_ERROR', error.message, {}, 500);
+    handleFinanceError(res, error, []);
   }
 });
 
@@ -107,7 +124,7 @@ router.get("/reports/trial-balance", async (req, res) => {
     const result = await financeService.getTrialBalance(schoolId, as_of_date);
     res.json(result);
   } catch (error) {
-    res.error('FINANCE_ERROR', error.message, {}, 500);
+    handleFinanceError(res, error, { accounts: [], total_debits: 0, total_credits: 0, is_balanced: true });
   }
 });
 
@@ -119,7 +136,7 @@ router.get("/reports/income-statement", async (req, res) => {
     const result = await financeService.getIncomeStatement(schoolId, startDate, endDate);
     res.json(result);
   } catch (error) {
-    res.error('FINANCE_ERROR', error.message, {}, 500);
+    handleFinanceError(res, error, { revenue: [], expenses: [], total_revenue: 0, total_expenses: 0, net_income: 0 });
   }
 });
 
@@ -131,7 +148,7 @@ router.get("/reports/balance-sheet", async (req, res) => {
     const result = await financeService.getBalanceSheet(schoolId, as_of_date);
     res.json(result);
   } catch (error) {
-    res.error('FINANCE_ERROR', error.message, {}, 500);
+    handleFinanceError(res, error, { assets: [], liabilities: [], equity: [], total_assets: 0, total_liabilities: 0, total_equity: 0, retained_earnings: 0, is_balanced: true });
   }
 });
 
@@ -144,7 +161,7 @@ router.get("/ledger/account", async (req, res) => {
     const ledger = result.ledger?.[0] || { account: null, transactions: [] };
     res.json(ledger);
   } catch (error) {
-    res.error('FINANCE_ERROR', error.message, {}, 500);
+    handleFinanceError(res, error, { account: null, transactions: [] });
   }
 });
 
@@ -156,7 +173,7 @@ router.get("/reports/general-ledger", async (req, res) => {
     const result = await financeService.getGeneralLedger(schoolId, account_id, start_date, end_date);
     res.json(result);
   } catch (error) {
-    res.error('FINANCE_ERROR', error.message, {}, 500);
+    handleFinanceError(res, error, { ledger: [], total_accounts: 0 });
   }
 });
 

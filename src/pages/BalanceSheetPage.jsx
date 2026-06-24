@@ -7,6 +7,8 @@ import StatCard from "../components/ui/StatCard";
 import EmptyState from "../components/ui/EmptyState";
 import { apiFetch } from "../lib/api";
 import { money } from "../lib/utils";
+import { exportCsv } from "../utils/reportExport";
+import { printHTML } from "../lib/print";
 
 export default function BalanceSheetPage({ auth, toast }) {
   const [balanceSheet, setBalanceSheet] = useState(null);
@@ -37,6 +39,84 @@ export default function BalanceSheetPage({ auth, toast }) {
     }
   };
 
+  const handlePrint = () => {
+    const asOf = asOfDate ? new Date(asOfDate).toLocaleDateString() : "today";
+    const assetRows = (balanceSheet?.assets || []).map(item => `
+      <tr>
+        <td>${item.account_name}</td>
+        <td style="text-align: right">${money(item.amount)}</td>
+      </tr>
+    `).join("");
+    const liabilityRows = (balanceSheet?.liabilities || []).map(item => `
+      <tr>
+        <td>${item.account_name}</td>
+        <td style="text-align: right">${money(item.amount)}</td>
+      </tr>
+    `).join("");
+    const equityRows = (balanceSheet?.equity || []).map(item => `
+      <tr>
+        <td>${item.account_name}</td>
+        <td style="text-align: right">${money(item.amount)}</td>
+      </tr>
+    `).join("");
+    const html = `
+      <html>
+      <head><title>Balance Sheet</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 { margin: 0 0 4px; font-size: 22px; }
+        .header p { margin: 0; color: #666; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 13px; }
+        th { background: #f5f5f5; font-weight: 700; }
+        .totals { font-weight: 700; margin-top: 10px; text-align: right; font-size: 14px; }
+        .status { margin-top: 16px; padding: 10px; border-radius: 4px; font-weight: 700; text-align: center; }
+        .balanced { background: #e6f4ea; color: #1e7e34; }
+        .unbalanced { background: #fce8e6; color: #c5221f; }
+        .section-title { font-weight: 700; font-size: 15px; margin-top: 16px; margin-bottom: 4px; }
+      </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Balance Sheet</h1>
+          <p>As of ${asOf}</p>
+        </div>
+        <div class="section-title">Assets</div>
+        <table>
+          <thead><tr><th>Account</th><th style="text-align: right">Amount</th></tr></thead>
+          <tbody>${assetRows}</tbody>
+        </table>
+        <div class="totals">Total Assets: ${money(totalAssets)}</div>
+        <div class="section-title">Liabilities</div>
+        <table>
+          <thead><tr><th>Account</th><th style="text-align: right">Amount</th></tr></thead>
+          <tbody>${liabilityRows}</tbody>
+        </table>
+        <div class="totals">Total Liabilities: ${money(totalLiabilities)}</div>
+        <div class="section-title">Equity</div>
+        <table>
+          <thead><tr><th>Account</th><th style="text-align: right">Amount</th></tr></thead>
+          <tbody>${equityRows}</tbody>
+        </table>
+        <div class="totals">Total Equity: ${money(totalEquity)}</div>
+        <div class="status ${isBalanced ? "balanced" : "unbalanced"}">${isBalanced ? "Balance Sheet Balanced" : "Balance Sheet Not Balanced"}</div>
+      </body>
+      </html>
+    `;
+    printHTML(html, { title: "Balance Sheet" });
+  };
+
+  const handleExport = () => {
+    const headers = ["Account", "Amount", "Category"];
+    const rows = [
+      ...(balanceSheet?.assets || []).map(item => [item.account_name, String(item.amount || 0), "Asset"]),
+      ...(balanceSheet?.liabilities || []).map(item => [item.account_name, String(item.amount || 0), "Liability"]),
+      ...(balanceSheet?.equity || []).map(item => [item.account_name, String(item.amount || 0), "Equity"]),
+    ];
+    exportCsv("balance-sheet.csv", headers, rows);
+  };
+
   if (loading) {
     return (
       <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>
@@ -62,6 +142,8 @@ export default function BalanceSheetPage({ auth, toast }) {
           </p>
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+          <Button onClick={handleExport} variant="secondary">📥 Export CSV</Button>
+          <Button onClick={handlePrint} variant="secondary">🖨️ Print</Button>
           <input
             type="date"
             value={asOfDate}

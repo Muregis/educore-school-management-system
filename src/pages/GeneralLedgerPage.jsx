@@ -8,6 +8,7 @@ import EmptyState from "../components/ui/EmptyState";
 import { apiFetch } from "../lib/api";
 import { money } from "../lib/utils";
 import { exportCsv, localDateInputValue, printReport } from "../utils/reportExport";
+import { printHTML } from "../lib/print";
 
 export default function GeneralLedgerPage({ auth, toast }) {
   const [transactions, setTransactions] = useState([]);
@@ -89,6 +90,51 @@ export default function GeneralLedgerPage({ auth, toast }) {
     );
   };
 
+  const handlePrint = () => {
+    const txRows = transactions.map(t => `
+      <tr>
+        <td>${new Date(t.transaction_date || t.date).toLocaleDateString()}</td>
+        <td style="font-family: monospace">${t.reference || "—"}</td>
+        <td>${t.description}</td>
+        <td style="text-align: right; color: green">${t.debit > 0 ? money(t.debit) : "—"}</td>
+        <td style="text-align: right; color: red">${t.credit > 0 ? money(t.credit) : "—"}</td>
+        <td style="text-align: right; font-weight: 700">${money(t.running_balance || 0)}</td>
+      </tr>
+    `).join("");
+    const html = `
+      <html>
+      <head><title>General Ledger</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 { margin: 0 0 4px; font-size: 22px; }
+        .header p { margin: 0; color: #666; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 13px; }
+        th { background: #f5f5f5; font-weight: 700; }
+        .summary { font-weight: 700; margin-top: 12px; text-align: right; font-size: 14px; }
+      </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>General Ledger</h1>
+          <p>${selectedAccountData?.account_name || "All Accounts"} | ${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}</p>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Date</th><th>Reference</th><th>Description</th><th style="text-align: right">Debit</th><th style="text-align: right">Credit</th><th style="text-align: right">Balance</th></tr>
+          </thead>
+          <tbody>${txRows}</tbody>
+        </table>
+        <div class="summary">
+          Total Debit: ${money(totalDebits)} | Total Credit: ${money(totalCredits)} | Running Balance: ${money(runningBalance)}
+        </div>
+      </body>
+      </html>
+    `;
+    printHTML(html, { title: "General Ledger" });
+  };
+
   if (loading) {
     return (
       <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>
@@ -108,9 +154,11 @@ export default function GeneralLedgerPage({ auth, toast }) {
             Transaction details by account
           </p>
         </div>
-        <Button onClick={loadTransactions} variant="secondary">
-          🔄 Refresh
-        </Button>
+        <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+          <Button onClick={loadTransactions} variant="secondary">🔄 Refresh</Button>
+          <Button onClick={handlePrint} variant="secondary">🖨️ Print</Button>
+          <Button onClick={exportLedger} variant="secondary">📥 Export CSV</Button>
+        </div>
       </div>
 
       {/* Filters */}

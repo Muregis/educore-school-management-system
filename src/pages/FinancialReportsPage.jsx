@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
+import { exportCsv } from "../utils/reportExport";
+import { printHTML } from "../lib/print";
 
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -49,21 +51,65 @@ function BalanceSheet({ auth }) {
   if (loading) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="⚖️" title="Loading..." description="Fetching balance sheet data" /></Card>;
   if (!data) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="⚖️" title="No data" description="Unable to load balance sheet" /></Card>;
 
+  const totalAssets = data.total_assets || 0;
+  const totalLiabilities = data.total_liabilities || 0;
+  const totalEquity = data.total_equity || 0;
+  const isBalanced = Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01;
+
+  const handleExport = () => {
+    const headers = ["Account", "Code", "Type", "Balance"];
+    const rows = [
+      ...(data.assets || []).map(acc => [acc.account_name, acc.account_code, "Asset", String(acc.balance || 0)]),
+      ...(data.liabilities || []).map(acc => [acc.account_name, acc.account_code, "Liability", String(acc.balance || 0)]),
+      ...(data.equity || []).map(acc => [acc.account_name, acc.account_code, "Equity", String(acc.balance || 0)]),
+    ];
+    exportCsv(`balance-sheet-${asOfDate}.csv`, headers, rows);
+  };
+
+  const handlePrint = () => {
+    const html = `
+      <div class="print-document">
+        <div class="print-header">
+          <h1>Balance Sheet</h1>
+          <p>As of ${new Date(asOfDate).toLocaleDateString()}</p>
+        </div>
+        <table class="print-table">
+          <thead><tr><th>Account</th><th>Code</th><th>Type</th><th style="text-align: right">Balance (KES)</th></tr></thead>
+          <tbody>
+            ${(data.assets || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td>Asset</td><td style="text-align: right">${money(acc.balance)}</td></tr>`).join('')}
+            ${(data.liabilities || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td>Liability</td><td style="text-align: right">${money(acc.balance)}</td></tr>`).join('')}
+            ${(data.equity || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td>Equity</td><td style="text-align: right">${money(acc.balance)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        <div class="summary">
+          <p><strong>Total Assets:</strong> ${money(totalAssets)}</p>
+          <p><strong>Total Liabilities:</strong> ${money(totalLiabilities)}</p>
+          <p><strong>Total Equity:</strong> ${money(totalEquity)}</p>
+          <p><strong>Retained Earnings:</strong> ${money(data.retained_earnings || 0)}</p>
+          <p><strong>Status:</strong> ${isBalanced ? "Balanced" : "Not Balanced"}</p>
+        </div>
+      </div>
+    `;
+    printHTML(html, { title: `Balance Sheet - ${asOfDate}` });
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <Card style={{ padding: "var(--space-3)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)" }}>
           <div>
             <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>Balance Sheet</h3>
             <p style={{ margin: "var(--space-1) 0 0 0", color: "var(--color-text-secondary)", fontSize: "13px" }}>As of {new Date(asOfDate).toLocaleDateString()}</p>
           </div>
-          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap" }}>
             <input
               type="date"
               value={asOfDate}
               onChange={(e) => setAsOfDate(e.target.value)}
               style={{ padding: "8px 12px", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}
             />
+            <Button onClick={handleExport} variant="secondary">📥 Export CSV</Button>
+            <Button onClick={handlePrint} variant="secondary">🖨️ Print</Button>
             <Button onClick={load}>Refresh</Button>
           </div>
         </div>
@@ -169,17 +215,54 @@ function IncomeStatement({ auth }) {
   if (loading) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="📊" title="Loading..." description="Fetching income statement data" /></Card>;
   if (!data) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="📊" title="No data" description="Unable to load income statement" /></Card>;
 
+  const totalRevenue = data.total_revenue || 0;
+  const totalExpenses = data.total_expenses || 0;
+  const netIncome = totalRevenue - totalExpenses;
+
+  const handleExport = () => {
+    const headers = ["Account", "Code", "Type", "Amount"];
+    const rows = [
+      ...(data.revenue || []).map(acc => [acc.account_name, acc.account_code, "Revenue", String(acc.balance || 0)]),
+      ...(data.expenses || []).map(acc => [acc.account_name, acc.account_code, "Expense", String(acc.balance || 0)]),
+    ];
+    exportCsv(`income-statement-${startDate}-to-${endDate}.csv`, headers, rows);
+  };
+
+  const handlePrint = () => {
+    const html = `
+      <div class="print-document">
+        <div class="print-header">
+          <h1>Income Statement (Profit & Loss)</h1>
+          <p>${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}</p>
+        </div>
+        <table class="print-table">
+          <thead><tr><th>Account</th><th>Code</th><th style="text-align: right">Amount (KES)</th></tr></thead>
+          <tbody>
+            ${(data.revenue || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td style="text-align: right">${money(acc.balance)}</td></tr>`).join('')}
+            ${(data.expenses || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td style="text-align: right">${money(acc.balance)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        <div class="summary">
+          <p><strong>Total Revenue:</strong> ${money(totalRevenue)}</p>
+          <p><strong>Total Expenses:</strong> ${money(totalExpenses)}</p>
+          <p><strong>Net Income:</strong> ${money(netIncome)}</p>
+        </div>
+      </div>
+    `;
+    printHTML(html, { title: "Income Statement" });
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <Card style={{ padding: "var(--space-3)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)" }}>
           <div>
             <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>Profit & Loss Statement</h3>
             <p style={{ margin: "var(--space-1) 0 0 0", color: "var(--color-text-secondary)", fontSize: "13px" }}>
               {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}
             </p>
           </div>
-          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap" }}>
             <input
               type="date"
               value={startDate}
@@ -192,6 +275,8 @@ function IncomeStatement({ auth }) {
               onChange={(e) => setEndDate(e.target.value)}
               style={{ padding: "8px 12px", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}
             />
+            <Button onClick={handleExport} variant="secondary">📥 Export CSV</Button>
+            <Button onClick={handlePrint} variant="secondary">🖨️ Print</Button>
             <Button onClick={load}>Refresh</Button>
           </div>
         </div>
@@ -270,21 +355,62 @@ function TrialBalance({ auth }) {
   if (loading) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="📋" title="Loading..." description="Fetching trial balance data" /></Card>;
   if (!data) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="📋" title="No data" description="Unable to load trial balance" /></Card>;
 
+  const totalDebits = data.total_debits || 0;
+  const totalCredits = data.total_credits || 0;
+  const isBalanced = data.is_balanced !== false;
+
+  const handleExport = () => {
+    const headers = ["Account", "Code", "Type", "Debit", "Credit"];
+    const rows = (data.accounts || []).map(acc => [
+      acc.account_name,
+      acc.account_code,
+      acc.account_type,
+      String(acc.debit_balance || acc.debit || 0),
+      String(acc.credit_balance || acc.credit || 0)
+    ]);
+    exportCsv(`trial-balance-${asOfDate}.csv`, headers, rows);
+  };
+
+  const handlePrint = () => {
+    const html = `
+      <div class="print-document">
+        <div class="print-header">
+          <h1>Trial Balance</h1>
+          <p>As of ${new Date(asOfDate).toLocaleDateString()}</p>
+        </div>
+        <table class="print-table">
+          <thead><tr><th>Account</th><th>Code</th><th>Type</th><th style="text-align: right">Debit (KES)</th><th style="text-align: right">Credit (KES)</th></tr></thead>
+          <tbody>
+            ${(data.accounts || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td>${acc.account_type}</td><td style="text-align: right">${money(acc.debit_balance || acc.debit || 0)}</td><td style="text-align: right">${money(acc.credit_balance || acc.credit || 0)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        <div class="summary">
+          <p><strong>Total Debits:</strong> ${money(totalDebits)}</p>
+          <p><strong>Total Credits:</strong> ${money(totalCredits)}</p>
+          <p><strong>Status:</strong> ${isBalanced ? "Balanced" : "Not Balanced"}</p>
+        </div>
+      </div>
+    `;
+    printHTML(html, { title: "Trial Balance" });
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <Card style={{ padding: "var(--space-3)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)" }}>
           <div>
             <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>Trial Balance</h3>
             <p style={{ margin: "var(--space-1) 0 0 0", color: "var(--color-text-secondary)", fontSize: "13px" }}>As of {new Date(asOfDate).toLocaleDateString()}</p>
           </div>
-          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap" }}>
             <input
               type="date"
               value={asOfDate}
               onChange={(e) => setAsOfDate(e.target.value)}
               style={{ padding: "8px 12px", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}
             />
+            <Button onClick={handleExport} variant="secondary">📥 Export CSV</Button>
+            <Button onClick={handlePrint} variant="secondary">🖨️ Print</Button>
             <Button onClick={load}>Refresh</Button>
           </div>
         </div>
@@ -342,6 +468,53 @@ function ChartOfAccounts({ auth }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const handlePrint = () => {
+    if (!data) return;
+    const accounts = Array.isArray(data) ? data : data.data || [];
+    const rows = accounts.map(acc => `
+      <tr>
+        <td style="font-family: monospace">${acc.account_code || "—"}</td>
+        <td>${acc.account_name}</td>
+        <td style="text-transform: capitalize">${ACCOUNT_TYPES[acc.account_type]?.label || acc.account_type}</td>
+        <td>${acc.is_active ? "Active" : "Inactive"}</td>
+      </tr>
+    `).join("");
+    const html = `
+      <html>
+      <head><title>Chart of Accounts</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 { margin: 0 0 4px; font-size: 22px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 13px; }
+        th { background: #f5f5f5; font-weight: 700; }
+      </style>
+      </head>
+      <body>
+        <div class="header"><h1>Chart of Accounts</h1><p>${accounts.length} accounts</p></div>
+        <table>
+          <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </body>
+      </html>
+    `;
+    printHTML(html, { title: "Chart of Accounts" });
+  };
+
+  const handleExport = () => {
+    const accounts = Array.isArray(data) ? data : data.data || [];
+    const headers = ["Account Code", "Account Name", "Type", "Status"];
+    const rows = accounts.map(acc => [
+      acc.account_code || "",
+      acc.account_name,
+      ACCOUNT_TYPES[acc.account_type]?.label || acc.account_type,
+      acc.is_active ? "Active" : "Inactive",
+    ]);
+    exportCsv("chart-of-accounts.csv", headers, rows);
+  };
+
   if (loading) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="📒" title="Loading..." description="Fetching chart of accounts" /></Card>;
   if (!data) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="📒" title="No data" description="Unable to load chart of accounts" /></Card>;
 
@@ -350,9 +523,12 @@ function ChartOfAccounts({ auth }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <Card style={{ padding: "var(--space-3)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>Chart of Accounts</h3>
-          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)" }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>Chart of Accounts</h3>
+            <p style={{ margin: "var(--space-1) 0 0 0", color: "var(--color-text-secondary)", fontSize: "13px" }}>Complete list of all financial accounts</p>
+          </div>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap" }}>
             <Select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
@@ -365,6 +541,8 @@ function ChartOfAccounts({ auth }) {
                 { value: "expense", label: "Expenses" },
               ]}
             />
+            <Button onClick={handleExport} variant="secondary">📥 Export CSV</Button>
+            <Button onClick={handlePrint} variant="secondary">🖨️ Print</Button>
             <Button onClick={load}>Refresh</Button>
           </div>
         </div>
@@ -408,6 +586,68 @@ function JournalEntries({ auth }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const handlePrint = () => {
+    if (!data) return;
+    const entries = Array.isArray(data) ? data : data.data || [];
+    const entryBlocks = entries.map(entry => {
+      const lineRows = (entry.journal_entry_lines || []).map(line => `
+        <tr>
+          <td style="padding-left: 20px">${line.chart_of_accounts?.account_name || line.account_id}</td>
+          <td style="text-align: right; color: green">${line.debit > 0 ? money(line.debit) : "—"}</td>
+          <td style="text-align: right; color: red">${line.credit > 0 ? money(line.credit) : "—"}</td>
+        </tr>
+      `).join("");
+      return `
+        <div style="margin-bottom: 16px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden;">
+          <div style="padding: 10px; background: #f5f5f5; display: flex; justify-content: space-between;">
+            <span style="font-weight: 700">${entry.entry_number || `JE-${entry.id}`}</span>
+            <span>${new Date(entry.entry_date).toLocaleDateString()}</span>
+          </div>
+          ${entry.description ? `<div style="padding: 6px 10px; font-size: 13px; color: #555">${entry.description}</div>` : ""}
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead><tr><th style="text-align: left">Account</th><th style="text-align: right">Debit</th><th style="text-align: right">Credit</th></tr></thead>
+            <tbody>${lineRows}</tbody>
+          </table>
+        </div>
+      `;
+    }).join("");
+    const html = `
+      <html>
+      <head><title>Journal Entries</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 { margin: 0 0 4px; font-size: 22px; }
+      </style>
+      </head>
+      <body>
+        <div class="header"><h1>Journal Entries</h1></div>
+        ${entryBlocks || '<p style="text-align: center; color: #999">No journal entries found.</p>'}
+      </body>
+      </html>
+    `;
+    printHTML(html, { title: "Journal Entries" });
+  };
+
+  const handleExport = () => {
+    const entries = Array.isArray(data) ? data : data.data || [];
+    const headers = ["Entry Number", "Date", "Description", "Account", "Debit", "Credit"];
+    const rows = [];
+    entries.forEach(entry => {
+      (entry.journal_entry_lines || []).forEach(line => {
+        rows.push([
+          entry.entry_number || `JE-${entry.id}`,
+          new Date(entry.entry_date).toLocaleDateString(),
+          entry.description || "",
+          line.chart_of_accounts?.account_name || line.account_id,
+          String(line.debit || 0),
+          String(line.credit || 0),
+        ]);
+      });
+    });
+    exportCsv("journal-entries.csv", headers, rows);
+  };
+
   if (loading) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="📝" title="Loading..." description="Fetching journal entries" /></Card>;
   if (!data) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="📝" title="No data" description="Unable to load journal entries" /></Card>;
 
@@ -416,14 +656,14 @@ function JournalEntries({ auth }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <Card style={{ padding: "var(--space-3)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)" }}>
           <div>
             <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>Journal Entries</h3>
             <p style={{ margin: "var(--space-1) 0 0 0", color: "var(--color-text-secondary)", fontSize: "13px" }}>
               {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}
             </p>
           </div>
-          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap" }}>
             <input
               type="date"
               value={startDate}
@@ -436,6 +676,8 @@ function JournalEntries({ auth }) {
               onChange={(e) => setEndDate(e.target.value)}
               style={{ padding: "8px 12px", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}
             />
+            <Button onClick={handleExport} variant="secondary">📥 Export CSV</Button>
+            <Button onClick={handlePrint} variant="secondary">🖨️ Print</Button>
             <Button onClick={load}>Refresh</Button>
           </div>
         </div>
@@ -515,6 +757,71 @@ function GeneralLedger({ auth }) {
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
   useEffect(() => { load(); }, [load]);
 
+  const handlePrint = () => {
+    if (!data) return;
+    const ledger = Array.isArray(data.ledger) ? data.ledger : [];
+    const txRows = ledger.flatMap(accountLedger =>
+      (accountLedger.transactions || []).map(tx => `
+        <tr>
+          <td>${new Date(tx.transaction_date || tx.date).toLocaleDateString()}</td>
+          <td style="font-family: monospace">${tx.reference || "—"}</td>
+          <td>${tx.description}</td>
+          <td style="text-align: right; color: green">${tx.debit > 0 ? money(tx.debit) : "—"}</td>
+          <td style="text-align: right; color: red">${tx.credit > 0 ? money(tx.credit) : "—"}</td>
+          <td style="text-align: right; font-weight: 700">${money(tx.balance || tx.running_balance || 0)}</td>
+        </tr>
+      `).join("")
+    ).join("");
+    const html = `
+      <html>
+      <head><title>General Ledger</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 { margin: 0 0 4px; font-size: 22px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 13px; }
+        th { background: #f5f5f5; font-weight: 700; }
+      </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>General Ledger</h1>
+          <p>${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}</p>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Date</th><th>Reference</th><th>Description</th><th style="text-align: right">Debit</th><th style="text-align: right">Credit</th><th style="text-align: right">Balance</th></tr>
+          </thead>
+          <tbody>${txRows || '<tr><td colspan="6" style="text-align: center; color: #999">No transactions found.</td></tr>'}</tbody>
+        </table>
+      </body>
+      </html>
+    `;
+    printHTML(html, { title: "General Ledger" });
+  };
+
+  const handleExport = () => {
+    const ledger = Array.isArray(data.ledger) ? data.ledger : [];
+    const headers = ["Account", "Date", "Reference", "Description", "Debit", "Credit", "Balance"];
+    const rows = [];
+    ledger.forEach(accountLedger => {
+      const accountName = accountLedger.account?.account_name || "";
+      (accountLedger.transactions || []).forEach(tx => {
+        rows.push([
+          accountName,
+          new Date(tx.transaction_date || tx.date).toLocaleDateString(),
+          tx.reference || "",
+          tx.description || "",
+          String(tx.debit || 0),
+          String(tx.credit || 0),
+          String(tx.balance || tx.running_balance || 0),
+        ]);
+      });
+    });
+    exportCsv("general-ledger.csv", headers, rows);
+  };
+
   if (loading) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="📚" title="Loading..." description="Fetching general ledger data" /></Card>;
   if (!data) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="📚" title="No data" description="Unable to load general ledger" /></Card>;
 
@@ -551,6 +858,8 @@ function GeneralLedger({ auth }) {
               onChange={(e) => setEndDate(e.target.value)}
               style={{ padding: "8px 12px", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}
             />
+            <Button onClick={handleExport} variant="secondary">📥 Export CSV</Button>
+            <Button onClick={handlePrint} variant="secondary">🖨️ Print</Button>
             <Button onClick={load}>Refresh</Button>
           </div>
         </div>

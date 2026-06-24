@@ -6,6 +6,8 @@ import Card from "../components/ui/Card";
 import StatCard from "../components/ui/StatCard";
 import EmptyState from "../components/ui/EmptyState";
 import { apiFetch } from "../lib/api";
+import { exportCsv } from "../utils/reportExport";
+import { printHTML } from "../lib/print";
 
 export default function ChartOfAccountsPage({ auth, toast }) {
   const [accounts, setAccounts] = useState([]);
@@ -26,6 +28,59 @@ export default function ChartOfAccountsPage({ auth, toast }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePrint = () => {
+    const rows = filteredAccounts.map(acc => `
+      <tr>
+        <td style="font-family: monospace">${acc.account_code || "—"}</td>
+        <td>${acc.account_name}</td>
+        <td style="text-transform: capitalize">${acc.account_type}</td>
+        <td style="text-transform: capitalize">${acc.account_subtype || "—"}</td>
+        <td style="text-transform: capitalize">${acc.normal_balance || "—"}</td>
+        <td>${acc.is_active !== false ? "Active" : "Inactive"}</td>
+      </tr>
+    `).join("");
+    const html = `
+      <html>
+      <head><title>Chart of Accounts</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 { margin: 0 0 4px; font-size: 22px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 13px; }
+        th { background: #f5f5f5; font-weight: 700; }
+      </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Chart of Accounts</h1>
+          <p>${filteredAccounts.length} accounts</p>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Code</th><th>Name</th><th>Type</th><th>Subtype</th><th>Balance Type</th><th>Status</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </body>
+      </html>
+    `;
+    printHTML(html, { title: "Chart of Accounts" });
+  };
+
+  const handleExport = () => {
+    const headers = ["Account Code", "Account Name", "Type", "Subtype", "Balance Type", "Status"];
+    const rows = filteredAccounts.map(acc => [
+      acc.account_code || "",
+      acc.account_name,
+      acc.account_type,
+      acc.account_subtype || "",
+      acc.normal_balance || "",
+      acc.is_active !== false ? "Active" : "Inactive",
+    ]);
+    exportCsv("chart-of-accounts.csv", headers, rows);
   };
 
   const filteredAccounts = filterType === "all" 
@@ -63,9 +118,13 @@ export default function ChartOfAccountsPage({ auth, toast }) {
             Complete list of all financial accounts
           </p>
         </div>
-        <Button onClick={loadAccounts} variant="secondary">
-          🔄 Refresh
-        </Button>
+        <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+          <Button onClick={handleExport} variant="secondary">📥 Export CSV</Button>
+          <Button onClick={handlePrint} variant="secondary">🖨️ Print</Button>
+          <Button onClick={loadAccounts} variant="secondary">
+            🔄 Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}

@@ -8,6 +8,8 @@ import EmptyState from "../components/ui/EmptyState";
 import Modal from "../components/ui/Modal";
 import { apiFetch } from "../lib/api";
 import { money } from "../lib/utils";
+import { exportCsv } from "../utils/reportExport";
+import { printHTML } from "../lib/print";
 
 export default function JournalEntriesPage({ auth, toast }) {
   const [journalEntries, setJournalEntries] = useState([]);
@@ -37,6 +39,68 @@ export default function JournalEntriesPage({ auth, toast }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePrint = () => {
+    const entryBlocks = journalEntries.map(entry => {
+      const lineRows = (entry.journal_entry_lines || []).map(line => `
+        <tr>
+          <td style="padding-left: 20px">${line.chart_of_accounts?.account_name || line.account_id}</td>
+          <td style="text-align: right; color: green">${line.debit > 0 ? money(line.debit) : "—"}</td>
+          <td style="text-align: right; color: red">${line.credit > 0 ? money(line.credit) : "—"}</td>
+        </tr>
+      `).join("");
+      return `
+        <div style="margin-bottom: 16px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden;">
+          <div style="padding: 10px; background: #f5f5f5; display: flex; justify-content: space-between;">
+            <span style="font-weight: 700">${entry.entry_number || `JE-${entry.id}`}</span>
+            <span>${new Date(entry.entry_date).toLocaleDateString()}</span>
+            <span style="font-size: 12px; color: #666">${entry.created_by || "—"}</span>
+          </div>
+          ${entry.description ? `<div style="padding: 6px 10px; font-size: 13px; color: #555">${entry.description}</div>` : ""}
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead><tr><th style="text-align: left">Account</th><th style="text-align: right">Debit</th><th style="text-align: right">Credit</th></tr></thead>
+            <tbody>${lineRows}</tbody>
+          </table>
+        </div>
+      `;
+    }).join("");
+    const html = `
+      <html>
+      <head><title>Journal Entries</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 { margin: 0 0 4px; font-size: 22px; }
+      </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Journal Entries</h1>
+        </div>
+        ${entryBlocks || '<p style="text-align: center; color: #999">No journal entries found.</p>'}
+      </body>
+      </html>
+    `;
+    printHTML(html, { title: "Journal Entries" });
+  };
+
+  const handleExport = () => {
+    const headers = ["Entry Number", "Date", "Description", "Account", "Debit", "Credit"];
+    const rows = [];
+    journalEntries.forEach(entry => {
+      (entry.journal_entry_lines || []).forEach(line => {
+        rows.push([
+          entry.entry_number || `JE-${entry.id}`,
+          new Date(entry.entry_date).toLocaleDateString(),
+          entry.description || "",
+          line.chart_of_accounts?.account_name || line.account_id,
+          String(line.debit || 0),
+          String(line.credit || 0),
+        ]);
+      });
+    });
+    exportCsv("journal-entries.csv", headers, rows);
   };
 
   const loadAccounts = async () => {
@@ -133,9 +197,11 @@ export default function JournalEntriesPage({ auth, toast }) {
             Record and manage adjusting journal entries
           </p>
         </div>
-        <Button onClick={() => setShowModal(true)} variant="primary">
-          + New Entry
-        </Button>
+          <Button onClick={() => setShowModal(true)} variant="primary">
+            + New Entry
+          </Button>
+          <Button onClick={handleExport} variant="secondary">📥 Export CSV</Button>
+          <Button onClick={handlePrint} variant="secondary">🖨️ Print</Button>
       </div>
 
       {/* Summary Cards */}

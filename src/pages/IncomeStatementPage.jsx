@@ -7,6 +7,8 @@ import StatCard from "../components/ui/StatCard";
 import EmptyState from "../components/ui/EmptyState";
 import { apiFetch } from "../lib/api";
 import { money } from "../lib/utils";
+import { exportCsv } from "../utils/reportExport";
+import { printHTML } from "../lib/print";
 
 export default function IncomeStatementPage({ auth, toast }) {
   const [incomeStatement, setIncomeStatement] = useState(null);
@@ -27,6 +29,74 @@ export default function IncomeStatementPage({ auth, toast }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const periodLabel = period === "current" ? "Current Term" : period === "ytd" ? "Year to Date" : "Previous Year";
+
+  const handlePrint = () => {
+    const revenueRows = (incomeStatement?.revenue || []).map(item => `
+      <tr>
+        <td>${item.account_name}</td>
+        <td style="text-align: right">${money(item.amount)}</td>
+      </tr>
+    `).join("");
+    const expenseRows = (incomeStatement?.expenses || []).map(item => `
+      <tr>
+        <td>${item.account_name}</td>
+        <td style="text-align: right">${money(item.amount)}</td>
+      </tr>
+    `).join("");
+    const html = `
+      <html>
+      <head><title>Income Statement</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .header h1 { margin: 0 0 4px; font-size: 22px; }
+        .header p { margin: 0; color: #666; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 13px; }
+        th { background: #f5f5f5; font-weight: 700; }
+        .totals { font-weight: 700; margin-top: 10px; text-align: right; font-size: 14px; }
+        .net { margin-top: 20px; padding: 12px; border-radius: 4px; font-weight: 700; text-align: center; font-size: 16px; }
+        .profit { background: #e6f4ea; color: #1e7e34; }
+        .loss { background: #fce8e6; color: #c5221f; }
+        .section-title { font-weight: 700; font-size: 15px; margin-top: 16px; margin-bottom: 4px; }
+      </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Income Statement (Profit & Loss)</h1>
+          <p>${periodLabel}</p>
+        </div>
+        <div class="section-title">Revenue</div>
+        <table>
+          <thead><tr><th>Account</th><th style="text-align: right">Amount</th></tr></thead>
+          <tbody>${revenueRows}</tbody>
+        </table>
+        <div class="totals">Total Revenue: ${money(totalRevenue)}</div>
+        <div class="section-title">Expenses</div>
+        <table>
+          <thead><tr><th>Account</th><th style="text-align: right">Amount</th></tr></thead>
+          <tbody>${expenseRows}</tbody>
+        </table>
+        <div class="totals">Total Expenses: ${money(totalExpenses)}</div>
+        <div class="net ${netIncome >= 0 ? "profit" : "loss"}">
+          ${netIncome >= 0 ? "Net Profit" : "Net Loss"}: ${money(netIncome)}
+        </div>
+      </body>
+      </html>
+    `;
+    printHTML(html, { title: "Income Statement" });
+  };
+
+  const handleExport = () => {
+    const headers = ["Account", "Amount", "Category"];
+    const rows = [
+      ...(incomeStatement?.revenue || []).map(item => [item.account_name, String(item.amount || 0), "Revenue"]),
+      ...(incomeStatement?.expenses || []).map(item => [item.account_name, String(item.amount || 0), "Expense"]),
+    ];
+    exportCsv("income-statement.csv", headers, rows);
   };
 
   if (loading) {
@@ -53,6 +123,8 @@ export default function IncomeStatementPage({ auth, toast }) {
           </p>
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          <Button onClick={handleExport} variant="secondary">📥 Export CSV</Button>
+          <Button onClick={handlePrint} variant="secondary">🖨️ Print</Button>
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value)}

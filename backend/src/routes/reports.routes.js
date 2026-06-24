@@ -4,6 +4,7 @@ import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { getExpenditureSummary } from "../services/expenditure.service.js";
 import { LedgerService } from "../services/ledger.service.js";
+import { isMissingTableError } from "../utils/missingTableError.js";
 
 const router = Router();
 router.use(authRequired);
@@ -206,8 +207,11 @@ router.get("/summary", async (req, res, next) => {
         .eq('school_id', schoolId)
         .eq('status', 'pending')
         .eq('is_deleted', false);
-      if (!plansErr) pendingPlans = count || 0;
-    } catch {
+      if (!plansErr && count != null) pendingPlans = count;
+    } catch (err) {
+      if (!isMissingTableError(err)) {
+        console.warn('[reports] payment_plans query failed:', err.message);
+      }
       pendingPlans = 0;
     }
 
