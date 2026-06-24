@@ -223,4 +223,3 @@ app.use(errorHandler);
 
 export default app;
 export { upload };
-export { upload };
