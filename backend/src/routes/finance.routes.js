@@ -52,6 +52,16 @@ function resolveReportPeriod(query) {
     };
   }
 
+  if (query.period === 'prev_period') {
+    // Previous month
+    const prevMonth = new Date(Date.UTC(year, month - 1, 1));
+    const lastDayPrevMonth = new Date(Date.UTC(year, month, 0));
+    return {
+      startDate: formatDate(prevMonth),
+      endDate: formatDate(lastDayPrevMonth)
+    };
+  }
+
   if (query.period === 'current') {
     return {
       startDate: formatDate(new Date(Date.UTC(year, month, 1))),

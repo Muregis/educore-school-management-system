@@ -62,14 +62,20 @@ export class FinanceService {
   async getAccounts(schoolId, type = null) {
     let savedResult;
     try {
+      // Use a large limit to avoid pagination for internal lookups
       savedResult = type
         ? await this.chartOfAccountsRepository.findByType(schoolId, type)
-        : await this.chartOfAccountsRepository.findAll({ school_id: schoolId });
+        : await this.chartOfAccountsRepository.findAll({ school_id: schoolId }, { limit: 1000 });
     } catch (error) {
       if (!isOptionalFinanceDataError(error)) throw error;
       savedResult = [];
     }
-    const savedAccounts = Array.isArray(savedResult) ? savedResult : savedResult.data || [];
+    
+    // Standardize result to array
+    const savedAccounts = Array.isArray(savedResult) 
+      ? savedResult 
+      : (savedResult?.data || []);
+      
     const operationalAccounts = this.getOperationalAccounts(schoolId)
       .filter(account => !type || account.account_type === type);
 
@@ -77,6 +83,8 @@ export class FinanceService {
   }
 
   async getOperationalRows(schoolId, startDate = null, endDate = null) {
+    if (!schoolId) return { payments: [], expenditures: [] };
+
     const paymentsQuery = this.chartOfAccountsRepository.client
       .from('payments')
       .select('*')
@@ -96,12 +104,17 @@ export class FinanceService {
     };
 
     const safeQuery = async (query) => {
-      const result = await query;
-      if (result.error) {
-        if (isOptionalFinanceDataError(result.error)) return [];
-        throw result.error;
+      try {
+        const result = await query;
+        if (result.error) {
+          if (isOptionalFinanceDataError(result.error)) return [];
+          throw result.error;
+        }
+        return result.data || [];
+      } catch (error) {
+        if (isOptionalFinanceDataError(error)) return [];
+        throw error;
       }
-      return result.data || [];
     };
 
     const [paymentsRows, expendituresRows] = await Promise.all([
@@ -273,21 +286,25 @@ export class FinanceService {
       const operationalDebit = operationalTransactions.reduce((sum, t) => sum + Number(t.debit || 0), 0);
       const operationalCredit = operationalTransactions.reduce((sum, t) => sum + Number(t.credit || 0), 0);
 
+      const netDebit = (totalDebit + operationalDebit) - (totalCredit + operationalCredit);
+      
       let debit = 0;
       let credit = 0;
 
-      if (account.account_type === 'asset' || account.account_type === 'expense') {
-        debit = totalDebit + operationalDebit - totalCredit - operationalCredit;
-      } else {
-        credit = totalCredit + operationalCredit - totalDebit - operationalDebit;
+      // In a Trial Balance, we usually show the net balance in the account's normal balance side,
+      // but if it's "unnatural" (e.g. negative cash), it shows on the other side.
+      if (netDebit > 0) {
+        debit = netDebit;
+      } else if (netDebit < 0) {
+        credit = Math.abs(netDebit);
       }
 
       return {
         ...account,
-        debit: debit > 0 ? debit : 0,
-        credit: credit > 0 ? credit : 0,
-        debit_balance: debit > 0 ? debit : 0,
-        credit_balance: credit > 0 ? credit : 0
+        debit: Number(debit.toFixed(2)),
+        credit: Number(credit.toFixed(2)),
+        debit_balance: Number(debit.toFixed(2)),
+        credit_balance: Number(credit.toFixed(2))
       };
     });
 
@@ -295,9 +312,9 @@ export class FinanceService {
     const totalCredits = trialBalance.reduce((sum, a) => sum + Number(a.credit || 0), 0);
 
     return {
-      accounts: trialBalance,
-      total_debits: totalDebits,
-      total_credits: totalCredits,
+      accounts: trialBalance.filter(a => a.debit > 0 || a.credit > 0),
+      total_debits: Number(totalDebits.toFixed(2)),
+      total_credits: Number(totalCredits.toFixed(2)),
       is_balanced: Math.abs(totalDebits - totalCredits) < 0.01
     };
   }
@@ -329,6 +346,8 @@ export class FinanceService {
    * Calculate account balances
    */
   async calculateAccountBalances(accounts, startDate, endDate) {
+    if (!accounts || accounts.length === 0) return [];
+    
     const result = [];
     const schoolId = accounts[0]?.school_id;
     const operationalRows = schoolId
@@ -352,16 +371,17 @@ export class FinanceService {
       const operationalCredit = operationalTransactions.reduce((sum, t) => sum + Number(t.credit || 0), 0);
 
       let balance = 0;
-      if (account.account_type === 'revenue' || account.account_type === 'liability' || account.account_type === 'equity') {
-        balance = totalCredit + operationalCredit - totalDebit - operationalDebit;
+      // Normal balance: Credit for revenue, liability, equity. Debit for asset, expense.
+      if (['revenue', 'liability', 'equity'].includes(String(account.account_type).toLowerCase())) {
+        balance = (totalCredit + operationalCredit) - (totalDebit + operationalDebit);
       } else {
-        balance = totalDebit + operationalDebit - totalCredit - operationalCredit;
+        balance = (totalDebit + operationalDebit) - (totalCredit + operationalCredit);
       }
 
       result.push({
         ...account,
-        balance,
-        amount: balance
+        balance: Number(balance.toFixed(2)),
+        amount: Number(balance.toFixed(2))
       });
     }
 
@@ -384,24 +404,26 @@ export class FinanceService {
     const totalLiabilities = liabilities.reduce((sum, a) => sum + Number(a.balance || 0), 0);
     const totalEquity = equity.reduce((sum, a) => sum + Number(a.balance || 0), 0);
 
-    // Calculate retained earnings (net income accumulated)
+    // Calculate retained earnings (net income accumulated up to asOfDate)
     const revenueAccounts = await this.getAccounts(schoolId, 'revenue');
     const expenseAccounts = await this.getAccounts(schoolId, 'expense');
     const revenue = await this.calculateAccountBalances(revenueAccounts, null, asOfDate);
     const expenses = await this.calculateAccountBalances(expenseAccounts, null, asOfDate);
     const totalRevenue = revenue.reduce((sum, a) => sum + Number(a.balance || 0), 0);
     const totalExpenses = expenses.reduce((sum, a) => sum + Number(a.balance || 0), 0);
-    const retainedEarnings = totalRevenue - totalExpenses;
+    const retainedEarnings = Number((totalRevenue - totalExpenses).toFixed(2));
+
+    const finalTotalEquity = Number((totalEquity + retainedEarnings).toFixed(2));
 
     return {
       assets,
       liabilities,
       equity,
-      total_assets: totalAssets,
-      total_liabilities: totalLiabilities,
-      total_equity: totalEquity + retainedEarnings,
+      total_assets: Number(totalAssets.toFixed(2)),
+      total_liabilities: Number(totalLiabilities.toFixed(2)),
+      total_equity: finalTotalEquity,
       retained_earnings: retainedEarnings,
-      is_balanced: Math.abs(totalAssets - (totalLiabilities + totalEquity + retainedEarnings)) < 0.01
+      is_balanced: Math.abs(totalAssets - (totalLiabilities + finalTotalEquity)) < 0.01
     };
   }
 
@@ -410,16 +432,30 @@ export class FinanceService {
    */
   async getGeneralLedger(schoolId, accountId, startDate, endDate) {
     const allAccounts = await this.getAccounts(schoolId);
-    const accounts = accountId
-      ? [allAccounts.find(account => account.id === accountId) || await this.chartOfAccountsRepository.findById(accountId)].filter(Boolean)
-      : allAccounts;
     
-    const accountData = Array.isArray(accounts) ? accounts.data || accounts : [accounts];
+    let accounts;
+    if (accountId) {
+      const found = allAccounts.find(account => account.id === accountId);
+      if (found) {
+        accounts = [found];
+      } else {
+        const dbAccount = await this.chartOfAccountsRepository.findById(accountId);
+        accounts = dbAccount ? [dbAccount] : [];
+      }
+    } else {
+      accounts = allAccounts;
+    }
+    
+    if (!accounts || accounts.length === 0) {
+      return { ledger: [], total_accounts: 0 };
+    }
+
     const operationalRows = await this.getOperationalRows(schoolId, startDate, endDate);
-    
     const ledger = [];
     
-    for (const account of accountData) {
+    for (const account of accounts) {
+      if (!account) continue;
+
       const lines = await this.journalEntryLinesRepository.findByAccount(
         schoolId,
         account.id,
@@ -432,15 +468,17 @@ export class FinanceService {
         transaction_date: line.journal_entries?.entry_date || line.created_at,
         reference: line.journal_entries?.entry_number || `JE-${line.journal_entry_id}`,
         description: line.description || line.journal_entries?.description || '',
-        debit: line.debit || 0,
-        credit: line.credit || 0,
+        debit: Number(line.debit || 0),
+        credit: Number(line.credit || 0),
         reference_type: line.journal_entries?.reference_type,
         reference_id: line.journal_entries?.reference_id,
         source_type: 'journal'
       }));
+
       const operationalTransactions = account.source === 'operational'
         ? this.buildOperationalTransactions(account, operationalRows.payments, operationalRows.expenditures)
         : [];
+      
       const transactions = [...journalTransactions, ...operationalTransactions];
       
       // Calculate running balance

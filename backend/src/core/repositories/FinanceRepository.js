@@ -82,7 +82,8 @@ export class JournalEntriesRepository extends BaseRepository {
     }
     return (data || []).map(entry => ({
       ...entry,
-      lines: entry.journal_entry_lines || []
+      lines: entry.journal_entry_lines || [],
+      journal_entry_lines: entry.journal_entry_lines || [] // Ensure both exist for compatibility
     }));
   }
 

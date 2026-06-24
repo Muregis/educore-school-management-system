@@ -79,13 +79,13 @@ function BalanceSheet({ auth }) {
             ${(data.assets || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td>Asset</td><td style="text-align: right">${money(acc.balance)}</td></tr>`).join('')}
             ${(data.liabilities || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td>Liability</td><td style="text-align: right">${money(acc.balance)}</td></tr>`).join('')}
             ${(data.equity || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td>Equity</td><td style="text-align: right">${money(acc.balance)}</td></tr>`).join('')}
+            <tr><td><strong>Retained Earnings</strong></td><td>—</td><td>Equity</td><td style="text-align: right"><strong>${money(data.retained_earnings)}</strong></td></tr>
           </tbody>
         </table>
         <div class="summary">
           <p><strong>Total Assets:</strong> ${money(totalAssets)}</p>
           <p><strong>Total Liabilities:</strong> ${money(totalLiabilities)}</p>
-          <p><strong>Total Equity:</strong> ${money(totalEquity)}</p>
-          <p><strong>Retained Earnings:</strong> ${money(data.retained_earnings || 0)}</p>
+          <p><strong>Total Equity & Retained Earnings:</strong> ${money(totalEquity)}</p>
           <p><strong>Status:</strong> ${isBalanced ? "Balanced" : "Not Balanced"}</p>
         </div>
       </div>
@@ -885,12 +885,12 @@ function GeneralLedger({ auth }) {
                     <Table
                       headers={["Date", "Reference", "Description", "Debit", "Credit", "Balance"]}
                       data={accountLedger.transactions.map(tx => [
-                        <span key="date" style={{ fontSize: "13px" }}>{new Date(tx.date).toLocaleDateString()}</span>,
-                        <span key="ref" style={{ fontSize: "13px", fontFamily: "monospace" }}>{tx.entry_number}</span>,
+                        <span key="date" style={{ fontSize: "13px" }}>{new Date(tx.transaction_date || tx.date).toLocaleDateString()}</span>,
+                        <span key="ref" style={{ fontSize: "13px", fontFamily: "monospace" }}>{tx.reference || tx.entry_number || "—"}</span>,
                         <span key="desc" style={{ fontSize: "13px", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.description}</span>,
-                        <span key="debit" style={{ fontWeight: 700, color: "var(--color-success)" }}>{tx.debit > 0 ? money(tx.debit) : "-"}</span>,
-                        <span key="credit" style={{ fontWeight: 700, color: "var(--color-danger)" }}>{tx.credit > 0 ? money(tx.credit) : "-"}</span>,
-                        <span key="balance" style={{ fontWeight: 800, color: "var(--color-text-primary)" }}>{money(tx.balance)}</span>,
+                        <span key="debit" style={{ fontWeight: 700, color: tx.debit > 0 ? "var(--color-success)" : "var(--color-text-muted)" }}>{tx.debit > 0 ? money(tx.debit) : "-"}</span>,
+                        <span key="credit" style={{ fontWeight: 700, color: tx.credit > 0 ? "var(--color-danger)" : "var(--color-text-muted)" }}>{tx.credit > 0 ? money(tx.credit) : "-"}</span>,
+                        <span key="balance" style={{ fontWeight: 800, color: "var(--color-text-primary)" }}>{money(tx.balance || tx.running_balance || 0)}</span>,
                       ])}
                     />
                   </div>
