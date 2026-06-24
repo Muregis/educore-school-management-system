@@ -192,4 +192,61 @@ export class FinanceService {
       is_balanced: Math.abs(totalAssets - (totalLiabilities + totalEquity + retainedEarnings)) < 0.01
     };
   }
+
+  /**
+   * Get general ledger - transaction history by account
+   */
+  async getGeneralLedger(schoolId, accountId, startDate, endDate) {
+    const accounts = accountId 
+      ? [await this.chartOfAccountsRepository.findById(accountId)]
+      : await this.chartOfAccountsRepository.findAll({ school_id: schoolId, is_active: true });
+    
+    const accountData = Array.isArray(accounts) ? accounts.data || accounts : [accounts];
+    
+    const ledger = [];
+    
+    for (const account of accountData) {
+      const lines = await this.journalEntryLinesRepository.findByAccount(
+        schoolId,
+        account.id,
+        startDate,
+        endDate
+      );
+      
+      const transactions = lines.map(line => ({
+        id: line.id,
+        date: line.journal_entries?.entry_date || line.created_at,
+        entry_number: line.journal_entries?.entry_number || `JE-${line.journal_entry_id}`,
+        description: line.description || line.journal_entries?.description || '',
+        debit: line.debit || 0,
+        credit: line.credit || 0,
+        balance: 0, // Will calculate running balance
+        reference_type: line.journal_entries?.reference_type,
+        reference_id: line.journal_entries?.reference_id,
+      }));
+      
+      // Calculate running balance
+      let runningBalance = 0;
+      transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+      
+      transactions.forEach(tx => {
+        if (account.account_type === 'asset' || account.account_type === 'expense') {
+          runningBalance += tx.debit - tx.credit;
+        } else {
+          runningBalance += tx.credit - tx.debit;
+        }
+        tx.balance = runningBalance;
+      });
+      
+      ledger.push({
+        account,
+        transactions
+      });
+    }
+    
+    return {
+      ledger,
+      total_accounts: ledger.length
+    };
+  }
 }

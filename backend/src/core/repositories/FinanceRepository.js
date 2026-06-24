@@ -32,6 +32,17 @@ export class ChartOfAccountsRepository extends BaseRepository {
     if (error) throw error;
     return data;
   }
+
+  async findById(id) {
+    const { data, error } = await this.client
+      .from(this.tableName)
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
 }
 
 /**

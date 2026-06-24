@@ -477,16 +477,123 @@ function JournalEntries({ auth }) {
   );
 }
 
-// General Ledger Component (placeholder - needs backend endpoint)
+// General Ledger Component
 function GeneralLedger({ auth }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedAccountId, setSelectedAccountId] = useState("");
+  const [accounts, setAccounts] = useState([]);
+
+  const loadAccounts = useCallback(async () => {
+    if (!auth?.token) return;
+    try {
+      const result = await apiFetch("/finance/accounts", { token: auth.token });
+      const accountList = Array.isArray(result) ? result : result.data || [];
+      setAccounts(accountList.filter(a => a.is_active));
+    } catch (e) {
+      console.error("Failed to load accounts:", e);
+    }
+  }, [auth]);
+
+  const load = useCallback(async () => {
+    if (!auth?.token) return;
+    setLoading(true);
+    try {
+      const url = selectedAccountId 
+        ? `/finance/reports/general-ledger?account_id=${selectedAccountId}&start_date=${startDate}&end_date=${endDate}`
+        : `/finance/reports/general-ledger?start_date=${startDate}&end_date=${endDate}`;
+      const result = await apiFetch(url, { token: auth.token });
+      setData(result);
+    } catch (e) {
+      console.error("General ledger error:", e);
+    }
+    setLoading(false);
+  }, [auth, selectedAccountId, startDate, endDate]);
+
+  useEffect(() => { loadAccounts(); }, [loadAccounts]);
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="📚" title="Loading..." description="Fetching general ledger data" /></Card>;
+  if (!data) return <Card style={{ padding: "40px", textAlign: "center" }}><EmptyState icon="📚" title="No data" description="Unable to load general ledger" /></Card>;
+
+  const ledger = Array.isArray(data.ledger) ? data.ledger : [];
+
   return (
-    <Card style={{ padding: "40px", textAlign: "center" }}>
-      <EmptyState 
-        icon="📚" 
-        title="General Ledger" 
-        description="This feature requires a dedicated backend endpoint to fetch transaction history by account. The ledger infrastructure exists in the backend (LedgerService, fee_balance_ledger table) but needs a general ledger API endpoint." 
-      />
-    </Card>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      <Card style={{ padding: "var(--space-3)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-3)" }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>General Ledger</h3>
+            <p style={{ margin: "var(--space-1) 0 0 0", color: "var(--color-text-secondary)", fontSize: "13px" }}>
+              {new Date(startDate).toLocaleDateString()} - {new Date(endDate).toLocaleDateString()}
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap" }}>
+            <Select
+              value={selectedAccountId}
+              onChange={(e) => setSelectedAccountId(e.target.value)}
+              options={[
+                { value: "", label: "All Accounts" },
+                ...accounts.map(a => ({ value: a.id, label: `${a.account_code} - ${a.account_name}` }))
+              ]}
+            />
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={{ padding: "8px 12px", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}
+            />
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              style={{ padding: "8px 12px", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}
+            />
+            <Button onClick={load}>Refresh</Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card style={{ padding: "var(--space-4)" }}>
+        {ledger.length === 0 ? (
+          <EmptyState icon="📚" title="No transactions" description="No ledger transactions found for the selected criteria" />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+            {ledger.map((accountLedger, idx) => (
+              <div key={idx} style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
+                <div style={{ padding: "var(--space-3)", background: "var(--color-bg-base)", borderBottom: "1px solid var(--color-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                    <span style={{ fontWeight: 700, fontSize: "15px" }}>{accountLedger.account.account_name}</span>
+                    <Badge text={accountLedger.account.account_code} style={{ background: "var(--color-bg-surface)", color: "var(--color-text-secondary)", borderColor: "var(--color-border)" }} />
+                    <Badge text={ACCOUNT_TYPES[accountLedger.account.account_type]?.label || accountLedger.account.account_type} style={{ background: ACCOUNT_TYPES[accountLedger.account.account_type]?.color + "20", color: ACCOUNT_TYPES[accountLedger.account.account_type]?.color, borderColor: "transparent" }} />
+                  </div>
+                  <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>{accountLedger.transactions.length} transactions</span>
+                </div>
+                {accountLedger.transactions.length > 0 ? (
+                  <div style={{ overflowX: "auto" }}>
+                    <Table
+                      headers={["Date", "Reference", "Description", "Debit", "Credit", "Balance"]}
+                      data={accountLedger.transactions.map(tx => [
+                        <span key="date" style={{ fontSize: "13px" }}>{new Date(tx.date).toLocaleDateString()}</span>,
+                        <span key="ref" style={{ fontSize: "13px", fontFamily: "monospace" }}>{tx.entry_number}</span>,
+                        <span key="desc" style={{ fontSize: "13px", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tx.description}</span>,
+                        <span key="debit" style={{ fontWeight: 700, color: "var(--color-success)" }}>{tx.debit > 0 ? money(tx.debit) : "-"}</span>,
+                        <span key="credit" style={{ fontWeight: 700, color: "var(--color-danger)" }}>{tx.credit > 0 ? money(tx.credit) : "-"}</span>,
+                        <span key="balance" style={{ fontWeight: 800, color: "var(--color-text-primary)" }}>{money(tx.balance)}</span>,
+                      ])}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ padding: "var(--space-4)", textAlign: "center", color: "var(--color-text-muted)" }}>No transactions for this account</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
   );
 }
 

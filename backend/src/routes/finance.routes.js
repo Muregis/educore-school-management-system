@@ -94,4 +94,16 @@ router.get("/reports/balance-sheet", async (req, res) => {
   }
 });
 
+// Get general ledger
+router.get("/reports/general-ledger", async (req, res) => {
+  try {
+    const schoolId = req.user.schoolId;
+    const { account_id, start_date, end_date } = req.query;
+    const result = await financeService.getGeneralLedger(schoolId, account_id, start_date, end_date);
+    res.success(result);
+  } catch (error) {
+    res.error('FINANCE_ERROR', error.message, {}, 500);
+  }
+});
+
 export default router;
