@@ -326,7 +326,7 @@ const BackupsTab = ({ auth }) => {
                       {b.sizeKb} KB · {new Date(b.createdAt).toLocaleString()}
                     </div>
                   </div>
-                  <a href={`${import.meta.env.VITE_API_URL}/admin/backups/${b.filename}/download`}
+                  <a href={`${import.meta.env.VITE_API_URL}/admin/backups/${b.filename}/download?token=${auth?.token}`}
                     style={{ fontSize:12, color:"#60a5fa", textDecoration:"none", fontWeight:600 }}>
                     ⬇ Download
                   </a>
