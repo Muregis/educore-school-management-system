@@ -27,12 +27,12 @@ export default function TrialBalancePage({ auth, toast }) {
       const data = await apiFetch("/finance/reports/trial-balance", { token: auth?.token });
       setTrialBalance(data.accounts || []);
       
-      const debits = (data.accounts || []).reduce((sum, acc) => sum + (acc.debit_balance || 0), 0);
-      const credits = (data.accounts || []).reduce((sum, acc) => sum + (acc.credit_balance || 0), 0);
+      const debits = data.total_debits || (data.accounts || []).reduce((sum, acc) => sum + (acc.debit_balance || acc.debit || 0), 0);
+      const credits = data.total_credits || (data.accounts || []).reduce((sum, acc) => sum + (acc.credit_balance || acc.credit || 0), 0);
       
       setTotalDebits(debits);
       setTotalCredits(credits);
-      setIsBalanced(Math.abs(debits - credits) < 0.01);
+      setIsBalanced(data.is_balanced !== false && Math.abs(debits - credits) < 0.01);
     } catch (err) {
       toast("Failed to load trial balance", "error");
     } finally {
@@ -47,8 +47,8 @@ export default function TrialBalancePage({ auth, toast }) {
         <td>${acc.account_code || "—"}</td>
         <td>${acc.account_name}</td>
         <td style="text-transform: capitalize">${acc.account_type}</td>
-        <td style="text-align: right; color: ${acc.debit_balance > 0 ? "green" : "inherit"}">${acc.debit_balance > 0 ? money(acc.debit_balance) : "—"}</td>
-        <td style="text-align: right; color: ${acc.credit_balance > 0 ? "red" : "inherit"}">${acc.credit_balance > 0 ? money(acc.credit_balance) : "—"}</td>
+        <td style="text-align: right; color: ${(acc.debit_balance || acc.debit || 0) > 0 ? "green" : "inherit"}">${(acc.debit_balance || acc.debit || 0) > 0 ? money(acc.debit_balance || acc.debit || 0) : "—"}</td>
+        <td style="text-align: right; color: ${(acc.credit_balance || acc.credit || 0) > 0 ? "red" : "inherit"}">${(acc.credit_balance || acc.credit || 0) > 0 ? money(acc.credit_balance || acc.credit || 0) : "—"}</td>
       </tr>
     `).join("");
     const html = `
@@ -95,8 +95,8 @@ export default function TrialBalancePage({ auth, toast }) {
       acc.account_code || "",
       acc.account_name,
       acc.account_type,
-      String(acc.debit_balance || 0),
-      String(acc.credit_balance || 0),
+      String(acc.debit_balance || acc.debit || 0),
+      String(acc.credit_balance || acc.credit || 0),
     ]);
     exportCsv("trial-balance.csv", headers, rows);
   };
@@ -171,11 +171,11 @@ export default function TrialBalancePage({ auth, toast }) {
                 <span key="code" style={{ fontFamily: "monospace", fontWeight: 600 }}>{acc.account_code || "—"}</span>,
                 <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{acc.account_name}</span>,
                 <span key="type" style={{ fontSize: "13px", textTransform: "capitalize" }}>{acc.account_type}</span>,
-                <span key="debit" style={{ fontWeight: 600, color: acc.debit_balance > 0 ? "var(--color-success)" : "var(--color-text-muted)" }}>
-                  {acc.debit_balance > 0 ? money(acc.debit_balance) : "—"}
+                <span key="debit" style={{ fontWeight: 600, color: (acc.debit_balance || acc.debit || 0) > 0 ? "var(--color-success)" : "var(--color-text-muted)" }}>
+                  {(acc.debit_balance || acc.debit || 0) > 0 ? money(acc.debit_balance || acc.debit || 0) : "—"}
                 </span>,
-                <span key="credit" style={{ fontWeight: 600, color: acc.credit_balance > 0 ? "var(--color-danger)" : "var(--color-text-muted)" }}>
-                  {acc.credit_balance > 0 ? money(acc.credit_balance) : "—"}
+                <span key="credit" style={{ fontWeight: 600, color: (acc.credit_balance || acc.credit || 0) > 0 ? "var(--color-danger)" : "var(--color-text-muted)" }}>
+                  {(acc.credit_balance || acc.credit || 0) > 0 ? money(acc.credit_balance || acc.credit || 0) : "—"}
                 </span>,
               ])}
             />

@@ -37,13 +37,13 @@ export default function IncomeStatementPage({ auth, toast }) {
     const revenueRows = (incomeStatement?.revenue || []).map(item => `
       <tr>
         <td>${item.account_name}</td>
-        <td style="text-align: right">${money(item.amount)}</td>
+        <td style="text-align: right">${money(item.amount || item.balance || 0)}</td>
       </tr>
     `).join("");
     const expenseRows = (incomeStatement?.expenses || []).map(item => `
       <tr>
         <td>${item.account_name}</td>
-        <td style="text-align: right">${money(item.amount)}</td>
+        <td style="text-align: right">${money(item.amount || item.balance || 0)}</td>
       </tr>
     `).join("");
     const html = `
@@ -93,8 +93,8 @@ export default function IncomeStatementPage({ auth, toast }) {
   const handleExport = () => {
     const headers = ["Account", "Amount", "Category"];
     const rows = [
-      ...(incomeStatement?.revenue || []).map(item => [item.account_name, String(item.amount || 0), "Revenue"]),
-      ...(incomeStatement?.expenses || []).map(item => [item.account_name, String(item.amount || 0), "Expense"]),
+      ...(incomeStatement?.revenue || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Revenue"]),
+      ...(incomeStatement?.expenses || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Expense"]),
     ];
     exportCsv("income-statement.csv", headers, rows);
   };
@@ -107,9 +107,9 @@ export default function IncomeStatementPage({ auth, toast }) {
     );
   }
 
-  const totalRevenue = incomeStatement?.revenue?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-  const totalExpenses = incomeStatement?.expenses?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-  const netIncome = totalRevenue - totalExpenses;
+  const totalRevenue = incomeStatement?.total_revenue || incomeStatement?.revenue?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
+  const totalExpenses = incomeStatement?.total_expenses || incomeStatement?.expenses?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
+  const netIncome = incomeStatement?.net_income ?? (totalRevenue - totalExpenses);
 
   return (
     <div>
@@ -186,7 +186,7 @@ export default function IncomeStatementPage({ auth, toast }) {
               headers={["Account", "Amount"]}
               data={incomeStatement.revenue.map(item => [
                 <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{item.account_name}</span>,
-                <span key="amount" style={{ fontWeight: 600, color: "var(--color-success)" }}>{money(item.amount)}</span>,
+                <span key="amount" style={{ fontWeight: 600, color: "var(--color-success)" }}>{money(item.amount || item.balance || 0)}</span>,
               ])}
             />
           ) : (
@@ -208,7 +208,7 @@ export default function IncomeStatementPage({ auth, toast }) {
               headers={["Account", "Amount"]}
               data={incomeStatement.expenses.map(item => [
                 <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{item.account_name}</span>,
-                <span key="amount" style={{ fontWeight: 600, color: "var(--color-danger)" }}>{money(item.amount)}</span>,
+                <span key="amount" style={{ fontWeight: 600, color: "var(--color-danger)" }}>{money(item.amount || item.balance || 0)}</span>,
               ])}
             />
           ) : (

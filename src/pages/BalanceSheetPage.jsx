@@ -44,19 +44,19 @@ export default function BalanceSheetPage({ auth, toast }) {
     const assetRows = (balanceSheet?.assets || []).map(item => `
       <tr>
         <td>${item.account_name}</td>
-        <td style="text-align: right">${money(item.amount)}</td>
+        <td style="text-align: right">${money(item.amount || item.balance || 0)}</td>
       </tr>
     `).join("");
     const liabilityRows = (balanceSheet?.liabilities || []).map(item => `
       <tr>
         <td>${item.account_name}</td>
-        <td style="text-align: right">${money(item.amount)}</td>
+        <td style="text-align: right">${money(item.amount || item.balance || 0)}</td>
       </tr>
     `).join("");
     const equityRows = (balanceSheet?.equity || []).map(item => `
       <tr>
         <td>${item.account_name}</td>
-        <td style="text-align: right">${money(item.amount)}</td>
+        <td style="text-align: right">${money(item.amount || item.balance || 0)}</td>
       </tr>
     `).join("");
     const html = `
@@ -110,9 +110,9 @@ export default function BalanceSheetPage({ auth, toast }) {
   const handleExport = () => {
     const headers = ["Account", "Amount", "Category"];
     const rows = [
-      ...(balanceSheet?.assets || []).map(item => [item.account_name, String(item.amount || 0), "Asset"]),
-      ...(balanceSheet?.liabilities || []).map(item => [item.account_name, String(item.amount || 0), "Liability"]),
-      ...(balanceSheet?.equity || []).map(item => [item.account_name, String(item.amount || 0), "Equity"]),
+      ...(balanceSheet?.assets || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Asset"]),
+      ...(balanceSheet?.liabilities || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Liability"]),
+      ...(balanceSheet?.equity || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Equity"]),
     ];
     exportCsv("balance-sheet.csv", headers, rows);
   };
@@ -125,10 +125,10 @@ export default function BalanceSheetPage({ auth, toast }) {
     );
   }
 
-  const totalAssets = balanceSheet?.assets?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-  const totalLiabilities = balanceSheet?.liabilities?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-  const totalEquity = balanceSheet?.equity?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-  const isBalanced = Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01;
+  const totalAssets = balanceSheet?.total_assets || balanceSheet?.assets?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
+  const totalLiabilities = balanceSheet?.total_liabilities || balanceSheet?.liabilities?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
+  const totalEquity = balanceSheet?.total_equity || balanceSheet?.equity?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
+  const isBalanced = balanceSheet?.is_balanced !== false && Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01;
 
   return (
     <div>
@@ -202,7 +202,7 @@ export default function BalanceSheetPage({ auth, toast }) {
               headers={["Account", "Amount"]}
               data={balanceSheet.assets.map(item => [
                 <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{item.account_name}</span>,
-                <span key="amount" style={{ fontWeight: 600, color: "var(--color-success)" }}>{money(item.amount)}</span>,
+                <span key="amount" style={{ fontWeight: 600, color: "var(--color-success)" }}>{money(item.amount || item.balance || 0)}</span>,
               ])}
             />
           ) : (
@@ -224,7 +224,7 @@ export default function BalanceSheetPage({ auth, toast }) {
               headers={["Account", "Amount"]}
               data={balanceSheet.liabilities.map(item => [
                 <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{item.account_name}</span>,
-                <span key="amount" style={{ fontWeight: 600, color: "var(--color-danger)" }}>{money(item.amount)}</span>,
+                <span key="amount" style={{ fontWeight: 600, color: "var(--color-danger)" }}>{money(item.amount || item.balance || 0)}</span>,
               ])}
             />
           ) : (
@@ -244,12 +244,12 @@ export default function BalanceSheetPage({ auth, toast }) {
         </div>
         {balanceSheet?.equity?.length > 0 ? (
           <Table
-            headers={["Account", "Amount"]}
-            data={balanceSheet.equity.map(item => [
-              <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{item.account_name}</span>,
-              <span key="amount" style={{ fontWeight: 600, color: "var(--color-primary)" }}>{money(item.amount)}</span>,
-            ])}
-          />
+              headers={["Account", "Amount"]}
+              data={balanceSheet.equity.map(item => [
+                <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }>{item.account_name}</span>,
+                <span key="amount" style={{ fontWeight: 600, color: "var(--color-primary)" }>{money(item.amount || item.balance || 0)}</span>,
+              ])}
+            />
         ) : (
           <EmptyState icon="📈" title="No Equity" description="No equity accounts found." />
         )}
