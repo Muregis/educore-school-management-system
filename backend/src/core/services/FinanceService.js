@@ -329,16 +329,16 @@ export class FinanceService {
     const revenue = await this.calculateAccountBalances(revenueAccounts, startDate, endDate);
     const expenses = await this.calculateAccountBalances(expenseAccounts, startDate, endDate);
 
-    const totalRevenue = revenue.reduce((sum, a) => sum + Number(a.balance || 0), 0);
-    const totalExpenses = expenses.reduce((sum, a) => sum + Number(a.balance || 0), 0);
+    const totalRevenue = revenue.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
+    const totalExpenses = expenses.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
     const netIncome = totalRevenue - totalExpenses;
 
     return {
       revenue,
       expenses,
-      total_revenue: totalRevenue,
-      total_expenses: totalExpenses,
-      net_income: netIncome
+      total_revenue: Number(totalRevenue.toFixed(2)),
+      total_expenses: Number(totalExpenses.toFixed(2)),
+      net_income: Number(netIncome.toFixed(2))
     };
   }
 
@@ -400,17 +400,17 @@ export class FinanceService {
     const liabilities = await this.calculateAccountBalances(liabilityAccounts, null, asOfDate);
     const equity = await this.calculateAccountBalances(equityAccounts, null, asOfDate);
 
-    const totalAssets = assets.reduce((sum, a) => sum + Number(a.balance || 0), 0);
-    const totalLiabilities = liabilities.reduce((sum, a) => sum + Number(a.balance || 0), 0);
-    const totalEquity = equity.reduce((sum, a) => sum + Number(a.balance || 0), 0);
+    const totalAssets = assets.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
+    const totalLiabilities = liabilities.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
+    const totalEquity = equity.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
 
     // Calculate retained earnings (net income accumulated up to asOfDate)
     const revenueAccounts = await this.getAccounts(schoolId, 'revenue');
     const expenseAccounts = await this.getAccounts(schoolId, 'expense');
     const revenue = await this.calculateAccountBalances(revenueAccounts, null, asOfDate);
     const expenses = await this.calculateAccountBalances(expenseAccounts, null, asOfDate);
-    const totalRevenue = revenue.reduce((sum, a) => sum + Number(a.balance || 0), 0);
-    const totalExpenses = expenses.reduce((sum, a) => sum + Number(a.balance || 0), 0);
+    const totalRevenue = revenue.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
+    const totalExpenses = expenses.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
     const retainedEarnings = Number((totalRevenue - totalExpenses).toFixed(2));
 
     const finalTotalEquity = Number((totalEquity + retainedEarnings).toFixed(2));

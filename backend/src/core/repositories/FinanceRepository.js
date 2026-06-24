@@ -114,7 +114,7 @@ export class JournalEntryLinesRepository extends BaseRepository {
   async findByAccount(schoolId, accountId, startDate, endDate) {
     let query = this.client
       .from(this.tableName)
-      .select('*, journal_entries!inner(*)')
+      .select('*, journal_entries(*)')
       .eq('journal_entries.school_id', schoolId);
 
     if (accountId) {
