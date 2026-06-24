@@ -1,6 +1,6 @@
 import { BaseRepository } from '../BaseRepository.js';
-import { generateTwoFactorSecret, generateBackupCodes, verifyTwoFactorToken } from '../middleware/twoFactor.js';
-import { validatePassword } from '../middleware/passwordPolicy.js';
+import { generateTwoFactorSecret, generateBackupCodes, verifyTwoFactorToken } from '../../middleware/twoFactor.js';
+import { validatePassword } from '../../middleware/passwordPolicy.js';
 
 /**
  * Security Service
