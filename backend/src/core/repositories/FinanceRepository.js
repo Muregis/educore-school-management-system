@@ -27,7 +27,7 @@ export class ChartOfAccountsRepository extends BaseRepository {
       .select('*')
       .eq('school_id', schoolId)
       .eq('account_code', accountCode)
-      .single();
+      .maybeSingle();
     
     if (error) throw error;
     return data;
@@ -54,16 +54,27 @@ export class JournalEntriesRepository extends BaseRepository {
   }
 
   async findByDateRange(schoolId, startDate, endDate) {
-    const { data, error } = await this.client
+    let query = this.client
       .from(this.tableName)
       .select('*, journal_entry_lines(*, chart_of_accounts(*))')
       .eq('school_id', schoolId)
-      .gte('entry_date', startDate)
-      .lte('entry_date', endDate)
       .order('entry_date', { ascending: false });
+
+    if (startDate) {
+      query = query.gte('entry_date', startDate);
+    }
+
+    if (endDate) {
+      query = query.lte('entry_date', endDate);
+    }
+
+    const { data, error } = await query;
     
     if (error) throw error;
-    return data || [];
+    return (data || []).map(entry => ({
+      ...entry,
+      lines: entry.journal_entry_lines || []
+    }));
   }
 
   async findByReference(schoolId, referenceType, referenceId) {
@@ -89,12 +100,24 @@ export class JournalEntryLinesRepository extends BaseRepository {
   }
 
   async findByAccount(schoolId, accountId, startDate, endDate) {
-    const { data, error } = await this.client
+    let query = this.client
       .from(this.tableName)
-      .select('*, journal_entries(*)')
-      .eq('account_id', accountId)
-      .gte('created_at', startDate)
-      .lte('created_at', endDate);
+      .select('*, journal_entries!inner(*)')
+      .eq('journal_entries.school_id', schoolId);
+
+    if (accountId) {
+      query = query.eq('account_id', accountId);
+    }
+
+    if (startDate) {
+      query = query.gte('journal_entries.entry_date', startDate);
+    }
+
+    if (endDate) {
+      query = query.lte('journal_entries.entry_date', endDate);
+    }
+
+    const { data, error } = await query;
     
     if (error) throw error;
     return data || [];

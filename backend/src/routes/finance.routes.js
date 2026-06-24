@@ -12,7 +12,7 @@ router.post("/accounts", async (req, res) => {
       school_id: req.user.schoolId
     };
     const result = await financeService.createAccount(data, { userId: req.user.id });
-    res.success(result, {}, 201);
+    res.status(201).json(result);
   } catch (error) {
     res.error('FINANCE_ERROR', error.message, {}, 400);
   }
@@ -23,10 +23,11 @@ router.get("/accounts", async (req, res) => {
   try {
     const schoolId = req.user.schoolId;
     const { type } = req.query;
-    const accounts = type 
+    const result = type 
       ? await financeService.chartOfAccountsRepository.findByType(schoolId, type)
       : await financeService.chartOfAccountsRepository.findAll({ school_id: schoolId });
-    res.success(accounts);
+    const accounts = Array.isArray(result) ? result : result.data || [];
+    res.json(accounts);
   } catch (error) {
     res.error('FINANCE_ERROR', error.message, {}, 500);
   }
@@ -40,7 +41,7 @@ router.post("/journal-entries", async (req, res) => {
       school_id: req.user.schoolId
     };
     const result = await financeService.createJournalEntry(data, { userId: req.user.id });
-    res.success(result, {}, 201);
+    res.status(201).json(result);
   } catch (error) {
     res.error('FINANCE_ERROR', error.message, {}, 400);
   }
@@ -52,7 +53,7 @@ router.get("/journal-entries", async (req, res) => {
     const schoolId = req.user.schoolId;
     const { start_date, end_date } = req.query;
     const entries = await financeService.journalEntriesRepository.findByDateRange(schoolId, start_date, end_date);
-    res.success(entries);
+    res.json(entries);
   } catch (error) {
     res.error('FINANCE_ERROR', error.message, {}, 500);
   }
@@ -64,7 +65,7 @@ router.get("/reports/trial-balance", async (req, res) => {
     const schoolId = req.user.schoolId;
     const { as_of_date } = req.query;
     const result = await financeService.getTrialBalance(schoolId, as_of_date);
-    res.success(result);
+    res.json(result);
   } catch (error) {
     res.error('FINANCE_ERROR', error.message, {}, 500);
   }
@@ -76,7 +77,7 @@ router.get("/reports/income-statement", async (req, res) => {
     const schoolId = req.user.schoolId;
     const { start_date, end_date } = req.query;
     const result = await financeService.getIncomeStatement(schoolId, start_date, end_date);
-    res.success(result);
+    res.json(result);
   } catch (error) {
     res.error('FINANCE_ERROR', error.message, {}, 500);
   }
@@ -88,7 +89,7 @@ router.get("/reports/balance-sheet", async (req, res) => {
     const schoolId = req.user.schoolId;
     const { as_of_date } = req.query;
     const result = await financeService.getBalanceSheet(schoolId, as_of_date);
-    res.success(result);
+    res.json(result);
   } catch (error) {
     res.error('FINANCE_ERROR', error.message, {}, 500);
   }
@@ -100,7 +101,7 @@ router.get("/reports/general-ledger", async (req, res) => {
     const schoolId = req.user.schoolId;
     const { account_id, start_date, end_date } = req.query;
     const result = await financeService.getGeneralLedger(schoolId, account_id, start_date, end_date);
-    res.success(result);
+    res.json(result);
   } catch (error) {
     res.error('FINANCE_ERROR', error.message, {}, 500);
   }
