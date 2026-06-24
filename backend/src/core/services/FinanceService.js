@@ -225,8 +225,8 @@ export class FinanceService {
     const { lines, ...entryData } = data;
 
     // Validate debits equal credits
-    const totalDebit = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
-    const totalCredit = lines.reduce((sum, line) => sum + (line.credit || 0), 0);
+    const totalDebit = lines.reduce((sum, line) => sum + Number(line.debit || 0), 0);
+    const totalCredit = lines.reduce((sum, line) => sum + Number(line.credit || 0), 0);
 
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
       throw new Error('Journal entry must balance: debits must equal credits');
@@ -265,8 +265,8 @@ export class FinanceService {
 
     const trialBalance = accounts.map(account => {
       const accountLines = lines.filter(l => l.account_id === account.id);
-      const totalDebit = accountLines.reduce((sum, l) => sum + (l.debit || 0), 0);
-      const totalCredit = accountLines.reduce((sum, l) => sum + (l.credit || 0), 0);
+      const totalDebit = accountLines.reduce((sum, l) => sum + Number(l.debit || 0), 0);
+      const totalCredit = accountLines.reduce((sum, l) => sum + Number(l.credit || 0), 0);
       const operationalTransactions = account.source === 'operational'
         ? this.buildOperationalTransactions(account, payments, expenditures)
         : [];
@@ -291,8 +291,8 @@ export class FinanceService {
       };
     });
 
-    const totalDebits = trialBalance.reduce((sum, a) => sum + a.debit, 0);
-    const totalCredits = trialBalance.reduce((sum, a) => sum + a.credit, 0);
+    const totalDebits = trialBalance.reduce((sum, a) => sum + Number(a.debit || 0), 0);
+    const totalCredits = trialBalance.reduce((sum, a) => sum + Number(a.credit || 0), 0);
 
     return {
       accounts: trialBalance,
@@ -312,8 +312,8 @@ export class FinanceService {
     const revenue = await this.calculateAccountBalances(revenueAccounts, startDate, endDate);
     const expenses = await this.calculateAccountBalances(expenseAccounts, startDate, endDate);
 
-    const totalRevenue = revenue.reduce((sum, a) => sum + a.balance, 0);
-    const totalExpenses = expenses.reduce((sum, a) => sum + a.balance, 0);
+    const totalRevenue = revenue.reduce((sum, a) => sum + Number(a.balance || 0), 0);
+    const totalExpenses = expenses.reduce((sum, a) => sum + Number(a.balance || 0), 0);
     const netIncome = totalRevenue - totalExpenses;
 
     return {
@@ -343,8 +343,8 @@ export class FinanceService {
         endDate
       );
 
-      const totalDebit = lines.reduce((sum, l) => sum + (l.debit || 0), 0);
-      const totalCredit = lines.reduce((sum, l) => sum + (l.credit || 0), 0);
+      const totalDebit = lines.reduce((sum, l) => sum + Number(l.debit || 0), 0);
+      const totalCredit = lines.reduce((sum, l) => sum + Number(l.credit || 0), 0);
       const operationalTransactions = account.source === 'operational'
         ? this.buildOperationalTransactions(account, operationalRows.payments, operationalRows.expenditures)
         : [];
@@ -380,17 +380,17 @@ export class FinanceService {
     const liabilities = await this.calculateAccountBalances(liabilityAccounts, null, asOfDate);
     const equity = await this.calculateAccountBalances(equityAccounts, null, asOfDate);
 
-    const totalAssets = assets.reduce((sum, a) => sum + a.balance, 0);
-    const totalLiabilities = liabilities.reduce((sum, a) => sum + a.balance, 0);
-    const totalEquity = equity.reduce((sum, a) => sum + a.balance, 0);
+    const totalAssets = assets.reduce((sum, a) => sum + Number(a.balance || 0), 0);
+    const totalLiabilities = liabilities.reduce((sum, a) => sum + Number(a.balance || 0), 0);
+    const totalEquity = equity.reduce((sum, a) => sum + Number(a.balance || 0), 0);
 
     // Calculate retained earnings (net income accumulated)
     const revenueAccounts = await this.getAccounts(schoolId, 'revenue');
     const expenseAccounts = await this.getAccounts(schoolId, 'expense');
     const revenue = await this.calculateAccountBalances(revenueAccounts, null, asOfDate);
     const expenses = await this.calculateAccountBalances(expenseAccounts, null, asOfDate);
-    const totalRevenue = revenue.reduce((sum, a) => sum + a.balance, 0);
-    const totalExpenses = expenses.reduce((sum, a) => sum + a.balance, 0);
+    const totalRevenue = revenue.reduce((sum, a) => sum + Number(a.balance || 0), 0);
+    const totalExpenses = expenses.reduce((sum, a) => sum + Number(a.balance || 0), 0);
     const retainedEarnings = totalRevenue - totalExpenses;
 
     return {

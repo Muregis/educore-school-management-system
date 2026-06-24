@@ -15,10 +15,11 @@ function isMissingFinanceTable(error) {
 }
 
 function handleFinanceError(res, error, emptyResult) {
+  console.error('[Finance Error]', error);
   if (isMissingFinanceTable(error)) {
     return res.json(emptyResult);
   }
-  res.error('FINANCE_ERROR', error.message, {}, 500);
+  res.error('FINANCE_ERROR', error.message || 'Unknown finance error', {}, 500);
 }
 
 function formatDate(date) {
