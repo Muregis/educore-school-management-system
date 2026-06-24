@@ -23,10 +23,7 @@ router.get("/accounts", async (req, res) => {
   try {
     const schoolId = req.user.schoolId;
     const { type } = req.query;
-    const result = type 
-      ? await financeService.chartOfAccountsRepository.findByType(schoolId, type)
-      : await financeService.chartOfAccountsRepository.findAll({ school_id: schoolId });
-    const accounts = Array.isArray(result) ? result : result.data || [];
+    const accounts = await financeService.getAccounts(schoolId, type);
     res.json(accounts);
   } catch (error) {
     res.error('FINANCE_ERROR', error.message, {}, 500);
@@ -90,6 +87,19 @@ router.get("/reports/balance-sheet", async (req, res) => {
     const { as_of_date } = req.query;
     const result = await financeService.getBalanceSheet(schoolId, as_of_date);
     res.json(result);
+  } catch (error) {
+    res.error('FINANCE_ERROR', error.message, {}, 500);
+  }
+});
+
+// Get account ledger for the General Ledger page
+router.get("/ledger/account", async (req, res) => {
+  try {
+    const schoolId = req.user.schoolId;
+    const { account_id, start_date, end_date } = req.query;
+    const result = await financeService.getGeneralLedger(schoolId, account_id, start_date, end_date);
+    const ledger = result.ledger?.[0] || { account: null, transactions: [] };
+    res.json(ledger);
   } catch (error) {
     res.error('FINANCE_ERROR', error.message, {}, 500);
   }

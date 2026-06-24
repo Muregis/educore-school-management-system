@@ -35,12 +35,16 @@ export default function GeneralLedgerPage({ auth, toast }) {
   const loadAccounts = async () => {
     try {
       const data = await apiFetch("/finance/accounts", { token: auth?.token });
-      setAccounts(data || []);
-      if (data && data.length > 0) {
-        setSelectedAccount(data[0].id);
+      const accountRows = Array.isArray(data) ? data : data?.data || [];
+      setAccounts(accountRows);
+      if (accountRows.length > 0) {
+        setSelectedAccount(accountRows[0].id);
+      } else {
+        setLoading(false);
       }
     } catch (err) {
       toast("Failed to load accounts", "error");
+      setLoading(false);
     }
   };
 
@@ -55,7 +59,7 @@ export default function GeneralLedgerPage({ auth, toast }) {
         end_date: endDate
       });
       const data = await apiFetch(`/finance/ledger/account?${params}`, { token: auth?.token });
-      setTransactions(data.transactions || []);
+      setTransactions(Array.isArray(data?.transactions) ? data.transactions : []);
     } catch (err) {
       toast("Failed to load ledger transactions", "error");
     } finally {
@@ -196,7 +200,7 @@ export default function GeneralLedgerPage({ auth, toast }) {
             <Table
               headers={["Date", "Reference", "Description", "Debit", "Credit", "Running Balance"]}
               data={transactions.map(t => [
-                <span key="date">{new Date(t.transaction_date).toLocaleDateString()}</span>,
+                <span key="date">{new Date(t.transaction_date || t.date).toLocaleDateString()}</span>,
                 <span key="ref" style={{ fontFamily: "monospace" }}>{t.reference || "—"}</span>,
                 <span key="desc" style={{ fontWeight: 600 }}>{t.description}</span>,
                 <span key="debit" style={{ fontWeight: 600, color: t.debit > 0 ? "var(--color-success)" : "var(--color-text-muted)" }}>
@@ -226,7 +230,7 @@ export default function GeneralLedgerPage({ auth, toast }) {
             </div>
             <div>
               <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "var(--space-1)" }}>Normal Balance</div>
-              <div style={{ fontWeight: 600, textTransform: "capitalize" }}>{selectedAccountData.normal_balance}</div>
+              <div style={{ fontWeight: 600, textTransform: "capitalize" }}>{selectedAccountData.normal_balance || (["asset", "expense"].includes(selectedAccountData.account_type) ? "debit" : "credit")}</div>
             </div>
             <div>
               <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "var(--space-1)" }}>Status</div>
