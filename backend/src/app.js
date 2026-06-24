@@ -5,6 +5,13 @@ import multer from "multer";
 import * as Sentry from "@sentry/node";
 import { env } from "./config/env.js";
 import { apiRateLimit } from "./middleware/tenantRateLimit.js";
+import { requestId } from "./middleware/requestId.js";
+import { responseWrapper } from "./middleware/responseWrapper.js";
+import { compressionMiddleware } from "./middleware/compression.js";
+import { securityHeaders } from "./middleware/securityHeaders.js";
+import { apiVersioning } from "./middleware/apiVersioning.js";
+import { idempotency } from "./middleware/idempotency.js";
+import { requestLogger } from "./utils/logger.js";
 import healthRoutes        from "./routes/health.routes.js";
 import authRoutes          from "./routes/auth.routes.js";
 import studentsRoutes      from "./routes/students.routes.js";
@@ -59,6 +66,13 @@ import expendituresRoutes     from "./routes/expenditures.routes.js";
 import examTypesRoutes         from "./routes/exam-types.routes.js";  // NEW: Exam types management
 import compiledResultsRoutes   from "./routes/compiled-results.routes.js";  // NEW: Compiled results endpoint
 import uploadRoutes           from "./routes/upload.routes.js";  // NEW: Cloudinary upload routes
+import examsEnhancedRoutes       from "./routes/exams-enhanced.routes.js";
+import libraryEnhancedRoutes     from "./routes/library-enhanced.routes.js";
+import hrPayrollRoutes           from "./routes/hr-payroll.routes.js";
+import reportingRoutes           from "./routes/reporting.routes.js";
+import auditComplianceRoutes      from "./routes/audit-compliance.routes.js";
+import backupRoutes               from "./routes/backup.routes.js";
+import { cacheMiddleware } from "./middleware/cache.js";
 // import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }         from "./middleware/error.js";
 import { authRequired }         from "./middleware/auth.js";
@@ -92,6 +106,13 @@ const corsOrigins = String(env.corsOrigin || "")
   .map(s => s.trim())
   .filter(Boolean);
 
+// Enterprise middleware chain - order matters
+app.use(securityHeaders);
+app.use(compressionMiddleware);
+app.use(requestId);
+app.use(apiVersioning);
+app.use(responseWrapper);
+
 app.use("/api/paystack/webhook", express.raw({ type: "application/json" }));
 app.use(cors({
   origin: (origin, cb) => {
@@ -105,7 +126,9 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "10mb" }));
 app.use(morgan("dev"));
-app.use(apiRateLimit); // Apply rate limiting to all API routes
+app.use(apiRateLimit);
+app.use(requestLogger);
+app.use(idempotency()); // Apply rate limiting to all API routes
 
 // NEW: Apply tenant context middleware globally (after auth, before routes)
 // Note: auth routes are excluded from global auth and handled separately
@@ -167,7 +190,18 @@ app.use("/api/admin-permissions", adminPermissionsRoutes); // NEW: Director admi
 app.use("/api/performance",     performanceRoutes);  // NEW: KNEC performance sheet
 app.use("/api/students/promote", promotionRoutes);   // NEW: Promotion chain
 app.use("/api/fees",             feereRemindersRoutes);      // NEW: Fee reminders (additive, does not override /api/payments)
-app.use("/api/academic/terms",    academicTermsRoutes);       // NEW: Academic term lifecycle
+app.use("/api/academic/terms",    academicTermsRoutes);
+app.use("/api/academic/years",     academicYearsRoutes);
+app.use("/api/students/lifecycle", studentLifecycleRoutes);
+app.use("/api/finance", financeRoutes);
+app.use("/api/exams/v2", examsEnhancedRoutes);
+app.use("/api/library/v2", libraryEnhancedRoutes);
+app.use("/api/hr/payroll", hrPayrollRoutes);
+app.use(cacheMiddleware(300)); // Apply caching to all subsequent routes
+app.use("/api/security", securityRoutes);
+app.use("/api/reports", reportingRoutes);
+app.use("/api/audit", auditComplianceRoutes);
+app.use("/api/backup", backupRoutes);
 app.use("/api/promotion",         promotionAdvancedRoutes);   // NEW: Advanced promotion
 app.use("/api/notifications",     notificationQueueRoutes);   // NEW: Notification queue
 app.use("/api/discounts",         discountsRoutes);           // NEW: Fee discounts system
@@ -188,4 +222,5 @@ app.use(errorHandler);
 // startBackupScheduler();
 
 export default app;
+export { upload };
 export { upload };
