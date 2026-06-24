@@ -65,6 +65,9 @@ const NAVIGATION_GROUPS = [
     label: "SYSTEM • ADMIN ONLY",
     systemOnly: true,
     items: [
+      { id: "reports", label: "Reports", icon: "📊" },
+      { id: "analytics", label: "Analytics", icon: "📈" },
+      { id: "accounts", label: "Accounts", icon: "🔐" },
       { id: "settings", label: "Settings", icon: "⚙️" },
     ]
   }
