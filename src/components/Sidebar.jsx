@@ -49,13 +49,22 @@ const NAVIGATION_GROUPS = [
     ]
   },
   {
+    id: "finance",
+    label: "FINANCE • ACCOUNTING",
+    items: [
+      { id: "trial-balance", label: "Trial Balance", icon: "⚖️" },
+      { id: "income-statement", label: "Income Statement", icon: "�" },
+      { id: "balance-sheet", label: "Balance Sheet", icon: "�" },
+      { id: "chart-of-accounts", label: "Chart of Accounts", icon: "�" },
+      { id: "journal-entries", label: "Journal Entries", icon: "📝" },
+      { id: "general-ledger", label: "General Ledger", icon: "�" },
+    ]
+  },
+  {
     id: "system",
     label: "SYSTEM • ADMIN ONLY",
     systemOnly: true,
     items: [
-      { id: "reports", label: "Reports", icon: "📊" },
-      { id: "analytics", label: "Analytics", icon: "📈" },
-      { id: "accounts", label: "Accounts", icon: "🔐" },
       { id: "settings", label: "Settings", icon: "⚙️" },
     ]
   }

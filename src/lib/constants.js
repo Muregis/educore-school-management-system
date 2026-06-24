@@ -14,15 +14,15 @@ export const DEFAULTS = {
 
 export const ROLE = {
   // Director - HIGHEST ROLE - Full control over all schools, can delegate permissions
-  director:  { pages:["dashboard","students","teachers","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","financial-reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true, canDelegate:true },
+  director:  { pages:["dashboard","students","teachers","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","financial-reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests","trial-balance","income-statement","chart-of-accounts","journal-entries","general-ledger","balance-sheet"], edit:true, canDelegate:true },
   // Superadmin - System-level full access
-  superadmin:{ pages:["dashboard","students","teachers","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","financial-reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests"], edit:true },
+  superadmin:{ pages:["dashboard","students","teachers","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","financial-reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests","trial-balance","income-statement","chart-of-accounts","journal-entries","general-ledger","balance-sheet"], edit:true },
   // Admin - School administrator with full school-level access
-  admin:     { pages:["dashboard","students","subjects","attendance","grades","fees","expenditures","invoices","reportcards","discipline","transport","communication","timetable","library","lessonplans","announcements","exams","admissions"], edit:true },
+  admin:     { pages:["dashboard","students","subjects","attendance","grades","fees","expenditures","invoices","reportcards","discipline","transport","communication","timetable","library","lessonplans","announcements","exams","admissions","trial-balance","income-statement","chart-of-accounts","journal-entries","general-ledger","balance-sheet"], edit:true },
   // Teacher - Classroom operations
   teacher:   { pages:["dashboard","subjects","attendance","grades","reportcards","discipline","timetable","communication","library","analysis","lessonplans","announcements","exams"], edit:true },
   // Finance - Fee operations
-  finance:   { pages:["dashboard","fees","expenditures","mpesa-reconcile","invoices","announcements","reports","financial-reports"], edit:true },
+  finance:   { pages:["dashboard","fees","expenditures","mpesa-reconcile","invoices","announcements","reports","financial-reports","trial-balance","income-statement","chart-of-accounts","journal-entries","general-ledger","balance-sheet"], edit:true },
   // HR - Staff management
   hr:        { pages:["dashboard","hr","staff","expenditures","announcements"], edit:true },
   // Librarian - Library management
@@ -62,6 +62,12 @@ export const NAV = [
   { id:"exams",           label:"Exams",          icon:"\u{1F4DD}" },
   { id:"bulk-import",     label:"Import/Export",  icon:"\u{1F4C1}" },
   { id:"update-requests", label:"Update Requests",icon:"\u{1F4DD}" },
+  { id:"trial-balance",   label:"Trial Balance",  icon:"\u2696" },
+  { id:"income-statement",label:"Income Statement",icon:"\u{1F4C8}" },
+  { id:"chart-of-accounts",label:"Chart of Accounts",icon:"\u{1F4CA}" },
+  { id:"journal-entries", label:"Journal Entries",icon:"\u{1F4DD}" },
+  { id:"general-ledger",  label:"General Ledger", icon:"\u{1F4D6}" },
+  { id:"balance-sheet",   label:"Balance Sheet",  icon:"\u{1F4CA}" },
   { id:"settings",        label:"Settings",       icon:"\u2699" },
 ];
 

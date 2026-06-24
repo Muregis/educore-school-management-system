@@ -39,6 +39,12 @@ import ExamsPage from "./pages/ExamsPage";
 import FinancialReportsPage from "./pages/FinancialReportsPage";
 import QRVerificationPage from "./pages/QRVerificationPage";
 import UpdateRequestsPage from "./pages/UpdateRequestsPage";
+import TrialBalancePage from "./pages/TrialBalancePage";
+import IncomeStatementPage from "./pages/IncomeStatementPage";
+import ChartOfAccountsPage from "./pages/ChartOfAccountsPage";
+import JournalEntriesPage from "./pages/JournalEntriesPage";
+import GeneralLedgerPage from "./pages/GeneralLedgerPage";
+import BalanceSheetPage from "./pages/BalanceSheetPage";
 import OfflineStatusBar from "./components/OfflineStatusBar"; // NEW: Offline/sync status indicator
 import ParentGuard from "./components/ParentGuard"; // NEW: Parent-student binding enforcement
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
@@ -516,6 +522,12 @@ export default function App() {
     "financial-reports": ["finance","director","superadmin"].includes(auth.role) ? <FinancialReportsPage auth={auth} toast={toast} /> : <Forbidden />,
     analysis: ["admin","teacher","director","superadmin"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,
     "update-requests": ["admin","parent"].includes(auth.role) ? <UpdateRequestsPage auth={auth} students={students} pendingUpdates={pendingUpdates} setPendingUpdates={setPendingUpdates} toast={toast} /> : <Forbidden />,
+    "trial-balance": ["admin","finance","director","superadmin"].includes(auth.role) ? <TrialBalancePage auth={auth} toast={toast} /> : <Forbidden />,
+    "income-statement": ["admin","finance","director","superadmin"].includes(auth.role) ? <IncomeStatementPage auth={auth} toast={toast} /> : <Forbidden />,
+    "chart-of-accounts": ["admin","finance","director","superadmin"].includes(auth.role) ? <ChartOfAccountsPage auth={auth} toast={toast} /> : <Forbidden />,
+    "journal-entries": ["admin","finance","director","superadmin"].includes(auth.role) ? <JournalEntriesPage auth={auth} toast={toast} /> : <Forbidden />,
+    "general-ledger": ["admin","finance","director","superadmin"].includes(auth.role) ? <GeneralLedgerPage auth={auth} toast={toast} /> : <Forbidden />,
+    "balance-sheet": ["admin","finance","director","superadmin"].includes(auth.role) ? <BalanceSheetPage auth={auth} toast={toast} /> : <Forbidden />,
     settings: ["director","superadmin"].includes(auth.role)
       ? <AdminSettings
           auth={auth}
