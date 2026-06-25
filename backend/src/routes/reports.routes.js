@@ -125,7 +125,7 @@ router.get("/summary", async (req, res, next) => {
       .from('payments')
       .select('amount, payment_date, student_id, term')
       .eq('school_id', schoolId)
-      .eq('status', 'paid')
+      .in('status', ['paid', 'completed', 'success'])
       .eq('is_deleted', false);
     if (paidErr) throw paidErr;
     const totalCollected = paidPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
@@ -276,7 +276,7 @@ router.get("/monthly-fee-collection", async (req, res, next) => {
       .from('payments')
       .select('payment_date, amount')
       .eq('school_id', schoolId)
-      .eq('status', 'paid')
+      .in('status', ['paid', 'completed', 'success'])
       .eq('is_deleted', false)
       .order('payment_date', { ascending: false });
     if (error) throw error;
@@ -388,7 +388,7 @@ router.get("/fee-defaulters", async (req, res, next) => {
       .from('payments')
       .select('student_id, amount, payment_date, term')
       .eq('school_id', schoolId)
-      .eq('status', 'paid')
+      .in('status', ['paid', 'completed', 'success'])
       .eq('term', currentTerm)
       .eq('is_deleted', false);
     if (payErr) throw payErr;
@@ -472,7 +472,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
       .from('payments')
       .select('student_id, amount')
       .eq('school_id', schoolId)
-      .eq('status', 'paid')
+      .in('status', ['paid', 'completed', 'success'])
       .eq('term', currentTerm)
       .eq('is_deleted', false);
     if (payErr) throw payErr;
@@ -678,7 +678,7 @@ router.get("/student/:studentId", async (req, res, next) => {
       .select('amount')
       .eq('student_id', studentId)
       .eq('school_id', schoolId)
-      .eq('status', 'paid')
+      .in('status', ['paid', 'completed', 'success'])
       .eq('is_deleted', false);
     if (payErr) throw payErr;
     

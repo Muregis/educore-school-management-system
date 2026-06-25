@@ -100,7 +100,7 @@ export class FinanceService {
         .from('payments')
         .select('*')
         .eq('school_id', schoolId)
-        .eq('status', 'paid')
+        .in('status', ['paid', 'completed', 'success'])
         .eq('is_deleted', false);
 
       const applyDateRange = (query, column) => {
