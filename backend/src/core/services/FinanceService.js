@@ -1,5 +1,6 @@
 import { ChartOfAccountsRepository, JournalEntriesRepository, JournalEntryLinesRepository } from '../repositories/FinanceRepository.js';
 import { getManualExpenditures, getPayrollExpenditures } from '../../services/expenditure.service.js';
+import { supabase } from '../../config/supabaseClient.js';
 
 function isOptionalFinanceDataError(error) {
   const message = String(error?.message || '').toLowerCase();
@@ -93,10 +94,12 @@ export class FinanceService {
     try {
       if (!schoolId) return { payments: [], expenditures: [] };
 
-      const paymentsQuery = this.chartOfAccountsRepository.client
+      let paymentsQuery = supabase
         .from('payments')
         .select('*')
-        .eq('school_id', schoolId);
+        .eq('school_id', schoolId)
+        .eq('status', 'paid')
+        .eq('is_deleted', false);
 
       const applyDateRange = (query, column) => {
         let scopedQuery = query;
@@ -124,8 +127,6 @@ export class FinanceService {
         getManualExpenditures(schoolId),
         getPayrollExpenditures(schoolId)
       ]);
-
-      const paidStatuses = new Set(['paid', 'completed', 'success', 'successful']);
       
       // Filter manual and payroll expenditures by date range
       const filterByDate = (items, dateField) => {
@@ -141,9 +142,7 @@ export class FinanceService {
       };
 
       return {
-        payments: paymentsRows.filter(payment => (
-          !payment.status || paidStatuses.has(String(payment.status).toLowerCase())
-        )),
+        payments: paymentsRows,
         expenditures: [
           ...filterByDate(manualExpenditures, 'expense_date'),
           ...filterByDate(payrollExpenditures, 'expense_date')
@@ -309,7 +308,12 @@ export class FinanceService {
     try {
       console.log('[FinanceService.getTrialBalance] Starting for schoolId:', schoolId);
       const accounts = await this.getAccounts(schoolId);
-      const lines = await this.journalEntryLinesRepository.findByAccount(schoolId, null, null, asOfDate);
+      let lines = [];
+      try {
+        lines = await this.journalEntryLinesRepository.findByAccount(schoolId, null, null, asOfDate);
+      } catch (error) {
+        if (!isOptionalFinanceDataError(error)) throw error;
+      }
       const { payments, expenditures } = await this.getOperationalRows(schoolId, null, asOfDate);
 
       const trialBalance = accounts.map(account => {
@@ -404,12 +408,17 @@ export class FinanceService {
         : { payments: [], expenditures: [] };
 
       for (const account of accounts) {
-        const lines = await this.journalEntryLinesRepository.findByAccount(
-          account.school_id,
-          account.id,
-          startDate,
-          endDate
-        );
+        let lines = [];
+        try {
+          lines = await this.journalEntryLinesRepository.findByAccount(
+            account.school_id,
+            account.id,
+            startDate,
+            endDate
+          );
+        } catch (error) {
+          if (!isOptionalFinanceDataError(error)) throw error;
+        }
 
         const totalDebit = lines.reduce((sum, l) => sum + Number(l.debit || 0), 0);
         const totalCredit = lines.reduce((sum, l) => sum + Number(l.credit || 0), 0);
@@ -500,7 +509,12 @@ export class FinanceService {
         if (found) {
           accounts = [found];
         } else {
-          const dbAccount = await this.chartOfAccountsRepository.findById(accountId);
+          let dbAccount = null;
+          try {
+            dbAccount = await this.chartOfAccountsRepository.findById(accountId);
+          } catch (error) {
+            if (!isOptionalFinanceDataError(error)) throw error;
+          }
           accounts = dbAccount ? [dbAccount] : [];
         }
       } else {
@@ -518,12 +532,17 @@ export class FinanceService {
       for (const account of accounts) {
         if (!account) continue;
 
-        const lines = await this.journalEntryLinesRepository.findByAccount(
-          schoolId,
-          account.id,
-          startDate,
-          endDate
-        );
+        let lines = [];
+        try {
+          lines = await this.journalEntryLinesRepository.findByAccount(
+            schoolId,
+            account.id,
+            startDate,
+            endDate
+          );
+        } catch (error) {
+          if (!isOptionalFinanceDataError(error)) throw error;
+        }
         
         const journalTransactions = lines.map(line => ({
           id: line.id,
