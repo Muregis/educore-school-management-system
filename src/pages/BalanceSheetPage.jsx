@@ -246,8 +246,8 @@ export default function BalanceSheetPage({ auth, toast }) {
           <Table
               headers={["Account", "Amount"]}
               data={balanceSheet.equity.map(item => [
-                <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }>{item.account_name}</span>,
-                <span key="amount" style={{ fontWeight: 600, color: "var(--color-primary)" }>{money(item.amount || item.balance || 0)}</span>,
+                <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{item.account_name}</span>,
+                <span key="amount" style={{ fontWeight: 600, color: "var(--color-primary)" }}>{money(item.amount || item.balance || 0)}</span>,
               ])}
             />
         ) : (
