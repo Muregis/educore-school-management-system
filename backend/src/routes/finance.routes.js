@@ -8,10 +8,12 @@ function isMissingFinanceTable(error) {
   const message = String(error?.message || '').toLowerCase();
   return error?.code === '42P01'
     || error?.code === '42703'
+    || error?.code === '22P02' // invalid UUID syntax
     || error?.code === 'PGRST205'
     || message.includes('does not exist')
     || message.includes('could not find the table')
-    || message.includes('could not find the column');
+    || message.includes('could not find the column')
+    || message.includes('invalid input syntax for type uuid');
 }
 
 function handleFinanceError(res, error, emptyResult) {

@@ -6,10 +6,12 @@ function isOptionalFinanceDataError(error) {
   const message = String(error?.message || '').toLowerCase();
   return error?.code === '42P01'
     || error?.code === '42703'
+    || error?.code === '22P02' // invalid UUID syntax
     || error?.code === 'PGRST205'
     || message.includes('does not exist')
     || message.includes('could not find the table')
-    || message.includes('could not find the column');
+    || message.includes('could not find the column')
+    || message.includes('invalid input syntax for type uuid');
 }
 
 /**
@@ -409,15 +411,18 @@ export class FinanceService {
 
       for (const account of accounts) {
         let lines = [];
-        try {
-          lines = await this.journalEntryLinesRepository.findByAccount(
-            account.school_id,
-            account.id,
-            startDate,
-            endDate
-          );
-        } catch (error) {
-          if (!isOptionalFinanceDataError(error)) throw error;
+        // Only query database if account is NOT operational
+        if (account.source !== 'operational') {
+          try {
+            lines = await this.journalEntryLinesRepository.findByAccount(
+              account.school_id,
+              account.id,
+              startDate,
+              endDate
+            );
+          } catch (error) {
+            if (!isOptionalFinanceDataError(error)) throw error;
+          }
         }
 
         const totalDebit = lines.reduce((sum, l) => sum + Number(l.debit || 0), 0);
@@ -509,13 +514,19 @@ export class FinanceService {
         if (found) {
           accounts = [found];
         } else {
-          let dbAccount = null;
-          try {
-            dbAccount = await this.chartOfAccountsRepository.findById(accountId);
-          } catch (error) {
-            if (!isOptionalFinanceDataError(error)) throw error;
+          // Check if it's an operational account first (starts with operating-)
+          if (accountId.startsWith('operating-')) {
+            // It's an operational account, no need to query DB
+            accounts = [];
+          } else {
+            let dbAccount = null;
+            try {
+              dbAccount = await this.chartOfAccountsRepository.findById(accountId);
+            } catch (error) {
+              if (!isOptionalFinanceDataError(error)) throw error;
+            }
+            accounts = dbAccount ? [dbAccount] : [];
           }
-          accounts = dbAccount ? [dbAccount] : [];
         }
       } else {
         accounts = allAccounts;
@@ -533,15 +544,18 @@ export class FinanceService {
         if (!account) continue;
 
         let lines = [];
-        try {
-          lines = await this.journalEntryLinesRepository.findByAccount(
-            schoolId,
-            account.id,
-            startDate,
-            endDate
-          );
-        } catch (error) {
-          if (!isOptionalFinanceDataError(error)) throw error;
+        // Only query database if account is NOT operational
+        if (account.source !== 'operational') {
+          try {
+            lines = await this.journalEntryLinesRepository.findByAccount(
+              schoolId,
+              account.id,
+              startDate,
+              endDate
+            );
+          } catch (error) {
+            if (!isOptionalFinanceDataError(error)) throw error;
+          }
         }
         
         const journalTransactions = lines.map(line => ({
