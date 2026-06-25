@@ -357,13 +357,15 @@ export class FinanceService {
         };
       });
 
-      const totalDebits = trialBalance.reduce((sum, acc) => sum + Number(acc.debit || 0), 0);
-      const totalCredits = trialBalance.reduce((sum, acc) => sum + Number(acc.credit || 0), 0);
+      // Filter accounts first, then calculate totals from filtered results
+      const filteredTrialBalance = trialBalance.filter(acc => acc.debit > 0 || acc.credit > 0);
+      const totalDebits = filteredTrialBalance.reduce((sum, acc) => sum + Number(acc.debit || 0), 0);
+      const totalCredits = filteredTrialBalance.reduce((sum, acc) => sum + Number(acc.credit || 0), 0);
 
       console.log('[FinanceService.getTrialBalance] Completed:', { totalDebits, totalCredits });
 
       return {
-        accounts: trialBalance.filter(acc => acc.debit > 0 || acc.credit > 0),
+        accounts: filteredTrialBalance,
         total_debits: Number(totalDebits.toFixed(2)),
         total_credits: Number(totalCredits.toFixed(2)),
         is_balanced: Math.abs(totalDebits - totalCredits) < 0.01

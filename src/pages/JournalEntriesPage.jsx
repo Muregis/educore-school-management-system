@@ -197,11 +197,13 @@ export default function JournalEntriesPage({ auth, toast }) {
             Record and manage adjusting journal entries
           </p>
         </div>
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
           <Button onClick={() => setShowModal(true)} variant="primary">
             + New Entry
           </Button>
           <Button onClick={handleExport} variant="secondary">📥 Export CSV</Button>
           <Button onClick={handlePrint} variant="secondary">🖨️ Print</Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
