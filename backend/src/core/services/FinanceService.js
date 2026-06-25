@@ -63,9 +63,12 @@ export class FinanceService {
     try {
       let savedResult;
       try {
-        savedResult = type
-          ? await this.chartOfAccountsRepository.findByType(schoolId, type)
-          : await this.chartOfAccountsRepository.findAll({ school_id: schoolId }, { limit: 1000 });
+        if (type) {
+          savedResult = await this.chartOfAccountsRepository.findByType(schoolId, type);
+        } else {
+          const findAllResult = await this.chartOfAccountsRepository.findAll({ school_id: schoolId }, { limit: 1000 });
+          savedResult = findAllResult?.data || [];
+        }
       } catch (error) {
         if (!isOptionalFinanceDataError(error)) throw error;
         savedResult = [];
@@ -73,7 +76,7 @@ export class FinanceService {
       
       const savedAccounts = Array.isArray(savedResult) 
         ? savedResult 
-        : (savedResult?.data || []);
+        : [];
         
       const operationalAccounts = this.getOperationalAccounts(schoolId)
         .filter(account => !type || account.account_type === type);
@@ -292,6 +295,7 @@ export class FinanceService {
    */
   async getTrialBalance(schoolId, asOfDate) {
     try {
+      console.log('[FinanceService.getTrialBalance] Starting for schoolId:', schoolId);
       const accounts = await this.getAccounts(schoolId);
       const lines = await this.journalEntryLinesRepository.findByAccount(schoolId, null, null, asOfDate);
       const { payments, expenditures } = await this.getOperationalRows(schoolId, null, asOfDate);
@@ -329,6 +333,8 @@ export class FinanceService {
       const totalDebits = trialBalance.reduce((sum, acc) => sum + Number(acc.debit || 0), 0);
       const totalCredits = trialBalance.reduce((sum, acc) => sum + Number(acc.credit || 0), 0);
 
+      console.log('[FinanceService.getTrialBalance] Completed:', { totalDebits, totalCredits });
+
       return {
         accounts: trialBalance.filter(acc => acc.debit > 0 || acc.credit > 0),
         total_debits: Number(totalDebits.toFixed(2)),
@@ -346,6 +352,7 @@ export class FinanceService {
    */
   async getIncomeStatement(schoolId, startDate, endDate) {
     try {
+      console.log('[FinanceService.getIncomeStatement] Starting for schoolId:', schoolId, 'dates:', startDate, endDate);
       const revenueAccounts = await this.getAccounts(schoolId, 'revenue');
       const expenseAccounts = await this.getAccounts(schoolId, 'expense');
 
@@ -355,6 +362,8 @@ export class FinanceService {
       const totalRevenue = revenue.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
       const totalExpenses = expenses.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
       const netIncome = totalRevenue - totalExpenses;
+
+      console.log('[FinanceService.getIncomeStatement] Completed:', { totalRevenue, totalExpenses, netIncome });
 
       return {
         revenue,
@@ -424,6 +433,7 @@ export class FinanceService {
    */
   async getBalanceSheet(schoolId, asOfDate) {
     try {
+      console.log('[FinanceService.getBalanceSheet] Starting for schoolId:', schoolId, 'asOf:', asOfDate);
       const assetAccounts = await this.getAccounts(schoolId, 'asset');
       const liabilityAccounts = await this.getAccounts(schoolId, 'liability');
       const equityAccounts = await this.getAccounts(schoolId, 'equity');
@@ -446,6 +456,8 @@ export class FinanceService {
 
       const finalTotalEquity = Number((totalEquity + retainedEarnings).toFixed(2));
 
+      console.log('[FinanceService.getBalanceSheet] Completed:', { totalAssets, totalLiabilities, finalTotalEquity, retainedEarnings });
+
       return {
         assets,
         liabilities,
@@ -467,6 +479,7 @@ export class FinanceService {
    */
   async getGeneralLedger(schoolId, accountId, startDate, endDate) {
     try {
+      console.log('[FinanceService.getGeneralLedger] Starting for schoolId:', schoolId, 'accountId:', accountId);
       const allAccounts = await this.getAccounts(schoolId);
       
       let accounts;
@@ -483,6 +496,7 @@ export class FinanceService {
       }
       
       if (!accounts || accounts.length === 0) {
+        console.log('[FinanceService.getGeneralLedger] No accounts found');
         return { ledger: [], total_accounts: 0 };
       }
 
@@ -525,6 +539,8 @@ export class FinanceService {
           transactions: transactionsWithBalance
         });
       }
+
+      console.log('[FinanceService.getGeneralLedger] Completed, found', ledger.length, 'accounts');
       
       return {
         ledger,
