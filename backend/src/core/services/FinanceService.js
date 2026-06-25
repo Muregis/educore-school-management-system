@@ -1,4 +1,5 @@
 import { ChartOfAccountsRepository, JournalEntriesRepository, JournalEntryLinesRepository } from '../repositories/FinanceRepository.js';
+import { getManualExpenditures, getPayrollExpenditures } from '../../services/expenditure.service.js';
 
 function isOptionalFinanceDataError(error) {
   const message = String(error?.message || '').toLowerCase();
@@ -97,20 +98,6 @@ export class FinanceService {
         .select('*')
         .eq('school_id', schoolId);
 
-      const expendituresQuery = this.chartOfAccountsRepository.client
-        .from('expenditures')
-        .select('*')
-        .eq('school_id', schoolId)
-        .eq('is_deleted', false);
-
-      const payrollQuery = this.chartOfAccountsRepository.client
-        .from('hr_payslips')
-        .select('payslip_id, school_id, month, year, net_pay, notes, paid_date, payment_method, payment_reference, generated_by, paid_by_user_id, payment_recorded_by, created_at, updated_at, hr_staff(full_name, job_title)')
-        .eq('school_id', schoolId)
-        .eq('is_deleted', false)
-        .eq('status', 'paid')
-        .not('paid_date', 'is', null);
-
       const applyDateRange = (query, column) => {
         let scopedQuery = query;
         if (startDate) scopedQuery = scopedQuery.gte(column, startDate);
@@ -132,38 +119,35 @@ export class FinanceService {
         }
       };
 
-      const [paymentsRows, expendituresRows, payrollRows] = await Promise.all([
+      const [paymentsRows, manualExpenditures, payrollExpenditures] = await Promise.all([
         safeQuery(applyDateRange(paymentsQuery, 'payment_date')),
-        safeQuery(applyDateRange(expendituresQuery, 'expense_date')),
-        safeQuery(applyDateRange(payrollQuery, 'paid_date'))
+        getManualExpenditures(schoolId),
+        getPayrollExpenditures(schoolId)
       ]);
 
       const paidStatuses = new Set(['paid', 'completed', 'success', 'successful']);
-
-      // Normalize payroll rows into expenditure-like objects
-      const normalisedPayroll = (payrollRows || []).map(row => ({
-        expenditure_id: `payroll-${row.payslip_id}`,
-        school_id: row.school_id,
-        expense_date: row.paid_date,
-        category: "Teachers Salary",
-        item_name: row.hr_staff?.full_name || "Payroll",
-        description: `${row.hr_staff?.job_title || "Staff salary"} for ${row.month}/${row.year}`,
-        amount: Number(row.net_pay || 0),
-        payment_method: row.payment_method || "Payroll",
-        vendor_name: row.hr_staff?.full_name || null,
-        paid_to_name: row.hr_staff?.full_name || null,
-        purpose: `Salary payment for ${row.month}/${row.year}`,
-        reference_number: row.payment_reference || null,
-        notes: row.notes || null,
-        created_at: row.created_at,
-        updated_at: row.updated_at
-      }));
+      
+      // Filter manual and payroll expenditures by date range
+      const filterByDate = (items, dateField) => {
+        if (!startDate && !endDate) return items;
+        return items.filter(item => {
+          const itemDate = item[dateField];
+          if (!itemDate) return false;
+          let isValid = true;
+          if (startDate && itemDate < startDate) isValid = false;
+          if (endDate && itemDate > endDate) isValid = false;
+          return isValid;
+        });
+      };
 
       return {
         payments: paymentsRows.filter(payment => (
           !payment.status || paidStatuses.has(String(payment.status).toLowerCase())
         )),
-        expenditures: [...expendituresRows, ...normalisedPayroll]
+        expenditures: [
+          ...filterByDate(manualExpenditures, 'expense_date'),
+          ...filterByDate(payrollExpenditures, 'expense_date')
+        ]
       };
     } catch (error) {
       console.error('[FinanceService.getOperationalRows] Error:', error);

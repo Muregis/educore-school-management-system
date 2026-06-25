@@ -1,6 +1,16 @@
 import { BaseRepository } from '../BaseRepository.js';
 import { isMissingTableError } from '../../utils/missingTableError.js';
 
+function isOptionalFinanceDataError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.code === '42P01'
+    || error?.code === '42703'
+    || error?.code === 'PGRST205'
+    || message.includes('does not exist')
+    || message.includes('could not find the table')
+    || message.includes('could not find the column');
+}
+
 export class ChartOfAccountsRepository extends BaseRepository {
   constructor() {
     super('chart_of_accounts');
@@ -17,14 +27,14 @@ export class ChartOfAccountsRepository extends BaseRepository {
         .order('account_code');
 
       if (error) {
-        if (isMissingTableError(error)) return [];
+        if (isOptionalFinanceDataError(error) || isMissingTableError(error)) return [];
         console.error('[ChartOfAccountsRepository.findByType] Error:', error);
         throw error;
       }
       return data || [];
     } catch (error) {
       console.error('[ChartOfAccountsRepository.findByType] Error:', error);
-      if (isMissingTableError(error)) return [];
+      if (isOptionalFinanceDataError(error) || isMissingTableError(error)) return [];
       throw error;
     }
   }
@@ -38,14 +48,14 @@ export class ChartOfAccountsRepository extends BaseRepository {
         .maybeSingle();
 
       if (error) {
-        if (isMissingTableError(error)) return null;
+        if (isOptionalFinanceDataError(error) || isMissingTableError(error)) return null;
         console.error('[ChartOfAccountsRepository.findByCode] Error:', error);
         throw error;
       }
       return data;
     } catch (error) {
       console.error('[ChartOfAccountsRepository.findByCode] Error:', error);
-      if (isMissingTableError(error)) return null;
+      if (isOptionalFinanceDataError(error) || isMissingTableError(error)) return null;
       throw error;
     }
   }
@@ -56,17 +66,17 @@ export class ChartOfAccountsRepository extends BaseRepository {
         .from(this.tableName)
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        if (isMissingTableError(error)) return null;
+        if (isOptionalFinanceDataError(error) || isMissingTableError(error)) return null;
         console.error('[ChartOfAccountsRepository.findById] Error:', error);
         throw error;
       }
       return data;
     } catch (error) {
       console.error('[ChartOfAccountsRepository.findById] Error:', error);
-      if (isMissingTableError(error)) return null;
+      if (isOptionalFinanceDataError(error) || isMissingTableError(error)) return null;
       throw error;
     }
   }
@@ -96,7 +106,7 @@ export class JournalEntriesRepository extends BaseRepository {
       const { data, error } = await query;
 
       if (error) {
-        if (isMissingTableError(error)) return [];
+        if (isOptionalFinanceDataError(error) || isMissingTableError(error)) return [];
         console.error('[JournalEntriesRepository.findByDateRange] Error:', error);
         throw error;
       }
@@ -107,7 +117,7 @@ export class JournalEntriesRepository extends BaseRepository {
       }));
     } catch (error) {
       console.error('[JournalEntriesRepository.findByDateRange] Error:', error);
-      if (isMissingTableError(error)) return [];
+      if (isOptionalFinanceDataError(error) || isMissingTableError(error)) return [];
       throw error;
     }
   }
@@ -119,17 +129,17 @@ export class JournalEntriesRepository extends BaseRepository {
         .select('*, journal_entry_lines(*)')
         .eq('reference_type', referenceType)
         .eq('reference_id', referenceId)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        if (isMissingTableError(error)) return null;
+        if (isOptionalFinanceDataError(error) || isMissingTableError(error)) return null;
         console.error('[JournalEntriesRepository.findByReference] Error:', error);
         throw error;
       }
       return data;
     } catch (error) {
       console.error('[JournalEntriesRepository.findByReference] Error:', error);
-      if (isMissingTableError(error)) return null;
+      if (isOptionalFinanceDataError(error) || isMissingTableError(error)) return null;
       throw error;
     }
   }
@@ -162,14 +172,14 @@ export class JournalEntryLinesRepository extends BaseRepository {
       const { data, error } = await query;
 
       if (error) {
-        if (isMissingTableError(error)) return [];
+        if (isOptionalFinanceDataError(error) || isMissingTableError(error)) return [];
         console.error('[JournalEntryLinesRepository.findByAccount] Error:', error);
         throw error;
       }
       return data || [];
     } catch (error) {
       console.error('[JournalEntryLinesRepository.findByAccount] Error:', error);
-      if (isMissingTableError(error)) return [];
+      if (isOptionalFinanceDataError(error) || isMissingTableError(error)) return [];
       throw error;
     }
   }
