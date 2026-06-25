@@ -143,6 +143,15 @@ export class FinanceService {
         });
       };
 
+      console.log('[FinanceService.getOperationalRows] Data counts (matching Reports page exactly):', {
+        payments: paymentsRows.length,
+        manualExpenditures: manualExpenditures.length,
+        payrollExpenditures: payrollExpenditures.length,
+        paymentsTotal: paymentsRows.reduce((sum, p) => sum + Number(p.amount || 0), 0),
+        manualTotal: manualExpenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
+        payrollTotal: payrollExpenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
+      });
+
       return {
         payments: paymentsRows,
         expenditures: [
@@ -409,6 +418,14 @@ export class FinanceService {
         ? await this.getOperationalRows(schoolId, startDate, endDate)
         : { payments: [], expenditures: [] };
 
+      console.log('[FinanceService.calculateAccountBalances] Data received:', {
+        schoolId,
+        paymentsCount: operationalRows.payments.length,
+        expendituresCount: operationalRows.expenditures.length,
+        paymentsTotal: operationalRows.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0),
+        expendituresTotal: operationalRows.expenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
+      });
+
       for (const account of accounts) {
         let lines = [];
         // Only query database if account is NOT operational
@@ -439,6 +456,15 @@ export class FinanceService {
         } else {
           balance = (totalDebit + operationalDebit) - (totalCredit + operationalCredit);
         }
+
+        console.log(`[FinanceService.calculateAccountBalances] Account: ${account.account_name}`, {
+          accountType: account.account_type,
+          journalDebit: totalDebit,
+          journalCredit: totalCredit,
+          operationalDebit,
+          operationalCredit,
+          finalBalance: Number(balance.toFixed(2)),
+        });
 
         result.push({
           ...account,
