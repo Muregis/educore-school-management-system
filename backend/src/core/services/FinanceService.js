@@ -335,30 +335,16 @@ export class FinanceService {
       });
     }
 
-    // fee-revenue shows ALL payments (total revenue)
-    if (!account || account.id === 'fee-revenue') {
-      payments.forEach(payment => {
-        const amount = Number(payment.amount || 0);
-        if (amount <= 0) return;
-        transactions.push({
-          id: `payment-revenue-${payment.payment_id || payment.id}`,
-          transaction_date: payment.payment_date || payment.created_at,
-          reference: payment.receipt_number || payment.reference_number || payment.mpesa_receipt_number || `PAY-${payment.payment_id || payment.id}`,
-          description: `Fee payment${payment.paid_by ? ` from ${payment.paid_by}` : ''}`,
-          debit: 0,
-          credit: amount,
-          source_type: 'payment'
-        });
-      });
-    }
+    // fee-revenue is deprecated - use specific payment method accounts instead
+    // Kept for backward compatibility but doesn't add transactions to avoid double-counting
 
     // Expense category-specific accounts
     const expenseCategoryMap = {
-      'salaries-expense': ['Teachers Salary', 'Salary', 'Payroll', 'Staff'],
-      'utilities-expense': ['Utilities', 'Water', 'Electricity', 'Internet', 'Power'],
-      'supplies-expense': ['Supplies', 'Stationery', 'Books', 'Materials'],
-      'maintenance-expense': ['Maintenance', 'Repairs', 'Renovation'],
-      'other-expenses': ['Other', 'Rent', 'Transport', 'Marketing', 'Administrative', 'General']
+      'salaries-expense': ['Teachers Salary', 'Salary', 'Payroll'],
+      'utilities-expense': ['Utilities', 'Water', 'Electricity', 'Internet'],
+      'supplies-expense': ['Supplies', 'Stationery', 'Books'],
+      'maintenance-expense': ['Maintenance', 'Repairs'],
+      'other-expenses': ['Other']
     };
 
     if (expenseCategoryMap[account.id]) {
@@ -383,7 +369,6 @@ export class FinanceService {
       });
     }
 
-    // operating-expenses shows ALL expenditures (total expenses)
     if (!account || account.id === 'operating-expenses') {
       expenditures.forEach(expense => {
         const amount = Number(expense.amount || 0);
