@@ -39,17 +39,6 @@ export class FinanceService {
         source: 'operational'
       },
       {
-        id: 'accounts-receivable',
-        school_id: schoolId,
-        account_code: 'OP-1100',
-        account_name: 'Accounts Receivable - Student Fees',
-        account_type: 'asset',
-        normal_balance: 'debit',
-        is_active: true,
-        is_system: true,
-        source: 'operational'
-      },
-      {
         id: 'fee-revenue',
         school_id: schoolId,
         account_code: 'OP-4000',
@@ -67,17 +56,6 @@ export class FinanceService {
         account_name: 'Operating Expenses',
         account_type: 'expense',
         normal_balance: 'debit',
-        is_active: true,
-        is_system: true,
-        source: 'operational'
-      },
-      {
-        id: 'accounts-payable',
-        school_id: schoolId,
-        account_code: 'OP-2000',
-        account_name: 'Accounts Payable',
-        account_type: 'liability',
-        normal_balance: 'credit',
         is_active: true,
         is_system: true,
         source: 'operational'
@@ -116,7 +94,7 @@ export class FinanceService {
 
   async getOperationalRows(schoolId, startDate = null, endDate = null) {
     try {
-      if (!schoolId) return { payments: [], expenditures: [], outstandingBalances: 0 };
+      if (!schoolId) return { payments: [], expenditures: [] };
 
       let paymentsQuery = supabase
         .from('payments')
@@ -146,11 +124,10 @@ export class FinanceService {
         }
       };
 
-      const [paymentsRows, manualExpenditures, payrollExpenditures, outstandingBalances] = await Promise.all([
+      const [paymentsRows, manualExpenditures, payrollExpenditures] = await Promise.all([
         safeQuery(applyDateRange(paymentsQuery, 'payment_date')),
         getManualExpenditures(schoolId),
-        getPayrollExpenditures(schoolId),
-        this.getOutstandingBalances(schoolId)
+        getPayrollExpenditures(schoolId)
       ]);
       
       // Filter manual and payroll expenditures by date range
@@ -173,7 +150,6 @@ export class FinanceService {
         paymentsTotal: paymentsRows.reduce((sum, p) => sum + Number(p.amount || 0), 0),
         manualTotal: manualExpenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
         payrollTotal: payrollExpenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
-        outstandingBalancesTotal: outstandingBalances
       });
 
       return {
@@ -181,8 +157,7 @@ export class FinanceService {
         expenditures: [
           ...filterByDate(manualExpenditures, 'expense_date'),
           ...filterByDate(payrollExpenditures, 'expense_date')
-        ],
-        outstandingBalances
+        ]
       };
     } catch (error) {
       console.error('[FinanceService.getOperationalRows] Error:', error);
@@ -190,29 +165,7 @@ export class FinanceService {
     }
   }
 
-  async getOutstandingBalances(schoolId) {
-    try {
-      const { data, error } = await supabase
-        .from('fee_balance_ledger')
-        .select('balance_after')
-        .eq('school_id', schoolId)
-        .eq('is_deleted', false)
-        .gt('balance_after', 0);
-
-      if (error) {
-        if (isOptionalFinanceDataError(error)) return 0;
-        throw error;
-      }
-
-      const total = (data || []).reduce((sum, row) => sum + Number(row.balance_after || 0), 0);
-      return total;
-    } catch (error) {
-      console.error('[FinanceService.getOutstandingBalances] Error:', error);
-      return 0;
-    }
-  }
-
-  buildOperationalTransactions(account, payments, expenditures, outstandingBalances = 0) {
+  buildOperationalTransactions(account, payments, expenditures) {
     const transactions = [];
 
     if (!account || account.id === 'operating-cash') {
@@ -245,38 +198,7 @@ export class FinanceService {
       });
     }
 
-    // Accounts Receivable - tracks outstanding student fees (accrual accounting)
-    if (!account || account.id === 'accounts-receivable') {
-      if (outstandingBalances > 0) {
-        transactions.push({
-          id: `ar-outstanding-${Date.now()}`,
-          transaction_date: new Date().toISOString().split('T')[0],
-          reference: 'OUTSTANDING-FEES',
-          description: 'Outstanding student fee balances',
-          debit: outstandingBalances,
-          credit: 0,
-          source_type: 'accrual'
-        });
-      }
-    }
-
-    // Fee Revenue - shows total billed revenue (accrual basis)
-    // Includes both collected payments and outstanding balances
     if (!account || account.id === 'fee-revenue') {
-      // First, add outstanding balances as revenue (accrual basis)
-      if (outstandingBalances > 0) {
-        transactions.push({
-          id: `revenue-outstanding-${Date.now()}`,
-          transaction_date: new Date().toISOString().split('T')[0],
-          reference: 'OUTSTANDING-FEES',
-          description: 'Revenue recognized for outstanding student fees',
-          debit: 0,
-          credit: outstandingBalances,
-          source_type: 'accrual'
-        });
-      }
-      
-      // Then, add collected payments as revenue
       payments.forEach(payment => {
         const amount = Number(payment.amount || 0);
         if (amount <= 0) return;
@@ -306,13 +228,6 @@ export class FinanceService {
           source_type: 'expenditure'
         });
       });
-    }
-
-    // Accounts Payable - tracks unpaid expenses
-    // This is a placeholder - needs data on unpaid/approved but not paid expenses
-    if (!account || account.id === 'accounts-payable') {
-      // TODO: Integrate with expenditure approval workflow
-      // For now, this account will show 0
     }
 
     transactions.sort((a, b) => new Date(a.transaction_date) - new Date(b.transaction_date));
@@ -410,14 +325,14 @@ export class FinanceService {
       } catch (error) {
         if (!isOptionalFinanceDataError(error)) throw error;
       }
-      const { payments, expenditures, outstandingBalances } = await this.getOperationalRows(schoolId, null, asOfDate);
+      const { payments, expenditures } = await this.getOperationalRows(schoolId, null, asOfDate);
 
       const trialBalance = accounts.map(account => {
         const accountLines = lines.filter(l => l.account_id === account.id);
         const totalDebit = accountLines.reduce((sum, l) => sum + Number(l.debit || 0), 0);
         const totalCredit = accountLines.reduce((sum, l) => sum + Number(l.credit || 0), 0);
         const operationalTransactions = account.source === 'operational'
-          ? this.buildOperationalTransactions(account, payments, expenditures, outstandingBalances)
+          ? this.buildOperationalTransactions(account, payments, expenditures)
           : [];
         const operationalDebit = operationalTransactions.reduce((sum, t) => sum + Number(t.debit || 0), 0);
         const operationalCredit = operationalTransactions.reduce((sum, t) => sum + Number(t.credit || 0), 0);
@@ -532,7 +447,7 @@ export class FinanceService {
         const totalDebit = lines.reduce((sum, l) => sum + Number(l.debit || 0), 0);
         const totalCredit = lines.reduce((sum, l) => sum + Number(l.credit || 0), 0);
         const operationalTransactions = account.source === 'operational'
-          ? this.buildOperationalTransactions(account, operationalRows.payments, operationalRows.expenditures, operationalRows.outstandingBalances)
+          ? this.buildOperationalTransactions(account, operationalRows.payments, operationalRows.expenditures)
           : [];
         const operationalDebit = operationalTransactions.reduce((sum, t) => sum + Number(t.debit || 0), 0);
         const operationalCredit = operationalTransactions.reduce((sum, t) => sum + Number(t.credit || 0), 0);
@@ -684,7 +599,7 @@ export class FinanceService {
         }));
 
         const operationalTransactions = account.source === 'operational'
-          ? this.buildOperationalTransactions(account, operationalRows.payments, operationalRows.expenditures, operationalRows.outstandingBalances)
+          ? this.buildOperationalTransactions(account, operationalRows.payments, operationalRows.expenditures)
           : [];
         
         const transactions = [...journalTransactions, ...operationalTransactions];
