@@ -26,6 +26,111 @@ export class FinanceService {
   }
 
   getOperationalAccounts(schoolId) {
+    const paymentMethodAccounts = [
+      {
+        id: 'cash-revenue',
+        school_id: schoolId,
+        account_code: 'OP-4100',
+        account_name: 'Cash Payments',
+        account_type: 'revenue',
+        normal_balance: 'credit',
+        is_active: true,
+        is_system: true,
+        source: 'operational'
+      },
+      {
+        id: 'bank-transfer-revenue',
+        school_id: schoolId,
+        account_code: 'OP-4200',
+        account_name: 'Bank Transfer Payments',
+        account_type: 'revenue',
+        normal_balance: 'credit',
+        is_active: true,
+        is_system: true,
+        source: 'operational'
+      },
+      {
+        id: 'mpesa-revenue',
+        school_id: schoolId,
+        account_code: 'OP-4300',
+        account_name: 'M-Pesa Payments',
+        account_type: 'revenue',
+        normal_balance: 'credit',
+        is_active: true,
+        is_system: true,
+        source: 'operational'
+      },
+      {
+        id: 'other-payments-revenue',
+        school_id: schoolId,
+        account_code: 'OP-4400',
+        account_name: 'Other Payment Methods',
+        account_type: 'revenue',
+        normal_balance: 'credit',
+        is_active: true,
+        is_system: true,
+        source: 'operational'
+      }
+    ];
+
+    const expenseCategoryAccounts = [
+      {
+        id: 'salaries-expense',
+        school_id: schoolId,
+        account_code: 'OP-5100',
+        account_name: 'Salaries Expense',
+        account_type: 'expense',
+        normal_balance: 'debit',
+        is_active: true,
+        is_system: true,
+        source: 'operational'
+      },
+      {
+        id: 'utilities-expense',
+        school_id: schoolId,
+        account_code: 'OP-5200',
+        account_name: 'Utilities Expense',
+        account_type: 'expense',
+        normal_balance: 'debit',
+        is_active: true,
+        is_system: true,
+        source: 'operational'
+      },
+      {
+        id: 'supplies-expense',
+        school_id: schoolId,
+        account_code: 'OP-5300',
+        account_name: 'Supplies Expense',
+        account_type: 'expense',
+        normal_balance: 'debit',
+        is_active: true,
+        is_system: true,
+        source: 'operational'
+      },
+      {
+        id: 'maintenance-expense',
+        school_id: schoolId,
+        account_code: 'OP-5400',
+        account_name: 'Maintenance Expense',
+        account_type: 'expense',
+        normal_balance: 'debit',
+        is_active: true,
+        is_system: true,
+        source: 'operational'
+      },
+      {
+        id: 'other-expenses',
+        school_id: schoolId,
+        account_code: 'OP-5500',
+        account_name: 'Other Expenses',
+        account_type: 'expense',
+        normal_balance: 'debit',
+        is_active: true,
+        is_system: true,
+        source: 'operational'
+      }
+    ];
+
     return [
       {
         id: 'operating-cash',
@@ -59,7 +164,9 @@ export class FinanceService {
         is_active: true,
         is_system: true,
         source: 'operational'
-      }
+      },
+      ...paymentMethodAccounts,
+      ...expenseCategoryAccounts
     ];
   }
 
@@ -198,6 +305,37 @@ export class FinanceService {
       });
     }
 
+    // Payment method-specific revenue accounts
+    const paymentMethodMap = {
+      'cash-revenue': ['cash'],
+      'bank-transfer-revenue': ['bank_transfer', 'bank'],
+      'mpesa-revenue': ['mpesa', 'mpesa_manual'],
+      'other-payments-revenue': ['card', 'cheque', 'paystack', 'other']
+    };
+
+    if (paymentMethodMap[account.id]) {
+      const allowedMethods = paymentMethodMap[account.id];
+      payments.forEach(payment => {
+        const method = (payment.payment_method || '').toLowerCase().replace(/[_\s]/g, '');
+        const normalizedAllowed = allowedMethods.map(m => m.toLowerCase().replace(/[_\s]/g, ''));
+        
+        if (normalizedAllowed.includes(method)) {
+          const amount = Number(payment.amount || 0);
+          if (amount <= 0) return;
+          transactions.push({
+            id: `payment-${account.id}-${payment.payment_id || payment.id}`,
+            transaction_date: payment.payment_date || payment.created_at,
+            reference: payment.receipt_number || payment.reference_number || payment.mpesa_receipt_number || `PAY-${payment.payment_id || payment.id}`,
+            description: `Fee payment via ${payment.payment_method}${payment.paid_by ? ` from ${payment.paid_by}` : ''}`,
+            debit: 0,
+            credit: amount,
+            source_type: 'payment'
+          });
+        }
+      });
+    }
+
+    // fee-revenue shows ALL payments (total revenue)
     if (!account || account.id === 'fee-revenue') {
       payments.forEach(payment => {
         const amount = Number(payment.amount || 0);
@@ -214,6 +352,38 @@ export class FinanceService {
       });
     }
 
+    // Expense category-specific accounts
+    const expenseCategoryMap = {
+      'salaries-expense': ['Teachers Salary', 'Salary', 'Payroll', 'Staff'],
+      'utilities-expense': ['Utilities', 'Water', 'Electricity', 'Internet', 'Power'],
+      'supplies-expense': ['Supplies', 'Stationery', 'Books', 'Materials'],
+      'maintenance-expense': ['Maintenance', 'Repairs', 'Renovation'],
+      'other-expenses': ['Other', 'Rent', 'Transport', 'Marketing', 'Administrative', 'General']
+    };
+
+    if (expenseCategoryMap[account.id]) {
+      const allowedCategories = expenseCategoryMap[account.id];
+      expenditures.forEach(expense => {
+        const category = (expense.category || '').toLowerCase();
+        const normalizedAllowed = allowedCategories.map(c => c.toLowerCase());
+        
+        if (normalizedAllowed.some(allowed => category.includes(allowed))) {
+          const amount = Number(expense.amount || 0);
+          if (amount <= 0) return;
+          transactions.push({
+            id: `expense-${account.id}-${expense.expenditure_id || expense.id}`,
+            transaction_date: expense.expense_date || expense.created_at,
+            reference: expense.reference_number || `EXP-${expense.expenditure_id || expense.id}`,
+            description: expense.description || expense.purpose || expense.item_name || expense.category || 'Expense',
+            debit: amount,
+            credit: 0,
+            source_type: 'expenditure'
+          });
+        }
+      });
+    }
+
+    // operating-expenses shows ALL expenditures (total expenses)
     if (!account || account.id === 'operating-expenses') {
       expenditures.forEach(expense => {
         const amount = Number(expense.amount || 0);
