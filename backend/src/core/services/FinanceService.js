@@ -475,8 +475,17 @@ export class FinanceService {
       const revenueAccounts = await this.getAccounts(schoolId, 'revenue');
       const expenseAccounts = await this.getAccounts(schoolId, 'expense');
 
-      const revenue = await this.calculateAccountBalances(revenueAccounts, startDate, endDate);
-      const expenses = await this.calculateAccountBalances(expenseAccounts, startDate, endDate);
+      // Filter out operational sub-accounts to avoid double-counting
+      // Keep only main accounts, not the category-specific ones
+      const filteredRevenue = revenueAccounts.filter(acc => 
+        !acc.source || acc.source !== 'operational' || acc.id === 'fee-revenue'
+      );
+      const filteredExpenses = expenseAccounts.filter(acc => 
+        !acc.source || acc.source !== 'operational' || acc.id === 'operating-expenses'
+      );
+
+      const revenue = await this.calculateAccountBalances(filteredRevenue, startDate, endDate);
+      const expenses = await this.calculateAccountBalances(filteredExpenses, startDate, endDate);
 
       const totalRevenue = revenue.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
       const totalExpenses = expenses.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);

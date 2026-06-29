@@ -1,4 +1,4 @@
-export const money = v => `KSh ${Number(v || 0).toLocaleString()}`;
+export const money = v => `KSh ${Number(v || 0).toLocaleString('en-KE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 export const genId = () => Date.now() + Math.floor(Math.random() * 10000);
 export const countBy = (arr, key) => arr.reduce((acc, item) => {
   const k = item[key];
