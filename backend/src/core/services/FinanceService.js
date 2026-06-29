@@ -472,24 +472,48 @@ export class FinanceService {
   async getIncomeStatement(schoolId, startDate, endDate) {
     try {
       console.log('[FinanceService.getIncomeStatement] Starting for schoolId:', schoolId, 'dates:', startDate, endDate);
-      const revenueAccounts = await this.getAccounts(schoolId, 'revenue');
-      const expenseAccounts = await this.getAccounts(schoolId, 'expense');
+      
+      // Get operational data directly for income statement
+      const { payments, expenditures } = await this.getOperationalRows(schoolId, startDate, endDate);
+      
+      console.log('[FinanceService.getIncomeStatement] Operational data:', {
+        paymentsCount: payments.length,
+        expendituresCount: expenditures.length,
+        paymentsTotal: payments.reduce((sum, p) => sum + Number(p.amount || 0), 0),
+        expendituresTotal: expenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
+      });
 
-      // Filter out operational sub-accounts to avoid double-counting
-      // Keep only main accounts, not the category-specific ones
-      const filteredRevenue = revenueAccounts.filter(acc => 
-        !acc.source || acc.source !== 'operational' || acc.id === 'fee-revenue'
-      );
-      const filteredExpenses = expenseAccounts.filter(acc => 
-        !acc.source || acc.source !== 'operational' || acc.id === 'operating-expenses'
-      );
-
-      const revenue = await this.calculateAccountBalances(filteredRevenue, startDate, endDate);
-      const expenses = await this.calculateAccountBalances(filteredExpenses, startDate, endDate);
-
-      const totalRevenue = revenue.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
-      const totalExpenses = expenses.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
+      const totalRevenue = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const totalExpenses = expenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0);
       const netIncome = totalRevenue - totalExpenses;
+
+      const revenue = [{
+        id: 'fee-revenue',
+        school_id: schoolId,
+        account_code: 'OP-4000',
+        account_name: 'Fee Revenue',
+        account_type: 'revenue',
+        normal_balance: 'credit',
+        is_active: true,
+        is_system: true,
+        source: 'operational',
+        balance: totalRevenue,
+        amount: totalRevenue
+      }];
+
+      const expenses = [{
+        id: 'operating-expenses',
+        school_id: schoolId,
+        account_code: 'OP-5000',
+        account_name: 'Operating Expenses',
+        account_type: 'expense',
+        normal_balance: 'debit',
+        is_active: true,
+        is_system: true,
+        source: 'operational',
+        balance: totalExpenses,
+        amount: totalExpenses
+      }];
 
       console.log('[FinanceService.getIncomeStatement] Completed:', { totalRevenue, totalExpenses, netIncome });
 
@@ -559,7 +583,9 @@ export class FinanceService {
         }
 
         console.log(`[FinanceService.calculateAccountBalances] Account: ${account.account_name}`, {
+          accountId: account.id,
           accountType: account.account_type,
+          accountSource: account.source,
           journalDebit: totalDebit,
           journalCredit: totalCredit,
           operationalDebit,
