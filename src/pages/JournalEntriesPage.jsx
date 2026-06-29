@@ -255,8 +255,7 @@ export default function JournalEntriesPage({ auth, toast }) {
       </Card>
 
       {/* New Journal Entry Modal */}
-      {showModal && (
-        <Modal onClose={() => setShowModal(false)} title="New Journal Entry">
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="New Journal Entry">
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: "var(--space-4)" }}>
               <label style={{ display: "block", marginBottom: "var(--space-2)", fontWeight: 600, fontSize: "13px" }}>
@@ -413,8 +412,7 @@ export default function JournalEntriesPage({ auth, toast }) {
               </Button>
             </div>
           </form>
-        </Modal>
-      )}
+      </Modal>
     </div>
   );
 }

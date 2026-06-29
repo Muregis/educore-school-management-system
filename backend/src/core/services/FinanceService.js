@@ -209,6 +209,23 @@ export class FinanceService {
         paymentsTotal: paymentsRows.reduce((sum, p) => sum + Number(p.amount || 0), 0),
         manualTotal: manualExpenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
         payrollTotal: payrollExpenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
+        paymentMethods: paymentsRows.reduce((acc, p) => {
+          const method = (p.payment_method || 'unknown').toLowerCase();
+          acc[method] = (acc[method] || 0) + 1;
+          return acc;
+        }, {}),
+        paymentMethodsByAmount: paymentsRows.reduce((acc, p) => {
+          const method = (p.payment_method || 'unknown').toLowerCase();
+          acc[method] = (acc[method] || 0) + Number(p.amount || 0);
+          return acc;
+        }, {}),
+        dateRange: { startDate, endDate },
+        samplePayments: paymentsRows.slice(0, 3).map(p => ({
+          amount: p.amount,
+          method: p.payment_method,
+          status: p.status,
+          date: p.payment_date
+        }))
       });
 
       return {
@@ -476,14 +493,20 @@ export class FinanceService {
       // Get operational data directly for income statement
       const { payments, expenditures } = await this.getOperationalRows(schoolId, startDate, endDate);
       
-      // Break down payments by method for debugging
+      // Break down payments by method for revenue breakdown
       const paymentsByMethod = payments.reduce((acc, p) => {
         const method = (p.payment_method || 'unknown').toLowerCase();
         acc[method] = (acc[method] || 0) + Number(p.amount || 0);
         return acc;
       }, {});
       
-      // Break down expenditures by source
+      // Break down expenditures by category
+      const expendituresByCategory = expenditures.reduce((acc, e) => {
+        const category = e.category || 'Other';
+        acc[category] = (acc[category] || 0) + Number(e.amount || 0);
+        return acc;
+      }, {});
+      
       const manualExpenditures = expenditures.filter(e => e.source_type === 'manual');
       const payrollExpenditures = expenditures.filter(e => e.source_type === 'payroll');
       
@@ -493,6 +516,7 @@ export class FinanceService {
         paymentsTotal: payments.reduce((sum, p) => sum + Number(p.amount || 0), 0),
         expendituresTotal: expenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
         paymentsByMethod,
+        expendituresByCategory,
         manualExpendituresTotal: manualExpenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
         payrollExpendituresTotal: payrollExpenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
       });
@@ -501,33 +525,99 @@ export class FinanceService {
       const totalExpenses = expenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0);
       const netIncome = totalRevenue - totalExpenses;
 
-      const revenue = [{
-        id: 'fee-revenue',
-        school_id: schoolId,
-        account_code: 'OP-4000',
-        account_name: 'Fee Revenue',
-        account_type: 'revenue',
-        normal_balance: 'credit',
-        is_active: true,
-        is_system: true,
-        source: 'operational',
-        balance: totalRevenue,
-        amount: totalRevenue
-      }];
+      // Build revenue breakdown by payment method
+      const revenue = [];
+      
+      // Add individual payment method revenue lines
+      if (paymentsByMethod.cash > 0) {
+        revenue.push({
+          id: 'cash-revenue',
+          school_id: schoolId,
+          account_code: 'OP-4100',
+          account_name: 'Cash Payments',
+          account_type: 'revenue',
+          normal_balance: 'credit',
+          is_active: true,
+          is_system: true,
+          source: 'operational',
+          balance: paymentsByMethod.cash,
+          amount: paymentsByMethod.cash
+        });
+      }
+      
+      if (paymentsByMethod.bank_transfer > 0) {
+        revenue.push({
+          id: 'bank-transfer-revenue',
+          school_id: schoolId,
+          account_code: 'OP-4200',
+          account_name: 'Bank Transfer Payments',
+          account_type: 'revenue',
+          normal_balance: 'credit',
+          is_active: true,
+          is_system: true,
+          source: 'operational',
+          balance: paymentsByMethod.bank_transfer,
+          amount: paymentsByMethod.bank_transfer
+        });
+      }
+      
+      if (paymentsByMethod.mpesa > 0 || paymentsByMethod.mpesa_manual > 0) {
+        const mpesaTotal = (paymentsByMethod.mpesa || 0) + (paymentsByMethod.mpesa_manual || 0);
+        revenue.push({
+          id: 'mpesa-revenue',
+          school_id: schoolId,
+          account_code: 'OP-4300',
+          account_name: 'M-Pesa Payments',
+          account_type: 'revenue',
+          normal_balance: 'credit',
+          is_active: true,
+          is_system: true,
+          source: 'operational',
+          balance: mpesaTotal,
+          amount: mpesaTotal
+        });
+      }
+      
+      // Add other payment methods
+      Object.keys(paymentsByMethod).forEach(method => {
+        if (!['cash', 'bank_transfer', 'mpesa', 'mpesa_manual'].includes(method) && paymentsByMethod[method] > 0) {
+          revenue.push({
+            id: `other-${method}-revenue`,
+            school_id: schoolId,
+            account_code: 'OP-4400',
+            account_name: `${method.charAt(0).toUpperCase() + method.slice(1)} Payments`,
+            account_type: 'revenue',
+            normal_balance: 'credit',
+            is_active: true,
+            is_system: true,
+            source: 'operational',
+            balance: paymentsByMethod[method],
+            amount: paymentsByMethod[method]
+          });
+        }
+      });
 
-      const expenses = [{
-        id: 'operating-expenses',
-        school_id: schoolId,
-        account_code: 'OP-5000',
-        account_name: 'Operating Expenses',
-        account_type: 'expense',
-        normal_balance: 'debit',
-        is_active: true,
-        is_system: true,
-        source: 'operational',
-        balance: totalExpenses,
-        amount: totalExpenses
-      }];
+      // Build expense breakdown by category
+      const expenses = [];
+      
+      // Add individual expense category lines
+      Object.keys(expendituresByCategory).forEach(category => {
+        if (expendituresByCategory[category] > 0) {
+          expenses.push({
+            id: `expense-${category.toLowerCase().replace(/\s+/g, '-')}`,
+            school_id: schoolId,
+            account_code: 'OP-5100',
+            account_name: category,
+            account_type: 'expense',
+            normal_balance: 'debit',
+            is_active: true,
+            is_system: true,
+            source: 'operational',
+            balance: expendituresByCategory[category],
+            amount: expendituresByCategory[category]
+          });
+        }
+      });
 
       console.log('[FinanceService.getIncomeStatement] Completed:', { totalRevenue, totalExpenses, netIncome });
 
