@@ -476,11 +476,25 @@ export class FinanceService {
       // Get operational data directly for income statement
       const { payments, expenditures } = await this.getOperationalRows(schoolId, startDate, endDate);
       
+      // Break down payments by method for debugging
+      const paymentsByMethod = payments.reduce((acc, p) => {
+        const method = (p.payment_method || 'unknown').toLowerCase();
+        acc[method] = (acc[method] || 0) + Number(p.amount || 0);
+        return acc;
+      }, {});
+      
+      // Break down expenditures by source
+      const manualExpenditures = expenditures.filter(e => e.source_type === 'manual');
+      const payrollExpenditures = expenditures.filter(e => e.source_type === 'payroll');
+      
       console.log('[FinanceService.getIncomeStatement] Operational data:', {
         paymentsCount: payments.length,
         expendituresCount: expenditures.length,
         paymentsTotal: payments.reduce((sum, p) => sum + Number(p.amount || 0), 0),
         expendituresTotal: expenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
+        paymentsByMethod,
+        manualExpendituresTotal: manualExpenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
+        payrollExpendituresTotal: payrollExpenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0),
       });
 
       const totalRevenue = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
