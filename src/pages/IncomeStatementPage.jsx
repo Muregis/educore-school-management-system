@@ -33,6 +33,27 @@ export default function IncomeStatementPage({ auth, toast }) {
 
   const periodLabel = period === "current" ? "Current Term" : period === "ytd" ? "Year to Date" : "Previous Year";
 
+  const handleExport = () => {
+    const headers = ["Account", "Amount", "Category"];
+    const rows = [
+      ...(incomeStatement?.revenue || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Revenue"]),
+      ...(incomeStatement?.expenses || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Expense"]),
+    ];
+    exportCsv("income-statement.csv", headers, rows);
+  };
+
+  if (loading) {
+    return (
+      <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>
+        Loading income statement...
+      </div>
+    );
+  }
+
+  const totalRevenue = incomeStatement?.total_revenue || incomeStatement?.revenue?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
+  const totalExpenses = incomeStatement?.total_expenses || incomeStatement?.expenses?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
+  const netIncome = incomeStatement?.net_income ?? (totalRevenue - totalExpenses);
+
   const handlePrint = () => {
     const revenueRows = (incomeStatement?.revenue || []).map(item => `
       <tr>
@@ -89,27 +110,6 @@ export default function IncomeStatementPage({ auth, toast }) {
     `;
     printHTML(html, { title: "Income Statement" });
   };
-
-  const handleExport = () => {
-    const headers = ["Account", "Amount", "Category"];
-    const rows = [
-      ...(incomeStatement?.revenue || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Revenue"]),
-      ...(incomeStatement?.expenses || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Expense"]),
-    ];
-    exportCsv("income-statement.csv", headers, rows);
-  };
-
-  if (loading) {
-    return (
-      <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>
-        Loading income statement...
-      </div>
-    );
-  }
-
-  const totalRevenue = incomeStatement?.total_revenue || incomeStatement?.revenue?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
-  const totalExpenses = incomeStatement?.total_expenses || incomeStatement?.expenses?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
-  const netIncome = incomeStatement?.net_income ?? (totalRevenue - totalExpenses);
 
   return (
     <div>

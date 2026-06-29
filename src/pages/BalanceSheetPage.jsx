@@ -39,6 +39,29 @@ export default function BalanceSheetPage({ auth, toast }) {
     }
   };
 
+  const handleExport = () => {
+    const headers = ["Account", "Amount", "Category"];
+    const rows = [
+      ...(balanceSheet?.assets || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Asset"]),
+      ...(balanceSheet?.liabilities || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Liability"]),
+      ...(balanceSheet?.equity || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Equity"]),
+    ];
+    exportCsv("balance-sheet.csv", headers, rows);
+  };
+
+  if (loading) {
+    return (
+      <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>
+        Loading balance sheet...
+      </div>
+    );
+  }
+
+  const totalAssets = balanceSheet?.total_assets || balanceSheet?.assets?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
+  const totalLiabilities = balanceSheet?.total_liabilities || balanceSheet?.liabilities?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
+  const totalEquity = balanceSheet?.total_equity || balanceSheet?.equity?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
+  const isBalanced = balanceSheet?.is_balanced !== false && Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01;
+
   const handlePrint = () => {
     const asOf = asOfDate ? new Date(asOfDate).toLocaleDateString() : "today";
     const assetRows = (balanceSheet?.assets || []).map(item => `
@@ -106,29 +129,6 @@ export default function BalanceSheetPage({ auth, toast }) {
     `;
     printHTML(html, { title: "Balance Sheet" });
   };
-
-  const handleExport = () => {
-    const headers = ["Account", "Amount", "Category"];
-    const rows = [
-      ...(balanceSheet?.assets || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Asset"]),
-      ...(balanceSheet?.liabilities || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Liability"]),
-      ...(balanceSheet?.equity || []).map(item => [item.account_name, String(item.amount || item.balance || 0), "Equity"]),
-    ];
-    exportCsv("balance-sheet.csv", headers, rows);
-  };
-
-  if (loading) {
-    return (
-      <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>
-        Loading balance sheet...
-      </div>
-    );
-  }
-
-  const totalAssets = balanceSheet?.total_assets || balanceSheet?.assets?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
-  const totalLiabilities = balanceSheet?.total_liabilities || balanceSheet?.liabilities?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
-  const totalEquity = balanceSheet?.total_equity || balanceSheet?.equity?.reduce((sum, item) => sum + (item.amount || item.balance || 0), 0) || 0;
-  const isBalanced = balanceSheet?.is_balanced !== false && Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01;
 
   return (
     <div>

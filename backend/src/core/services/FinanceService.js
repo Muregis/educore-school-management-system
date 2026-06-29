@@ -26,53 +26,6 @@ export class FinanceService {
   }
 
   getOperationalAccounts(schoolId) {
-    const paymentMethodAccounts = [
-      {
-        id: 'cash-revenue',
-        school_id: schoolId,
-        account_code: 'OP-4100',
-        account_name: 'Cash Payments',
-        account_type: 'revenue',
-        normal_balance: 'credit',
-        is_active: true,
-        is_system: true,
-        source: 'operational'
-      },
-      {
-        id: 'bank-transfer-revenue',
-        school_id: schoolId,
-        account_code: 'OP-4200',
-        account_name: 'Bank Transfer Payments',
-        account_type: 'revenue',
-        normal_balance: 'credit',
-        is_active: true,
-        is_system: true,
-        source: 'operational'
-      },
-      {
-        id: 'mpesa-revenue',
-        school_id: schoolId,
-        account_code: 'OP-4300',
-        account_name: 'M-Pesa Payments',
-        account_type: 'revenue',
-        normal_balance: 'credit',
-        is_active: true,
-        is_system: true,
-        source: 'operational'
-      },
-      {
-        id: 'other-payments-revenue',
-        school_id: schoolId,
-        account_code: 'OP-4400',
-        account_name: 'Other Payment Methods',
-        account_type: 'revenue',
-        normal_balance: 'credit',
-        is_active: true,
-        is_system: true,
-        source: 'operational'
-      }
-    ];
-
     const expenseCategoryAccounts = [
       {
         id: 'salaries-expense',
@@ -165,7 +118,6 @@ export class FinanceService {
         is_system: true,
         source: 'operational'
       },
-      ...paymentMethodAccounts,
       ...expenseCategoryAccounts
     ];
   }
@@ -302,36 +254,6 @@ export class FinanceService {
           credit: amount,
           source_type: 'expenditure'
         });
-      });
-    }
-
-    // Payment method-specific revenue accounts
-    const paymentMethodMap = {
-      'cash-revenue': ['cash'],
-      'bank-transfer-revenue': ['bank_transfer', 'bank'],
-      'mpesa-revenue': ['mpesa', 'mpesa_manual'],
-      'other-payments-revenue': ['card', 'cheque', 'paystack', 'other']
-    };
-
-    if (paymentMethodMap[account.id]) {
-      const allowedMethods = paymentMethodMap[account.id];
-      payments.forEach(payment => {
-        const method = (payment.payment_method || '').toLowerCase().replace(/[_\s]/g, '');
-        const normalizedAllowed = allowedMethods.map(m => m.toLowerCase().replace(/[_\s]/g, ''));
-        
-        if (normalizedAllowed.includes(method)) {
-          const amount = Number(payment.amount || 0);
-          if (amount <= 0) return;
-          transactions.push({
-            id: `payment-${account.id}-${payment.payment_id || payment.id}`,
-            transaction_date: payment.payment_date || payment.created_at,
-            reference: payment.receipt_number || payment.reference_number || payment.mpesa_receipt_number || `PAY-${payment.payment_id || payment.id}`,
-            description: `Fee payment via ${payment.payment_method}${payment.paid_by ? ` from ${payment.paid_by}` : ''}`,
-            debit: 0,
-            credit: amount,
-            source_type: 'payment'
-          });
-        }
       });
     }
 
@@ -678,12 +600,29 @@ export class FinanceService {
 
       const finalTotalEquity = Number((totalEquity + retainedEarnings).toFixed(2));
 
+      const equityWithRetainedEarnings = [
+        ...equity,
+        {
+          id: 'retained-earnings',
+          school_id: schoolId,
+          account_code: 'RE-0000',
+          account_name: 'Retained Earnings',
+          account_type: 'equity',
+          normal_balance: 'credit',
+          is_active: true,
+          is_system: true,
+          source: 'calculated',
+          balance: retainedEarnings,
+          amount: retainedEarnings
+        }
+      ];
+
       console.log('[FinanceService.getBalanceSheet] Completed:', { totalAssets, totalLiabilities, finalTotalEquity, retainedEarnings });
 
       return {
         assets,
         liabilities,
-        equity,
+        equity: equityWithRetainedEarnings,
         total_assets: Number(totalAssets.toFixed(2)),
         total_liabilities: Number(totalLiabilities.toFixed(2)),
         total_equity: finalTotalEquity,

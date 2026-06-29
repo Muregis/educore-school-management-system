@@ -154,7 +154,7 @@ export class JournalEntryLinesRepository extends BaseRepository {
     try {
       let query = this.client
         .from(this.tableName)
-        .select('*, journal_entries(*)')
+        .select('*, journal_entries!inner(*)')
         .eq('journal_entries.school_id', schoolId);
 
       if (accountId) {
