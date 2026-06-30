@@ -44,13 +44,30 @@ function normaliseManualExpenditure(row) {
 }
 
 function normalisePayrollExpenditure(row) {
+  const jobTitle = row.hr_staff?.job_title || "Staff";
+  // Create category based on job title for better categorization
+  let category = "HR Payroll";
+  const jobTitleLower = jobTitle.toLowerCase();
+  
+  if (jobTitleLower.includes("teacher") || jobTitleLower.includes("lecturer")) {
+    category = "Teachers Salary";
+  } else if (jobTitleLower.includes("support") || jobTitleLower.includes("cleaner") || jobTitleLower.includes("security") || jobTitleLower.includes("driver")) {
+    category = "Support Staff Salary";
+  } else if (jobTitleLower.includes("admin") || jobTitleLower.includes("secretary") || jobTitleLower.includes("receptionist") || jobTitleLower.includes("manager")) {
+    category = "Administrative Staff Salary";
+  } else if (jobTitleLower.includes("principal") || jobTitleLower.includes("director") || jobTitleLower.includes("head")) {
+    category = "Management Salary";
+  } else {
+    category = "Other Staff Salary";
+  }
+
   return {
     expenditure_id: `payroll-${row.payslip_id}`,
     school_id: row.school_id,
     expense_date: row.paid_date,
-    category: "Teachers Salary",
+    category: category,
     item_name: row.hr_staff?.full_name || "Payroll",
-    description: `${row.hr_staff?.job_title || "Staff salary"} for ${row.month}/${row.year}`,
+    description: `${jobTitle} for ${row.month}/${row.year}`,
     amount: Number(row.net_pay || 0),
     payment_method: row.payment_method || "Payroll",
     vendor_name: row.hr_staff?.full_name || null,

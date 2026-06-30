@@ -291,7 +291,7 @@ export class FinanceService {
 
     // Expense category-specific accounts
     const expenseCategoryMap = {
-      'salaries-expense': ['Teachers Salary', 'Salary', 'Payroll'],
+      'salaries-expense': ['Teachers Salary', 'Support Staff Salary', 'Administrative Staff Salary', 'Management Salary', 'Other Staff Salary', 'Salary', 'Payroll', 'HR Payroll'],
       'utilities-expense': ['Utilities', 'Water', 'Electricity', 'Internet'],
       'supplies-expense': ['Supplies', 'Stationery', 'Books'],
       'maintenance-expense': ['Maintenance', 'Repairs'],
@@ -431,13 +431,21 @@ export class FinanceService {
       } catch (error) {
         if (!isOptionalFinanceDataError(error)) throw error;
       }
+      const { payments, expenditures } = await this.getOperationalRows(schoolId, null, asOfDate);
 
       const trialBalance = accounts.map(account => {
         const accountLines = lines.filter(l => l.account_id === account.id);
         const totalDebit = accountLines.reduce((sum, l) => sum + Number(l.debit || 0), 0);
         const totalCredit = accountLines.reduce((sum, l) => sum + Number(l.credit || 0), 0);
+        
+        // Only add operational transactions for operational accounts
+        const operationalTransactions = account.source === 'operational'
+          ? this.buildOperationalTransactions(account, payments, expenditures)
+          : [];
+        const operationalDebit = operationalTransactions.reduce((sum, t) => sum + Number(t.debit || 0), 0);
+        const operationalCredit = operationalTransactions.reduce((sum, t) => sum + Number(t.credit || 0), 0);
 
-        const netDebit = totalDebit - totalCredit;
+        const netDebit = (totalDebit + operationalDebit) - (totalCredit + operationalCredit);
         
         let debit = 0;
         let credit = 0;
