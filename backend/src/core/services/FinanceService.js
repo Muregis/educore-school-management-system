@@ -159,7 +159,6 @@ export class FinanceService {
         .from('payments')
         .select('*')
         .eq('school_id', schoolId)
-        .in('status', ['paid', 'completed', 'success'])
         .eq('is_deleted', false);
 
       const applyDateRange = (query, column) => {
@@ -432,19 +431,13 @@ export class FinanceService {
       } catch (error) {
         if (!isOptionalFinanceDataError(error)) throw error;
       }
-      const { payments, expenditures } = await this.getOperationalRows(schoolId, null, asOfDate);
 
       const trialBalance = accounts.map(account => {
         const accountLines = lines.filter(l => l.account_id === account.id);
         const totalDebit = accountLines.reduce((sum, l) => sum + Number(l.debit || 0), 0);
         const totalCredit = accountLines.reduce((sum, l) => sum + Number(l.credit || 0), 0);
-        const operationalTransactions = account.source === 'operational'
-          ? this.buildOperationalTransactions(account, payments, expenditures)
-          : [];
-        const operationalDebit = operationalTransactions.reduce((sum, t) => sum + Number(t.debit || 0), 0);
-        const operationalCredit = operationalTransactions.reduce((sum, t) => sum + Number(t.credit || 0), 0);
 
-        const netDebit = (totalDebit + operationalDebit) - (totalCredit + operationalCredit);
+        const netDebit = totalDebit - totalCredit;
         
         let debit = 0;
         let credit = 0;
@@ -717,30 +710,44 @@ export class FinanceService {
   async getBalanceSheet(schoolId, asOfDate) {
     try {
       console.log('[FinanceService.getBalanceSheet] Starting for schoolId:', schoolId, 'asOf:', asOfDate);
-      const assetAccounts = await this.getAccounts(schoolId, 'asset');
-      const liabilityAccounts = await this.getAccounts(schoolId, 'liability');
-      const equityAccounts = await this.getAccounts(schoolId, 'equity');
-
-      const assets = await this.calculateAccountBalances(assetAccounts, null, asOfDate);
-      const liabilities = await this.calculateAccountBalances(liabilityAccounts, null, asOfDate);
-      const equity = await this.calculateAccountBalances(equityAccounts, null, asOfDate);
-
-      const totalAssets = assets.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
-      const totalLiabilities = liabilities.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
-      const totalEquity = equity.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
-
-      const revenueAccounts = await this.getAccounts(schoolId, 'revenue');
-      const expenseAccounts = await this.getAccounts(schoolId, 'expense');
-      const revenue = await this.calculateAccountBalances(revenueAccounts, null, asOfDate);
-      const expenses = await this.calculateAccountBalances(expenseAccounts, null, asOfDate);
-      const totalRevenue = revenue.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
-      const totalExpenses = expenses.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
+      
+      // Use operational data directly for consistency with Income Statement
+      const { payments, expenditures } = await this.getOperationalRows(schoolId, null, asOfDate);
+      
+      // Calculate cash/bank balance from payments
+      const cashBalance = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      
+      // Calculate total expenses from expenditures
+      const totalExpenses = expenditures.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+      
+      // Calculate total revenue from payments
+      const totalRevenue = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      
+      // Build assets from operational data
+      const assets = [
+        {
+          id: 'operating-cash',
+          school_id: schoolId,
+          account_code: 'OP-1000',
+          account_name: 'Cash and Bank',
+          account_type: 'asset',
+          normal_balance: 'debit',
+          is_active: true,
+          is_system: true,
+          source: 'operational',
+          balance: cashBalance,
+          amount: cashBalance
+        }
+      ];
+      
+      // Build liabilities (empty for now, could add from journal entries later)
+      const liabilities = [];
+      
+      // Calculate retained earnings
       const retainedEarnings = Number((totalRevenue - totalExpenses).toFixed(2));
-
-      const finalTotalEquity = Number((totalEquity + retainedEarnings).toFixed(2));
-
-      const equityWithRetainedEarnings = [
-        ...equity,
+      
+      // Build equity
+      const equity = [
         {
           id: 'retained-earnings',
           school_id: schoolId,
@@ -755,18 +762,22 @@ export class FinanceService {
           amount: retainedEarnings
         }
       ];
+      
+      const totalAssets = assets.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
+      const totalLiabilities = liabilities.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
+      const totalEquity = equity.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
 
-      console.log('[FinanceService.getBalanceSheet] Completed:', { totalAssets, totalLiabilities, finalTotalEquity, retainedEarnings });
+      console.log('[FinanceService.getBalanceSheet] Completed:', { totalAssets, totalLiabilities, totalEquity, retainedEarnings });
 
       return {
         assets,
         liabilities,
-        equity: equityWithRetainedEarnings,
+        equity,
         total_assets: Number(totalAssets.toFixed(2)),
         total_liabilities: Number(totalLiabilities.toFixed(2)),
-        total_equity: finalTotalEquity,
+        total_equity: Number(totalEquity.toFixed(2)),
         retained_earnings: retainedEarnings,
-        is_balanced: Math.abs(totalAssets - (totalLiabilities + finalTotalEquity)) < 0.01
+        is_balanced: Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01
       };
     } catch (error) {
       console.error('[FinanceService.getBalanceSheet] Error:', error);
