@@ -115,6 +115,10 @@ export default function LoginView({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
+  const [twoFactorToken, setTwoFactorToken] = useState("");
+  const [tempToken, setTempToken] = useState("");
+  const [tempSessionId, setTempSessionId] = useState("");
   const lastResolvedIdentifierRef = useRef("");
   const lastResolveRoleRef = useRef("");
 
@@ -283,6 +287,15 @@ export default function LoginView({ onLogin }) {
         body: { email, password },
       });
       const data = raw?.data || raw;
+
+      if (data?.twoFactorRequired) {
+        setTempToken(data.tempToken);
+        setTempSessionId(data.tempSessionId);
+        setTwoFactorRequired(true);
+        setLoading(false);
+        return;
+      }
+
       if (!data?.token || !data?.user) {
         throw new Error("Login succeeded but the server response was missing session data.");
       }
@@ -300,6 +313,42 @@ export default function LoginView({ onLogin }) {
       setPassword("");
     } catch (err) {
       setError(err.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitTwoFactor(event) {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const raw = await apiFetch("/auth/verify-2fa", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${tempToken}` },
+        body: { token: twoFactorToken },
+      });
+      const data = raw?.data || raw;
+      if (!data?.token || !data?.user) {
+        throw new Error("2FA verification succeeded but the server response was missing session data.");
+      }
+      onLogin({
+        id: data.user.userId,
+        name: data.user.name,
+        email: data.user.email ?? email,
+        role: data.user.role,
+        schoolId: data.user.schoolId,
+        token: data.token,
+        sessionId: data.sessionId,
+        studentId: null,
+      });
+      setTwoFactorToken("");
+      setTempToken("");
+      setTempSessionId("");
+      setTwoFactorRequired(false);
+    } catch (err) {
+      setError(err.message || "2FA verification failed");
+      setTwoFactorToken("");
     } finally {
       setLoading(false);
     }
@@ -436,10 +485,31 @@ export default function LoginView({ onLogin }) {
               })}
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              
-              {mode === "staff" ? (
-                <form onSubmit={submitStaff} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
+             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+               
+               {twoFactorRequired ? (
+                 <form onSubmit={submitTwoFactor} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
+                   <div style={{ textAlign: "center", marginBottom: "8px" }}>
+                     <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Two-Factor Authentication</div>
+                     <div style={{ fontSize: "13px", color: "var(--color-text-muted)", marginTop: "4px" }}>Enter the 6-digit code from your authenticator app</div>
+                   </div>
+                   <label style={labelStyle}>
+                     <span style={labelTextStyle}>Verification Code</span>
+                     <input 
+                       value={twoFactorToken} 
+                       onChange={(e) => setTwoFactorToken(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} 
+                       type="text" 
+                       inputMode="numeric"
+                       autoComplete="off"
+                       placeholder="123456"
+                       style={fieldStyle}
+                       maxLength={6}
+                     />
+                   </label>
+                   <SubmitButton loading={loading} text="Verify" />
+                 </form>
+               ) : mode === "staff" ? (
+                 <form onSubmit={submitStaff} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
                   {/* Hidden fields to trick browser autofill */}
                   <input type="text" name="fake_username" style={{ display: 'none' }} autoComplete="off" />
                   <input type="password" name="fake_password" style={{ display: 'none' }} autoComplete="off" />

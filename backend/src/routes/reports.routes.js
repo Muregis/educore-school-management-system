@@ -182,21 +182,28 @@ router.get("/summary", async (req, res, next) => {
       }
     });
 
-    // Calculate outstanding using current-term fees plus brought-forward debit/credit.
+    // Calculate outstanding using student_ledger as source of truth
+    const { data: ledgerEntries, error: ledgerErr } = await supabase
+      .from('student_ledger')
+      .select('student_id, balance_after')
+      .eq('school_id', schoolId)
+      .order('ledger_id', { ascending: false });
+    if (ledgerErr) throw ledgerErr;
+
+    const latestBalanceMap = new Map();
+    for (const entry of ledgerEntries || []) {
+      if (!latestBalanceMap.has(entry.student_id)) {
+        latestBalanceMap.set(entry.student_id, Number(entry.balance_after || 0));
+      }
+    }
+
     let totalOutstanding = 0;
-    let debugCount = 0;
     students?.forEach(student => {
-      const classFee = feeMap[student.class_name] || 0;
-      const paid = paymentMap[student.student_id] || 0;
-      const balanceInfo = calculateReportBalanceLikeFeesPage(student, classFee, paid);
-      const outstanding = balanceInfo.balance;
-      totalOutstanding += outstanding;
-      if (debugCount < 5 && outstanding > 10000) {
-        console.log(`[DEBUG] Student ${student.student_id}: classFee=${classFee}, openingBalance=${balanceInfo.openingBalance}, transportFee=${balanceInfo.transportFee}, lunchFee=${balanceInfo.lunchFee}, breakfastFee=${balanceInfo.breakfastFee}, expected=${balanceInfo.expected}, paid=${paid}, outstanding=${outstanding}`);
-        debugCount++;
+      const balance = latestBalanceMap.get(student.student_id);
+      if (typeof balance === 'number') {
+        totalOutstanding += Math.max(0, balance);
       }
     });
-    console.log(`[DEBUG] Total outstanding: ${totalOutstanding}, Total students: ${students?.length}`);
 
     // Get pending plans count (if payment_plans table exists)
     let pendingPlans = 0;
@@ -393,6 +400,13 @@ router.get("/fee-defaulters", async (req, res, next) => {
       .eq('is_deleted', false);
     if (payErr) throw payErr;
 
+    const { data: ledgerEntries, error: ledgerErr } = await supabase
+      .from('student_ledger')
+      .select('student_id, balance_after, ledger_id')
+      .eq('school_id', schoolId)
+      .order('ledger_id', { ascending: false });
+    if (ledgerErr) throw ledgerErr;
+
     const feeMap = {};
     feeStructures?.forEach(fs => {
       const expected = Number(fs.tuition) + Number(fs.activity) + Number(fs.misc);
@@ -411,12 +425,25 @@ router.get("/fee-defaulters", async (req, res, next) => {
       }
     });
 
+    const latestLedgerBalance = new Map();
+    for (const entry of ledgerEntries || []) {
+      if (!latestLedgerBalance.has(entry.student_id)) {
+        latestLedgerBalance.set(entry.student_id, Number(entry.balance_after || 0));
+      }
+    }
+
     const defaultersList = [];
     for (const student of (allStudents || [])) {
-      const classFee = feeMap[student.class_name] || 0;
-      const paidAmount = paymentMap[student.student_id]?.total || 0;
-      const balanceInfo = calculateReportBalanceLikeFeesPage(student, classFee, paidAmount);
-      const balance = balanceInfo.balance;
+      const ledgerBalance = latestLedgerBalance.get(student.student_id);
+      let balance;
+      if (typeof ledgerBalance === 'number') {
+        balance = Math.max(0, ledgerBalance);
+      } else {
+        const classFee = feeMap[student.class_name] || 0;
+        const paidAmount = paymentMap[student.student_id]?.total || 0;
+        const balanceInfo = calculateReportBalanceLikeFeesPage(student, classFee, paidAmount);
+        balance = balanceInfo.balance;
+      }
       const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
 
       if (balance > 0) {

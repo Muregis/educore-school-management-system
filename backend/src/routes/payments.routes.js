@@ -39,7 +39,10 @@ router.get("/", async (req, res, next) => {
         students!left(
           first_name,
           last_name,
-          class_name
+          class_name,
+          admission_number,
+          parent_phone,
+          parent_name
         )
       `)
       .eq('school_id', schoolId)
@@ -305,7 +308,8 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
       mpesaPhone,
       proofUrl,
       paymentDate,
-      notes
+      notes,
+      term
     } = req.body;
 
     // Validation
@@ -349,6 +353,7 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
         proof_url: proofUrl || null,
         payment_date: paymentDate || new Date().toISOString(),
         status: 'paid',
+        term: term || 'Term 2',
         received_by_user_id: userId,
         notes: notes || null,
         created_at: new Date().toISOString()

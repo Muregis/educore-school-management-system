@@ -60,6 +60,9 @@ function normalisePayment(p) {
     status:      p.status         ?? "paid",
     reference:   p.reference_number ?? p.reference ?? "",
     paidBy:      p.paid_by          ?? p.paidBy    ?? "",
+    admissionNumber: p.admission_number ?? p.admissionNumber ?? "",
+    parentPhone: p.parent_phone ?? p.parentPhone ?? "",
+    parentName:  p.parent_name ?? p.parentName ?? "",
   };
 }
 
@@ -106,6 +109,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [filterDate, setFilterDate] = useState("all"); // 'all' | 'today'
   const [filterStudent, setFilterStudent] = useState("all"); // 'all' | studentId
   const [studentSearch, setStudentSearch] = useState("");
+  const [recordSearch, setRecordSearch] = useState("");
   const [page, setPage]               = useState(1);
   const [paymentForm, setPaymentForm] = useState({ studentId: "", amount: "", feeType: "tuition", method: "cash", date: new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
   const [paymentClass, setPaymentClass] = useState("");
@@ -276,11 +280,31 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   const balances = students.map(s => calculateLedgerBalance(s, studentDiscounts[s.id ?? s.student_id] || []))
     .filter(b => filterClass === "all" || b.className === filterClass)
-    .filter(b => filterStudent === "all" || String(b.studentId) === String(filterStudent));
+    .filter(b => filterStudent === "all" || String(b.studentId) === String(filterStudent))
+    .filter(b => {
+      if (!recordSearch) return true;
+      const q = recordSearch.toLowerCase();
+      return (
+        b.name.toLowerCase().includes(q) ||
+        String(b.studentId).includes(q) ||
+        b.className.toLowerCase().includes(q) ||
+        b.admissionNumber.toLowerCase().includes(q)
+      );
+    });
 
   const filteredPayments = normalisedPayments.filter(p => 
     (filterClass === "all" || p.className === filterClass) &&
-    (filterStudent === "all" || String(p.studentId) === String(filterStudent))
+    (filterStudent === "all" || String(p.studentId) === String(filterStudent)) &&
+    (!recordSearch || (
+      (p.studentName || "").toLowerCase().includes(recordSearch.toLowerCase()) ||
+      String(p.studentId).includes(recordSearch) ||
+      (p.className || "").toLowerCase().includes(recordSearch.toLowerCase()) ||
+      (p.reference || "").toLowerCase().includes(recordSearch.toLowerCase()) ||
+      (p.admissionNumber || "").toLowerCase().includes(recordSearch.toLowerCase()) ||
+      (p.parentPhone || "").includes(recordSearch) ||
+      (p.parentName || "").toLowerCase().includes(recordSearch.toLowerCase()) ||
+      String(p.id || p.payment_id || "").includes(recordSearch)
+    ))
   );
   const { pages, rows }  = pager(filteredPayments, page);
   useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
@@ -396,6 +420,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           amount: amt,
           paymentMethod: paymentForm.method,
           paymentDate: paymentForm.date,
+          term: displayTerm,
         },
       });
       await reloadPayments();
@@ -610,34 +635,30 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 ...ALL_CLASSES.map(c => ({ value: c, label: c }))
               ]}
             />
-            <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flex: "1 1 320px", minWidth: "280px" }}>
               <Input
-                placeholder="Search students..."
-                value={studentSearch}
-                onChange={e => setStudentSearch(e.target.value)}
-                style={{ minWidth: "200px" }}
+                placeholder="Search by name, admission, receipt, phone, class, transaction ID..."
+                value={recordSearch}
+                onChange={e => {
+                  setRecordSearch(e.target.value);
+                  if (e.target.value) setFilterStudent("all");
+                }}
+                style={{ flex: 1, minWidth: "240px" }}
               />
               <Select 
                 value={filterStudent} 
                 onChange={e => {
                   setFilterStudent(e.target.value);
-                  setStudentSearch("");
+                  if (e.target.value !== "all") setRecordSearch("");
                 }}
                 options={[
-                  { value: "all", label: "All students" },
-                  ...students
-                    .filter(s => {
-                      const searchLower = studentSearch.toLowerCase();
-                      const name = `${s.first_name ?? s.firstName ?? ''} ${s.last_name ?? s.lastName ?? ''}`.toLowerCase();
-                      const admission = String(s.admission ?? s.admission_number ?? '').toLowerCase();
-                      return name.includes(searchLower) || admission.includes(searchLower);
-                    })
-                    .map(s => ({ 
-                      value: String(s.id ?? s.student_id), 
-                      label: `${s.first_name ?? s.firstName ?? ''} ${s.last_name ?? s.lastName ?? ''} (${s.admission ?? s.admission_number ?? 'N/A'})` 
-                    }))
+                  { value: "all", label: "All Students" },
+                  ...students.map(s => ({ 
+                    value: String(s.id ?? s.student_id), 
+                    label: `${s.first_name ?? s.firstName ?? ''} ${s.last_name ?? s.lastName ?? ''} (${s.admission ?? s.admission_number ?? 'N/A'})` 
+                  }))
                 ]}
-                style={{ minWidth: "200px" }}
+                style={{ minWidth: "180px" }}
               />
             </div>
           </div>

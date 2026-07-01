@@ -13,6 +13,7 @@ import { generateSupabaseJWT } from "../helpers/supabase-jwt.js";
 import { logTenantContext, logTenantQuery } from "../helpers/tenant-debug.logger.js";
 import { requireRoles, requireDirector } from "../middleware/roles.js";
 import { pgPool } from "../config/pg.js";
+import { generateTwoFactorSecret, generateBackupCodes, verifyTwoFactorToken } from "../middleware/twoFactor.js";
 
 const router = Router();
 
@@ -279,6 +280,110 @@ router.get("/me", authRequired, validateSession, (req, res) => {
 
 const SUPERADMIN_EMAIL = env.superadminEmail || "muregivictor@gmail.com";
 
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MINUTES = 15;
+
+async function logSecurityEvent(schoolId, userId, eventType, req, details = {}) {
+  try {
+    await pgPool.query(
+      `INSERT INTO security_logs (school_id, user_id, event_type, ip_address, user_agent, details, severity)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        schoolId || 0,
+        userId || null,
+        eventType,
+        req.ip,
+        req.get("User-Agent") || null,
+        JSON.stringify(details),
+        details.severity || "info"
+      ]
+    );
+  } catch (err) {
+    console.error("[security] Failed to log security event:", err.message);
+  }
+}
+
+async function checkAccountLockout(schoolId, email) {
+  try {
+    const { data: user } = await supabase
+      .from("users")
+      .select("user_id, failed_login_attempts, locked_until, email")
+      .eq("school_id", schoolId)
+      .ilike("email", email)
+      .eq("is_deleted", false)
+      .maybeSingle();
+
+    if (!user) return { locked: false, userId: null };
+
+    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      return { locked: true, userId: user.user_id, lockedUntil: user.locked_until };
+    }
+
+    if (user.locked_until && new Date(user.locked_until) <= new Date()) {
+      await supabase
+        .from("users")
+        .update({ failed_login_attempts: 0, locked_until: null })
+        .eq("user_id", user.user_id);
+    }
+
+    return { locked: false, userId: user.user_id };
+  } catch (err) {
+    console.error("[security] Lockout check failed:", err);
+    return { locked: false, userId: null };
+  }
+}
+
+async function incrementFailedLogin(schoolId, email, req) {
+  try {
+    const { data: user } = await supabase
+      .from("users")
+      .select("user_id, failed_login_attempts, email")
+      .eq("school_id", schoolId)
+      .ilike("email", email)
+      .eq("is_deleted", false)
+      .maybeSingle();
+
+    if (!user) return;
+
+    const attempts = (user.failed_login_attempts || 0) + 1;
+    const updates = { failed_login_attempts: attempts };
+
+    if (attempts >= MAX_FAILED_ATTEMPTS) {
+      const lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000).toISOString();
+      updates.locked_until = lockedUntil;
+      await logSecurityEvent(schoolId, user.user_id, "account_locked", req, {
+        reason: "Too many failed login attempts",
+        attempts
+      });
+    } else {
+      await logSecurityEvent(schoolId, user.user_id, "login_failed", req, {
+        reason: "Invalid credentials",
+        attempts,
+        remaining: MAX_FAILED_ATTEMPTS - attempts
+      });
+    }
+
+    await supabase
+      .from("users")
+      .update(updates)
+      .eq("user_id", user.user_id);
+  } catch (err) {
+    console.error("[security] Failed to increment failed login:", err);
+  }
+}
+
+async function resetFailedLogin(schoolId, userId) {
+  try {
+    await supabase
+      .from("users")
+      .update({ failed_login_attempts: 0, locked_until: null })
+      .eq("school_id", schoolId)
+      .eq("user_id", userId);
+  } catch (err) {
+    console.error("[security] Failed to reset failed login:", err);
+  }
+}
+
 // Helper to verify superadmin password (stored in env or hardcoded for now)
 async function verifySuperadminPassword(password) {
   // For now, use a hash of a default superadmin password
@@ -371,14 +476,43 @@ router.post("/login", authRateLimit, async (req, res, next) => {
 
     const authResult = await authLogin(email, password, normalizedSchoolId);
     if (!authResult) {
+      await incrementFailedLogin(normalizedSchoolId, trimmedEmail, req);
       logAuthFailure(req, { email, reason: "User not found or invalid credentials", schoolId: normalizedSchoolId });
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const { user } = authResult;
     if (user.status !== "active") {
+      await incrementFailedLogin(normalizedSchoolId, trimmedEmail, req);
       logAuthFailure(req, { email, reason: "Account inactive", schoolId: normalizedSchoolId });
       return res.status(403).json({ message: "Account inactive" });
+    }
+
+    // Check if account is locked
+    const lockoutStatus = await checkAccountLockout(normalizedSchoolId, trimmedEmail);
+    if (lockoutStatus.locked) {
+      logAuthFailure(req, { email, reason: "Account locked", userId: lockoutStatus.userId, schoolId: normalizedSchoolId });
+      return res.status(423).json({ 
+        message: "Account temporarily locked. Please try again later.",
+        lockedUntil: lockoutStatus.lockedUntil 
+      });
+    }
+
+    // Check if 2FA is required
+    if (user.two_factor_enabled) {
+      const tempToken = jwt.sign(
+        { user_id: user.user_id, school_id: normalizedSchoolId, role: user.role, two_factor_pending: true },
+        env.jwtSecret,
+        { expiresIn: "5m" }
+      );
+      const tempSessionId = await createUserSession(req, user.user_id);
+      await logSecurityEvent(normalizedSchoolId, user.user_id, "login_2fa_required", req, { email: user.email });
+      return res.json({
+        twoFactorRequired: true,
+        tempToken,
+        tempSessionId,
+        message: "Two-factor authentication required"
+      });
     }
 
     const role = user.role;
@@ -425,6 +559,8 @@ router.post("/login", authRateLimit, async (req, res, next) => {
 
     req.user = userPayload;
     logActivity(req, { action: "auth.login", description: `${role} login: ${name}` });
+    await resetFailedLogin(normalizedSchoolId, user.user_id);
+    await logSecurityEvent(normalizedSchoolId, user.user_id, "login_success", req, { email: user.email, role });
     const sessionId = await createUserSession(req, user.user_id);
 
     // Hide branch info from parents/students
@@ -869,6 +1005,208 @@ router.delete("/sessions/:sessionId", authRequired, validateSession, requireDire
         ? "Your current session revoked. Logging out..."
         : "Session revoked successfully",
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/me", authRequired, validateSession, (req, res) => res.json({ user: req.user }));
+
+// ─── 2FA Verification ───────────────────────────────────────────────────────
+router.post("/verify-2fa", authRequired, async (req, res, next) => {
+  try {
+    const { token } = req.body;
+    const userId = req.user.user_id || req.user.userId;
+    const schoolId = req.user.school_id || req.user.schoolId;
+
+    const { data: user } = await supabase
+      .from("users")
+      .select("two_factor_secret, two_factor_enabled")
+      .eq("user_id", userId)
+      .eq("school_id", schoolId)
+      .single();
+
+    if (!user || !user.two_factor_enabled) {
+      return res.status(400).json({ message: "2FA not enabled for this account" });
+    }
+
+    const isValid = verifyTwoFactorToken(user.two_factor_secret, token);
+    if (!isValid) {
+      await logSecurityEvent(schoolId, userId, "login_2fa_failed", req, { reason: "Invalid 2FA token" });
+      return res.status(401).json({ code: "2FA_INVALID", message: "Invalid two-factor authentication token" });
+    }
+
+    await logSecurityEvent(schoolId, userId, "login_2fa_success", req, {});
+    const { data: updatedUser } = await supabase
+      .from("users")
+      .select("user_id, full_name, email, role, status")
+      .eq("user_id", userId)
+      .single();
+
+    const userPayload = { user_id: updatedUser.user_id, school_id: schoolId, role: updatedUser.role, name: updatedUser.full_name, email: updatedUser.email };
+    const newToken = jwt.sign(userPayload, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
+    const sessionId = await createUserSession(req, userId);
+
+    res.json({ token: newToken, sessionId, user: { userId: updatedUser.user_id, schoolId, role: updatedUser.role, name: updatedUser.full_name, email: updatedUser.email } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── 2FA Setup ───────────────────────────────────────────────────────────
+router.get("/2fa/status", authRequired, validateSession, async (req, res) => {
+  const userId = req.user.user_id || req.user.userId;
+  const schoolId = req.user.school_id || req.user.schoolId;
+  supabase.from("users").select("two_factor_enabled, two_factor_backup_codes").eq("user_id", userId).eq("school_id", schoolId).single().then(({ data }) => {
+    res.json({ enabled: !!data?.two_factor_enabled, backupCodesCount: data?.two_factor_backup_codes?.length || 0 });
+  });
+});
+
+router.post("/2fa/setup", authRequired, validateSession, async (req, res, next) => {
+  try {
+    const userId = req.user.user_id || req.user.userId;
+    const schoolId = req.user.school_id || req.user.schoolId;
+    const secret = generateTwoFactorSecret();
+    const backupCodes = generateBackupCodes(10);
+
+    await supabase
+      .from("users")
+      .update({ two_factor_secret: secret.base32, two_factor_backup_codes: backupCodes })
+      .eq("user_id", userId)
+      .eq("school_id", schoolId);
+
+    res.json({ secret: secret.base32, otpauth_url: secret.otpauth_url, backupCodes });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/2fa/enable", authRequired, validateSession, async (req, res, next) => {
+  try {
+    const userId = req.user.user_id || req.user.userId;
+    const schoolId = req.user.school_id || req.user.schoolId;
+    const { token } = req.body;
+
+    const { data: user } = await supabase.from("users").select("two_factor_secret").eq("user_id", userId).eq("school_id", schoolId).single();
+    if (!user || !verifyTwoFactorToken(user.two_factor_secret, token)) {
+      return res.status(400).json({ message: "Invalid verification code" });
+    }
+
+    await supabase.from("users").update({ two_factor_enabled: true }).eq("user_id", userId).eq("school_id", schoolId);
+    await logSecurityEvent(schoolId, userId, "2fa_enabled", req, {});
+    res.json({ enabled: true, message: "Two-factor authentication enabled" });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/2fa/disable", authRequired, validateSession, async (req, res, next) => {
+  try {
+    const userId = req.user.user_id || req.user.userId;
+    const schoolId = req.user.school_id || req.user.schoolId;
+    const { password } = req.body;
+
+    const { data: user } = await supabase.from("users").select("password_hash").eq("user_id", userId).eq("school_id", schoolId).single();
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    if (!isValid) {
+      return res.status(401).json({ message: "Invalid password" });
+    }
+
+    await supabase.from("users").update({ two_factor_enabled: false, two_factor_secret: null, two_factor_backup_codes: null }).eq("user_id", userId).eq("school_id", schoolId);
+    await logSecurityEvent(schoolId, userId, "2fa_disabled", req, {});
+    res.json({ enabled: false, message: "Two-factor authentication disabled" });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Device Recognition ──────────────────────────────────────────────────
+router.get("/devices", authRequired, validateSession, async (req, res, next) => {
+  try {
+    const userId = req.user.user_id || req.user.userId;
+    const result = await pgPool.query(`SELECT session_id, user_agent, ip_address, last_active, created_at, is_active FROM user_sessions WHERE user_id = $1 AND is_active = true ORDER BY last_active DESC`, [Number(userId)]);
+    res.json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/devices/trust", authRequired, validateSession, async (req, res, next) => {
+  try {
+    const userId = req.user.user_id || req.user.userId;
+    const { sessionId, name } = req.body;
+    await pgPool.query("UPDATE user_sessions SET device_name = $1 WHERE session_id = $2 AND user_id = $3", [name, sessionId, Number(userId)]);
+    res.json({ trusted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete("/devices/:sessionId", authRequired, validateSession, async (req, res, next) => {
+  try {
+    const result = await revokeUserSession(req.params.sessionId);
+    if (!result.revoked) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+    res.json({ success: true, message: "Device session revoked" });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Login History ───────────────────────────────────────────────────────
+router.get("/login-history", authRequired, validateSession, async (req, res, next) => {
+  try {
+    const userId = req.user.user_id || req.user.userId;
+    const schoolId = req.user.school_id || req.user.schoolId;
+    const { data } = await supabase
+      .from("security_logs")
+      .select("event_type, ip_address, user_agent, details, created_at")
+      .eq("user_id", userId)
+      .eq("school_id", schoolId)
+      .in("event_type", ["login_success", "login_failed", "login_2fa_required", "login_2fa_success", "login_2fa_failed", "logout", "account_locked"])
+      .order("created_at", { ascending: false })
+      .limit(100);
+    res.json(data || []);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── My Sessions ─────────────────────────────────────────────────────────
+router.get("/my-sessions", authRequired, validateSession, async (req, res, next) => {
+  try {
+    const userId = req.user.user_id || req.user.userId;
+    const result = await pgPool.query(`
+      SELECT session_id, user_agent, ip_address, last_active, expires_at, created_at, is_active
+      FROM user_sessions
+      WHERE user_id = $1 AND is_active = true
+      ORDER BY last_active DESC
+    `, [Number(userId)]);
+    res.json(result.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete("/my-sessions/:sessionId", authRequired, validateSession, async (req, res, next) => {
+  try {
+    const result = await revokeUserSession(req.params.sessionId, req.user?.user_id || req.user?.userId);
+    if (!result.revoked) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+    res.json({ success: true, message: Number(result.user_id) === Number(req.user.user_id || req.user.userId) ? "Your session revoked" : "Session revoked successfully" });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/my-sessions/revoke-all", authRequired, validateSession, async (req, res, next) => {
+  try {
+    const userId = req.user.user_id || req.user.userId;
+    const currentSessionId = req.headers["x-session-id"];
+    await pgPool.query("UPDATE user_sessions SET is_active = false WHERE user_id = $1 AND session_id <> $2 AND is_active = true", [Number(userId), currentSessionId]);
+    res.json({ success: true, message: "All other sessions revoked" });
   } catch (err) {
     next(err);
   }
