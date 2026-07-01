@@ -22,12 +22,7 @@ export default React.memo(function Table({
   onSelectRow,
   renderMobileCard,
   className = "",
-  style = {},
-  stickyHeader = true,
-  hoverable = true,
-  dense = false,
-  striped = false,
-  rowClassName = ""
+  style = {}
 }) {
   const tableData = data || rows || [];
   const colSpan = headers.length + (selectable ? 1 : 0);
@@ -35,14 +30,14 @@ export default React.memo(function Table({
   const skeleton = Array.from({ length: skeletonRows });
 
   return (
-    <div className={`ui-table-wrap ${className}`} style={style} role="region" aria-busy={loading} aria-live="polite">
+    <div className={`ui-table-wrap ${className}`} style={style}>
       <div className="ui-table-scroll">
         <table className="ui-table">
           <thead>
             <tr>
               {selectable && <th style={{ width: 44 }} />}
               {headers.map((header, index) => (
-                <th key={`${header}-${index}`} style={stickyHeader ? { position: "sticky", top: 0, zIndex: 2, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" } : undefined}>{header}</th>
+                <th key={`${header}-${index}`}>{header}</th>
               ))}
             </tr>
           </thead>
@@ -67,15 +62,7 @@ export default React.memo(function Table({
                 const rowId = getRowId(row, rowIndex);
                 const selected = selectedRows.includes(rowId);
                 return (
-                  <tr
-                    key={rowId}
-                    className={rowClassName}
-                    style={{
-                      background: selected ? "color-mix(in srgb, var(--color-primary) 10%, transparent)" : striped && rowIndex % 2 === 1 ? "color-mix(in srgb, var(--color-bg-hover) 70%, transparent)" : undefined,
-                      boxShadow: selected ? "inset 3px 0 0 var(--color-primary)" : undefined,
-                      transition: "background var(--transition-fast), box-shadow var(--transition-fast)"
-                    }}
-                  >
+                  <tr key={rowId} style={{ background: selected ? "var(--color-bg-selected)" : undefined }}>
                     {selectable && (
                       <td>
                         <input
@@ -87,7 +74,7 @@ export default React.memo(function Table({
                       </td>
                     )}
                     {renderRow ? renderRow(row, rowIndex) : headers.map((header, colIndex) => (
-                      <td key={`${header}-${colIndex}`} style={{ padding: dense ? "10px 12px" : undefined }}>{getCell(row, header, colIndex)}</td>
+                      <td key={`${header}-${colIndex}`}>{getCell(row, header, colIndex)}</td>
                     ))}
                   </tr>
                 );

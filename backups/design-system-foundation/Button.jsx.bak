@@ -5,13 +5,12 @@ const variants = {
     background: "var(--color-primary)",
     color: "var(--color-text-inverse)",
     border: "1px solid var(--color-primary)",
-    boxShadow: "0 10px 24px color-mix(in srgb, var(--color-primary) 18%, transparent)"
+    boxShadow: "var(--shadow-glow-primary)"
   },
   secondary: {
     background: "var(--color-bg-card)",
     color: "var(--color-text-primary)",
-    border: "1px solid var(--color-border)",
-    boxShadow: "var(--shadow-xs)"
+    border: "1px solid var(--color-border)"
   },
   outline: {
     background: "transparent",
@@ -52,33 +51,24 @@ export default React.memo(function Button({
   leftIcon,
   rightIcon,
   style = {},
-  type = "button",
   ...props
 }) {
-  const isDisabled = disabled || loading;
-
   return (
     <button
-      type={type}
-      className={`ui-btn ui-btn-${variant} ${className}`.trim()}
-      disabled={isDisabled}
+      className={`ui-btn ui-btn-${variant} ${className}`}
+      disabled={disabled || loading}
       aria-busy={loading || undefined}
-      aria-disabled={isDisabled || undefined}
       style={{
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
         gap: "var(--space-2)",
         width: fullWidth ? "100%" : undefined,
-        position: "relative",
-        fontWeight: 700,
-        letterSpacing: "0.01em",
-        cursor: isDisabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.6 : 1,
-        transition: "transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast)",
-        transform: "translateZ(0)",
-        willChange: "transform",
-        contain: "layout paint",
+        fontWeight: 800,
+        letterSpacing: 0,
+        cursor: disabled || loading ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.58 : 1,
+        transition: "transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast)",
         ...sizes[size],
         ...(variants[variant] || variants.primary),
         ...style
@@ -98,7 +88,7 @@ export default React.memo(function Button({
           }}
         />
       ) : leftIcon}
-      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{children}</span>
+      <span>{children}</span>
       {!loading && rightIcon}
     </button>
   );

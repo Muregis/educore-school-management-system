@@ -342,13 +342,20 @@ Keep the tone professional but simple enough for a school administrator to act o
   );
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
-        <h1 style={{ margin: 0, fontSize: "24px", fontWeight: 700, color: "var(--color-text-primary)" }}>Academic Analysis</h1>
+    <div style={{ display: "grid", gap: "var(--space-4)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)", fontWeight: 800 }}>Academic Insights</div>
+          <h1 style={{ margin: "2px 0 0", fontSize: "24px", fontWeight: 800, color: "var(--color-text-primary)", fontFamily: "var(--font-heading)" }}>Academic Analysis</h1>
+        </div>
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+          <Badge text="Live data" variant="primary" />
+          <Badge text="Brand aware" variant="success" />
+        </div>
       </div>
 
       {/* ── Filters + mode toggle ── */}
-      <Card style={{ padding: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+      <Card style={{ padding: "var(--space-4)", background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 96%, transparent) 0%, var(--color-bg-card) 100%)", boxShadow: "var(--shadow-sm)" }}>
         <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end" }}>
             <div style={{ width: "150px" }}>

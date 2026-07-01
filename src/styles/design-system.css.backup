@@ -12,18 +12,10 @@
   /* Brand Colors */
   --color-primary: var(--color-school-primary);
   --color-primary-hover: var(--color-school-primary-hover);
-  --color-primary-light: color-mix(in srgb, var(--color-primary) 70%, white);
-  --color-primary-dark: color-mix(in srgb, var(--color-primary) 70%, black);
   --color-primary-muted: rgba(37, 99, 235, 0.12);
   --color-primary-soft: rgba(37, 99, 235, 0.08);
   --color-primary-ring: rgba(37, 99, 235, 0.28);
-  --color-focus-ring: var(--color-primary-ring);
   --color-primary-glow: var(--color-school-glow);
-  
-  /* Accent Color - Complementary to primary */
-  --color-accent: color-mix(in srgb, var(--color-primary) 70%, #8B5CF6);
-  --color-accent-hover: color-mix(in srgb, var(--color-accent) 85%, black);
-  --color-accent-muted: color-mix(in srgb, var(--color-accent) 15%, transparent);
 
   /* ===========================================
      DARK THEME BASE (#070F1C)
@@ -178,8 +170,6 @@ body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  overflow-x: hidden;
 }
 
 /* ===========================================
@@ -208,12 +198,6 @@ button, input, select, textarea {
 
 button, a, input, select, textarea {
   -webkit-tap-highlight-color: transparent;
-}
-
-img, svg, video {
-  max-width: 100%;
-  height: auto;
-  display: block;
 }
 
 button:focus-visible,
@@ -255,7 +239,7 @@ textarea:focus-visible,
    ANIMATIONS
    =========================================== */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -284,33 +268,6 @@ textarea:focus-visible,
 }
 
 /* ===========================================
-   APP SHELL LAYOUT
-   =========================================== */
-.app-shell {
-  min-height: 100vh;
-  background: var(--color-bg-base);
-}
-
-.ec-page-content {
-  width: 100%;
-  max-width: 1680px;
-  margin: 0 auto;
-  padding: var(--space-5) var(--space-6) var(--space-7);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.ec-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-}
-
-/* ===========================================
    PREMIUM CARD COMPONENT
    =========================================== */
 .ui-card,
@@ -319,14 +276,16 @@ textarea:focus-visible,
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
-  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+  transition: 
+    transform var(--transition-base), 
+    box-shadow var(--transition-base), 
+    border-color var(--transition-base);
   will-change: transform;
-  contain: layout paint;
 }
 
 .ui-card:hover,
 .premium-card:hover {
-  border-color: var(--color-border-strong);
+  border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
   box-shadow: var(--shadow-elevated);
   transform: translateY(-2px);
 }
@@ -336,10 +295,8 @@ textarea:focus-visible,
    =========================================== */
 .ui-btn {
   min-height: 40px;
-  -webkit-user-select: none;
   user-select: none;
   will-change: transform;
-  contain: layout paint;
 }
 
 .ui-btn:not(:disabled):hover {
@@ -493,7 +450,6 @@ textarea:focus-visible,
 
   body {
     -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
   }
 
   button,
@@ -528,7 +484,6 @@ textarea:focus-visible,
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 1ms !important;
-    transition-delay: 0ms !important;
   }
 }
 
@@ -584,8 +539,8 @@ textarea:focus-visible,
    =========================================== */
 .ec-blur-glass {
   background: rgba(255, 255, 255, 0.05);
-  -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 

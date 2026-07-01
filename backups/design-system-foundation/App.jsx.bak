@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DEFAULTS, NAV, ROLE, NAV_EXTRAS } from "./lib/constants";
-import { C, applyBrandColorTokens } from "./lib/theme";
+import { C } from "./lib/theme";
 import { genId } from "./lib/utils";
 import { useLocalState } from "./hooks/useLocalState";
 import Btn from "./components/Btn";
+import NotificationPanel from "./components/NotificationPanel";
 import LoginView from "./pages/LoginView";
 import DashboardPage from "./pages/DashboardPage";
 import StudentsPage from "./pages/StudentsPage";
@@ -47,9 +48,8 @@ import BalanceSheetPage from "./pages/BalanceSheetPage";
 import OfflineStatusBar from "./components/OfflineStatusBar"; // NEW: Offline/sync status indicator
 import ParentGuard from "./components/ParentGuard"; // NEW: Parent-student binding enforcement
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
-import SidebarModern from "./components/SidebarModern";
+import Sidebar from "./components/Sidebar";
 import BranchSelector from "./components/BranchSelector";
-import Topbar from "./components/Topbar";
 import { API_BASE, apiFetch } from "./lib/api";
 import { clearSession, getSession, logout, saveSession } from "./lib/auth";
 
@@ -65,6 +65,23 @@ function useIsMobile() {
     return () => window.removeEventListener("resize", handler);
   }, []);
   return isMobile;
+}
+
+// Helper functions for school color integration
+function darkenColor(hex, percent) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.max(0, (num >> 16) - Math.round(2.55 * percent));
+  const g = Math.max(0, ((num >> 8) & 0xFF) - Math.round(2.55 * percent));
+  const b = Math.max(0, (num & 0xFF) - Math.round(2.55 * percent));
+  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+function hexToRgba(hex, alpha) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 const RESPONSIVE_CSS = `
@@ -188,11 +205,28 @@ export default function App() {
     }
   }, []);
 
+  // Apply school's primary color to entire app
   useEffect(() => {
     if (school?.primary_color) {
-      applyBrandColorTokens(school.primary_color, document.documentElement);
+      // Apply school's chosen color to entire app
+      document.documentElement.style.setProperty('--color-school-primary', school.primary_color);
+      document.documentElement.style.setProperty('--color-primary', school.primary_color);
+      // Generate darker shade for hover
+      document.documentElement.style.setProperty('--color-school-primary-hover', darkenColor(school.primary_color, 15));
+      document.documentElement.style.setProperty('--color-primary-hover', darkenColor(school.primary_color, 15));
+      // Generate muted version for backgrounds
+      document.documentElement.style.setProperty(
+        '--color-primary-muted',
+        hexToRgba(school.primary_color, 0.15)
+      );
+      // Update glow effect
+      document.documentElement.style.setProperty(
+        '--color-primary-glow',
+        hexToRgba(school.primary_color, 0.15)
+      );
+      document.documentElement.style.setProperty('--color-school-glow', hexToRgba(school.primary_color, 0.15));
     }
-  }, [school?.primary_color]);
+  }, [school]);
 
   useEffect(() => { setDrawerOpen(false); }, [page]);
 
@@ -509,7 +543,7 @@ export default function App() {
 
 
   const SidebarContent = ({ collapsed }) => (
-    <SidebarModern
+    <Sidebar
       auth={auth}
       school={school}
       page={page}
@@ -558,23 +592,181 @@ export default function App() {
           )}
 
           <main style={{ marginLeft: isMobile ? 0 : sideW, flex:1, transition:"margin-left 0.2s ease", minWidth:0 }}>
-        <Topbar
-          auth={auth}
-          school={school}
-          currentNav={currentNav}
-          page={page}
-          isPortal={isPortal}
-          isParent={isParent}
-          activeChild={activeChild}
-          isMobile={isMobile}
-          notifications={notifications}
-          showBell={showBell}
-          setShowBell={setShowBell}
-          setDrawerOpen={setDrawerOpen}
-          onLogout={handleLogout}
-          activeSchoolId={activeSchoolId}
-          onSchoolSwitch={handleSchoolSwitch}
-        />
+        <div className="ec-topbar" style={{ 
+          height: "var(--topbar-height)", 
+          background: "var(--color-bg-surface)", 
+          backdropFilter: "blur(18px)",
+          WebkitBackdropFilter: "blur(18px)",
+          borderBottom: "1px solid var(--color-border)", 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center", 
+          padding: "0 var(--space-5)", 
+          position: "sticky", 
+          top: 0, 
+          zIndex: 40,
+          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.18)"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+            {isMobile && (
+              <button 
+                onClick={() => setDrawerOpen(true)} 
+                style={{ 
+                  background: "var(--color-bg-card)", 
+                  border: "1px solid var(--color-border)", 
+                  borderRadius: "var(--radius-md)", 
+                  color: "var(--color-text-primary)", 
+                  cursor: "pointer", 
+                  width: "40px",
+                  height: "40px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "18px",
+                  boxShadow: "var(--shadow-card)",
+                  transition: "all var(--transition-fast)"
+                }} 
+                className="touch-target"
+              >
+                ☰
+              </button>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+              {school.logo_url && !isMobile && (
+                <img 
+                  src={school.logo_url} 
+                  alt="Logo" 
+                  style={{ 
+                    width: "36px", 
+                    height: "36px", 
+                    borderRadius: "var(--radius-md)", 
+                    objectFit: "cover",
+                    boxShadow: "var(--shadow-glow)",
+                    border: "2px solid var(--color-bg-card)"
+                  }} 
+                />
+              )}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                  <span style={{ fontSize: "20px", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))" }}>{currentNav?.icon}</span>
+                  <span style={{ 
+                    fontFamily: "var(--font-heading)",
+                    fontWeight: "800", 
+                    fontSize: isMobile ? "18px" : "22px", 
+                    color: "var(--color-text-primary)",
+                    letterSpacing: "-0.01em"
+                  }}>
+                    {currentNav?.label || page}
+                  </span>
+                </div>
+                {!isMobile && (
+                  <div style={{ 
+                    color: "var(--color-text-muted)", 
+                    fontSize: "12px", 
+                    marginTop: "2px",
+                    fontWeight: "500",
+                    letterSpacing: "0.02em"
+                  }}>
+                    {isPortal
+                      ? `${isParent ? "Parent" : "Student"} · ${activeChild ? `${activeChild.firstName ?? activeChild.first_name} ${activeChild.lastName ?? activeChild.last_name}` : auth.name}`
+                      : `${school.name} · ${school.term} ${school.year}`}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+            {!isMobile && ["admin","director","superadmin"].includes(auth.role) && (
+              <BranchSelector
+                token={auth?.token}
+                activeSchoolId={activeSchoolId}
+                onSwitch={handleSchoolSwitch}
+              />
+            )}
+            {!isMobile && (
+              <div style={{ 
+                background: `${roleColor}15`, 
+                border: `1px solid ${roleColor}30`, 
+                borderRadius: "var(--radius-full)", 
+                padding: "4px 12px", 
+                fontSize: "11px", 
+                fontWeight: "700", 
+                color: roleColor, 
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                boxShadow: `0 0 10px ${roleColor}10`
+              }}>
+                {auth.role}
+              </div>
+            )}
+            {["admin","teacher","finance"].includes(auth.role) && (
+              <div style={{ position: "relative" }}>
+                <button 
+                  onClick={() => setShowBell(!showBell)} 
+                  style={{ 
+                    border: "1px solid var(--color-border)", 
+                    borderRadius: "var(--radius-full)", 
+                    background: "var(--color-bg-card)", 
+                    color: "var(--color-text-secondary)", 
+                    cursor: "pointer", 
+                    width: "40px",
+                    height: "40px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "18px", 
+                    position: "relative",
+                    transition: "all var(--transition-fast)"
+                  }} 
+                  className="touch-target"
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-bg-hover)'; e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-bg-card)'; e.currentTarget.style.color = 'var(--color-text-secondary)'; }}
+                >
+                  🔔
+                  {notifications.filter(n => !n.read).length > 0 && (
+                    <span style={{ 
+                      position: "absolute", 
+                      top: "0px", 
+                      right: "0px", 
+                      width: "12px", 
+                      height: "12px", 
+                      borderRadius: "50%", 
+                      background: "var(--color-danger)", 
+                      border: "2px solid var(--color-bg-surface)",
+                      boxShadow: "0 0 8px var(--color-danger)"
+                    }} />
+                  )}
+                </button>
+                {showBell && <NotificationPanel list={notifications} markAll={() => setNotifications(notifications.map(n => ({ ...n, read:true })))} />}
+              </div>
+            )}
+            {isMobile && (
+              <button 
+                onClick={handleLogout} 
+                style={{ 
+                  width: "40px", 
+                  height: "40px", 
+                  borderRadius: "var(--radius-full)", 
+                  background: `${roleColor}15`, 
+                  border: `1px solid ${roleColor}30`, 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "center", 
+                  fontWeight: "800", 
+                  fontSize: "14px", 
+                  color: roleColor, 
+                  cursor: "pointer",
+                  boxShadow: `0 0 10px ${roleColor}10`
+                }} 
+                title="Logout" 
+                className="touch-target"
+              >
+                {ROLE_AVATARS[auth.role] || "?"}
+              </button>
+            )}
+          </div>
+        </div>
 
         <div className="ec-page-content" style={{ padding: isMobile ? "var(--space-4)" : "var(--space-5)" }}>
           {!pageExists ? <NotFound /> : !allowed ? <Forbidden /> : (pages[page] || <NotFound />)}

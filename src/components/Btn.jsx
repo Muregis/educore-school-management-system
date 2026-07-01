@@ -1,11 +1,12 @@
 import PropTypes from "prop-types";
-import { C } from "../lib/theme";
 
 export default function Btn({ children, onClick, variant = "primary", type = "button", disabled = false, loading = false, size = "default" }) {
   const styles = {
-    primary: { background: C.accent, color: "#fff", border: "none" },
-    ghost: { background: "transparent", color: C.textSub, border: `1px solid ${C.border}` },
-    danger: { background: "#3D0015", color: C.rose, border: `1px solid ${C.rose}44` },
+    primary: { background: "var(--color-primary)", color: "var(--color-text-inverse)", border: "1px solid var(--color-primary)", boxShadow: "0 10px 24px color-mix(in srgb, var(--color-primary) 18%, transparent)" },
+    secondary: { background: "var(--color-bg-card)", color: "var(--color-text-primary)", border: "1px solid var(--color-border)", boxShadow: "var(--shadow-xs)" },
+    outline: { background: "transparent", color: "var(--color-primary)", border: "1px solid var(--color-primary)" },
+    ghost: { background: "transparent", color: "var(--color-text-secondary)", border: "1px solid transparent" },
+    danger: { background: "var(--color-danger)", color: "#FFFFFF", border: "1px solid var(--color-danger)" },
   };
 
   const sizeStyles = {
@@ -15,25 +16,30 @@ export default function Btn({ children, onClick, variant = "primary", type = "bu
   };
 
   const sizeStyle = sizeStyles[size] || sizeStyles.default;
+  const isDisabled = disabled || loading;
 
   return (
     <button
       type={type}
       onClick={onClick}
-      disabled={disabled || loading}
+      disabled={isDisabled}
+      aria-busy={loading || undefined}
+      aria-disabled={isDisabled || undefined}
       style={{
         ...styles[variant],
-        borderRadius: 12,
-        fontWeight: 600,
-        cursor: (disabled || loading) ? "not-allowed" : "pointer",
-        opacity: (disabled || loading) ? 0.6 : 1,
+        borderRadius: "var(--radius-md)",
+        fontWeight: 700,
+        cursor: isDisabled ? "not-allowed" : "pointer",
+        opacity: isDisabled ? 0.6 : 1,
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
         gap: 6,
-        transition: "all 0.15s ease",
+        transition: "transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast)",
         touchAction: "manipulation",
         WebkitTapHighlightColor: "rgba(59, 130, 246, 0.2)",
+        transform: "translateZ(0)",
+        contain: "layout paint",
         ...sizeStyle,
       }}
     >
@@ -50,7 +56,7 @@ export default function Btn({ children, onClick, variant = "primary", type = "bu
 Btn.propTypes = {
   children: PropTypes.node.isRequired,
   onClick: PropTypes.func,
-  variant: PropTypes.oneOf(["primary", "ghost", "danger"]),
+  variant: PropTypes.oneOf(["primary", "secondary", "outline", "ghost", "danger"]),
   type: PropTypes.oneOf(["button", "submit"]),
   disabled: PropTypes.bool,
   loading: PropTypes.bool,

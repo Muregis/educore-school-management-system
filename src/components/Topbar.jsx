@@ -1,5 +1,8 @@
 import PropTypes from "prop-types";
+import { useEffect, useMemo, useState } from "react";
+import { Bell, ChevronDown, Menu, Search, Sparkles } from "lucide-react";
 import BranchSelector from "./BranchSelector";
+import NotificationPanel from "./NotificationPanel";
 
 const ROLE_COLORS = {
   admin: "#3B82F6",
@@ -10,7 +13,7 @@ const ROLE_COLORS = {
   parent: "#F43F5E",
   student: "#38BDF8",
   director: "#3B82F6",
-  superadmin: "#3B82F6"
+  superadmin: "#3B82F6",
 };
 
 const ROLE_AVATARS = {
@@ -22,7 +25,7 @@ const ROLE_AVATARS = {
   parent: "P",
   student: "S",
   director: "D",
-  superadmin: "A"
+  superadmin: "A",
 };
 
 export default function Topbar({
@@ -38,212 +41,150 @@ export default function Topbar({
   showBell,
   setShowBell,
   setDrawerOpen,
-  rolePermissions,
-  onLogout
+  onLogout,
+  activeSchoolId,
+  onSchoolSwitch,
 }) {
   const roleColor = ROLE_COLORS[auth?.role] || "#3B82F6";
   const roleAvatar = ROLE_AVATARS[auth?.role] || "?";
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  useEffect(() => {
+    if (!showProfileMenu) return undefined;
+    const handler = () => setShowProfileMenu(false);
+    window.addEventListener("click", handler);
+    return () => window.removeEventListener("click", handler);
+  }, [showProfileMenu]);
+
+  const breadcrumbs = useMemo(() => {
+    const base = [{ label: "Home", value: "dashboard" }];
+    if (currentNav?.label) {
+      base.push({ label: currentNav.label, value: currentNav.id || page });
+    }
+    return base;
+  }, [currentNav, page]);
+
+  const CurrentIcon = currentNav?.icon && typeof currentNav.icon !== "string" ? currentNav.icon : Sparkles;
 
   return (
-    <div
+    <header
       className="ec-topbar"
       style={{
-        height: "var(--topbar-height)",
-        background: "var(--color-bg-surface)",
+        minHeight: "var(--topbar-height)",
+        background: "linear-gradient(90deg, var(--color-bg-surface) 0%, color-mix(in srgb, var(--color-bg-surface) 85%, var(--color-bg-card)) 100%)",
         borderBottom: "1px solid var(--color-border)",
         display: "flex",
-        justifyContent: "space-between",
         alignItems: "center",
+        justifyContent: "space-between",
+        gap: "var(--space-4)",
         padding: isMobile ? "0 var(--space-4)" : "0 var(--space-5)",
         position: "sticky",
         top: 0,
         zIndex: 40,
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)"
       }}
     >
-      {/* Left Section */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", minWidth: 0, flex: 1 }}>
         {isMobile && (
           <button
             onClick={() => setDrawerOpen(true)}
             style={{
-              background: "var(--color-bg-card)",
-              border: "1px solid var(--color-border)",
+              width: 40,
+              height: 40,
+              display: "grid",
+              placeItems: "center",
               borderRadius: "var(--radius-md)",
+              border: "1px solid var(--color-border)",
+              background: "var(--color-bg-card)",
               color: "var(--color-text-primary)",
               cursor: "pointer",
-              width: "40px",
-              height: "40px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "18px",
-              transition: "all var(--transition-fast)"
             }}
             className="touch-target"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--color-bg-hover)";
-              e.currentTarget.style.borderColor = "var(--color-primary)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "var(--color-bg-card)";
-              e.currentTarget.style.borderColor = "var(--color-border)";
-            }}
           >
-            ☰
+            <Menu size={18} />
           </button>
         )}
 
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-          {school.logo_url && !isMobile && (
-            <img
-              src={school.logo_url}
-              alt="Logo"
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "var(--radius-md)",
-                objectFit: "cover",
-                border: "2px solid var(--color-bg-card)"
-              }}
-            />
-          )}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-              <span style={{ fontSize: "20px" }}>{currentNav?.icon}</span>
-              <span
-                style={{
-                  fontFamily: "var(--font-heading)",
-                  fontWeight: 800,
-                  fontSize: isMobile ? "18px" : "22px",
-                  color: "var(--color-text-primary)",
-                  letterSpacing: "-0.01em"
-                }}
-              >
-                {currentNav?.label || page}
-              </span>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", minWidth: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: "var(--radius-md)", display: "grid", placeItems: "center", background: "color-mix(in srgb, var(--color-primary) 16%, var(--color-bg-card))", color: "var(--color-primary)" }}>
+              {typeof currentNav?.icon === "string" ? <span>{currentNav.icon}</span> : <CurrentIcon size={18} />}
             </div>
-            {!isMobile && (
-              <div
-                style={{
-                  color: "var(--color-text-muted)",
-                  fontSize: "12px",
-                  marginTop: "2px",
-                  fontWeight: 500,
-                  letterSpacing: "0.02em"
-                }}
-              >
-                {isPortal
-                  ? `${isParent ? "Parent" : "Student"} · ${activeChild ? `${activeChild.firstName ?? activeChild.first_name} ${activeChild.lastName ?? activeChild.last_name}` : auth?.name}`
-                  : `${school.name} · ${school.term} ${school.year}`}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: isMobile ? "18px" : "20px", color: "var(--color-text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {currentNav?.label || page}
               </div>
-            )}
+              <nav aria-label="Breadcrumbs" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--space-2)", color: "var(--color-text-muted)", fontSize: "12px", marginTop: "2px" }}>
+                {breadcrumbs.map((crumb, index) => (
+                  <span key={`${crumb.value}-${index}`} style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)" }}>
+                    <span>{crumb.label}</span>
+                    {index < breadcrumbs.length - 1 && <span>/</span>}
+                  </span>
+                ))}
+              </nav>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Right Section */}
-       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-         {/* Branch Selector for admin/director/superadmin */}
-         {!isMobile && ["admin","director","superadmin"].includes(auth?.role) && (
-           <BranchSelector token={auth?.token} />
-         )}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-full)", background: "var(--color-bg-card)", padding: "8px 12px", minWidth: isMobile ? 0 : 240 }}>
+          <Search size={16} color="var(--color-text-muted)" />
+          <input
+            aria-label="Search"
+            placeholder="Search"
+            style={{ border: "none", background: "transparent", color: "var(--color-text-primary)", outline: "none", width: "100%", fontSize: "13px" }}
+          />
+        </div>
 
-         {/* Role Badge */}
+        {!isMobile && ["admin", "director", "superadmin"].includes(auth?.role) && (
+          <BranchSelector token={auth?.token} activeSchoolId={activeSchoolId} onSwitch={onSchoolSwitch} />
+        )}
+
         {!isMobile && (
-          <div
-            style={{
-              background: `${roleColor}15`,
-              border: `1px solid ${roleColor}30`,
-              borderRadius: "var(--radius-full)",
-              padding: "4px 12px",
-              fontSize: "11px",
-              fontWeight: 700,
-              color: roleColor,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em"
-            }}
-          >
+          <div style={{ background: `${roleColor}15`, border: `1px solid ${roleColor}30`, borderRadius: "var(--radius-full)", padding: "4px 12px", fontSize: "11px", fontWeight: 700, color: roleColor, textTransform: "uppercase", letterSpacing: "0.05em" }}>
             {auth?.role}
           </div>
         )}
 
-        {/* Notification Bell */}
-        {["admin", "teacher", "finance"].includes(auth?.role) && (
+        {['admin', 'teacher', 'finance'].includes(auth?.role) && (
           <div style={{ position: "relative" }}>
             <button
               onClick={() => setShowBell(!showBell)}
-              style={{
-                border: "1px solid var(--color-border)",
-                borderRadius: "var(--radius-full)",
-                background: "var(--color-bg-card)",
-                color: "var(--color-text-secondary)",
-                cursor: "pointer",
-                width: "40px",
-                height: "40px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "18px",
-                position: "relative",
-                transition: "all var(--transition-fast)"
-              }}
+              style={{ width: 40, height: 40, borderRadius: "50%", border: "1px solid var(--color-border)", background: "var(--color-bg-card)", color: "var(--color-text-secondary)", display: "grid", placeItems: "center", cursor: "pointer", position: "relative" }}
               className="touch-target"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--color-bg-hover)";
-                e.currentTarget.style.color = "var(--color-text-primary)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "var(--color-bg-card)";
-                e.currentTarget.style.color = "var(--color-text-secondary)";
-              }}
             >
-              🔔
-              {notifications.filter((n) => !n.read).length > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "0px",
-                    right: "0px",
-                    width: "12px",
-                    height: "12px",
-                    borderRadius: "50%",
-                    background: "var(--color-danger)",
-                    border: "2px solid var(--color-bg-surface)"
-                  }}
-                />
-              )}
+              <Bell size={18} />
+              {notifications.filter((n) => !n.read).length > 0 && <span style={{ position: "absolute", top: 2, right: 3, width: 10, height: 10, borderRadius: "50%", background: "var(--color-danger)", border: "2px solid var(--color-bg-surface)" }} />}
             </button>
+            {showBell && <NotificationPanel list={notifications} markAll={() => setShowBell(false)} />}
           </div>
         )}
 
-        {/* Mobile Logout */}
-        {isMobile && (
+        <div style={{ position: "relative" }}>
           <button
-            onClick={onLogout}
-            style={{
-              width: "40px",
-              height: "40px",
-              borderRadius: "var(--radius-full)",
-              background: `${roleColor}15`,
-              border: `1px solid ${roleColor}30`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 800,
-              fontSize: "14px",
-              color: roleColor,
-              cursor: "pointer"
+            onClick={(event) => {
+              event.stopPropagation();
+              setShowProfileMenu((value) => !value);
             }}
-            title="Logout"
-            className="touch-target"
+            style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-full)", padding: "6px 10px", background: "var(--color-bg-card)", color: "var(--color-text-primary)", cursor: "pointer" }}
           >
-            {roleAvatar}
+            <div style={{ width: 30, height: 30, borderRadius: "50%", background: `color-mix(in srgb, ${roleColor} 18%, transparent)`, display: "grid", placeItems: "center", color: roleColor, fontWeight: 800 }}>
+              {roleAvatar}
+            </div>
+            {!isMobile && <ChevronDown size={15} />}
           </button>
-        )}
+          {showProfileMenu && (
+            <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, minWidth: 200, padding: "var(--space-3)", borderRadius: "var(--radius-lg)", background: "var(--color-bg-card)", border: "1px solid var(--color-border)", boxShadow: "var(--shadow-md)", display: "grid", gap: "var(--space-2)" }}>
+              <div style={{ fontWeight: 700, color: "var(--color-text-primary)" }}>{auth?.name}</div>
+              <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>{auth?.role}</div>
+              <button onClick={onLogout} style={{ border: "none", background: "var(--color-danger-muted)", color: "var(--color-danger)", borderRadius: "var(--radius-md)", padding: "8px 10px", fontWeight: 700, cursor: "pointer" }}>
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </header>
   );
 }
 
@@ -260,6 +201,7 @@ Topbar.propTypes = {
   showBell: PropTypes.bool,
   setShowBell: PropTypes.func,
   setDrawerOpen: PropTypes.func,
-  rolePermissions: PropTypes.object,
-  onLogout: PropTypes.func
+  onLogout: PropTypes.func,
+  activeSchoolId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onSchoolSwitch: PropTypes.func,
 };

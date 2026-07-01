@@ -10,38 +10,63 @@ import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 
 // Define money here locally just in case it was a global that gets lost in strict module scope
 const money = (val) => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(val || 0);
-// Premium Stat Card Component
-  const StatCard = ({ label, value, color, loading = false }) => (
-    <Card style={{ 
-      minHeight: 100, 
-      position: "relative", 
+const StatCard = ({ label, value, color, loading = false, icon = "●" }) => (
+  <Card
+    hoverable
+    style={{
+      minHeight: 118,
+      position: "relative",
       overflow: "hidden",
-      background: "var(--color-bg-card)",
-      border: "1px solid var(--color-border)"
-    }}>
-      <div style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        height: "3px",
-        background: color,
-        opacity: 0.8
-      }} />
-      <div style={{ color: "var(--color-text-muted)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700 }}>{label}</div>
-      <div style={{ color: "var(--color-text-primary)", fontWeight: 800, fontSize: "26px", marginTop: "var(--space-2)" }}>
-        {loading ? <Skeleton width="60px" height="32px" /> : value}
+      background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 92%, transparent) 0%, var(--color-bg-card) 100%)",
+      border: "1px solid var(--color-border)",
+      boxShadow: "var(--shadow-sm)",
+      transition: "transform 180ms ease, box-shadow 180ms ease"
+    }}
+  >
+    <div style={{ position: "absolute", inset: 0, background: `linear-gradient(135deg, color-mix(in srgb, ${color} 12%, transparent) 0%, transparent 70%)`, pointerEvents: "none" }} />
+    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: color, opacity: 0.85 }} />
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-3)" }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ color: "var(--color-text-muted)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 800 }}>{label}</div>
+        <div style={{ color: "var(--color-text-primary)", fontWeight: 800, fontSize: "24px", marginTop: "var(--space-2)", fontFamily: "var(--font-heading)" }}>
+          {loading ? <Skeleton width="60px" height="32px" /> : value}
+        </div>
       </div>
-    </Card>
-  );
+      <div style={{ width: 44, height: 44, borderRadius: "var(--radius-md)", display: "grid", placeItems: "center", background: `color-mix(in srgb, ${color} 16%, var(--color-bg-base))`, color, fontSize: 20, flexShrink: 0 }}>
+        {icon}
+      </div>
+    </div>
+  </Card>
+);
 
-  // Premium Chart Card Component  
-  const ChartCard = ({ title, children, loading = false }) => (
-    <Card>
-      <div style={{ color: "var(--color-text-primary)", fontWeight: 700, marginBottom: "var(--space-4)", fontFamily: "var(--font-heading)" }}>{title}</div>
-      {loading ? <Skeleton height="180px" /> : children}
-    </Card>
+const ChartCard = ({ title, subtitle, children, loading = false }) => (
+  <Card style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 96%, transparent) 0%, var(--color-bg-card) 100%)", boxShadow: "var(--shadow-sm)" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+      <div>
+        <div style={{ color: "var(--color-text-primary)", fontWeight: 700, fontFamily: "var(--font-heading)", fontSize: "16px" }}>{title}</div>
+        {subtitle && <div style={{ color: "var(--color-text-muted)", fontSize: "12px", marginTop: "2px" }}>{subtitle}</div>}
+      </div>
+      <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-primary)", boxShadow: "0 0 0 5px color-mix(in srgb, var(--color-primary) 14%, transparent)" }} />
+    </div>
+    {loading ? <Skeleton height="180px" /> : children}
+  </Card>
+);
+
+const ProgressRow = ({ label, value, max, color = "var(--color-primary)", displayValue }) => {
+  const numericValue = Number(value) || 0;
+  const ratio = max > 0 ? Math.min(100, (numericValue / max) * 100) : 0;
+  return (
+    <div style={{ marginBottom: "var(--space-3)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", color: "var(--color-text-secondary)", fontSize: "12px", fontWeight: 700 }}>
+        <span>{label}</span>
+        <span style={{ color: "var(--color-text-primary)" }}>{displayValue ?? value}</span>
+      </div>
+      <div style={{ height: 8, borderRadius: "var(--radius-full)", background: "var(--color-bg-hover)", overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${ratio}%`, borderRadius: "var(--radius-full)", background: color, transition: "width 0.25s ease" }} />
+      </div>
+    </div>
   );
+};
 // Fallback apiFetch if it was magically global, but better to import it
 import { apiFetch } from "../lib/api";
 
@@ -320,17 +345,15 @@ export default function DashboardPage({ auth, school, students, teachers, attend
             )}
           </ChartCard>
 
-          <ChartCard title="Grade Distribution">
+          <ChartCard title="Grade Distribution" subtitle="Current performance split">
             {["EE", "ME", "AE", "BE"].map(g => (
-              <div key={g} style={{ marginBottom: "var(--space-3)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
-                  <span style={{ fontWeight: 600 }}>{g}</span>
-                  <span>{gradeCount[g]}</span>
-                </div>
-                <div style={{ height: 8, borderRadius: "var(--radius-full)", background: "var(--color-bg-hover)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${Math.min(100, gradeCount[g] * 12)}%`, borderRadius: "var(--radius-full)", background: g === "EE" ? "var(--color-success)" : g === "ME" ? "var(--color-teal)" : g === "AE" ? "var(--color-warning)" : "var(--color-danger)" }} />
-                </div>
-              </div>
+              <ProgressRow
+                key={g}
+                label={g}
+                value={gradeCount[g]}
+                max={Math.max(...Object.values(gradeCount), 1)}
+                color={g === "EE" ? "var(--color-success)" : g === "ME" ? "var(--color-teal)" : g === "AE" ? "var(--color-warning)" : "var(--color-danger)"}
+              />
             ))}
           </ChartCard>
         </div>
@@ -381,17 +404,15 @@ export default function DashboardPage({ auth, school, students, teachers, attend
             )}
           </ChartCard>
 
-          <ChartCard title="Grade Distribution">
+          <ChartCard title="Grade Distribution" subtitle="Current performance split">
             {["EE", "ME", "AE", "BE"].map(g => (
-              <div key={g} style={{ marginBottom: "var(--space-3)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
-                  <span style={{ fontWeight: 600 }}>{g}</span>
-                  <span>{gradeCount[g]}</span>
-                </div>
-                <div style={{ height: 8, borderRadius: "var(--radius-full)", background: "var(--color-bg-hover)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${Math.min(100, gradeCount[g] * 12)}%`, borderRadius: "var(--radius-full)", background: g === "EE" ? "var(--color-success)" : g === "ME" ? "var(--color-teal)" : g === "AE" ? "var(--color-warning)" : "var(--color-danger)" }} />
-                </div>
-              </div>
+              <ProgressRow
+                key={g}
+                label={g}
+                value={gradeCount[g]}
+                max={Math.max(...Object.values(gradeCount), 1)}
+                color={g === "EE" ? "var(--color-success)" : g === "ME" ? "var(--color-teal)" : g === "AE" ? "var(--color-warning)" : "var(--color-danger)"}
+              />
             ))}
           </ChartCard>
         </div>
@@ -484,17 +505,15 @@ export default function DashboardPage({ auth, school, students, teachers, attend
             )}
           </ChartCard>
 
-          <ChartCard title="My Students Grade Distribution">
+          <ChartCard title="My Students Grade Distribution" subtitle="Performance milestones">
             {["EE", "ME", "AE", "BE"].map(g => (
-              <div key={g} style={{ marginBottom: "var(--space-3)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--color-text-secondary)", marginBottom: "4px" }}>
-                  <span style={{ fontWeight: 600 }}>{g}</span>
-                  <span>{gradeCount[g]}</span>
-                </div>
-                <div style={{ height: 8, borderRadius: "var(--radius-full)", background: "var(--color-bg-hover)", overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${Math.min(100, gradeCount[g] * 25)}%`, borderRadius: "var(--radius-full)", background: g === "EE" ? "var(--color-success)" : g === "ME" ? "var(--color-teal)" : g === "AE" ? "var(--color-warning)" : "var(--color-danger)" }} />
-                </div>
-              </div>
+              <ProgressRow
+                key={g}
+                label={g}
+                value={gradeCount[g]}
+                max={Math.max(...Object.values(gradeCount), 1)}
+                color={g === "EE" ? "var(--color-success)" : g === "ME" ? "var(--color-teal)" : g === "AE" ? "var(--color-warning)" : "var(--color-danger)"}
+              />
             ))}
           </ChartCard>
         </div>
@@ -591,18 +610,17 @@ export default function DashboardPage({ auth, school, students, teachers, attend
             </div>
           </ChartCard>
 
-          <ChartCard title="Outstanding by Class">
+          <ChartCard title="Outstanding by Class" subtitle="Collection risk by stream">
             <div style={{ fontSize: "13px" }}>
               {Object.entries(outstandingByClass).map(([className, amount]) => (
-                <div key={className} style={{ marginBottom: "var(--space-3)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", color: "var(--color-text-secondary)" }}>
-                    <span style={{ fontWeight: 600 }}>{className}</span>
-                    <span style={{ fontWeight: 700, color: "var(--color-text-primary)" }}>{money(amount)}</span>
-                  </div>
-                  <div style={{ height: 8, borderRadius: "var(--radius-full)", background: "var(--color-bg-hover)", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.min(100, (amount / (outstanding || 1)) * 100)}%`, borderRadius: "var(--radius-full)", background: "var(--color-warning)" }} />
-                  </div>
-                </div>
+                <ProgressRow
+                  key={className}
+                  label={className}
+                  value={amount}
+                  max={outstanding || 1}
+                  displayValue={money(amount)}
+                  color="var(--color-warning)"
+                />
               ))}
             </div>
           </ChartCard>

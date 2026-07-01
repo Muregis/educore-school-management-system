@@ -17,24 +17,35 @@ function BarChart({ data, height = 200 }) {
   const validData = data.map(d => ({ ...d, value: Number(d.value) || 0 }));
   const max = Math.max(...validData.map(d => d.value), 1);
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", height, gap: "var(--space-2)", padding: "var(--space-4) 0" }}>
-      {validData.map((d, i) => (
-        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <div style={{ 
-            width: "100%", 
-            height: `${(d.value / max) * 100}%`, 
-            background: d.color || "var(--color-primary)",
-            borderRadius: "4px 4px 0 0",
-            minHeight: 4,
-          }} />
-          <div style={{ fontSize: "11px", marginTop: "var(--space-1)", color: "var(--color-text-secondary)", textAlign: "center", wordBreak: "break-word" }}>
-            {d.label}
+    <div style={{ display: "grid", gap: "var(--space-3)", padding: "var(--space-3) 0" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", height, gap: "var(--space-2)" }}>
+        {validData.map((d, i) => (
+          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div title={`${d.label}: ${d.value}`} style={{
+              width: "100%",
+              height: `${(d.value / max) * 100}%`,
+              background: d.color || "var(--color-primary)",
+              borderRadius: "10px 10px 2px 2px",
+              minHeight: 4,
+              boxShadow: "inset 0 -8px 16px rgba(255,255,255,0.14)",
+            }} />
+            <div style={{ fontSize: "11px", marginTop: "var(--space-1)", color: "var(--color-text-secondary)", textAlign: "center", wordBreak: "break-word" }}>
+              {d.label}
+            </div>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-text-primary)" }}>
+              {d.value}
+            </div>
           </div>
-          <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-primary)" }}>
-            {d.value}
+        ))}
+      </div>
+      <div style={{ display: "flex", justifyContent: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
+        {validData.map((d, i) => (
+          <div key={`${d.label}-${i}`} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", color: "var(--color-text-secondary)", fontSize: "12px" }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: d.color || "var(--color-primary)" }} />
+            <span>{d.label}</span>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -45,7 +56,7 @@ function PieChart({ data, size = 150 }) {
   let currentAngle = 0;
   
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", flexWrap: "wrap" }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         {data.map((d, i) => {
           const angle = (d.value / total) * 360;
@@ -73,11 +84,14 @@ function PieChart({ data, size = 150 }) {
           );
         })}
       </svg>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", minWidth: 180 }}>
         {data.map((d, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-            <div style={{ width: 12, height: 12, background: d.color, borderRadius: "var(--radius-sm)" }} />
-            <span style={{ fontSize: "13px", color: "var(--color-text-primary)" }}>{d.label}: {d.value} ({((d.value/total)*100).toFixed(1)}%)</span>
+          <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-2)", background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "8px 10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+              <div style={{ width: 12, height: 12, background: d.color, borderRadius: "var(--radius-sm)" }} />
+              <span style={{ fontSize: "13px", color: "var(--color-text-primary)" }}>{d.label}</span>
+            </div>
+            <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 700 }}>{d.value} ({((d.value/total)*100).toFixed(1)}%)</span>
           </div>
         ))}
       </div>

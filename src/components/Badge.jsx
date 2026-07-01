@@ -3,11 +3,11 @@ import { C } from "../lib/theme";
 
 export default function Badge({ text, children, tone = "neutral" }) {
   const tones = {
-    success: ["#0D2E1A", C.green],
-    warning: ["#3D2200", C.amber],
-    danger: ["#3D0015", C.rose],
-    info: [C.accentGlow, C.accent],
-    neutral: [C.surface, C.textSub],
+    success: ["var(--color-success-muted)", "var(--color-success)"],
+    warning: ["var(--color-warning-muted)", "var(--color-warning)"],
+    danger: ["var(--color-danger-muted)", "var(--color-danger)"],
+    info: ["var(--color-info-muted)", "var(--color-info)"],
+    neutral: ["var(--color-bg-hover)", "var(--color-text-secondary)"],
   };
   const t = tones[tone] || tones.neutral;
   const content = text ?? children ?? "";

@@ -226,24 +226,22 @@ export default function AttendancePage({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-      {/* Summary badges */}
-      <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-        <Badge 
-          text={`Present: ${normalised.filter(a => a.status === "present").length}`} 
-          variant="success" 
-        />
-        <Badge 
-          text={`Absent: ${normalised.filter(a => a.status === "absent").length}`} 
-          variant="danger" 
-        />
-        <Badge 
-          text={`Late: ${normalised.filter(a => a.status === "late").length}`} 
-          variant="warning" 
-        />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--space-3)" }}>
+        {[
+          { label: "Present", value: normalised.filter(a => a.status === "present").length, tone: "success" },
+          { label: "Absent", value: normalised.filter(a => a.status === "absent").length, tone: "danger" },
+          { label: "Late", value: normalised.filter(a => a.status === "late").length, tone: "warning" },
+        ].map((item) => (
+          <Card key={item.label} style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 96%, transparent) 0%, var(--color-bg-card) 100%)", boxShadow: "var(--shadow-sm)", padding: "var(--space-4)" }}>
+            <div style={{ fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-text-muted)", fontWeight: 800 }}>{item.label}</div>
+            <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-text-primary)", marginTop: "var(--space-2)", fontFamily: "var(--font-heading)" }}>{item.value}</div>
+            <div style={{ marginTop: "var(--space-2)" }}><Badge text={item.label} variant={item.tone} /></div>
+          </Card>
+        ))}
       </div>
 
       {/* Filters and actions */}
-      <Card style={{ padding: "var(--space-3)" }}>
+      <Card style={{ padding: "var(--space-4)", background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 96%, transparent) 0%, var(--color-bg-card) 100%)", boxShadow: "var(--shadow-sm)" }}>
         <div style={{ 
           display: "grid", 
           gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", 

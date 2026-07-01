@@ -3,11 +3,11 @@ import React, { useEffect, useState } from "react";
 export default function Toast({ message, type = "success", onClose, duration = 3500 }) {
   const [closing, setClosing] = useState(false);
   const tones = {
-    success: { color: "var(--color-success)", bg: "var(--color-success-muted)" },
-    error: { color: "var(--color-danger)", bg: "var(--color-danger-muted)" },
-    danger: { color: "var(--color-danger)", bg: "var(--color-danger-muted)" },
-    warning: { color: "var(--color-warning)", bg: "var(--color-warning-muted)" },
-    info: { color: "var(--color-info)", bg: "var(--color-info-muted)" }
+    success: { color: "var(--color-success)", bg: "var(--color-success-muted)", icon: "✓" },
+    error: { color: "var(--color-danger)", bg: "var(--color-danger-muted)", icon: "!" },
+    danger: { color: "var(--color-danger)", bg: "var(--color-danger-muted)", icon: "!" },
+    warning: { color: "var(--color-warning)", bg: "var(--color-warning-muted)", icon: "⚠" },
+    info: { color: "var(--color-info)", bg: "var(--color-info-muted)", icon: "i" }
   };
   const tone = tones[type] || tones.info;
 
@@ -23,6 +23,9 @@ export default function Toast({ message, type = "success", onClose, duration = 3
   return (
     <div
       className="ui-toast animate-in"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       style={{
         position: "relative",
         overflow: "hidden",
@@ -38,13 +41,17 @@ export default function Toast({ message, type = "success", onClose, duration = 3
         boxShadow: "var(--shadow-elevated)",
         minWidth: 280,
         maxWidth: 420,
-        opacity: closing ? 0.7 : 1
+        opacity: closing ? 0.7 : 1,
+        contain: "layout paint"
       }}
     >
-      <span style={{ color: "var(--color-text-primary)", fontSize: 14, fontWeight: 700 }}>{message}</span>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)", minWidth: 0 }}>
+        <span aria-hidden="true" style={{ display: "inline-grid", placeItems: "center", width: 24, height: 24, borderRadius: "var(--radius-full)", background: tone.bg, color: tone.color, fontWeight: 900 }}>{tone.icon}</span>
+        <span style={{ color: "var(--color-text-primary)", fontSize: 14, fontWeight: 700, lineHeight: 1.4 }}>{message}</span>
+      </div>
       {onClose && (
-        <button onClick={onClose} aria-label="Dismiss toast" style={{ background: "transparent", border: 0, color: "var(--color-text-muted)", cursor: "pointer", fontWeight: 900 }}>
-          x
+        <button type="button" onClick={onClose} aria-label="Dismiss toast" style={{ background: "transparent", border: 0, color: "var(--color-text-muted)", cursor: "pointer", fontWeight: 900, padding: 0 }}>
+          ×
         </button>
       )}
       <div
