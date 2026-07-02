@@ -280,7 +280,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   const balances = students.map(s => calculateLedgerBalance(s, studentDiscounts[s.id ?? s.student_id] || []))
     .filter(b => filterClass === "all" || b.className === filterClass)
-    .filter(b => filterStudent === "all" || String(b.studentId) === String(filterStudent))
+    .filter(b => (!filterClass || filterClass === "all" || b.className === filterClass))
     .filter(b => {
       if (!recordSearch) return true;
       const q = recordSearch.toLowerCase();
@@ -294,7 +294,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   const filteredPayments = normalisedPayments.filter(p => 
     (filterClass === "all" || p.className === filterClass) &&
-    (filterStudent === "all" || String(p.studentId) === String(filterStudent)) &&
     (!recordSearch || (
       (p.studentName || "").toLowerCase().includes(recordSearch.toLowerCase()) ||
       String(p.studentId).includes(recordSearch) ||
@@ -645,21 +644,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 }}
                 style={{ flex: 1, minWidth: "240px" }}
               />
-              <Select 
-                value={filterStudent} 
-                onChange={e => {
-                  setFilterStudent(e.target.value);
-                  if (e.target.value !== "all") setRecordSearch("");
-                }}
-                options={[
-                  { value: "all", label: "All Students" },
-                  ...students.map(s => ({ 
-                    value: String(s.id ?? s.student_id), 
-                    label: `${s.first_name ?? s.firstName ?? ''} ${s.last_name ?? s.lastName ?? ''} (${s.admission ?? s.admission_number ?? 'N/A'})` 
-                  }))
-                ]}
-                style={{ minWidth: "180px" }}
-              />
+              {/* Removed limiting filterStudent Select in favor of live searchable input */}
             </div>
           </div>
 
@@ -674,6 +659,69 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
               if (tab==="balances") csv("balances.csv",["Student","Class","Paid","Balance"],balances.map(b=>[b.name,b.className,b.paid,b.balance]));
               toast("CSV exported","success");
             }}>Export CSV</Button>}
+            {canViewTotals && tab === "payments" && <Button variant="ghost" onClick={() => {
+              const schoolInfo = schoolData || school || {};
+              const schoolName = schoolInfo.name || schoolInfo.school_name || "School";
+              const logoUrl = schoolInfo.logo_url || "";
+              const printDate = new Date().toLocaleDateString();
+              const uniqueStudents = [...new Set(filteredPayments.map(p => String(p.studentId)))];
+              const statementTitle = uniqueStudents.length === 1 ? `Payment Statement - ${filteredPayments[0].studentName}` : "Payment History Statement";
+
+              const rowsHtml = filteredPayments.map(p => `
+                <tr>
+                  <td style="padding: 8px; border-bottom: 1px solid #ddd;">${p.date}</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #ddd;">${p.studentName}</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #ddd;">${p.className}</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #ddd;">KES ${Number(p.amount).toLocaleString()}</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #ddd;">${p.method}</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #ddd;">${p.reference || '-'}</td>
+                  <td style="padding: 8px; border-bottom: 1px solid #ddd;">${p.paidBy || 'System'}</td>
+                </tr>
+              `).join("");
+              
+              let currentBalanceHtml = "";
+              if (uniqueStudents.length === 1) {
+                const studentBal = balances.find(b => String(b.studentId) === uniqueStudents[0]);
+                if (studentBal) {
+                   currentBalanceHtml = `<p style="margin: 5px 0 0 0; color: #333; font-weight: bold;">Outstanding Balance: KES ${Number(studentBal.balance).toLocaleString()}</p>`;
+                }
+              }
+
+              const html = `
+                <div style="font-family: Arial, sans-serif; padding: 20px;">
+                  <div style="text-align: center; margin-bottom: 20px;">
+                    ${logoUrl ? `<img src="${logoUrl}" style="max-height: 80px;" alt="Logo" />` : ''}
+                    <h1 style="margin: 10px 0 5px 0;">${schoolName}</h1>
+                    <h2 style="margin: 0; color: #555; font-size: 18px;">${statementTitle}</h2>
+                    <p style="margin: 5px 0 0 0; color: #777;">Generated on ${printDate}</p>
+                    ${currentBalanceHtml}
+                  </div>
+                  <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                    <thead>
+                      <tr style="background-color: #f8f9fa;">
+                        <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Date</th>
+                        <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Student</th>
+                        <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Class</th>
+                        <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Amount</th>
+                        <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Method</th>
+                        <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Ref</th>
+                        <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Cashier</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${rowsHtml}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colspan="3" style="padding: 8px; text-align: right; font-weight: bold; border-top: 2px solid #ddd;">Total Paid:</td>
+                        <td colspan="4" style="padding: 8px; font-weight: bold; border-top: 2px solid #ddd;">KES ${filteredPayments.reduce((s, p) => s + Number(p.amount), 0).toLocaleString()}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              `;
+              printHTML(html, { title: statementTitle });
+            }}>🖨️ Print Statement</Button>}
             {canEdit && tab==="payments" && <Button onClick={() => setShowPayment(true)}>+ Record Payment</Button>}
             {canEdit && tab==="payments" && <Button variant="secondary" onClick={() => setShowRecordPaymentModal(true)}>📝 Manual Payment</Button>}
             {canEdit && tab==="structure" && <Button onClick={() => { setEditStruct(null); setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""}); setShowStruct(true); }}>Set Fee Structure</Button>}
@@ -689,10 +737,15 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           <EmptyState icon="💳" title="No Payments" description="There are no payment records matching the selected criteria." />
         ) : (
           <>
-            {filterStudent !== "all" && (
+            {(() => {
+              const uniqueStudents = [...new Set(filteredPayments.map(p => String(p.studentId)))];
+              const activeStudentIdForProgress = uniqueStudents.length === 1 ? uniqueStudents[0] : null;
+              if (!activeStudentIdForProgress) return null;
+              
+              return (
               <Card style={{ marginBottom: "var(--space-4)", background: "var(--color-info-muted)", borderColor: "var(--color-info-border)" }}>
                 <div style={{ fontWeight: 700, marginBottom: "var(--space-2)", color: "var(--color-info)" }}>
-                  📊 Payment Progress for {students.find(s => String(s.id ?? s.student_id) === String(filterStudent))?.first_name} {students.find(s => String(s.id ?? s.student_id) === String(filterStudent))?.last_name}
+                  📊 Payment Progress for {students.find(s => String(s.id ?? s.student_id) === activeStudentIdForProgress)?.first_name} {students.find(s => String(s.id ?? s.student_id) === activeStudentIdForProgress)?.last_name}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "var(--space-3)" }}>
                   <div>
@@ -710,14 +763,14 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                   <div>
                     <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Outstanding Balance</div>
                     <div style={{ fontWeight: 600, color: "var(--color-info)" }}>
-                      {money(balances.find(b => String(b.studentId) === String(filterStudent))?.balance || 0)}
+                      {money(balances.find(b => String(b.studentId) === activeStudentIdForProgress)?.balance || 0)}
                     </div>
                   </div>
                   <div>
                     <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Completion</div>
                     <div style={{ fontWeight: 600, color: "var(--color-info)" }}>
                       {(() => {
-                        const studentBal = balances.find(b => String(b.studentId) === String(filterStudent));
+                        const studentBal = balances.find(b => String(b.studentId) === activeStudentIdForProgress);
                         if (!studentBal || studentBal.expected === 0) return "0%";
                         const percent = Math.round((studentBal.paid / studentBal.expected) * 100);
                         return `${percent}%`;
@@ -726,7 +779,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                   </div>
                 </div>
               </Card>
-            )}
+              );
+            })()}
             <Card style={{ padding: 0, overflow: "hidden" }}>
               <Table
                 headers={["Date", "Student", "Class", "Amount", "Method", "Paid By", "Status", "Ref", "Actions"]}

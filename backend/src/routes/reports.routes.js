@@ -435,13 +435,15 @@ router.get("/fee-defaulters", async (req, res, next) => {
     const defaultersList = [];
     for (const student of (allStudents || [])) {
       const ledgerBalance = latestLedgerBalance.get(student.student_id);
+      
+      const classFee = feeMap[student.class_name] || 0;
+      const paidAmount = paymentMap[student.student_id]?.total || 0;
+      const balanceInfo = calculateReportBalanceLikeFeesPage(student, classFee, paidAmount);
+      
       let balance;
       if (typeof ledgerBalance === 'number') {
         balance = Math.max(0, ledgerBalance);
       } else {
-        const classFee = feeMap[student.class_name] || 0;
-        const paidAmount = paymentMap[student.student_id]?.total || 0;
-        const balanceInfo = calculateReportBalanceLikeFeesPage(student, classFee, paidAmount);
         balance = balanceInfo.balance;
       }
       const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;

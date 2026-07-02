@@ -42,7 +42,7 @@ router.get("/", async (req, res, next) => {
       .from('payments')
       .select('amount')
       .eq('school_id', schoolId)
-      .eq('status', 'paid')
+      .in('status', ['paid', 'completed', 'success'])
       .eq('is_deleted', false);
     if (paidErr) throw paidErr;
     const totalCollected = paidData?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
@@ -90,7 +90,7 @@ router.get("/", async (req, res, next) => {
       .from('payments')
       .select('payment_date, amount')
       .eq('school_id', schoolId)
-      .eq('status', 'paid')
+      .in('status', ['paid', 'completed', 'success'])
       .eq('is_deleted', false)
       .gte('payment_date', sixMonthsAgo.toISOString().split('T')[0]);
     if (payErr) throw payErr;
@@ -172,7 +172,7 @@ router.get("/", async (req, res, next) => {
       .from('payments')
       .select('amount, payment_date, payment_method, paid_by, students(first_name, last_name, class_name)')
       .eq('school_id', schoolId)
-      .eq('status', 'paid')
+      .in('status', ['paid', 'completed', 'success'])
       .eq('is_deleted', false)
       .order('payment_date', { ascending: false })
       .limit(8);
@@ -219,7 +219,7 @@ router.get("/", async (req, res, next) => {
           .from('payments')
           .select('student_id, amount, term')
           .eq('school_id', schoolId)
-          .eq('status', 'paid')
+          .in('status', ['paid', 'completed', 'success'])
           .eq('term', currentTerm)
           .eq('is_deleted', false)
           .in('student_id', studentIds);
