@@ -76,6 +76,10 @@ function SchoolTab({ school, setSchool, toast, auth }) {
         admin_title: form.admin_title || "",
         school_type: form.school_type || "",
         curriculum: form.curriculum || "",
+        lunch_daily_rate: form.lunch_daily_rate || 100,
+        lunch_days: form.lunch_days || 66,
+        breakfast_daily_rate: form.breakfast_daily_rate || 100,
+        breakfast_days: form.breakfast_days || 66,
       };
       const response = await apiFetch("/settings/school", {
         method: "PUT",
@@ -246,6 +250,10 @@ function SchoolTab({ school, setSchool, toast, auth }) {
         
         <Input label="Administrator Name" value={form.admin_name || ""} onChange={e => setForm(p => ({...p, admin_name: e.target.value}))} placeholder="e.g. Jane Wanjiku" />
         <Input label="Administrator Title" value={form.admin_title || ""} onChange={e => setForm(p => ({...p, admin_title: e.target.value}))} placeholder="e.g. School Principal" />
+        <Input label="Lunch Daily Rate (KES)" type="number" value={form.lunch_daily_rate || 100} onChange={e => setForm(p => ({...p, lunch_daily_rate: Number(e.target.value)}))} />
+        <Input label="Lunch Days per Term" type="number" value={form.lunch_days || 66} onChange={e => setForm(p => ({...p, lunch_days: Number(e.target.value)}))} />
+        <Input label="Breakfast Daily Rate (KES)" type="number" value={form.breakfast_daily_rate || 100} onChange={e => setForm(p => ({...p, breakfast_daily_rate: Number(e.target.value)}))} />
+        <Input label="Breakfast Days per Term" type="number" value={form.breakfast_days || 66} onChange={e => setForm(p => ({...p, breakfast_days: Number(e.target.value)}))} />
       </div>
       
       <Button onClick={save} disabled={saving} style={{ padding: "10px 24px", fontSize: "15px" }}>

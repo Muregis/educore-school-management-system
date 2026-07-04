@@ -33,22 +33,22 @@ export function getStudentTransportFee(student) {
   );
 }
 
-export function getStudentLunchFee(student) {
+export function getStudentLunchFee(student, schoolSettings = {}) {
   const enabled = Boolean(student?.lunch_enabled ?? student?.lunchEnabled);
   if (!enabled) return 0;
   return ledgerBalanceService.calculateLunchFee(
-    toNumber(student?.lunch_daily_rate ?? student?.lunchDailyRate ?? 100),
-    toNumber(student?.lunch_days ?? student?.lunchDays ?? 66),
+    toNumber(student?.lunch_daily_rate ?? student?.lunchDailyRate ?? schoolSettings.lunch_daily_rate ?? 100),
+    toNumber(student?.lunch_days ?? student?.lunchDays ?? schoolSettings.lunch_days ?? 66),
     student?.lunch_billing_type ?? student?.lunchBillingType ?? "daily"
   );
 }
 
-export function getStudentBreakfastFee(student) {
+export function getStudentBreakfastFee(student, schoolSettings = {}) {
   const enabled = Boolean(student?.breakfast_enabled ?? student?.breakfastEnabled);
   if (!enabled) return 0;
   return ledgerBalanceService.calculateBreakfastFee(
-    toNumber(student?.breakfast_daily_rate ?? student?.breakfastDailyRate ?? 100),
-    toNumber(student?.breakfast_days ?? student?.breakfastDays ?? 66),
+    toNumber(student?.breakfast_daily_rate ?? student?.breakfastDailyRate ?? schoolSettings.breakfast_daily_rate ?? 100),
+    toNumber(student?.breakfast_days ?? student?.breakfastDays ?? schoolSettings.breakfast_days ?? 66),
     student?.breakfast_billing_type ?? student?.breakfastBillingType ?? "daily"
   );
 }
@@ -72,7 +72,8 @@ export function calculateStudentBalanceLocal({
   student,
   feeStructures = [],
   payments = [],
-  discounts = []
+  discounts = [],
+  schoolSettings = {}
 }) {
   const studentId = getStudentId(student);
   const className = getStudentClassName(student);
@@ -80,8 +81,8 @@ export function calculateStudentBalanceLocal({
   const structure = feeStructures.find(f => (f?.className ?? f?.class_name) === className);
   const tuition = structure ? toNumber(structure.tuition) : 0;
   const transportFee = getStudentTransportFee(student);
-  const lunchFee = getStudentLunchFee(student);
-  const breakfastFee = getStudentBreakfastFee(student);
+  const lunchFee = getStudentLunchFee(student, schoolSettings);
+  const breakfastFee = getStudentBreakfastFee(student, schoolSettings);
   const openingBalance = getOpeningBalanceImpact(student);
   const activeDiscounts = discounts?.length ? discounts : getFallbackDiscounts(student);
 

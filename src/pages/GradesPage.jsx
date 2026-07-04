@@ -217,7 +217,25 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
     (examType === "all" || r.examType === examType)
   );
 
-  const { pages, rows } = pager(filtered, page);
+  // Group results by student
+  const groupedByStudent = filtered.reduce((acc, result) => {
+    const key = String(result.studentId);
+    if (!acc[key]) {
+      acc[key] = {
+        studentId: result.studentId,
+        studentName: result.studentName,
+        className: result.className,
+        results: [],
+      };
+    }
+    acc[key].results.push(result);
+    return acc;
+  }, {});
+
+  const groupedRows = Object.values(groupedByStudent);
+
+  // Pagination on grouped students
+  const { pages, rows } = pager(groupedRows, page);
   useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
 
   const saveBulk = async () => {
@@ -531,21 +549,37 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
       </div>
 
       {/* Table */}
-      {filtered.length === 0 ? <Msg text="No results yet." /> : (
+      {groupedRows.length === 0 ? <Msg text="No results yet." /> : (
         <>
           <div style={{ overflowX:"auto" }}>
             <Table
-              headers={["Student","Class","Subject","Term","Exam Type","Score","Grade","Actions"]}
-              rows={rows.map(r => [
-                <span key={r.id} style={{ color:C.text, fontWeight:600 }}>{r.studentName}</span>,
-                r.className, r.subject, r.term, r.examType,
-                displayMark(r.marks, r.total),
-                r.marks === "na" || r.marks === "absent" || r.marks === "cheat"
-                  ? <span style={{ color:C.textMuted, fontSize:12 }}>—</span>
-                  : <Badge tone={gradeColor(r.grade)}>{r.grade}</Badge>,
-                <div key="a" style={{ display:"flex", gap:6 }}>
-                  {canEdit && <Btn variant="ghost" onClick={() => setEditing(r)}>Edit</Btn>}
-                  {canEdit && <Btn variant="danger" onClick={() => del(r.id)}>Del</Btn>}
+              headers={["Student","Class", ...subjects, "Actions"]}
+              rows={rows.map(studentGroup => [
+                <span key={studentGroup.studentId} style={{ color:C.text, fontWeight:600 }}>{studentGroup.studentName}</span>,
+                studentGroup.className,
+                // For each subject, display the grade if exists
+                ...subjects.map(subject => {
+                  const result = studentGroup.results.find(r => r.subject === subject);
+                  if (!result) return <span key={subject} style={{ color:C.textMuted }}>—</span>;
+                  return (
+                    <div key={subject} style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                      <span style={{ fontSize:"11px", color:C.textMuted }}>
+                        {result.term} • {result.examType}
+                      </span>
+                      <span>{displayMark(result.marks, result.total)}</span>
+                      {result.marks !== "na" && result.marks !== "absent" && result.marks !== "cheat" && (
+                        <Badge tone={gradeColor(result.grade)}>{result.grade}</Badge>
+                      )}
+                    </div>
+                  );
+                }),
+                <div key="actions" style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                  {studentGroup.results.map(result => (
+                    <div key={result.id} style={{ display:"flex", gap:"4px" }}>
+                      {canEdit && <Btn size="sm" variant="ghost" onClick={() => setEditing(result)}>Edit</Btn>}
+                      {canEdit && <Btn size="sm" variant="danger" onClick={() => del(result.id)}>Del</Btn>}
+                    </div>
+                  ))}
                 </div>,
               ])}
             />

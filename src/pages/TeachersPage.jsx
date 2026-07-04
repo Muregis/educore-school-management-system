@@ -118,7 +118,15 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
     };
   }, []);
 
-  const normalised = teachers.map(t => t.first_name ? normalise(t) : t);
+  // Normalize all teachers and deduplicate by id
+  const normalised = teachers.reduce((acc, t) => {
+    const normalized = normalise(t);
+    const id = normalized.id;
+    if (!acc.find(item => item.id === id)) {
+      acc.push(normalized);
+    }
+    return acc;
+  }, []);
 
   const filtered = normalised.filter(t => {
     const assignments = assignmentsForTeacher(t);
@@ -164,9 +172,8 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
           },
           token: auth?.token,
         });
-        setTeachers(prev => prev.map(t => (t.id === editId || t.teacher_id === editId) ? { ...normalise(t), ...f, id: editId } : t));
       } else {
-        const res = await apiFetch(`/teachers`, {
+        await apiFetch(`/teachers`, {
           method: "POST",
           body: {
             firstName: f.firstName,
@@ -183,8 +190,6 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
           },
           token: auth?.token,
         });
-        const newId = res.teacher_id || res.id || res.teacherId;
-        setTeachers(prev => [...prev, normalise({ ...res, ...f, id: newId })]);
       }
       // Refetch to ensure consistency with backend
       const refreshed = await apiFetch("/teachers", { token: auth.token });

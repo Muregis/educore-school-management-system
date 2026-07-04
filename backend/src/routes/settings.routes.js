@@ -178,6 +178,11 @@ router.get("/school", async (req, res, next) => {
       type: data.school_type || settings.get("school_type") || "",  // alias for frontend compatibility
       curriculum: data.curriculum || settings.get("curriculum") || "",
       library_shortcode: data.library_shortcode || settings.get("library_shortcode") || "",
+      // Lunch/breakfast settings
+      lunch_daily_rate: settings.get("lunch_daily_rate") || 100,
+      lunch_days: settings.get("lunch_days") || 66,
+      breakfast_daily_rate: settings.get("breakfast_daily_rate") || 100,
+      breakfast_days: settings.get("breakfast_days") || 66,
     });
   } catch (err) {
     next(err);
@@ -213,6 +218,10 @@ router.put("/school", requireRoles("admin", "director", "superadmin"), async (re
       curriculum,
       whatsapp_business_number,
       library_shortcode,
+      lunch_daily_rate,
+      lunch_days,
+      breakfast_daily_rate,
+      breakfast_days,
     } = req.body;
 
     const updatePayload = {
@@ -257,6 +266,10 @@ router.put("/school", requireRoles("admin", "director", "superadmin"), async (re
       school_type,
       curriculum,
       library_shortcode,
+      lunch_daily_rate,
+      lunch_days,
+      breakfast_daily_rate,
+      breakfast_days,
     });
 
     const settings = await getSchoolSettingsMap(schoolId);
@@ -283,6 +296,11 @@ router.put("/school", requireRoles("admin", "director", "superadmin"), async (re
         curriculum: settings.get("curriculum") || "",
         library_shortcode: settings.get("library_shortcode") || "",
         whatsapp_business_number: data.whatsapp_business_number || "",
+        // Lunch/breakfast settings
+        lunch_daily_rate: settings.get("lunch_daily_rate") || 100,
+        lunch_days: settings.get("lunch_days") || 66,
+        breakfast_daily_rate: settings.get("breakfast_daily_rate") || 100,
+        breakfast_days: settings.get("breakfast_days") || 66,
       },
     });
   } catch (err) { next(err); }

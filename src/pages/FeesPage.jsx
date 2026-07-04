@@ -246,7 +246,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       student,
       feeStructures: normalisedStructures,
       payments: normalisedPayments,
-      discounts: studentDiscounts
+      discounts: studentDiscounts,
+      schoolSettings: schoolData || {}
     });
 
     return {

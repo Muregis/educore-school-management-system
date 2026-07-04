@@ -54,6 +54,7 @@ import SidebarModern from "./components/SidebarModern";
 import BranchSelector from "./components/BranchSelector";
 import Topbar from "./components/Topbar";
 import { API_BASE, apiFetch } from "./lib/api";
+import { TermManagementPage } from "./components/enhanced_frontend_components";
 import { clearSession, getSession, logout, saveSession } from "./lib/auth";
 
 // Mobile portal imports
@@ -450,6 +451,7 @@ export default function App() {
   const sideW      = sideCollapsed ? 64 : 240;
 
   const pages = {
+    "term-management": <TermManagementPage auth={auth} />,
     dashboard: isPortal && isMobile
       ? (auth.role === "parent"
           ? <ParentGuard auth={auth} requiredPermission="view" redirectTo="/login">
