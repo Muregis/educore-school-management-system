@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
 import { pager } from "../components/Helpers";
+import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -36,6 +37,7 @@ function Pager({ page, pages, setPage }) {
 }
 
 export default function ExamsPage({ auth, students, subjects, toast }) {
+  const { term, academicYear, startDate, endDate } = useCurrentTerm(auth);
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -43,16 +45,27 @@ export default function ExamsPage({ auth, students, subjects, toast }) {
   const [activeTab, setActiveTab] = useState("exams");
   const [page, setPage] = useState(1);
 
-  // Form states
+  // Form states - initialize with current term dates from school settings
   const [form, setForm] = useState({
     name: "",
     examType: "internal",
-    term: "Term 1",
-    year: new Date().getFullYear(),
-    startDate: "",
-    endDate: "",
+    term: term || "Term 1",
+    year: academicYear || new Date().getFullYear(),
+    startDate: startDate || "",
+    endDate: endDate || "",
     description: "",
   });
+
+  // Update form when term data changes
+  useEffect(() => {
+    setForm(prev => ({
+      ...prev,
+      term: term || "Term 1",
+      year: academicYear || new Date().getFullYear(),
+      startDate: startDate || prev.startDate,
+      endDate: endDate || prev.endDate,
+    }));
+  }, [term, academicYear, startDate, endDate]);
 
   // Load exams
   const loadExams = async () => {

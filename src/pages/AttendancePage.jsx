@@ -6,6 +6,7 @@ import { ALL_CLASSES } from "../lib/constants";
 import { apiFetch } from "../lib/api";
 import { parseStudentQrContent } from "../lib/qr";
 import { Pager, csv, pager } from "../components/Helpers";
+import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -50,8 +51,9 @@ export default function AttendancePage({
   feeBlocked = false, 
   onGoFees 
 }) {
+  const { term, startDate, endDate } = useCurrentTerm(auth);
   const [cls, setCls] = useState("Grade 7");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(startDate || new Date().toISOString().slice(0, 10));
   const [filterClass, setFilterClass] = useState("all");
   const [filterDate, setFilterDate] = useState("");
   const [page, setPage] = useState(1);
@@ -59,6 +61,13 @@ export default function AttendancePage({
   const [editing, setEditing] = useState(null);
   const [bulk, setBulk] = useState([]);
   const [showQRScanner, setShowQRScanner] = useState(false);
+
+  // Update date when term dates change
+  useEffect(() => {
+    if (startDate && !filterDate) {
+      setDate(startDate);
+    }
+  }, [startDate, filterDate]);
 
   // Fetch attendance records on mount
   useEffect(() => {

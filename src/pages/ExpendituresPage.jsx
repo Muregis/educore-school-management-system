@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
 import { money } from "../lib/utils";
+import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -30,8 +31,8 @@ const EXPENSE_CATEGORIES = [
 
 const PAYMENT_METHODS = ["Cash", "Bank Transfer", "M-Pesa", "Cheque", "Card", "Payroll", "Other"];
 
-const blankForm = () => ({
-  expenseDate: new Date().toISOString().slice(0, 10),
+const blankForm = (startDate = null) => ({
+  expenseDate: startDate || new Date().toISOString().slice(0, 10),
   category: "Daily Use",
   itemName: "",
   description: "",
@@ -87,6 +88,7 @@ StatCard.propTypes = {
 };
 
 export default function ExpendituresPage({ auth, canEdit, toast }) {
+  const { startDate } = useCurrentTerm(auth);
   const [expenses, setExpenses] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -95,7 +97,12 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
   const [editingExpense, setEditingExpense] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState(blankForm());
+  const [form, setForm] = useState(blankForm(startDate));
+
+  // Update form when term dates change
+  useEffect(() => {
+    setForm(blankForm(startDate));
+  }, [startDate]);
 
   const loadData = async () => {
     if (!auth?.token) return;

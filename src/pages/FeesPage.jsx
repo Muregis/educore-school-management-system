@@ -89,6 +89,7 @@ function loadPaystackScript() {
 }
 
 export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, canViewTotals, canDeletePayments, toast, linkedStudentId, school }) {
+  const { term, academicYear, startDate, endDate } = useCurrentTerm(auth);
   const [tab, setTab]                 = useState("payments");
   const [showPayment, setShowPayment] = useState(false);
   const [showStruct, setShowStruct]   = useState(false);
@@ -111,9 +112,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [studentSearch, setStudentSearch] = useState("");
   const [recordSearch, setRecordSearch] = useState("");
   const [page, setPage]               = useState(1);
-  const [paymentForm, setPaymentForm] = useState({ studentId: "", amount: "", feeType: "tuition", method: "cash", date: new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
+  const [paymentForm, setPaymentForm] = useState({ studentId: "", amount: "", feeType: "tuition", method: "cash", date: startDate || new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
   const [paymentClass, setPaymentClass] = useState("");
-  const [structForm, setStructForm]   = useState({ className: "Grade 7", term: "Term 1", tuition: "", activity: "", misc: "" });
+  const [structForm, setStructForm]   = useState({ className: "Grade 7", term: term || "Term 1", tuition: "", activity: "", misc: "" });
   const [bankDetails, setBankDetails] = useState(null);
   const [schoolWhatsApp, setSchoolWhatsApp] = useState("");
   const [schoolData, setSchoolData] = useState(null);
@@ -123,6 +124,18 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [bankDepositLoading, setBankDepositLoading] = useState(false);
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [studentDiscounts, setStudentDiscounts] = useState({});
+
+  // Update forms when term data changes
+  useEffect(() => {
+    setPaymentForm(prev => ({
+      ...prev,
+      date: startDate || prev.date,
+    }));
+    setStructForm(prev => ({
+      ...prev,
+      term: term || prev.term,
+    }));
+  }, [term, startDate]);
 
   // Day End settings (stored in localStorage)
   const [dayEndTime, setDayEndTime] = useState(() => localStorage.getItem('dayEndTime') || '18:00'); // Default 6 PM
