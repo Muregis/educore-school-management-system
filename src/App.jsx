@@ -12,7 +12,6 @@ import AttendancePage from "./pages/AttendancePage";
 import GradesPage from "./pages/GradesPage";
 import FeesPage from "./pages/FeesPage";
 import SettingsPage from "./pages/SettingsPage";
-import SessionsPage from "./pages/SessionsPage";
 import DisciplinePage from "./pages/DisciplinePage";
 import TransportPage from "./pages/TransportPage";
 import CommunicationPage from "./pages/CommunicationPage";
