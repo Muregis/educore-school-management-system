@@ -61,12 +61,24 @@ router.get("/", async (req, res, next) => {
     // Get existing teacher emails to avoid duplicates
     const existingEmails = new Set((rows || []).map(t => t.email?.toLowerCase()).filter(Boolean));
 
+    // Also check for staff_id links to avoid duplicates where hr_staff is already linked
+    const linkedStaffIds = new Set((rows || []).map(t => t.staff_id).filter(Boolean));
+
     // Add staff teachers who aren't already in teachers table
     const additionalTeachers = staffAsTeachers
-      .filter(s => s.email && !existingEmails.has(s.email.toLowerCase()))
+      .filter(s => {
+        // Skip if no email
+        if (!s.email) return false;
+        // Skip if email already exists in teachers table
+        if (existingEmails.has(s.email.toLowerCase())) return false;
+        // Skip if this staff record is already linked to a teacher
+        if (linkedStaffIds.has(s.staff_id)) return false;
+        return true;
+      })
       .map(s => ({
         teacher_id: `staff-${s.staff_id}`,
         user_id: null,
+        staff_id: s.staff_id,
         staff_number: `HR-${s.staff_id}`,
         national_id: null,
         first_name: s.full_name.split(' ')[0] || s.full_name,

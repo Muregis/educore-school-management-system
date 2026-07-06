@@ -227,6 +227,185 @@ export class TermService {
       return null;
     }
   }
+  
+  /**
+   * End term transition - comprehensive term end workflow
+   * Handles closing term, archiving data, and preparing for next term
+   */
+  static async endTermTransition(schoolId, termId, userId, options = {}) {
+    const { carryForwardBalances = true, archiveGrades = true, nextTermId } = options;
+    const client = database;
+    
+    try {
+      // Get current term details
+      const term = await this.getTerm(schoolId, termId);
+      if (!term) {
+        throw new Error('Term not found');
+      }
+      
+      if (term.status === 'closed') {
+        throw new Error('Term is already closed');
+      }
+      
+      const summary = {
+        termClosed: false,
+        gradesArchived: 0,
+        balancesCarriedForward: 0,
+        studentsProcessed: 0,
+        feeStructuresUpdated: 0
+      };
+      
+      // Step 1: Close the term
+      await client.update('academic_terms', {
+        status: 'closed',
+        is_current: false,
+        closed_at: new Date().toISOString(),
+        closed_by: userId
+      }, {
+        term_id: termId,
+        school_id: schoolId
+      });
+      summary.termClosed = true;
+      
+      // Step 2: Archive grades if requested
+      if (archiveGrades) {
+        const { data: grades } = await client.query('grades', {
+          where: { 
+            school_id: schoolId,
+            term: term.term_name
+          }
+        });
+        
+        if (grades && grades.length > 0) {
+          // Mark grades as archived (add to archived_grades table or update status)
+          await client.update('grades', {
+            is_archived: true,
+            archived_at: new Date().toISOString(),
+            archived_term_id: termId
+          }, {
+            school_id: schoolId,
+            term: term.term_name
+          });
+          summary.gradesArchived = grades.length;
+        }
+      }
+      
+      // Step 3: Carry forward student balances if requested
+      if (carryForwardBalances) {
+        const { data: students } = await client.query('students', {
+          where: { 
+            school_id: schoolId,
+            status: 'active'
+          }
+        });
+        
+        if (students && students.length > 0) {
+          let balanceCount = 0;
+          for (const student of students) {
+            // Calculate current balance from payments and fee structures
+            const { data: payments } = await client.query('payments', {
+              where: { 
+                student_id: student.student_id,
+                status: 'paid'
+              }
+            });
+            
+            const totalPaid = payments?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
+            
+            // Get fee structure for student's class
+            const { data: feeStructures } = await client.query('fee_structures', {
+              where: { 
+                class_name: student.class_name,
+                term: term.term_name
+              },
+              limit: 1
+            });
+            
+            const expectedFees = feeStructures?.[0] 
+              ? Number(feeStructures[0].tuition || 0) + Number(feeStructures[0].activity || 0) + Number(feeStructures[0].misc || 0)
+              : 0;
+            
+            const currentBalance = expectedFees - totalPaid;
+            
+            // If student has outstanding balance, carry it forward as opening balance
+            if (currentBalance > 0) {
+              await client.update('students', {
+                opening_balance: currentBalance,
+                opening_balance_type: 'owing',
+                opening_balance_term: term.term_name,
+                updated_at: new Date().toISOString()
+              }, {
+                student_id: student.student_id
+              });
+              balanceCount++;
+            }
+          }
+          summary.balancesCarriedForward = balanceCount;
+          summary.studentsProcessed = students.length;
+        }
+      }
+      
+      // Step 4: If next term ID provided, activate it
+      if (nextTermId) {
+        await this.activateTerm(schoolId, nextTermId, userId);
+        
+        // Copy fee structures to next term
+        const { data: currentFeeStructures } = await client.query('fee_structures', {
+          where: { 
+            school_id: schoolId,
+            term: term.term_name
+          }
+        });
+        
+        if (currentFeeStructures && currentFeeStructures.length > 0) {
+          const nextTerm = await this.getTerm(schoolId, nextTermId);
+          if (nextTerm) {
+            for (const feeStruct of currentFeeStructures) {
+              // Check if fee structure already exists for next term
+              const { data: existing } = await client.query('fee_structures', {
+                where: {
+                  class_name: feeStruct.class_name,
+                  term: nextTerm.term_name,
+                  school_id: schoolId
+                },
+                limit: 1
+              });
+              
+              if (!existing || existing.length === 0) {
+                await client.insert('fee_structures', {
+                  school_id: schoolId,
+                  class_name: feeStruct.class_name,
+                  term: nextTerm.term_name,
+                  tuition: feeStruct.tuition,
+                  activity: feeStruct.activity,
+                  misc: feeStruct.misc,
+                  created_at: new Date().toISOString()
+                });
+                summary.feeStructuresUpdated++;
+              }
+            }
+          }
+        }
+      }
+      
+      // Log the transition
+      await logAuditEvent({ user: { userId, schoolId } }, {
+        action: 'term.transition',
+        entity: 'academic_term',
+        entityId: termId,
+        description: `Ended term ${term.term_name} ${term.academic_year} and prepared for transition`,
+        metadata: summary
+      });
+      
+      return {
+        term: { ...term, status: 'closed' },
+        summary
+      };
+    } catch (error) {
+      console.error('End term transition error:', error);
+      throw error;
+    }
+  }
 }
 
 export default TermService;

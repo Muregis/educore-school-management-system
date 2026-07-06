@@ -109,6 +109,40 @@ router.put("/:id/close", requireRoles("admin", "director", "superadmin"), async 
 });
 
 /**
+ * POST /api/academic/terms/:id/end-term - End term and prepare for next term
+ * This handles the full term transition workflow:
+ * 1. Closes current term
+ * 2. Archives grades and results
+ * 3. Carries forward student balances
+ * 4. Prepares fee structures for next term
+ */
+router.post("/:id/end-term", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
+  try {
+    const { schoolId, userId } = req.user;
+    const { id } = req.params;
+    const { carryForwardBalances = true, archiveGrades = true, nextTermId } = req.body;
+    
+    const result = await TermService.endTermTransition(schoolId, id, userId, {
+      carryForwardBalances,
+      archiveGrades,
+      nextTermId
+    });
+    
+    if (!result) {
+      return res.status(404).json({ message: "Term not found or transition failed" });
+    }
+    
+    res.json({ 
+      message: "Term ended and transition completed successfully", 
+      term: result.term,
+      summary: result.summary
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * GET /api/academic/terms/:id - Get single term
  */
 router.get("/:id", async (req, res, next) => {

@@ -74,9 +74,11 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const [examType, setExamType] = useState("all");
   const [examTypes, setExamTypes] = useState([]);
   const [filterClass, setFilterClass]     = useState("all");
+  const [filterStream, setFilterStream]   = useState("all");
   const [filterStudent, setFilterStudent] = useState("all");
   const [filterSubject, setFilterSubject] = useState("all");
   const [classOptions, setClassOptions] = useState([]);
+  const [viewMode, setViewMode] = useState("all"); // "all" or "single"
 
   // Set term from currentTerm when loaded
   useEffect(() => {
@@ -137,6 +139,22 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
      const merged = Array.from(new Set([...fromApi, ...fromStudents]));
      return merged.length ? merged.sort() : ALL_CLASSES;
    }, [classOptions, students]);
+
+   // Extract streams from class names (e.g., "Grade 7 East" -> stream "East")
+   const streamsForDropdown = useMemo(() => {
+     if (filterClass === "all") return [];
+     const classStudents = students.filter(s => normalizeClassName(getStudentClass(s)) === normalizeClassName(filterClass));
+     const streams = new Set();
+     classStudents.forEach(s => {
+       const className = getStudentClass(s);
+       // Try to extract stream from class name (pattern: "Grade X Stream" or "Grade X-Stream")
+       const parts = className.split(/\s+-\s+|\s+/);
+       if (parts.length > 2) {
+         streams.add(parts.slice(2).join(" "));
+       }
+     });
+     return Array.from(streams).sort();
+   }, [filterClass, students]);
 
    const subjects = useMemo(() => {
      const fromCatalog = subjectCatalog.map(s => s.name);
@@ -211,7 +229,8 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
 
   const filtered = results.filter(r =>
     (term === "all" || r.term === term) &&
-    (filterClass === "all" || r.className === filterClass) &&
+    (filterClass === "all" || normalizeClassName(r.className) === normalizeClassName(filterClass)) &&
+    (filterStream === "all" || r.className.includes(filterStream)) &&
     (filterStudent === "all" || String(r.studentId) === String(filterStudent)) &&
     (filterSubject === "all" || r.subject === filterSubject) &&
     (examType === "all" || r.examType === examType)
@@ -346,14 +365,20 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           <option value="Term 2">Term 2</option>
           <option value="Term 3">Term 3</option>
         </select>
-        <select style={inputStyle} value={filterClass} onChange={e => setFilterClass(e.target.value)}>
+        <select style={inputStyle} value={filterClass} onChange={e => { setFilterClass(e.target.value); setFilterStream("all"); }}>
           <option value="all">All classes</option>
           {classesForDropdown.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select style={inputStyle} value={filterStudent} onChange={e => setFilterStudent(e.target.value)}>
-          <option value="all">{filterClass === "all" ? "All students" : `Students in ${filterClass}`}</option>
+        {filterClass !== "all" && streamsForDropdown.length > 0 && (
+          <select style={inputStyle} value={filterStream} onChange={e => setFilterStream(e.target.value)}>
+            <option value="all">All streams</option>
+            {streamsForDropdown.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
+        <select style={inputStyle} value={filterStudent} onChange={e => { setFilterStudent(e.target.value); if (e.target.value !== "all") setViewMode("single"); else setViewMode("all"); }}>
+          <option value="all">All students</option>
           {(filterClass === "all" ? students : students.filter(s => normalizeClassName(getStudentClass(s)) === normalizeClassName(filterClass))).map(s => (
-            <option key={getStudentId(s)} value={getStudentId(s)}>{getStudentName(s)}</option>
+            <option key={getStudentId(s)} value={getStudentId(s)}>{getStudentName(s)}{s.admission ? ` (${s.admission})` : ""}</option>
           ))}
         </select>
         <select style={inputStyle} value={filterSubject} onChange={e => setFilterSubject(e.target.value)}>

@@ -48,11 +48,11 @@ function normalise(s) {
     transport_base_fee: s.transport_base_fee ?? 0,
     lunch_enabled: s.lunch_enabled ?? false,
     lunch_daily_rate: s.lunch_daily_rate ?? 0,
-    lunch_days: s.lunch_days ?? 66,
+    lunch_days: s.lunch_days ?? null,
     lunch_billing_type: s.lunch_billing_type ?? "daily",
     breakfast_enabled: s.breakfast_enabled ?? false,
     breakfast_daily_rate: s.breakfast_daily_rate ?? 0,
-    breakfast_days: s.breakfast_days ?? 66,
+    breakfast_days: s.breakfast_days ?? null,
     breakfast_billing_type: s.breakfast_billing_type ?? "daily",
     discount_type: s.discount_type ?? null,
     discount_value: s.discount_value ?? 0,
@@ -73,7 +73,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", transport_direction: "none", transport_base_fee: "", lunch_enabled: false, lunch_daily_rate: "", lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: 66, breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
+  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", transport_direction: "none", transport_base_fee: "", lunch_enabled: false, lunch_daily_rate: "", lunch_days: "", lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: "", breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -114,7 +114,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
   const openAdd = () => {
     setEditId(null); setErr("");
-    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", transport_direction: "none", transport_base_fee: "", lunch_enabled: false, lunch_daily_rate: "", lunch_days: 66, lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: 66, breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
+    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", transport_direction: "none", transport_base_fee: "", lunch_enabled: false, lunch_daily_rate: "", lunch_days: "", lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: "", breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
     setShow(true);
   };
 
@@ -195,11 +195,11 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           transport_base_fee: parseFloat(f.transport_base_fee) || 0,
           lunch_enabled: Boolean(f.lunch_enabled),
           lunch_daily_rate: parseFloat(f.lunch_daily_rate) || 0,
-          lunch_days: parseInt(f.lunch_days) || 66,
+          lunch_days: f.lunch_days ? parseInt(f.lunch_days) : null,
           lunch_billing_type: f.lunch_billing_type || "daily",
           breakfast_enabled: Boolean(f.breakfast_enabled),
           breakfast_daily_rate: parseFloat(f.breakfast_daily_rate) || 0,
-          breakfast_days: parseInt(f.breakfast_days) || 66,
+          breakfast_days: f.breakfast_days ? parseInt(f.breakfast_days) : null,
           breakfast_billing_type: f.breakfast_billing_type || "daily",
           discount_type: f.discount_type || null,
           discount_value: parseFloat(f.discount_value) || 0,
@@ -521,7 +521,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
                 <Select value={f.lunch_billing_type || 'daily'} onChange={e => setF({ ...f, lunch_billing_type: e.target.value })} options={[{value:"daily", label:"Daily Rate"}, {value:"termly", label:"Termly Rate"}]} />
                 <Input type="number" value={f.lunch_daily_rate || ""} onChange={e => setF({ ...f, lunch_daily_rate: e.target.value ? parseFloat(e.target.value) || 0 : 0 })} placeholder={f.lunch_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
                 {f.lunch_billing_type !== 'termly' && (
-                  <Input type="number" value={f.lunch_days || 66} onChange={e => setF({ ...f, lunch_days: e.target.value ? parseInt(e.target.value) || 66 : 66 })} placeholder="School days" />
+                  <Input type="number" value={f.lunch_days || ""} onChange={e => setF({ ...f, lunch_days: e.target.value })} placeholder="School days (optional)" />
                 )}
               </div>
             )}
@@ -539,7 +539,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
                 <Select value={f.breakfast_billing_type || 'daily'} onChange={e => setF({ ...f, breakfast_billing_type: e.target.value })} options={[{value:"daily", label:"Daily Rate"}, {value:"termly", label:"Termly Rate"}]} />
                 <Input type="number" value={f.breakfast_daily_rate || ""} onChange={e => setF({ ...f, breakfast_daily_rate: e.target.value ? parseFloat(e.target.value) || 0 : 0 })} placeholder={f.breakfast_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
                 {f.breakfast_billing_type !== 'termly' && (
-                  <Input type="number" value={f.breakfast_days || 66} onChange={e => setF({ ...f, breakfast_days: e.target.value ? parseInt(e.target.value) || 66 : 66 })} placeholder="School days" />
+                  <Input type="number" value={f.breakfast_days || ""} onChange={e => setF({ ...f, breakfast_days: e.target.value })} placeholder="School days (optional)" />
                 )}
               </div>
             )}
