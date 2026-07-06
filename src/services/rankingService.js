@@ -20,16 +20,31 @@ import { calculateGrade, getGradePoints, parseMark } from '../lib/grading.js';
 export function calculateClassRankings(results, options = {}) {
   const { 
     subjects = null,  // Filter to specific subjects
-    minSubjects = 1,    // Minimum subjects to be ranked
-    includeGradeInfo = true 
+    minSubjects = 9,    // Minimum subjects to be ranked (increased from 1 to avoid students with few/no exams leading)
+    includeGradeInfo = true,
+    className = null    // Optional: filter by specific class
   } = options;
 
   if (!results || results.length === 0) {
     return { students: [], subjects: [], summary: {} };
   }
 
+  // Filter by class if specified
+  let filteredResults = results;
+  if (className) {
+    filteredResults = results.filter(r => {
+      const resultClass = (r.class_name || r.className || '').toLowerCase().trim();
+      const targetClass = className.toLowerCase().trim();
+      return resultClass === targetClass;
+    });
+  }
+
+  if (filteredResults.length === 0) {
+    return { students: [], subjects: [], summary: {} };
+  }
+
   // Group by student
-  const byStudent = results.reduce((acc, result) => {
+  const byStudent = filteredResults.reduce((acc, result) => {
     const studentId = result.student_id || result.studentId;
     if (!acc[studentId]) {
       acc[studentId] = {
@@ -44,6 +59,7 @@ export function calculateClassRankings(results, options = {}) {
     const total = parseFloat(result.total_marks || result.totalMarks || 100) || 100;
     const parsed = parseMark(result.marks);
 
+    // Only include valid marks (not special marks like absent, cheat, etc.)
     if (!parsed.isSpecial && parsed.value != null && parsed.value >= 0 && total > 0) {
       const percentage = (parsed.value / total) * 100;
 

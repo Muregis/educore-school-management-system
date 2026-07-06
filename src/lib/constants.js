@@ -14,9 +14,10 @@ export const DEFAULTS = {
 
 export const ROLE = {
   // Director - HIGHEST ROLE - Full control over all schools, can delegate permissions
+  // Has comprehensive access to all reporting, analytics, and management functions
   director:  { pages:["dashboard","students","teachers","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","financial-reports","analytics","analysis","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests","trial-balance","income-statement","chart-of-accounts","journal-entries","general-ledger","balance-sheet","term-management"], edit:true, canDelegate:true },
   // Superadmin - System-level full access
-  superadmin:{ pages:["dashboard","students","teachers","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","financial-reports","analytics","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests","trial-balance","income-statement","chart-of-accounts","journal-entries","general-ledger","balance-sheet","term-management"], edit:true },
+  superadmin:{ pages:["dashboard","students","teachers","staff","attendance","grades","subjects","fees","expenditures","mpesa-reconcile","admissions","invoices","reportcards","discipline","transport","communication","timetable","reports","financial-reports","analytics","analysis","accounts","hr","library","lessonplans","settings","announcements","bulk-import","exams","update-requests","trial-balance","income-statement","chart-of-accounts","journal-entries","general-ledger","balance-sheet","term-management"], edit:true },
   // Admin - School administrator with full school-level access
   admin:     { pages:["dashboard","students","subjects","attendance","grades","fees","expenditures","invoices","reportcards","discipline","transport","communication","timetable","library","lessonplans","announcements","exams","admissions","trial-balance","income-statement","chart-of-accounts","journal-entries","general-ledger","balance-sheet","term-management"], edit:true },
   // Teacher - Classroom operations

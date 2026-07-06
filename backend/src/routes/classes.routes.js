@@ -26,8 +26,8 @@ router.get("/promotion-chain", requireRoles("admin", "director", "superadmin"), 
       return res.json({ data: classes });
     }
     
-    // If classes table is empty or doesn't exist, get unique classes from students table
-    console.log('[CLASSES] Classes table empty or missing, using students table');
+    // If classes table is empty or doesn't exist, get unique classes from students table and create them
+    console.log('[CLASSES] Classes table empty or missing, creating from students table');
     const { data: students, error: studentsError } = await supabase
       .from("students")
       .select("class_name")
@@ -40,14 +40,36 @@ router.get("/promotion-chain", requireRoles("admin", "director", "superadmin"), 
     // Get unique class names
     const uniqueClasses = [...new Set((students || []).map(s => s.class_name))].filter(Boolean).sort();
     
-    // Convert to format expected by frontend
-    const classData = uniqueClasses.map((className, index) => ({
-      class_id: index + 1, // Use numeric ID for frontend compatibility
+    if (uniqueClasses.length === 0) {
+      return res.json({ data: [] });
+    }
+    
+    // Create classes entries in the database
+    const classesToInsert = uniqueClasses.map(className => ({
+      school_id: schoolId,
       class_name: className,
-      next_class_name: null
+      next_class_name: null,
+      is_deleted: false
     }));
     
-    res.json({ data: classData });
+    const { data: insertedClasses, error: insertError } = await supabase
+      .from("classes")
+      .insert(classesToInsert)
+      .select("class_id, class_name, next_class_name");
+    
+    if (insertError) {
+      console.error('[CLASSES] Failed to create classes:', insertError);
+      // If insert fails, return the class names as dummy data
+      const classData = uniqueClasses.map((className, index) => ({
+        class_id: index + 1,
+        class_name: className,
+        next_class_name: null
+      }));
+      return res.json({ data: classData });
+    }
+    
+    console.log('[CLASSES] Created classes from students table:', insertedClasses.length);
+    res.json({ data: insertedClasses || [] });
   } catch (err) {
     next(err);
   }

@@ -191,7 +191,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           (term === "all" || r.term === term)
       );
       if (classResults.length > 0) {
-        const calculatedRankings = rankingService.calculateClassRankings(classResults);
+        const calculatedRankings = rankingService.calculateClassRankings(classResults, { className: filterClass });
         setRankings(calculatedRankings);
       } else {
         setRankings(null);
