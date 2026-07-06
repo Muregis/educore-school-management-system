@@ -84,7 +84,7 @@ async function computeClassPosition(schoolId, studentId, term, className) {
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId, role } = req.user;
-    const { studentId, term, academicYear } = req.query;
+    const { studentId, term, academicYear, class: className } = req.query;
     let query = supabase
       .from("report_cards")
       .select("*")
@@ -100,6 +100,7 @@ router.get("/", async (req, res, next) => {
     if (studentId) query = query.eq("student_id", studentId);
     if (term) query = query.eq("term", term);
     if (academicYear) query = query.eq("academic_year", academicYear);
+    if (className) query = query.eq("class_name", className);
 
     const { data: cards, error } = await query;
     if (error) {
@@ -144,7 +145,7 @@ router.get("/", async (req, res, next) => {
 router.get("/:studentId/full", async (req, res, next) => {
   try {
     const { schoolId, role } = req.user;
-    const { term = "Term 2", academicYear = "2026", examType } = req.query;
+    const { term, academicYear, examType } = req.query;
     const { studentId } = req.params;
 
     const { data: studentRow, error: studentErr } = await supabase
@@ -190,25 +191,26 @@ router.get("/:studentId/full", async (req, res, next) => {
       .select("*")
       .eq("school_id", schoolId)
       .eq("student_id", studentId)
-      .eq("term", term)
-      .eq("academic_year", academicYear)
       .eq("is_deleted", false)
       .limit(1)
       .maybeSingle();
 
-    // Parents and students can only see approved and published report cards
-    if (role === "parent" || role === "student") {
-      rcQuery = rcQuery.eq("is_published", true).eq("is_approved", true);
-    }
+    // Apply filters if provided
+    if (term) rcQuery = rcQuery.eq("term", term);
+    if (academicYear) rcQuery = rcQuery.eq("academic_year", academicYear);
+    if (examType) rcQuery = rcQuery.eq("exam_type", examType);
 
     let resultsQuery = supabase
       .from("results")
       .select("subject, marks, total_marks, grade, teacher_comment, teacher_id, exam_type, teachers(first_name,last_name)")
       .eq("school_id", schoolId)
       .eq("student_id", studentId)
-      .eq("term", term)
       .eq("is_deleted", false);
     
+    // Apply term filter if provided
+    if (term) resultsQuery = resultsQuery.eq("term", term);
+    
+    // Apply exam type filter if provided
     if (examType && examType !== "all") {
       resultsQuery = resultsQuery.eq("exam_type", examType);
     }
@@ -376,6 +378,129 @@ router.put("/:id/publish", requireRoles("admin", "director", "superadmin"), asyn
 
     res.json({ published: publish });
   } catch (err) { next(err); }
+});
+
+// POST /api/reportcards/print - Generate/print report cards with filters
+router.post("/print", requireRoles("admin", "director", "superadmin", "teacher"), async (req, res, next) => {
+  try {
+    const { schoolId, userId } = req.user;
+    const { 
+      term, 
+      academicYear, 
+      className, 
+      examType,
+      studentIds,
+      format = "pdf" 
+    } = req.body;
+
+    // Build base query for students
+    let studentsQuery = supabase
+      .from("students")
+      .select("student_id, first_name, last_name, class_name, admission_number")
+      .eq("school_id", schoolId)
+      .eq("is_deleted", false)
+      .eq("status", "active");
+
+    // Apply class filter
+    if (className) {
+      studentsQuery = studentsQuery.eq("class_name", className);
+    }
+
+    // Apply specific student IDs filter
+    if (studentIds && Array.isArray(studentIds) && studentIds.length > 0) {
+      studentsQuery = studentsQuery.in("student_id", studentIds);
+    }
+
+    const { data: students, error: studentsError } = await studentsQuery;
+    if (studentsError) throw studentsError;
+
+    if (!students || students.length === 0) {
+      return res.status(404).json({ message: "No students found matching the criteria" });
+    }
+
+    // Fetch results for all students with filters
+    const studentIdsList = students.map(s => s.student_id);
+    let resultsQuery = supabase
+      .from("results")
+      .select("student_id, subject, marks, total_marks, grade, teacher_comment, exam_type, term")
+      .eq("school_id", schoolId)
+      .in("student_id", studentIdsList)
+      .eq("is_deleted", false);
+
+    // Apply term filter
+    if (term) {
+      resultsQuery = resultsQuery.eq("term", term);
+    }
+
+    // Apply exam type filter
+    if (examType && examType !== "all") {
+      resultsQuery = resultsQuery.eq("exam_type", examType);
+    }
+
+    const { data: results, error: resultsError } = await resultsQuery;
+    if (resultsError) throw resultsError;
+
+    // Group results by student
+    const resultsByStudent = new Map();
+    (results || []).forEach(r => {
+      if (!resultsByStudent.has(r.student_id)) {
+        resultsByStudent.set(r.student_id, []);
+      }
+      resultsByStudent.get(r.student_id).push(r);
+    });
+
+    // Build report data for each student
+    const reportData = students.map(student => {
+      const studentResults = resultsByStudent.get(student.student_id) || [];
+      const meanScore = meanPercentFromResults(studentResults);
+      
+      return {
+        student: {
+          id: student.student_id,
+          name: `${student.first_name} ${student.last_name}`.trim(),
+          admissionNumber: student.admission_number,
+          className: student.class_name
+        },
+        term: term || "All Terms",
+        academicYear: academicYear || "All Years",
+        examType: examType || "All Exams",
+        results: studentResults,
+        meanScore: meanScore.toFixed(1),
+        totalSubjects: studentResults.length
+      };
+    });
+
+    // Fetch school branding
+    const { data: schoolRows, error: schoolErr } = await supabase
+      .from("school_settings")
+      .select("setting_key, setting_value")
+      .eq("school_id", schoolId);
+    
+    const settingsMap = new Map((schoolRows || []).map(s => [s.setting_key, s.setting_value]));
+    const schoolBranding = {
+      schoolName: settingsMap.get("school_name") || "School Name",
+      schoolAddress: settingsMap.get("school_address") || "",
+      schoolPhone: settingsMap.get("school_phone") || "",
+      schoolEmail: settingsMap.get("school_email") || "",
+      logoUrl: settingsMap.get("school_logo") || null,
+    };
+
+    res.json({
+      success: true,
+      school: schoolBranding,
+      filters: {
+        term: term || "All Terms",
+        academicYear: academicYear || "All Years",
+        className: className || "All Classes",
+        examType: examType || "All Exams"
+      },
+      reports: reportData,
+      totalStudents: reportData.length,
+      generatedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;
