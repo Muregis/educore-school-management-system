@@ -76,6 +76,7 @@ import academicYearsRoutes        from "./routes/academic-years.routes.js";
 import studentLifecycleRoutes     from "./routes/student-lifecycle.routes.js";
 import financeRoutes              from "./routes/finance.routes.js";
 import securityRoutes             from "./routes/security.routes.js";
+import classesRoutes              from "./routes/classes.routes.js";
 import { cacheMiddleware } from "./middleware/cache.js";
 // import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }         from "./middleware/error.js";
@@ -213,6 +214,7 @@ app.use("/api/expenditures",      expendituresRoutes);
 app.use("/api/exam-types",        examTypesRoutes);           // NEW: Exam types management
 app.use("/api/grades/compiled",   compiledResultsRoutes);     // NEW: Compiled results endpoint
 app.use("/api/upload",            uploadRoutes);              // NEW: Cloudinary upload routes
+app.use("/api/classes",            classesRoutes);             // NEW: Classes management
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
 
