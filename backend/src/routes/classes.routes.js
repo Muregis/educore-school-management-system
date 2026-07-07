@@ -24,7 +24,7 @@ const PROMOTION_CHAIN = {
 
 /**
  * GET /api/classes/promotion-chain - Get promotion chain configuration
- * Returns hardcoded promotion chain
+ * Returns hardcoded promotion chain using class names as IDs
  */
 router.get("/promotion-chain", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
@@ -44,8 +44,9 @@ router.get("/promotion-chain", requireRoles("admin", "director", "superadmin"), 
     const uniqueClasses = [...new Set((students || []).map(s => s.class_name))].filter(Boolean).sort();
     
     // Build promotion chain data using hardcoded progression
-    const classData = uniqueClasses.map((className, index) => ({
-      class_id: index + 1,
+    // Use class name as the ID for reliable lookup
+    const classData = uniqueClasses.map((className) => ({
+      class_id: className, // Use class name as ID instead of index
       class_name: className,
       next_class_name: PROMOTION_CHAIN[className] || null
     }));
@@ -59,6 +60,7 @@ router.get("/promotion-chain", requireRoles("admin", "director", "superadmin"), 
 /**
  * PUT /api/classes/:classId/promotion - Update promotion target for a class
  * This endpoint now validates against the hardcoded chain but allows customization
+ * Uses class name as the ID for reliable lookup
  */
 router.put("/:classId/promotion", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
@@ -68,37 +70,35 @@ router.put("/:classId/promotion", requireRoles("admin", "director", "superadmin"
     
     console.log('[PROMOTION] Updating class:', classId, 'to:', nextClassName, 'for school:', schoolId);
     
-    // Get unique classes from students table to find the class
+    // classId is now the class name (e.g., "Grade 7")
+    const className = classId;
+    
+    // Verify this class exists in the school
     const { data: students, error: studentsError } = await supabase
       .from("students")
       .select("class_name")
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
-      .not("class_name", "is", null);
+      .eq("class_name", className)
+      .limit(1);
     
     if (studentsError) throw studentsError;
     
-    const uniqueClasses = [...new Set((students || []).map(s => s.class_name))].filter(Boolean).sort();
-    
-    // Find the class by numeric ID (index-based from sorted array)
-    const index = parseInt(classId) - 1;
-    if (index < 0 || index >= uniqueClasses.length) {
-      console.error('[PROMOTION] Class not found for classId:', classId, 'Available classes:', uniqueClasses.length);
+    if (!students || students.length === 0) {
+      console.error('[PROMOTION] Class not found:', className);
       return res.status(404).json({ 
         message: "Class not found", 
-        classId,
-        availableClasses: uniqueClasses.map((name, idx) => ({ id: idx + 1, name }))
+        classId: className
       });
     }
     
-    const className = uniqueClasses[index];
-    console.log('[PROMOTION] Found class:', className, 'at index:', index);
+    console.log('[PROMOTION] Found class:', className);
     
     // Validate next class is in the promotion chain or is null
     if (nextClassName && !Object.values(PROMOTION_CHAIN).includes(nextClassName) && nextClassName !== "") {
       return res.status(400).json({ 
         message: "Invalid promotion target. Must be a valid class in the school.",
-        validClasses: uniqueClasses
+        validClasses: Object.keys(PROMOTION_CHAIN)
       });
     }
     
@@ -106,7 +106,7 @@ router.put("/:classId/promotion", requireRoles("admin", "director", "superadmin"
     res.json({ 
       message: "Promotion target updated successfully",
       data: {
-        class_id: classId,
+        class_id: className,
         class_name: className,
         next_class_name: nextClassName || PROMOTION_CHAIN[className] || null
       }

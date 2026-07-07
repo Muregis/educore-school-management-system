@@ -226,7 +226,14 @@ export default function AdmissionsPage({ auth, canEdit, toast }) {
               />
             </Field>
             <Field label="Date of Birth">
-              <input type="date" style={inputStyle} value={form.dateOfBirth} onChange={e => setForm({ ...form, dateOfBirth: e.target.value })} />
+              <input 
+                id="dateOfBirth"
+                name="dateOfBirth"
+                type="date" 
+                style={inputStyle} 
+                value={form.dateOfBirth} 
+                onChange={e => setForm({ ...form, dateOfBirth: e.target.value })} 
+              />
             </Field>
             <Field label="Gender">
               <select style={inputStyle} value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })}>
@@ -242,6 +249,8 @@ export default function AdmissionsPage({ auth, canEdit, toast }) {
             </Field>
             <Field label="Academic Year *">
               <input 
+                id="academicYear"
+                name="academicYear"
                 style={inputStyle} 
                 value={form.academicYear} 
                 onChange={e => setForm({ ...form, academicYear: e.target.value })} 
@@ -262,15 +271,29 @@ export default function AdmissionsPage({ auth, canEdit, toast }) {
             </Field>
             <Field label="Parent Email">
               <input 
-                type="email"
-                style={inputStyle} 
-                value={form.parentEmail} 
-                onChange={e => setForm({ ...form, parentEmail: e.target.value })} 
-                placeholder="parent@example.com"
+                 laceholder="parent@example.com"
               />
             </Field>
             <Field label="Previous School">
-              <input style={inputStyle} value={form.previousSchool} onChange={e => setForm({ ...form, previousSchool: e.target.value })} />
+              <input 
+                id="previousSchool"
+                name="previousSchool"
+                style={inputStyle} 
+                value={form.previousSchool} 
+                onCh 
+                id="address"
+           a    name="address"
+                nge={e => setForm({
+                 ...form, previousSc 
+      h         ool: ea 
+                id="notes"
+                n.me="notes"
+               target.value })}   
+                
+                
+             
+             
+              />
             </Field>
             <Field label="Address" style={{ gridColumn: "1 / -1" }}>
               <input style={inputStyle} value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
@@ -349,5 +372,17 @@ export default function AdmissionsPage({ auth, canEdit, toast }) {
 AdmissionsPage.propTypes = {
   auth: PropTypes.object,
   canEdit: PropTypes.bool.isRequired,
+  toast: PropTypes.func.isRequired,
+};
+  toast: PropTypes.func.isRequired,
+};
+  );
+}
+
+AdmissionsPage.propTypes = {
+  auth: PropTypes.object,
+  canEdit: PropTypes.bool.isRequired,
+  toast: PropTypes.func.isRequired,
+};
   toast: PropTypes.func.isRequired,
 };

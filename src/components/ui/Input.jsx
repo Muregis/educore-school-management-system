@@ -1,6 +1,6 @@
 import React from "react";
 
-export default React.memo(function Input({
+export default function Input({
   label,
   error,
   icon,
@@ -96,4 +96,4 @@ export default React.memo(function Input({
       )}
     </div>
   );
-});
+}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import PropTypes from "prop-types";
 import StudentIDCard from "../components/StudentIDCard";
 import QRScanner from "../components/QRScanner";
@@ -74,6 +74,10 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", transport_direction: "none", transport_base_fee: "", lunch_enabled: false, lunch_daily_rate: "", lunch_days: "", lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: "", breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
+
+  const handleChange = useCallback((field, value) => {
+    setF(prev => ({ ...prev, [field]: value }));
+  }, []);
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -454,21 +458,21 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         </>
       }>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
-          <Input label="First Name" value={f.firstName} onChange={e => setF({ ...f, firstName: e.target.value })} />
-          <Input label="Last Name" value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} />
-          <Input label="Admission" value={f.admission || ""} onChange={e => setF({ ...f, admission: e.target.value })} />
+          <Input label="First Name" value={f.firstName} onChange={e => handleChange('firstName', e.target.value)} />
+          <Input label="Last Name" value={f.lastName} onChange={e => handleChange('lastName', e.target.value)} />
+          <Input label="Admission" value={f.admission || ""} onChange={e => handleChange('admission', e.target.value)} />
           
-          <Select label="Class" value={f.className} onChange={e => setF({ ...f, className: e.target.value })} options={ALL_CLASSES.map(c => ({ value: c, label: c }))} />
-          <Select label="Gender" value={f.gender} onChange={e => setF({ ...f, gender: e.target.value })} options={[{value:"female", label:"Female"}, {value:"male", label:"Male"}]} />
-          <Select label="Status" value={f.status} onChange={e => setF({ ...f, status: e.target.value })} options={[{value:"active", label:"Active"}, {value:"inactive", label:"Inactive"}]} />
+          <Select label="Class" value={f.className} onChange={e => handleChange('className', e.target.value)} options={ALL_CLASSES.map(c => ({ value: c, label: c }))} />
+          <Select label="Gender" value={f.gender} onChange={e => handleChange('gender', e.target.value)} options={[{value:"female", label:"Female"}, {value:"male", label:"Male"}]} />
+          <Select label="Status" value={f.status} onChange={e => handleChange('status', e.target.value)} options={[{value:"active", label:"Active"}, {value:"inactive", label:"Inactive"}]} />
           
-          <Input label="Parent Name" value={f.parentName || ""} onChange={e => setF({ ...f, parentName: e.target.value })} />
-          <Input label="Parent WhatsApp" value={f.parentPhone || ""} onChange={e => setF({ ...f, parentPhone: e.target.value })} placeholder="07xxxxxxxx" />
-          <Input label="Date of Birth" type="date" value={f.dob || ""} onChange={e => setF({ ...f, dob: e.target.value })} />
-          <Input label="NEMIS Number" value={f.nemisNumber || ""} onChange={e => setF({ ...f, nemisNumber: e.target.value.toUpperCase() })} placeholder="e.g. NEM12345678" />
+          <Input label="Parent Name" value={f.parentName || ""} onChange={e => handleChange('parentName', e.target.value)} />
+          <Input label="Parent WhatsApp" value={f.parentPhone || ""} onChange={e => handleChange('parentPhone', e.target.value)} placeholder="07xxxxxxxx" />
+          <Input label="Date of Birth" type="date" value={f.dob || ""} onChange={e => handleChange('dob', e.target.value)} />
+          <Input label="NEMIS Number" value={f.nemisNumber || ""} onChange={e => handleChange('nemisNumber', e.target.value.toUpperCase())} placeholder="e.g. NEM12345678" />
           
-          <Select label="Blood Group" value={f.bloodGroup || ""} onChange={e => setF({ ...f, bloodGroup: e.target.value })} options={[{value:"", label:"-- Select --"}, {value:"A+", label:"A+"}, {value:"A-", label:"A-"}, {value:"B+", label:"B+"}, {value:"B-", label:"B-"}, {value:"O+", label:"O+"}, {value:"O-", label:"O-"}, {value:"AB+", label:"AB+"}, {value:"AB-", label:"AB-"}]} />
-          <Input label="Allergies" value={f.allergies || ""} onChange={e => setF({ ...f, allergies: e.target.value })} placeholder="e.g. Peanuts" />
+          <Select label="Blood Group" value={f.bloodGroup || ""} onChange={e => handleChange('bloodGroup', e.target.value)} options={[{value:"", label:"-- Select --"}, {value:"A+", label:"A+"}, {value:"A-", label:"A-"}, {value:"B+", label:"B+"}, {value:"B-", label:"B-"}, {value:"O+", label:"O+"}, {value:"O-", label:"O-"}, {value:"AB+", label:"AB+"}, {value:"AB-", label:"AB-"}]} />
+          <Input label="Allergies" value={f.allergies || ""} onChange={e => handleChange('allergies', e.target.value)} placeholder="e.g. Peanuts" />
           
           <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
             <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Medical Conditions</label>
@@ -487,25 +491,25 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
                 resize: 'vertical'
               }} 
               value={f.medicalConditions || ""} 
-              onChange={e => setF({ ...f, medicalConditions: e.target.value })} 
+              onChange={e => handleChange('medicalConditions', e.target.value)} 
               placeholder="Any medical conditions or special needs" 
             />
           </div>
 
-          <Input label="Emergency Contact" value={f.emergencyContactName || ""} onChange={e => setF({ ...f, emergencyContactName: e.target.value })} placeholder="Name" />
-          <Input label="Emergency Phone" value={f.emergencyContactPhone || ""} onChange={e => setF({ ...f, emergencyContactPhone: e.target.value })} placeholder="07xxxxxxxx" />
-          <Input label="Relationship" value={f.emergencyContactRelationship || ""} onChange={e => setF({ ...f, emergencyContactRelationship: e.target.value })} placeholder="e.g. Parent, Guardian" />
+          <Input label="Emergency Contact" value={f.emergencyContactName || ""} onChange={e => handleChange('emergencyContactName', e.target.value)} placeholder="Name" />
+          <Input label="Emergency Phone" value={f.emergencyContactPhone || ""} onChange={e => handleChange('emergencyContactPhone', e.target.value)} placeholder="07xxxxxxxx" />
+          <Input label="Relationship" value={f.emergencyContactRelationship || ""} onChange={e => handleChange('emergencyContactRelationship', e.target.value)} placeholder="e.g. Parent, Guardian" />
           
           {/* Transport */}
           <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
             <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Transport Settings</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
-              <Select value={f.transport_direction || "none"} onChange={e => setF({ ...f, transport_direction: e.target.value })} options={[
+              <Select value={f.transport_direction || "none"} onChange={e => handleChange('transport_direction', e.target.value)} options={[
                 { value: "none", label: "No Transport" },
                 { value: "one_way", label: "One Way (60% fee)" },
                 { value: "two_way", label: "Two Way (100% fee)" }
               ]} />
-              <Input type="number" value={f.transport_base_fee || ""} onChange={e => setF({ ...f, transport_base_fee: e.target.value ? parseFloat(e.target.value) || 0 : 0 })} placeholder="Base transport fee (KES)" disabled={f.transport_direction === "none"} />
+              <Input type="number" value={f.transport_base_fee || ""} onChange={e => handleChange('transport_base_fee', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder="Base transport fee (KES)" disabled={f.transport_direction === "none"} />
             </div>
           </div>
 
@@ -513,15 +517,15 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
             <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Lunch Program</div>
             <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer", marginBottom: "var(--space-3)", color: "var(--color-text-primary)", fontSize: "14px" }}>
-              <input type="checkbox" checked={f.lunch_enabled || false} onChange={e => setF({ ...f, lunch_enabled: e.target.checked })} style={{ width: "16px", height: "16px", cursor: "pointer" }} />
+              <input type="checkbox" checked={f.lunch_enabled || false} onChange={e => handleChange('lunch_enabled', e.target.checked)} style={{ width: "16px", height: "16px", cursor: "pointer" }} />
               <span>Enrolled in lunch program</span>
             </label>
             {f.lunch_enabled && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
-                <Select value={f.lunch_billing_type || 'daily'} onChange={e => setF({ ...f, lunch_billing_type: e.target.value })} options={[{value:"daily", label:"Daily Rate"}, {value:"termly", label:"Termly Rate"}]} />
-                <Input type="number" value={f.lunch_daily_rate || ""} onChange={e => setF({ ...f, lunch_daily_rate: e.target.value ? parseFloat(e.target.value) || 0 : 0 })} placeholder={f.lunch_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
+                <Select value={f.lunch_billing_type || 'daily'} onChange={e => handleChange('lunch_billing_type', e.target.value)} options={[{value:"daily", label:"Daily Rate"}, {value:"termly", label:"Termly Rate"}]} />
+                <Input type="number" value={f.lunch_daily_rate || ""} onChange={e => handleChange('lunch_daily_rate', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder={f.lunch_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
                 {f.lunch_billing_type !== 'termly' && (
-                  <Input type="number" value={f.lunch_days || ""} onChange={e => setF({ ...f, lunch_days: e.target.value })} placeholder="School days (optional)" />
+                  <Input type="number" value={f.lunch_days || ""} onChange={e => handleChange('lunch_days', e.target.value)} placeholder="School days (optional)" />
                 )}
               </div>
             )}
@@ -531,15 +535,15 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
             <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Breakfast Program</div>
             <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer", marginBottom: "var(--space-3)", color: "var(--color-text-primary)", fontSize: "14px" }}>
-              <input type="checkbox" checked={f.breakfast_enabled || false} onChange={e => setF({ ...f, breakfast_enabled: e.target.checked })} style={{ width: "16px", height: "16px", cursor: "pointer" }} />
+              <input type="checkbox" checked={f.breakfast_enabled || false} onChange={e => handleChange('breakfast_enabled', e.target.checked)} style={{ width: "16px", height: "16px", cursor: "pointer" }} />
               <span>Enrolled in breakfast program</span>
             </label>
             {f.breakfast_enabled && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
-                <Select value={f.breakfast_billing_type || 'daily'} onChange={e => setF({ ...f, breakfast_billing_type: e.target.value })} options={[{value:"daily", label:"Daily Rate"}, {value:"termly", label:"Termly Rate"}]} />
-                <Input type="number" value={f.breakfast_daily_rate || ""} onChange={e => setF({ ...f, breakfast_daily_rate: e.target.value ? parseFloat(e.target.value) || 0 : 0 })} placeholder={f.breakfast_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
+                <Select value={f.breakfast_billing_type || 'daily'} onChange={e => handleChange('breakfast_billing_type', e.target.value)} options={[{value:"daily", label:"Daily Rate"}, {value:"termly", label:"Termly Rate"}]} />
+                <Input type="number" value={f.breakfast_daily_rate || ""} onChange={e => handleChange('breakfast_daily_rate', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder={f.breakfast_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
                 {f.breakfast_billing_type !== 'termly' && (
-                  <Input type="number" value={f.breakfast_days || ""} onChange={e => setF({ ...f, breakfast_days: e.target.value })} placeholder="School days (optional)" />
+                  <Input type="number" value={f.breakfast_days || ""} onChange={e => handleChange('breakfast_days', e.target.value)} placeholder="School days (optional)" />
                 )}
               </div>
             )}

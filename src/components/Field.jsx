@@ -1,11 +1,8 @@
-import { cloneElement, isValidElement, useId, useMemo } from "react";
+import { useId } from "react";
 import PropTypes from "prop-types";
 import { C } from "../lib/theme";
 
 export default function Field({ label, children, style }) {
-  const autoId = `field_${useId().replace(/:/g, "_")}`;
-  const autoName = autoId;
-
   const containerStyle = {
     marginBottom: 16,
     ...style,
@@ -21,27 +18,12 @@ export default function Field({ label, children, style }) {
     letterSpacing: "0.5px",
   };
 
-  const control = useMemo(() => {
-    if (isValidElement(children)) {
-      return cloneElement(children, {
-        id: autoId,
-        name: autoName,
-        style: {
-          ...children.props.style,
-          minHeight: 44,
-          fontSize: 16,
-        },
-      });
-    }
-    return children;
-  }, [children, autoId, autoName]);
-
   return (
     <div style={containerStyle}>
-      <label htmlFor={autoId} style={labelStyle}>
+      <label style={labelStyle}>
         {label}
       </label>
-      {control}
+      {children}
     </div>
   );
 }
