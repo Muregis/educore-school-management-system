@@ -80,15 +80,19 @@ router.put("/:classId/promotion", requireRoles("admin", "director", "superadmin"
     
     const uniqueClasses = [...new Set((students || []).map(s => s.class_name))].filter(Boolean).sort();
     
-    // Find the class by numeric ID
+    // Find the class by numeric ID (index-based from sorted array)
     const index = parseInt(classId) - 1;
     if (index < 0 || index >= uniqueClasses.length) {
-      console.error('[PROMOTION] Class not found for classId:', classId);
-      return res.status(404).json({ message: "Class not found", classId });
+      console.error('[PROMOTION] Class not found for classId:', classId, 'Available classes:', uniqueClasses.length);
+      return res.status(404).json({ 
+        message: "Class not found", 
+        classId,
+        availableClasses: uniqueClasses.map((name, idx) => ({ id: idx + 1, name }))
+      });
     }
     
     const className = uniqueClasses[index];
-    console.log('[PROMOTION] Found class:', className);
+    console.log('[PROMOTION] Found class:', className, 'at index:', index);
     
     // Validate next class is in the promotion chain or is null
     if (nextClassName && !Object.values(PROMOTION_CHAIN).includes(nextClassName) && nextClassName !== "") {
