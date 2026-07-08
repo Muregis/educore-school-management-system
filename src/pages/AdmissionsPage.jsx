@@ -280,19 +280,7 @@ export default function AdmissionsPage({ auth, canEdit, toast }) {
                 name="previousSchool"
                 style={inputStyle} 
                 value={form.previousSchool} 
-                onCh 
-                id="address"
-           a    name="address"
-                nge={e => setForm({
-                 ...form, previousSc 
-      h         ool: ea 
-                id="notes"
-                n.me="notes"
-               target.value })}   
-                
-                
-             
-             
+                onChange={e => setForm({ ...form, previousSchool: e.target.value })} 
               />
             </Field>
             <Field label="Address" style={{ gridColumn: "1 / -1" }}>

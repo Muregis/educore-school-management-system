@@ -614,31 +614,24 @@ export const AppErrorHandler = ({ children, enableHealthCheck = false }) => {
     return () => clearInterval(interval);
   }, [enableHealthCheck]);
 
-  // API response interceptor for slow connections
+  // API response interceptor for slow connections.
+  // NOTE: This must be gated behind enableHealthCheck. Previously it patched
+  // window.fetch on every load and aborted requests after 8s, which broke
+  // slow backends and caused the whole app (and any focused input) to
+  // remount on every fetch — making typing lose focus after each keystroke.
   useEffect(() => {
+    if (!enableHealthCheck) return undefined;
     const originalFetch = window.fetch;
 
     window.fetch = async (...args) => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        setErrorState(prev => ({ ...prev, isSlowConnection: true }));
-        controller.abort();
-      }, 8000); // 8 seconds
-
       try {
-        const [resource, config = {}] = args;
-        const response = await originalFetch(resource, {
-          ...config,
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-        setErrorState(prev => ({ ...prev, isSlowConnection: false }));
+        const response = await originalFetch(...args);
+        // Only update state when it actually changes to avoid needless re-renders
+        setErrorState(prev => prev.isSlowConnection ? { ...prev, isSlowConnection: false } : prev);
         return response;
       } catch (error) {
-        clearTimeout(timeoutId);
         if (error.name === 'AbortError' && navigator.onLine) {
-          setErrorState(prev => ({ ...prev, isSlowConnection: true }));
+          setErrorState(prev => prev.isSlowConnection ? prev : { ...prev, isSlowConnection: true });
         }
         throw error;
       }
@@ -647,9 +640,10 @@ export const AppErrorHandler = ({ children, enableHealthCheck = false }) => {
     return () => {
       window.fetch = originalFetch;
     };
-  }, []);
+  }, [enableHealthCheck]);
 
-  // Render appropriate error screen
+  // Render error screens. Offline/maintenance replace the app; a slow
+  // connection is shown as an overlay so focused inputs are not unmounted.
   if (errorState.isOffline) {
     return <OfflineScreen />;
   }
@@ -658,12 +652,12 @@ export const AppErrorHandler = ({ children, enableHealthCheck = false }) => {
     return <MaintenanceScreen showCountdown={false} />;
   }
 
-  if (errorState.isSlowConnection) {
-    return <SlowConnectionScreen />;
-  }
-
-  // Everything is fine, render children
-  return children;
+  return (
+    <>
+      {children}
+      {errorState.isSlowConnection && <SlowConnectionScreen />}
+    </>
+  );
 };
 
 AppErrorHandler.propTypes = {
