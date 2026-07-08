@@ -4,6 +4,7 @@
 // =====================================================
 
 import { supabase } from '../config/supabaseClient.js';
+import { logAuditEvent } from '../helpers/audit.logger.js';
 
 // =====================================================
 // ACADEMIC YEAR SERVICE
@@ -563,6 +564,261 @@ export class TermTransitionService {
     } catch (error) {
       console.error('Error opening term:', error);
       throw error;
+    }
+  }
+
+  static async endAcademicYear(schoolId, academicYearId, userId, options = {}) {
+    try {
+      const { createNextYear = true, promoteStudents = true, carryForwardBalances = true } = options;
+
+      const { data: year } = await supabase
+        .from('academic_years')
+        .select('*')
+        .eq('academic_year_id', academicYearId)
+        .eq('school_id', schoolId)
+        .single();
+
+      if (!year) throw new Error('Academic year not found');
+      if (year.is_closed) throw new Error('Academic year is already closed');
+
+      const { data: terms } = await supabase
+        .from('terms')
+        .select('*')
+        .eq('academic_year_id', academicYearId)
+        .eq('school_id', schoolId)
+        .neq('status', 'closed');
+
+      const summary = {
+        termsClosed: 0,
+        studentsPromoted: 0,
+        balancesCarriedForward: 0,
+        alumniCreated: 0,
+        nextYearCreated: false,
+      };
+
+      for (const term of terms || []) {
+        await supabase
+          .from('terms')
+          .update({ status: 'closed', is_current: false, updated_at: new Date() })
+          .eq('term_id', term.term_id);
+
+        summary.termsClosed++;
+      }
+
+      if (promoteStudents) {
+        const { data: classes } = await supabase
+          .from('classes')
+          .select('class_id, class_name, next_class_name')
+          .eq('school_id', schoolId)
+          .eq('is_deleted', false)
+          .order('class_name');
+
+        const { data: activeStudents } = await supabase
+          .from('students')
+          .select('student_id, first_name, last_name, class_id, class_name, status')
+          .eq('school_id', schoolId)
+          .eq('is_deleted', false)
+          .eq('status', 'active');
+
+        const classMap = new Map((classes || []).map(c => [c.class_name, c]));
+
+        for (const student of activeStudents || []) {
+          const currentClass = classMap.get(student.class_name);
+          const nextClassName = currentClass?.next_class_name;
+
+          if (nextClassName) {
+            const nextClass = classMap.get(nextClassName);
+            if (nextClass) {
+              await supabase
+                .from('students')
+                .update({
+                  class_id: nextClass.class_id,
+                  class_name: nextClassName,
+                  updated_at: new Date(),
+                })
+                .eq('student_id', student.student_id);
+
+              await supabase.from('promotion_decisions').insert({
+                student_id: student.student_id,
+                academic_year_id: academicYearId,
+                from_class_id: student.class_id,
+                to_class_id: nextClass.class_id,
+                decision: 'promoted',
+                decision_date: new Date().toISOString().split('T')[0],
+                decided_by: userId,
+              });
+
+              summary.studentsPromoted++;
+            }
+          } else {
+            await supabase.from('alumni').insert({
+              student_id: student.student_id,
+              school_id: schoolId,
+              graduation_date: new Date().toISOString().split('T')[0],
+              final_class_id: student.class_id,
+              created_at: new Date(),
+              updated_at: new Date(),
+            });
+
+            await supabase
+              .from('students')
+              .update({ status: 'graduated', updated_at: new Date() })
+              .eq('student_id', student.student_id);
+
+            summary.alumniCreated++;
+          }
+        }
+      }
+
+      if (carryForwardBalances) {
+        const { data: unpaidBalances } = await supabase
+          .from('fee_balance_ledger')
+          .select('student_id, balance_after, academic_year_id')
+          .eq('school_id', schoolId)
+          .eq('academic_year_id', academicYearId)
+          .gt('balance_after', 0);
+
+        if (unpaidBalances?.length) {
+          const nextYearId = createNextYear ? (await this.createNextAcademicYear(schoolId, year, userId))?.academic_year_id : null;
+
+          for (const balance of unpaidBalances) {
+            await supabase.from('fee_balance_ledger').insert({
+              school_id: schoolId,
+              student_id: balance.student_id,
+              academic_year_id: nextYearId || balance.academic_year_id,
+              balance_after: balance.balance_after,
+              created_at: new Date(),
+            });
+          }
+          summary.balancesCarriedForward = unpaidBalances.length;
+        }
+      }
+
+      await supabase
+        .from('academic_years')
+        .update({ is_closed: true, is_current: false, updated_at: new Date() })
+        .eq('academic_year_id', academicYearId);
+
+      if (createNextYear) {
+        const nextYear = await this.createNextAcademicYear(schoolId, year, userId);
+        if (nextYear) {
+          await supabase
+            .from('academic_years')
+            .update({ is_current: true, updated_at: new Date() })
+            .eq('academic_year_id', nextYear.academic_year_id);
+
+          await supabase
+            .from('terms')
+            .update({ is_current: false })
+            .eq('academic_year_id', nextYear.academic_year_id);
+
+          const { data: firstTerm } = await supabase
+            .from('terms')
+            .select('term_id')
+            .eq('academic_year_id', nextYear.academic_year_id)
+            .order('term_order')
+            .limit(1)
+            .single();
+
+          if (firstTerm) {
+            await supabase
+              .from('terms')
+              .update({ is_current: true, status: 'upcoming' })
+              .eq('term_id', firstTerm.term_id);
+          }
+
+          summary.nextYearCreated = true;
+        }
+      }
+
+      await logAuditEvent({ user: { userId, schoolId } }, {
+        action: 'academic_year.end',
+        entity: 'academic_year',
+        entityId: academicYearId,
+        description: `Ended academic year ${year.year_label || year.academic_year}`,
+        metadata: summary,
+      });
+
+      return { success: true, summary, year };
+    } catch (error) {
+      console.error('Error ending academic year:', error);
+      throw error;
+    }
+  }
+
+  static async createNextAcademicYear(schoolId, currentYear, userId) {
+    try {
+      const startDate = new Date(currentYear.end_date);
+      startDate.setDate(startDate.getDate() + 1);
+
+      const endDate = new Date(startDate);
+      endDate.setFullYear(endDate.getFullYear() + 1);
+      endDate.setDate(endDate.getDate() - 1);
+
+      const nextYearLabel = `${startDate.getFullYear()}/${endDate.getFullYear()}`;
+
+      const { data: existing } = await supabase
+        .from('academic_years')
+        .select('academic_year_id')
+        .eq('school_id', schoolId)
+        .eq('academic_year', nextYearLabel)
+        .single();
+
+      if (existing) return existing;
+
+      const { data: nextYear, error } = await supabase
+        .from('academic_years')
+        .insert({
+          school_id: schoolId,
+          academic_year: nextYearLabel,
+          year_label: nextYearLabel,
+          start_date: startDate.toISOString().split('T')[0],
+          end_date: endDate.toISOString().split('T')[0],
+          is_current: false,
+          is_closed: false,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const { data: currentTerms } = await supabase
+        .from('terms')
+        .select('term_name, term_order, start_date, end_date')
+        .eq('academic_year_id', currentYear.academic_year_id)
+        .eq('school_id', schoolId)
+        .order('term_order');
+
+      if (currentTerms?.length) {
+        const termRecords = currentTerms.map((term, index) => {
+          const termStart = new Date(startDate);
+          const termEnd = new Date(startDate);
+          const duration = (new Date(term.end_date) - new Date(term.start_date)) / (1000 * 60 * 60 * 24);
+          termEnd.setDate(termStart.getDate() + duration);
+
+          return {
+            school_id: schoolId,
+            academic_year_id: nextYear.academic_year_id,
+            term_name: term.term_name,
+            term_order: index + 1,
+            start_date: termStart.toISOString().split('T')[0],
+            end_date: termEnd.toISOString().split('T')[0],
+            status: 'upcoming',
+            is_current: false,
+            created_at: new Date(),
+            updated_at: new Date(),
+          };
+        });
+
+        await supabase.from('terms').insert(termRecords);
+      }
+
+      return nextYear;
+    } catch (error) {
+      console.error('Error creating next academic year:', error);
+      return null;
     }
   }
 }

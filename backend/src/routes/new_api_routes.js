@@ -70,6 +70,21 @@ router.post("/academic/years", authorize("academic.manage"), async (req, res) =>
   }
 });
 
+// POST /api/academic/years/:id/end-year - End academic year with full transition
+router.post("/academic/years/:id/end-year", authorize("academic.manage"), async (req, res) => {
+  try {
+    const { schoolId, user_id } = req.user;
+    const academicYearId = req.params.id;
+    const options = req.body || {};
+
+    const result = await TermTransitionService.endAcademicYear(schoolId, academicYearId, user_id, options);
+    res.json(result);
+  } catch (err) {
+    console.error('Error ending academic year:', err);
+    res.status(500).json({ message: err.message || "Failed to end academic year" });
+  }
+});
+
 // GET /api/academic/terms - List terms
 router.get("/academic/terms", authorize("academic.view"), async (req, res) => {
   try {

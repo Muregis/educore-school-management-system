@@ -52,6 +52,7 @@ import BranchSelector from "./components/BranchSelector";
 import Topbar from "./components/Topbar";
 import { API_BASE, apiFetch } from "./lib/api";
 import { TermManagementPage } from "./components/enhanced_frontend_components";
+import AcademicTransitionPage from "./pages/AcademicTransitionPage";
 import { clearSession, getSession, logout, saveSession } from "./lib/auth";
 
 // Mobile portal imports
@@ -449,6 +450,7 @@ export default function App() {
 
   const pages = {
     "term-management": <TermManagementPage auth={auth} />,
+    "academic-transition": <AcademicTransitionPage auth={auth} />,
     dashboard: isPortal && isMobile
       ? (auth.role === "parent"
           ? <ParentGuard auth={auth} requiredPermission="view" redirectTo="/login">
