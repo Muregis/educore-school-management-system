@@ -360,12 +360,30 @@ router.post("/promotion/rules", authorize("promotion.approve"), async (req, res)
   }
 });
 
+// Standard CBC promotion progression used as a default chain
+const PROMOTION_CHAIN = {
+  "Playgroup": "PP1",
+  "PP1": "PP2",
+  "PP2": "Grade 1",
+  "Grade 1": "Grade 2",
+  "Grade 2": "Grade 3",
+  "Grade 3": "Grade 4",
+  "Grade 4": "Grade 5",
+  "Grade 5": "Grade 6",
+  "Grade 6": "Grade 7",
+  "Grade 7": "Grade 8",
+  "Grade 8": "Grade 9",
+  "Grade 9": null
+};
+
 // GET /api/classes/promotion-chain - Get all classes with their promotion chain
 router.get("/classes/promotion-chain", authorize("academic.view"), async (req, res) => {
   try {
     const { schoolId } = req.user;
 
-    const { data: rows, error } = await supabase
+    // Prefer the dedicated classes table, but fall back to deriving classes
+    // from enrolled students so the chain always shows something.
+    let { data: rows, error } = await supabase
       .from('classes')
       .select('*')
       .eq('school_id', schoolId)
@@ -373,10 +391,22 @@ router.get("/classes/promotion-chain", authorize("academic.view"), async (req, r
 
     if (error) throw error;
 
+    if (!rows || rows.length === 0) {
+      const { data: students, error: stuErr } = await supabase
+        .from('students')
+        .select('class_name')
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false)
+        .not('class_name', 'is', null);
+      if (stuErr) throw stuErr;
+      const unique = [...new Set((students || []).map(s => s.class_name))].filter(Boolean).sort();
+      rows = unique.map((name, i) => ({ class_id: name, class_name: name, next_class_name: null, sort_order: i, status: 'active' }));
+    }
+
     const classes = (rows || []).map(c => ({
-      class_id: c.class_id || c.id,
+      class_id: c.class_id || c.id || c.class_name,
       class_name: c.class_name,
-      next_class_name: c.next_class_name || null,
+      next_class_name: c.next_class_name || PROMOTION_CHAIN[c.class_name] || null,
       class_order: c.sort_order ?? c.class_order ?? 0,
       status: c.status || 'active'
     })).sort((a, b) => (a.class_order || 0) - (b.class_order || 0) || a.class_name.localeCompare(b.class_name));
@@ -446,50 +476,56 @@ router.get("/classes", authorize("academic.view"), async (req, res) => {
 
 // PUT /api/classes/:id/promotion - Set next class for promotion
 router.put("/classes/:id/promotion", requireRoles("admin", "director", "superadmin"), async (req, res) => {
-try {
-const { schoolId } = req.user;
-const classId = req.params.id;
-const { nextClassName, classOrder } = req.body;
+ try {
+ const { schoolId } = req.user;
+ const classId = req.params.id;
+ const { nextClassName, classOrder } = req.body;
 
-// Build update payload with only columns that exist
-const updateData = { updated_at: new Date().toISOString() };
-if (nextClassName !== undefined) updateData.next_class_name = nextClassName;
-if (classOrder !== undefined) updateData.class_order = classOrder;
+ // Resolve the class by class_id, numeric id, OR class name
+ const { data: existing, error: findErr } = await supabase
+ .from('classes')
+ .select('class_id, id, class_name')
+ .eq('school_id', schoolId)
+ .or(`class_id.eq.${classId},id.eq.${classId},class_name.eq.${classId}`)
+ .maybeSingle();
 
-// First check if the class exists
-const { data: existing, error: findErr } = await supabase
-.from('classes')
-.select('class_id, id')
-.eq('school_id', schoolId)
-.or(`class_id.eq.${classId},id.eq.${classId}`)
-.maybeSingle();
+ if (findErr || !existing) {
+ return res.status(404).json({ message: "Class not found", classId });
+ }
 
-if (findErr || !existing) {
-return res.status(404).json({ message: "Class not found" });
-}
+ const pk = existing.class_id || existing.id;
+ const pkColumn = existing.class_id ? 'class_id' : 'id';
 
-const pk = existing.class_id || existing.id;
+ // Build update payload with only columns that exist
+ const updateData = { updated_at: new Date().toISOString() };
+ if (nextClassName === undefined || nextClassName === null || nextClassName === "") {
+   const name = existing.class_name || classId;
+   updateData.next_class_name = PROMOTION_CHAIN[name] || null;
+ } else {
+   updateData.next_class_name = nextClassName;
+ }
+ if (classOrder !== undefined) updateData.class_order = classOrder;
 
-const { data, error } = await supabase
-.from('classes')
-.update(updateData)
-.eq('school_id', schoolId)
-.eq(existing.class_id ? 'class_id' : 'id', pk)
-.select()
-.single();
+ const { data, error } = await supabase
+ .from('classes')
+ .update(updateData)
+ .eq('school_id', schoolId)
+ .eq(pkColumn, pk)
+ .select()
+ .single();
 
-if (error) {
-// If column doesn't exist, return what we tried to save
-if (error.message?.includes('does not exist') || error.code === '42703') {
-return res.json({ class_id: classId, next_class_name: nextClassName, class_order: classOrder, warning: 'Columns not in table, update skipped' });
-}
-throw error;
-}
-res.json(data);
-} catch (err) {
-console.error('Error updating class promotion:', err);
-res.status(500).json({ message: "Failed to update class promotion", detail: err.message });
-}
+ if (error) {
+ // If column doesn't exist, return what we tried to save
+ if (error.message?.includes('does not exist') || error.code === '42703') {
+ return res.json({ class_id: classId, next_class_name: nextClassName, class_order: classOrder, warning: 'Columns not in table, update skipped' });
+ }
+ throw error;
+ }
+ res.json(data);
+ } catch (err) {
+ console.error('Error updating class promotion:', err);
+ res.status(500).json({ message: "Failed to update class promotion", detail: err.message });
+ }
 });
 
 // =====================================================

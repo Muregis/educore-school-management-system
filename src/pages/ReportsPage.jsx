@@ -967,7 +967,7 @@ export default function ReportsPage({ auth }) {
       apiFetch("/reports/summary",                { token }),
       apiFetch("/reports/monthly-fee-collection", { token }),
       apiFetch("/reports/attendance-rate",        { token }),
-      apiFetch("/reports/fee-defaulters",         { token }),
+      apiFetch(`/reports/fee-defaulters${term ? `?term=${encodeURIComponent(term)}` : ""}`, { token }),
       apiFetch(`/reports/grade-distribution${filterClass !== "all" ? `?class_name=${encodeURIComponent(filterClass)}` : ""}`, { token }),
       apiFetch("/reports/class-fee-summary",      { token }), // New endpoint for class-wise fees
       apiFetch("/reports/expenditure-summary",    { token }),

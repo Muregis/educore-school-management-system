@@ -34,6 +34,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_update_academic_terms_updated_at ON academic_terms;
+
 CREATE TRIGGER trigger_update_academic_terms_updated_at
   BEFORE UPDATE ON academic_terms
   FOR EACH ROW

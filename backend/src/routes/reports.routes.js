@@ -368,11 +368,35 @@ router.get("/attendance-rate", async (req, res, next) => {
 });
 
 // ─── Fee defaulters ───────────────────────────────────────────────────
+async function resolveCurrentTermName(schoolId) {
+  try {
+    const { data: current, error } = await supabase
+      .from('terms')
+      .select('term_name')
+      .eq('school_id', schoolId)
+      .eq('status', 'active')
+      .limit(1)
+      .maybeSingle();
+    if (!error && current?.term_name) return current.term_name;
+
+    const { data: anyTerm } = await supabase
+      .from('terms')
+      .select('term_name')
+      .eq('school_id', schoolId)
+      .limit(1)
+      .maybeSingle();
+    return anyTerm?.term_name || null;
+  } catch {
+    return null;
+  }
+}
+
 router.get("/fee-defaulters", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { term } = req.query; // Allow term filtering via query param
-    const currentTerm = term; // No default - require term parameter
+    // Fall back to the school's active term so balances reflect real payments
+    const currentTerm = term || await resolveCurrentTermName(schoolId);
 
     const { data: allStudents, error: stuErr } = await supabase
       .from('students')
@@ -383,29 +407,24 @@ router.get("/fee-defaulters", async (req, res, next) => {
       .order('class_name', { ascending: true });
     if (stuErr) throw stuErr;
 
-    const { data: feeStructures, error: feeErr } = await supabase
+    const feeQuery = supabase
       .from('fee_structures')
       .select('class_name, tuition, activity, misc')
       .eq('school_id', schoolId)
-      .eq('term', currentTerm)
       .eq('is_deleted', false);
+    if (currentTerm) feeQuery.eq('term', currentTerm);
+    const { data: feeStructures, error: feeErr } = await feeQuery;
     if (feeErr) throw feeErr;
 
-    const { data: payments, error: payErr } = await supabase
+    const payQuery = supabase
       .from('payments')
       .select('student_id, amount, payment_date, term')
       .eq('school_id', schoolId)
       .in('status', ['paid', 'completed', 'success'])
-      .eq('term', currentTerm)
       .eq('is_deleted', false);
+    if (currentTerm) payQuery.eq('term', currentTerm);
+    const { data: payments, error: payErr } = await payQuery;
     if (payErr) throw payErr;
-
-    const { data: ledgerEntries, error: ledgerErr } = await supabase
-      .from('student_ledger')
-      .select('student_id, balance_after, ledger_id')
-      .eq('school_id', schoolId)
-      .order('ledger_id', { ascending: false });
-    if (ledgerErr) throw ledgerErr;
 
     const feeMap = {};
     feeStructures?.forEach(fs => {
@@ -425,27 +444,15 @@ router.get("/fee-defaulters", async (req, res, next) => {
       }
     });
 
-    const latestLedgerBalance = new Map();
-    for (const entry of ledgerEntries || []) {
-      if (!latestLedgerBalance.has(entry.student_id)) {
-        latestLedgerBalance.set(entry.student_id, Number(entry.balance_after || 0));
-      }
-    }
-
     const defaultersList = [];
     for (const student of (allStudents || [])) {
-      const ledgerBalance = latestLedgerBalance.get(student.student_id);
-      
+      // Compute balance from fee structures + payments (matches the Fees page),
+      // rather than relying on a possibly stale student_ledger snapshot.
       const classFee = feeMap[student.class_name] || 0;
       const paidAmount = paymentMap[student.student_id]?.total || 0;
       const balanceInfo = calculateReportBalanceLikeFeesPage(student, classFee, paidAmount);
-      
-      let balance;
-      if (typeof ledgerBalance === 'number') {
-        balance = Math.max(0, ledgerBalance);
-      } else {
-        balance = balanceInfo.balance;
-      }
+
+      const balance = balanceInfo.balance;
       const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
 
       if (balance > 0) {
