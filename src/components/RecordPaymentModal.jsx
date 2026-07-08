@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import Modal from "./Modal";
 import Btn from "./Btn";
@@ -38,10 +38,13 @@ export default function RecordPaymentModal({
   // Get unique classes from students
   const classes = [...new Set(students.map(s => s.class_name || s.className).filter(Boolean))].sort();
 
+  const prevIsOpenRef = useRef(false);
+
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
       resetForms();
     }
+    prevIsOpenRef.current = isOpen;
   }, [isOpen]);
 
   const [cashForm, setCashForm] = useState({
@@ -69,19 +72,22 @@ export default function RecordPaymentModal({
     setActiveTab("cash");
   };
 
-  // Filter students when class is selected
+  // Filter students when class or students list changes
   useEffect(() => {
     if (selectedClass) {
       const filtered = students.filter(s => 
         (s.class_name || s.className) === selectedClass
       );
       setFilteredStudents(filtered);
-      // Reset student selection when class changes
-      setFormData(prev => ({ ...prev, studentId: "" }));
     } else {
       setFilteredStudents([]);
     }
   }, [selectedClass, students]);
+
+  // Reset student selection only when class changes
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, studentId: "" }));
+  }, [selectedClass]);
 
   const handleSubmit = async () => {
     const { studentId, amount, paymentDate } = formData;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
 import AdminSettings from "./AdminSettings";
@@ -21,8 +21,13 @@ function SchoolTab({ school, setSchool, toast, auth }) {
   const [saving, setSaving] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
 
+  const prevSchoolRef = useRef(school);
+
   useEffect(() => {
-    setForm({ ...school });
+    if (prevSchoolRef.current !== school) {
+      prevSchoolRef.current = school;
+      setForm({ ...school });
+    }
   }, [school]);
 
   const handleLogoUpload = (e) => {

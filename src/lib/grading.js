@@ -175,8 +175,6 @@ export function calculateClassMean(studentResults) {
  * @returns {boolean}
  */
 export function isPassing(percentage, curriculum = 'cbc') {
-  const grade = calculateGrade(percentage, curriculum);
-  
   if (curriculum === 'cbc') {
     return percentage >= 50; // AE and above passes
   }
@@ -222,7 +220,7 @@ export function calculatePassRate(results, curriculum = 'cbc') {
  * @param {number} total - Total students
  * @returns {string} Position text
  */
-export function getPositionLabel(rank, total) {
+export function getPositionLabel(rank) {
   if (rank === 1) return '🥇 1st';
   if (rank === 2) return '🥈 2nd';
   if (rank === 3) return '🥉 3rd';

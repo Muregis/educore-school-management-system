@@ -125,8 +125,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [studentDiscounts, setStudentDiscounts] = useState({});
 
-  // Update forms when term data changes
+  // Update forms when term data changes (skip if a modal is open to avoid overwriting user input)
   useEffect(() => {
+    if (showPayment || showStruct || showRecordPaymentModal || showPaystack || showMpesa || showBankDeposit) return;
     setPaymentForm(prev => ({
       ...prev,
       date: startDate || prev.date,
@@ -135,7 +136,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       ...prev,
       term: term || prev.term,
     }));
-  }, [term, startDate]);
+  }, [term, startDate, showPayment, showStruct, showRecordPaymentModal, showPaystack, showMpesa, showBankDeposit]);
 
   // Day End settings (stored in localStorage)
   const [dayEndTime, setDayEndTime] = useState(() => localStorage.getItem('dayEndTime') || '18:00'); // Default 6 PM

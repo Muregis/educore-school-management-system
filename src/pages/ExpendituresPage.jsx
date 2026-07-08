@@ -99,10 +99,12 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(blankForm(startDate));
 
-  // Update form when term dates change
+  // Update default expense date when term changes (only when modal is closed)
   useEffect(() => {
-    setForm(blankForm(startDate));
-  }, [startDate]);
+    if (!showModal && !editingExpense) {
+      setForm(prev => ({ ...prev, expenseDate: startDate || new Date().toISOString().slice(0, 10) }));
+    }
+  }, [startDate, showModal, editingExpense]);
 
   const loadData = async () => {
     if (!auth?.token) return;

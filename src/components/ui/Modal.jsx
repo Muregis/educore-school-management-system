@@ -3,6 +3,12 @@ import React, { useEffect, useId, useRef } from "react";
 export default function Modal({ isOpen, onClose, title, children, footer, maxWidth = "560px", subtitle, showCloseButton = true }) {
   const dialogRef = useRef(null);
   const titleId = useId();
+  const onCloseRef = useRef(onClose);
+  const previouslyFocusedRef = useRef(null);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "auto";
@@ -12,15 +18,21 @@ export default function Modal({ isOpen, onClose, title, children, footer, maxWid
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen) return undefined;
+    if (!isOpen) {
+      if (previouslyFocusedRef.current && dialogRef.current?.contains(document.activeElement)) {
+        previouslyFocusedRef.current.focus?.();
+      }
+      previouslyFocusedRef.current = null;
+      return undefined;
+    }
 
-    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const focusableSelector = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose?.();
+        onCloseRef.current?.();
         return;
       }
 
@@ -50,9 +62,8 @@ export default function Modal({ isOpen, onClose, title, children, footer, maxWid
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      previouslyFocused?.focus?.();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

@@ -19,8 +19,7 @@ import { calculateGrade, getGradePoints, parseMark } from '../lib/grading.js';
  */
 export function calculateClassRankings(results, options = {}) {
   const { 
-    subjects = null,  // Filter to specific subjects
-    minSubjects = 9,    // Minimum subjects to be ranked (increased from 1 to avoid students with few/no exams leading)
+    minSubjects = null,    // Auto-detected per class if null
     includeGradeInfo = true,
     className = null    // Optional: filter by specific class
   } = options;
@@ -42,6 +41,10 @@ export function calculateClassRankings(results, options = {}) {
   if (filteredResults.length === 0) {
     return { students: [], subjects: [], summary: {} };
   }
+
+  // Auto-detect subject count per class if not explicitly provided
+  const distinctSubjects = [...new Set(filteredResults.map(r => r.subject).filter(Boolean))];
+  const autoMinSubjects = minSubjects ?? distinctSubjects.length;
 
   // Group by student
   const byStudent = filteredResults.reduce((acc, result) => {
@@ -77,7 +80,7 @@ export function calculateClassRankings(results, options = {}) {
 
   // Calculate totals and means per student
   const students = Object.values(byStudent)
-    .filter(s => s.subjects.length >= minSubjects)
+    .filter(s => s.subjects.length >= autoMinSubjects)
     .map(s => {
       const validSubjects = s.subjects;
 
@@ -193,7 +196,14 @@ export function calculateClassRankings(results, options = {}) {
     students: rankedStudents,
     subjects: subjectRankings,
     summary,
-    classStats
+    classStats,
+    _debug: {
+      distinctSubjects: distinctSubjects.length,
+      autoMinSubjects,
+      totalResults: filteredResults.length,
+      studentsBeforeFilter: Object.keys(byStudent).length,
+      studentsAfterFilter: rankedStudents.length
+    }
   };
 }
 

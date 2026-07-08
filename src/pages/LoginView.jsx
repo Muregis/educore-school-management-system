@@ -122,60 +122,15 @@ export default function LoginView({ onLogin }) {
   const lastResolvedIdentifierRef = useRef("");
   const lastResolveRoleRef = useRef("");
 
-  // Clear form fields on component mount and prevent credential autofill
+  // Reset form fields on component mount
   useEffect(() => {
     setEmail("");
     setPassword("");
     setAdmission("");
-    
-    // Clear stored credentials
-    if (typeof window !== "undefined") {
-      localStorage.removeItem('educore.auth');
-      localStorage.removeItem('educore.remember');
-      localStorage.removeItem('educore.activeSchool');
-      sessionStorage.clear();
-      
-      // Clear form data
-      const forms = document.querySelectorAll('form');
-      forms.forEach(form => form.reset());
-      
-      // Prevent autofill with proper attributes
-      const inputs = document.querySelectorAll('input[type="email"], input[type="password"], input[type="text"]');
-      inputs.forEach(input => {
-        input.value = '';
-        input.autocomplete = 'new-password';
-        input.setAttribute('autocomplete', 'new-password');
-      });
-    }
   }, []);
   
   // Generate random form field names to prevent browser recognition
   const [randomFieldSuffix] = useState(() => Math.random().toString(36).substring(2, 15));
-
-  // Prevent autofill when page becomes visible
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        setEmail("");
-        setPassword("");
-        setAdmission("");
-        
-        const inputs = document.querySelectorAll('input[type="email"], input[type="password"]');
-        inputs.forEach(input => {
-          if (input.value) {
-            input.value = '';
-            input.setAttribute('autocomplete', 'new-password');
-          }
-        });
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
 
   const activeIdentifier = mode === "staff" ? email : admission;
   const schoolOptions = branding.schoolOptions || [];
@@ -532,7 +487,6 @@ export default function LoginView({ onLogin }) {
                       style={fieldStyle}
                       onFocus={(e) => {
                         e.target.autocomplete = 'new-password';
-                        e.target.value = '';
                       }}
                       onBlur={(e) => {
                         if (e.target.value !== email) {
@@ -558,10 +512,9 @@ export default function LoginView({ onLogin }) {
                         data-form-type="other"
                         placeholder="Enter password" 
                         style={{ ...fieldStyle, paddingRight: 52 }}
-                        onFocus={(e) => {
-                          e.target.autocomplete = 'new-password';
-                          e.target.value = '';
-                        }}
+                         onFocus={(e) => {
+                           e.target.autocomplete = 'new-password';
+                         }}
                         onBlur={(e) => {
                           if (e.target.value !== password) {
                             setPassword(e.target.value);
@@ -622,7 +575,6 @@ export default function LoginView({ onLogin }) {
                       style={fieldStyle}
                       onFocus={(e) => {
                         e.target.autocomplete = 'new-password';
-                        e.target.value = '';
                       }}
                       onBlur={(e) => {
                         if (e.target.value !== admission) {
@@ -648,10 +600,9 @@ export default function LoginView({ onLogin }) {
                         data-form-type="other"
                         placeholder="Enter password" 
                         style={{ ...fieldStyle, paddingRight: 52 }}
-                        onFocus={(e) => {
-                          e.target.autocomplete = 'new-password';
-                          e.target.value = '';
-                        }}
+                         onFocus={(e) => {
+                           e.target.autocomplete = 'new-password';
+                         }}
                         onBlur={(e) => {
                           if (e.target.value !== password) {
                             setPassword(e.target.value);
