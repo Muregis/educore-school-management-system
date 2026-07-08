@@ -33,6 +33,7 @@ import {
   BadgeDollarSign,
   UserRoundPlus,
   FileCheck2,
+  GraduationCap,
 } from "lucide-react";
 
 const NAVIGATION_GROUPS = [
@@ -107,13 +108,15 @@ const NAVIGATION_GROUPS = [
       { id: "reports", label: "Reports", icon: BarChart3 },
       { id: "analytics", label: "Analytics", icon: BarChart3 },
       { id: "accounts", label: "Accounts", icon: CircleUserRound },
+      { id: "term-management", label: "Term Management", icon: CalendarDays },
+      { id: "academic-transition", label: "Academic Transition", icon: GraduationCap },
       { id: "settings", label: "Settings", icon: Settings2 },
     ],
   },
 ];
 
 const ROLE_NAV_LIMITS = {
-  admin: ["dashboard", "students", "teachers", "subjects", "attendance", "grades", "fees", "expenditures", "invoices", "reportcards", "discipline", "transport", "communication", "timetable", "library", "lessonplans", "announcements", "exams", "admissions", "hr", "bulk-import"],
+  admin: ["dashboard", "students", "teachers", "subjects", "attendance", "grades", "fees", "expenditures", "invoices", "reportcards", "discipline", "transport", "communication", "timetable", "library", "lessonplans", "announcements", "exams", "admissions", "hr", "bulk-import", "term-management", "academic-transition"],
   director: null,
   superadmin: null,
   teacher: ["dashboard", "subjects", "attendance", "grades", "reportcards", "discipline", "timetable", "communication", "library", "analysis", "lessonplans", "announcements", "exams"],

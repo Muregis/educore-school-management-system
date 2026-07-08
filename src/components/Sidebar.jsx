@@ -68,6 +68,8 @@ const NAVIGATION_GROUPS = [
       { id: "reports", label: "Reports", icon: "📊" },
       { id: "analytics", label: "Analytics", icon: "📈" },
       { id: "accounts", label: "Accounts", icon: "🔐" },
+      { id: "term-management", label: "Term Management", icon: "📅" },
+      { id: "academic-transition", label: "Academic Transition", icon: "🎓" },
       { id: "settings", label: "Settings", icon: "⚙️" },
     ]
   }
@@ -118,7 +120,7 @@ const Sidebar = ({
 
   // ROLE FILTERING LOGIC
   const ROLE_NAV_LIMITS = {
-    admin: ["dashboard", "students", "teachers", "subjects", "attendance", "grades", "fees", "expenditures", "invoices", "reportcards", "discipline", "transport", "communication", "timetable", "library", "lessonplans", "announcements", "exams", "admissions", "hr", "bulk-import"],
+    admin: ["dashboard", "students", "teachers", "subjects", "attendance", "grades", "fees", "expenditures", "invoices", "reportcards", "discipline", "transport", "communication", "timetable", "library", "lessonplans", "announcements", "exams", "admissions", "hr", "bulk-import", "term-management", "academic-transition"],
     director: null, 
     superadmin: null, 
     teacher: ["dashboard", "subjects", "attendance", "grades", "reportcards", "discipline", "timetable", "communication", "library", "analysis", "lessonplans", "announcements", "exams"],
