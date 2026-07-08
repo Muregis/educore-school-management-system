@@ -286,7 +286,7 @@ function TermConfirmModal({ show, onHide, onConfirm, loading, term, classes }) {
   const finalClasses = classes.filter(c => !c.next_class_name).length;
 
   return (
-    <Modal show={show} onHide={onHide} title="Close Current Term">
+    <Modal isOpen={show} onHide={onHide} title="Close Current Term">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ background: C.amberDim, border: '1px solid #F59E0B', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: '#F59E0B' }}>
           <strong>Warning:</strong> This will lock {term?.term_name || 'the term'} and promote students to their next class. This action cannot be undone.
@@ -335,7 +335,7 @@ function YearConfirmModal({ show, onHide, onConfirm, loading, year, classes, stu
   const promotedCount = classes.filter(c => c.next_class_name).length;
 
   return (
-    <Modal show={show} onHide={onHide} title="End Academic Year">
+    <Modal isOpen={show} onHide={onHide} title="End Academic Year">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ background: 'rgba(244,63,94,0.12)', border: '1px solid #F43F5E', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: '#F43F5E' }}>
           <strong>Warning:</strong> This will close {year?.year_label || 'the academic year'} and all its terms, promote all students, and create the next academic year. This cannot be undone.

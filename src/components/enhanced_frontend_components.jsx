@@ -192,7 +192,7 @@ function TermClosureChecklist({ term, onClose, show, onHide, loading }) {
   const canProceed = checklist.every(item => item.status);
 
   return (
-    <Modal show={show} onHide={onHide} title="Close Academic Term">
+    <Modal isOpen={show} onHide={onHide} title="Close Academic Term">
       <div className="term-closure-checklist">
         <div className="warning-message">
           <strong>⚠️ Warning:</strong> Closing this term will:
