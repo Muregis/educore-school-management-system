@@ -926,6 +926,7 @@ AnalysisTab.propTypes = { auth: PropTypes.object };
 
 // ─── Main ReportsPage ──────────────────────────────────────────────────────
 export default function ReportsPage({ auth }) {
+  const { term: currentTerm } = useCurrentTerm(auth);
   const [summary, setSummary]       = useState(null);
   const [monthly, setMonthly]       = useState([]);
   const [attendance, setAttendance] = useState([]);
@@ -967,7 +968,7 @@ export default function ReportsPage({ auth }) {
       apiFetch("/reports/summary",                { token }),
       apiFetch("/reports/monthly-fee-collection", { token }),
       apiFetch("/reports/attendance-rate",        { token }),
-      apiFetch(`/reports/fee-defaulters${term ? `?term=${encodeURIComponent(term)}` : ""}`, { token }),
+      apiFetch(`/reports/fee-defaulters${currentTerm ? `?term=${encodeURIComponent(currentTerm)}` : ""}`, { token }),
       apiFetch(`/reports/grade-distribution${filterClass !== "all" ? `?class_name=${encodeURIComponent(filterClass)}` : ""}`, { token }),
       apiFetch("/reports/class-fee-summary",      { token }), // New endpoint for class-wise fees
       apiFetch("/reports/expenditure-summary",    { token }),
