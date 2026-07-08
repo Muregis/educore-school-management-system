@@ -4,6 +4,8 @@ import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { requireRoles, requireDirector } from "../middleware/roles.js";
+import { authorize } from "../middleware/permissions.js";
+import { PromotionService } from "../services/backend_services.js";
 import { studentDataRateLimit } from "../middleware/rateLimit.js";
 import multer from "multer";
 import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
@@ -101,6 +103,67 @@ router.get("/", async (req, res, next) => {
     res.json(rows || []);
   } catch (err) {
     next(err);
+  }
+});
+
+// ─── GET /promotion-eligible - Get promotion-eligible students ─────────────────
+router.get("/promotion-eligible", authorize("promotion.view"), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { classId } = req.query;
+
+    let query = supabase
+      .from('student_enrollments')
+      .select(`
+        enrollment_id,
+        enrollment_date,
+        status,
+        students:student_id(
+          student_id,
+          first_name,
+          last_name,
+          admission_number,
+          class_name
+        ),
+        classes:class_id(class_name)
+      `)
+      .eq('is_current', true)
+      .eq('status', 'active');
+
+    if (classId) {
+      query = query.eq('class_id', classId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    res.json(data || []);
+  } catch (err) {
+    console.error('Error fetching promotion-eligible students:', err);
+    res.status(500).json({ message: "Failed to fetch promotion-eligible students" });
+  }
+});
+
+// ─── POST /bulk-promote - Bulk promote students ───────────────────────────────
+router.post("/bulk-promote", authorize("promotion.approve"), async (req, res, next) => {
+  try {
+    const { studentIds, toClassId, reason } = req.body;
+    const { user_id } = req.user;
+
+    const results = [];
+    for (const studentId of studentIds) {
+      try {
+        const result = await PromotionService.promoteStudent(studentId, toClassId, user_id, reason);
+        results.push({ studentId, success: true, result });
+      } catch (error) {
+        results.push({ studentId, success: false, error: error.message });
+      }
+    }
+
+    res.json({ results });
+  } catch (err) {
+    console.error('Error bulk promoting students:', err);
+    res.status(500).json({ message: err.message || "Failed to bulk promote students" });
   }
 });
 

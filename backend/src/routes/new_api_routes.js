@@ -187,43 +187,8 @@ router.get("/students/:id/enrollment/current", authorize("enrollment.view"), asy
   }
 });
 
-// GET /api/students/promotion-eligible - Get promotion-eligible students
-router.get("/students/promotion-eligible", authorize("promotion.view"), async (req, res) => {
-  try {
-    const { schoolId } = req.user;
-    const { classId } = req.query;
-
-    let query = supabase
-      .from('student_enrollments')
-      .select(`
-        enrollment_id,
-        enrollment_date,
-        status,
-        students:student_id(
-          student_id,
-          first_name,
-          last_name,
-          admission_number,
-          class_name
-        ),
-        classes:class_id(class_name)
-      `)
-      .eq('is_current', true)
-      .eq('status', 'active');
-
-    if (classId) {
-      query = query.eq('class_id', classId);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    res.json(data || []);
-  } catch (err) {
-    console.error('Error fetching promotion-eligible students:', err);
-    res.status(500).json({ message: "Failed to fetch promotion-eligible students" });
-  }
-});
+// NOTE: /students/promotion-eligible and /students/bulk-promote are now in students.routes.js
+// to avoid being caught by the students/:id catch-all route.
 
 // POST /api/students/:id/promote - Promote student
 router.post("/students/:id/promote", authorize("promotion.approve"), async (req, res) => {
@@ -240,28 +205,7 @@ router.post("/students/:id/promote", authorize("promotion.approve"), async (req,
   }
 });
 
-// POST /api/students/bulk-promote - Bulk promote students
-router.post("/students/bulk-promote", authorize("promotion.approve"), async (req, res) => {
-  try {
-    const { studentIds, toClassId, reason } = req.body;
-    const { user_id } = req.user;
-
-    const results = [];
-    for (const studentId of studentIds) {
-      try {
-        const result = await PromotionService.promoteStudent(studentId, toClassId, user_id, reason);
-        results.push({ studentId, success: true, result });
-      } catch (error) {
-        results.push({ studentId, success: false, error: error.message });
-      }
-    }
-
-    res.json({ results });
-  } catch (err) {
-    console.error('Error bulk promoting students:', err);
-    res.status(500).json({ message: "Failed to bulk promote students" });
-  }
-});
+// NOTE: /students/bulk-promote is now in students.routes.js
 
 // =====================================================
 // FINANCIAL MANAGEMENT ROUTES

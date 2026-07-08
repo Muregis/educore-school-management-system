@@ -26,15 +26,18 @@ export default function AcademicTransitionPage({ auth }) {
     try {
       setLoading(true);
       const [yearRes, termRes, classesRes, studentsRes] = await Promise.all([
-        apiFetch('/academic/years/current', { token: auth?.token }),
-        apiFetch('/academic/terms/current', { token: auth?.token }),
-        apiFetch('/classes/promotion-chain', { token: auth?.token }),
-        apiFetch('/students/promotion-eligible', { token: auth?.token }),
+        apiFetch('/academic/years/current', { token: auth?.token }).catch(() => ({ data: null })),
+        apiFetch('/academic/terms/current', { token: auth?.token }).catch(() => ({ data: null })),
+        apiFetch('/classes/promotion-chain', { token: auth?.token }).catch(() => ({ data: [] })),
+        apiFetch('/students/promotion-eligible', { token: auth?.token }).catch(() => ({ data: [] })),
       ]);
 
-      setCurrent({ academicYear: yearRes, term: termRes });
-      setClasses(classesRes.data || classesRes || []);
-      setStudents((studentsRes.data || studentsRes || []).length);
+      setCurrent({
+        academicYear: yearRes?.data || yearRes || null,
+        term: termRes?.data || termRes || null,
+      });
+      setClasses(classesRes?.data || classesRes || []);
+      setStudents((studentsRes?.data || studentsRes || []).length);
     } catch (error) {
       console.error('Error loading academic data:', error);
     } finally {
@@ -101,6 +104,7 @@ export default function AcademicTransitionPage({ auth }) {
   const currentYear = current?.academicYear;
   const activeTerm = currentTerm;
   const hasPromotionChain = classes.some(c => c.next_class_name);
+  const isConfigured = currentTerm || currentYear;
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 16px' }}>
@@ -110,6 +114,15 @@ export default function AcademicTransitionPage({ auth }) {
           Close terms and end academic years. Student records and fees will be carried forward automatically.
         </p>
       </div>
+
+      {!isConfigured && (
+        <Card style={{ marginBottom: 16, border: '1px solid #F59E0B', background: 'rgba(245,158,11,0.08)' }}>
+          <div style={{ color: '#F59E0B', fontWeight: 600 }}>Academic calendar not configured</div>
+          <div style={{ color: C.textSub, fontSize: 13, marginTop: 4 }}>
+            No active academic year or term is set. Please configure an academic year and term in Settings before closing a term or ending a year.
+          </div>
+        </Card>
+      )}
 
       {termResult?.error && (
         <Card style={{ marginBottom: 16, border: '1px solid #F43F5E', background: 'rgba(244,63,94,0.08)' }}>
