@@ -33,14 +33,12 @@ export function TermManagementPage({ auth }) {
   const loadTermData = async () => {
     try {
       setLoading(true);
-      const [termRes, statsRes, termsRes] = await Promise.all([
+      const [termRes, termsRes] = await Promise.all([
         apiFetch('/academic/terms/current', { token: auth?.token }),
-        apiFetch('/academic/terms/stats', { token: auth?.token }),
         apiFetch('/academic/terms', { token: auth?.token })
       ]);
 
       setCurrentTerm(termRes.data);
-      setTermStats(statsRes.data || {});
       setUpcomingTerms(termsRes.data?.filter(t => t.status === 'upcoming') || []);
     } catch (error) {
       console.error('Error loading term data:', error);
