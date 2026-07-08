@@ -235,8 +235,18 @@ export default function App() {
     }
   }, [auth?.token, loadRolePermissions]);
 
-  // Defensive: fallback to ROLE defaults if backend permissions are missing or empty
-  const perms = auth ? (rolePermissions?.[auth.role]?.pages?.length ? rolePermissions[auth.role] : ROLE[auth.role]) : null;
+  // Merge backend permissions with ROLE defaults so newly added pages are always available
+  const perms = useMemo(() => {
+    if (!auth) return null;
+    const rolePages = ROLE[auth.role]?.pages || [];
+    const backend = rolePermissions?.[auth.role];
+    const backendPages = backend?.pages || [];
+    const mergedPages = [...new Set([...backendPages, ...rolePages])];
+    return {
+      edit: backend?.edit ?? ROLE[auth.role]?.edit,
+      pages: mergedPages,
+    };
+  }, [auth, rolePermissions]);
   const isPortal = auth?.role === "parent" || auth?.role === "student";
   const isParent = auth?.role === "parent";
   const canEdit  = Boolean(perms?.edit);
