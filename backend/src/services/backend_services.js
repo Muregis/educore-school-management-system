@@ -360,8 +360,7 @@ export class TermTransitionService {
         .select('class_id, class_name, next_class_name')
         .eq('school_id', schoolId)
         .eq('is_deleted', false)
-        .eq('status', 'active')
-        .order('class_order');
+        .order('class_name');
 
       // Get promotion rules
       const { data: rules } = await supabase

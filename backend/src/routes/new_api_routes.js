@@ -429,7 +429,7 @@ router.get("/classes/:id/promotion", authorize("academic.view"), async (req, res
       .from('classes')
       .select('class_id, id, class_name, next_class_name, class_order')
       .eq('school_id', schoolId)
-      .or(`class_id.eq.${classId},id.eq.${classId}`)
+      .or(`class_id.eq."${classId}",id.eq."${classId}"`)
       .maybeSingle();
 
     if (findErr || !existing) {
@@ -457,8 +457,7 @@ router.get("/classes", authorize("academic.view"), async (req, res) => {
       .from('classes')
       .select('*')
       .eq('school_id', schoolId)
-      .neq('is_deleted', true)
-      .eq('status', 'active');
+      .neq('is_deleted', true);
 
     if (error) throw error;
     
@@ -481,13 +480,13 @@ router.put("/classes/:id/promotion", requireRoles("admin", "director", "superadm
  const classId = req.params.id;
  const { nextClassName, classOrder } = req.body;
 
- // Resolve the class by class_id, numeric id, OR class name
- const { data: existing, error: findErr } = await supabase
- .from('classes')
- .select('class_id, id, class_name')
- .eq('school_id', schoolId)
- .or(`class_id.eq.${classId},id.eq.${classId},class_name.eq.${classId}`)
- .maybeSingle();
+  // Resolve the class by class_id, numeric id, OR class name
+  const { data: existing, error: findErr } = await supabase
+  .from('classes')
+  .select('class_id, id, class_name')
+  .eq('school_id', schoolId)
+  .or(`class_id.eq."${classId}",id.eq."${classId}",class_name.eq."${classId}"`)
+  .maybeSingle();
 
  if (findErr || !existing) {
  return res.status(404).json({ message: "Class not found", classId });
