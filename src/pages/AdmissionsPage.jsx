@@ -362,15 +362,3 @@ AdmissionsPage.propTypes = {
   canEdit: PropTypes.bool.isRequired,
   toast: PropTypes.func.isRequired,
 };
-  toast: PropTypes.func.isRequired,
-};
-  );
-}
-
-AdmissionsPage.propTypes = {
-  auth: PropTypes.object,
-  canEdit: PropTypes.bool.isRequired,
-  toast: PropTypes.func.isRequired,
-};
-  toast: PropTypes.func.isRequired,
-};
