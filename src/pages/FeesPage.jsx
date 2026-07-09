@@ -528,6 +528,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     setBankDepositLoading(false);
   };
 
+  const getBusinessToday = () => new Date().toISOString().split('T')[0];
   const businessToday = getBusinessToday();
   const todayPayments = normalisedPayments.filter(p => {
     const paymentDate = p.date || p.payment_date;
