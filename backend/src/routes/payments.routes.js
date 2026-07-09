@@ -333,17 +333,39 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
     const numericStudentId = Number(studentId);
     const numericAmount = Number(amount);
 
+    console.log('[PAYMENT] record-manual request:', {
+      studentId,
+      numericStudentId,
+      amount,
+      paymentMethod,
+      schoolId,
+      userId
+    });
+
     if (!Number.isFinite(numericStudentId) || numericStudentId <= 0) {
       return res.status(400).json({ message: 'Invalid student ID' });
     }
 
-    const { data: student, error: studentErr } = await supabase
-      .from('students')
-      .select('student_id, first_name, last_name, parent_phone')
-      .eq('student_id', numericStudentId)
-      .eq('school_id', schoolId)
-      .eq('is_deleted', false)
-      .single();
+    let student = null;
+    let studentErr = null;
+
+    try {
+      const result = await supabase
+        .from('students')
+        .select('student_id, first_name, last_name, parent_phone')
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false)
+        .or(`student_id.eq.${numericStudentId},id.eq.${numericStudentId}`)
+        .maybeSingle();
+
+      student = result.data;
+      studentErr = result.error;
+    } catch (lookupError) {
+      console.error('[PAYMENT] Student lookup error:', lookupError);
+      studentErr = lookupError;
+    }
+
+    console.log('[PAYMENT] Student lookup result:', { student: student?.student_id, error: studentErr?.message });
 
     if (studentErr || !student) {
       return res.status(404).json({ message: 'Student not found in this school' });

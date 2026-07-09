@@ -110,7 +110,7 @@ export default function RecordPaymentModal({
     setLoading(true);
     try {
       const payload = {
-        studentId: parseInt(studentId),
+        studentId: String(studentId).trim(),
         amount: parseFloat(amount),
         paymentMethod: activeTab,
         paymentDate
@@ -208,8 +208,9 @@ export default function RecordPaymentModal({
                 const lastName = s.last_name || s.lastName || "";
                 const name = `${firstName} ${lastName}`.trim();
                 const admission = s.admission_number || s.admission || s.admissionNumber || "";
+                const studentValue = s.student_id ?? s.id;
                 return (
-                  <option key={s.id || s.student_id} value={s.id || s.student_id}>
+                  <option key={studentValue} value={studentValue}>
                     {name || "Student"} {admission ? `(${admission})` : ""}
                   </option>
                 );
