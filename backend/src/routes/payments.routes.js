@@ -379,7 +379,7 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
         .select('student_id, first_name, last_name, parent_phone')
         .eq('school_id', schoolId)
         .eq('is_deleted', false)
-        .or(`student_id.eq.${numericStudentId},id.eq.${numericStudentId}`)
+        .eq('student_id', numericStudentId)
         .maybeSingle();
 
       student = result.data;
