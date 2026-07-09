@@ -125,6 +125,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [studentDiscounts, setStudentDiscounts] = useState({});
   const [ledgerBalances, setLedgerBalances] = useState({});
+  const [lastDayClosed, setLastDayClosed] = useState(() => localStorage.getItem('lastDayClosed') || null);
 
   const refreshLedgerBalances = useCallback(async () => {
     if (!auth?.token) return;
@@ -170,15 +171,15 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     let paid = balanceInfo.paid;
 
     if (typeof ledgerBalanceAfter === 'number') {
-      if (ledgerBalanceAfter > 0) {
-        balance = ledgerBalanceAfter;
+      if (ledgerBalanceAfter < 0) {
+        balance = Math.abs(ledgerBalanceAfter);
         rawBalance = ledgerBalanceAfter;
         overpaymentAmount = 0;
         isOverpaid = false;
       } else {
         balance = 0;
         rawBalance = ledgerBalanceAfter;
-        overpaymentAmount = Math.abs(ledgerBalanceAfter);
+        overpaymentAmount = ledgerBalanceAfter;
         isOverpaid = true;
       }
     }
