@@ -297,41 +297,65 @@ router.delete("/:id", requireRoles("director", "superadmin"), async (req, res, n
 router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'director', 'superadmin'), async (req, res, next) => {
   try {
     const { schoolId, userId } = req.user;
-    const {
+    const body = req.body || {};
+    const studentId = body.studentId ?? body.student_id;
+    const amount = body.amount;
+    const paymentMethod = body.paymentMethod ?? body.payment_method;
+    const referenceNumber = body.referenceNumber ?? body.reference_number;
+    const bankName = body.bankName ?? body.bank_name;
+    const accountNumber = body.accountNumber ?? body.account_number;
+    const mpesaCode = body.mpesaCode ?? body.mpesa_code;
+    const mpesaPhone = body.mpesaPhone ?? body.mpesa_phone;
+    const proofUrl = body.proofUrl ?? body.proof_url;
+    const paymentDate = body.paymentDate ?? body.payment_date;
+    const notes = body.notes;
+    const term = body.term;
+
+    console.log('[PAYMENT] record-manual body:', {
       studentId,
       amount,
-      paymentMethod, // 'cash' | 'bank_transfer' | 'mpesa_manual'
-      referenceNumber,
-      bankName,
-      accountNumber,
-      mpesaCode,
-      mpesaPhone,
-      proofUrl,
-      paymentDate,
-      notes,
-      term
-    } = req.body;
+      paymentMethod,
+      schoolId,
+      userId,
+      keys: Object.keys(body)
+    });
 
-    if (!studentId || !amount || !paymentMethod) {
+    const numericStudentId = studentId !== undefined && studentId !== null && studentId !== '' ? Number(studentId) : NaN;
+    const numericAmount = amount !== undefined && amount !== null ? Number(amount) : NaN;
+
+    if (!Number.isFinite(numericStudentId) || numericStudentId <= 0) {
       return res.status(400).json({
-        message: 'studentId, amount and paymentMethod are required'
+        message: 'studentId is required and must be a valid positive number',
+        received: { studentId, numericStudentId }
       });
     }
 
-    if (paymentMethod === 'mpesa_manual' && !mpesaCode) {
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({
+        message: 'amount is required and must be a valid positive number',
+        received: { amount, numericAmount }
+      });
+    }
+
+    const normalizedPaymentMethod = String(paymentMethod || '').trim().toLowerCase();
+    if (!normalizedPaymentMethod) {
+      return res.status(400).json({
+        message: 'paymentMethod is required',
+        received: { paymentMethod }
+      });
+    }
+
+    if (['mpesa_manual', 'mpesa'].includes(normalizedPaymentMethod) && !mpesaCode) {
       return res.status(400).json({
         message: 'M-Pesa transaction code is required'
       });
     }
 
-    if (paymentMethod === 'bank_transfer' && !referenceNumber) {
+    if (['bank_transfer', 'bank'].includes(normalizedPaymentMethod) && !referenceNumber) {
       return res.status(400).json({
         message: 'Bank reference number is required'
       });
     }
-
-    const numericStudentId = Number(studentId);
-    const numericAmount = Number(amount);
 
     console.log('[PAYMENT] record-manual request:', {
       studentId,
@@ -371,9 +395,9 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
       return res.status(404).json({ message: 'Student not found in this school' });
     }
 
-    const receiptNumber = paymentMethod === 'cash'
+    const receiptNumber = normalizedPaymentMethod === 'cash'
       ? (referenceNumber ? `CASH-${referenceNumber}` : `CASH-${Date.now()}`)
-      : paymentMethod === 'bank_transfer'
+      : ['bank_transfer', 'bank'].includes(normalizedPaymentMethod)
       ? `BANK-${referenceNumber}`
       : `MPESA-${mpesaCode}`;
 
@@ -383,7 +407,7 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
         school_id: schoolId,
         student_id: numericStudentId,
         amount: numericAmount,
-        payment_method: paymentMethod,
+        payment_method: normalizedPaymentMethod,
         reference_number: receiptNumber,
         bank_name: bankName || null,
         account_number: accountNumber || null,
@@ -408,7 +432,7 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
     }
 
     try {
-      await LedgerService.recordPayment(schoolId, numericStudentId, numericAmount, `Payment recorded via ${paymentMethod}`, data.payment_id, req);
+      await LedgerService.recordPayment(schoolId, numericStudentId, numericAmount, `Payment recorded via ${normalizedPaymentMethod}`, data.payment_id, req);
     } catch (ledgerErr) {
       console.error('Ledger update error:', ledgerErr);
     }
@@ -419,9 +443,9 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
       receiptNumber: data.reference_number,
       studentId: numericStudentId,
       amount: numericAmount,
-      paymentMethod: paymentMethod,
+      paymentMethod: normalizedPaymentMethod,
       date: paymentDate || new Date().toISOString().split('T')[0],
-      message: `${paymentMethod} payment of KES ${numericAmount} recorded successfully`
+      message: `${normalizedPaymentMethod} payment of KES ${numericAmount} recorded successfully`
     });
 
   } catch (err) {

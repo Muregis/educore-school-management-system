@@ -116,6 +116,8 @@ export default function RecordPaymentModal({
         paymentDate
       };
 
+      console.log('[RecordPaymentModal] submit payload:', payload);
+
       if (activeTab === "bank_transfer") {
         payload.referenceNumber = bankForm.referenceNumber;
         payload.bankName = bankForm.bankName;

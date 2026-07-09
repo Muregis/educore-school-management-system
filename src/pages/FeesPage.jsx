@@ -464,14 +464,25 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     if (!amt || amt <= 0) return toast("Amount required", "error");
     if (amt > balance) return toast("Cannot exceed outstanding balance", "error");
 
+    const methodMap = { cash: 'cash', mpesa: 'mpesa_manual', bank: 'bank_transfer' };
+    const paymentMethod = methodMap[paymentForm.method] || paymentForm.method;
+
+    console.log('[FeesPage] savePayment payload:', {
+      studentId: sid,
+      amount: amt,
+      paymentMethod,
+      paymentDate: paymentForm.date,
+      term: displayTerm
+    });
+
     try {
       await apiFetch("/payments/record-manual", {
         method: "POST",
         token: auth?.token,
         body: {
-          studentId: paymentForm.studentId,
+          studentId: sid,
           amount: amt,
-          paymentMethod: paymentForm.method,
+          paymentMethod,
           paymentDate: paymentForm.date,
           term: displayTerm,
         },
