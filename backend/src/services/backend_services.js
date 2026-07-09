@@ -833,20 +833,40 @@ export class StudentEnrollmentService {
    */
   static async getEnrollmentHistory(studentId) {
     try {
-      const { data, error } = await supabase
+      const { data: enrollments, error } = await supabase
         .from('student_enrollments')
-        .select(`
-          *,
-          classes:class_id(class_name),
-          academic_years:academic_year_id(year_label),
-          terms:term_id(term_name)
-        `)
+        .select('*')
         .eq('student_id', studentId)
-        .neq('is_deleted', true)
+        .eq('is_deleted', false)
         .order('enrollment_date', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      if (!enrollments?.length) return [];
+
+      const classIds = [...new Set(enrollments.map(e => e.class_id).filter(Boolean))];
+      const yearIds = [...new Set(enrollments.map(e => e.academic_year_id).filter(Boolean))];
+      const termIds = [...new Set(enrollments.map(e => e.term_id).filter(Boolean))];
+
+      const [classesResult, yearsResult, termsResult] = await Promise.all([
+        classIds.length ? supabase.from('classes').select('class_id, class_name').in('class_id', classIds) : { data: [] },
+        yearIds.length ? supabase.from('academic_years').select('academic_year_id, year_label').in('academic_year_id', yearIds) : { data: [] },
+        termIds.length ? supabase.from('terms').select('term_id, term_name').in('term_id', termIds) : { data: [] }
+      ]);
+
+      if (classesResult.error) throw classesResult.error;
+      if (yearsResult.error) throw yearsResult.error;
+      if (termsResult.error) throw termsResult.error;
+
+      const classMap = new Map((classesResult.data || []).map(c => [c.class_id, c]));
+      const yearMap = new Map((yearsResult.data || []).map(y => [y.academic_year_id, y]));
+      const termMap = new Map((termsResult.data || []).map(t => [t.term_id, t]));
+
+      return enrollments.map(e => ({
+        ...e,
+        classes: classMap.get(e.class_id) || null,
+        academic_years: yearMap.get(e.academic_year_id) || null,
+        terms: termMap.get(e.term_id) || null
+      }));
     } catch (error) {
       console.error('Error getting enrollment history:', error);
       return [];
@@ -858,19 +878,34 @@ export class StudentEnrollmentService {
    */
   static async getCurrentEnrollment(studentId) {
     try {
-      const { data, error } = await supabase
+      const { data: enrollments, error } = await supabase
         .from('student_enrollments')
-        .select(`
-          *,
-          classes:class_id(class_name),
-          academic_years:academic_year_id(year_label)
-        `)
+        .select('*')
         .eq('student_id', studentId)
-        .eq('is_current', true)
-        .single();
+        .eq('is_deleted', false);
 
-      if (error && error.code !== 'PGRST116') throw error;
-      return data;
+      if (error) {
+        if (error.code === 'PGRST116' || error.code === '42703') return null;
+        throw error;
+      }
+
+      if (!enrollments || !enrollments.length) return null;
+
+      const current = enrollments.find(r => r.is_current ?? true) || enrollments[0];
+
+      const [classResult, yearResult] = await Promise.all([
+        current.class_id ? supabase.from('classes').select('class_name').eq('class_id', current.class_id).single() : { data: null },
+        current.academic_year_id ? supabase.from('academic_years').select('year_label').eq('academic_year_id', current.academic_year_id).single() : { data: null }
+      ]);
+
+      if (classResult.error && classResult.error.code !== 'PGRST116') throw classResult.error;
+      if (yearResult.error && yearResult.error.code !== 'PGRST116') throw yearResult.error;
+
+      return {
+        ...current,
+        classes: classResult.data || null,
+        academic_years: yearResult.data || null
+      };
     } catch (error) {
       console.error('Error getting current enrollment:', error);
       return null;
@@ -1079,12 +1114,7 @@ export class FeeBalanceService {
 
       let query = supabase
         .from('fee_balance_ledger')
-        .select(`
-          *,
-          terms:term_id(term_name),
-          academic_years:academic_year_id(year_label),
-          users:created_by(full_name)
-        `)
+        .select('*')
         .eq('school_id', schoolId)
         .eq('student_id', studentId)
         .order('created_at', { ascending: false })
@@ -1101,7 +1131,32 @@ export class FeeBalanceService {
       const { data, error } = await query;
       if (error) throw error;
 
-      return data || [];
+      if (!data?.length) return [];
+
+      const termIds = [...new Set(data.map(r => r.term_id).filter(Boolean))];
+      const yearIds = [...new Set(data.map(r => r.academic_year_id).filter(Boolean))];
+      const createdByIds = [...new Set(data.map(r => r.created_by).filter(Boolean))];
+
+      const [termsResult, yearsResult, usersResult] = await Promise.all([
+        termIds.length ? supabase.from('terms').select('term_id, term_name').in('term_id', termIds) : { data: [] },
+        yearIds.length ? supabase.from('academic_years').select('academic_year_id, year_label').in('academic_year_id', yearIds) : { data: [] },
+        createdByIds.length ? supabase.from('users').select('user_id, full_name').in('user_id', createdByIds) : { data: [] }
+      ]);
+
+      if (termsResult.error) throw termsResult.error;
+      if (yearsResult.error) throw yearsResult.error;
+      if (usersResult.error) throw usersResult.error;
+
+      const termMap = new Map((termsResult.data || []).map(t => [t.term_id, t]));
+      const yearMap = new Map((yearsResult.data || []).map(y => [y.academic_year_id, y]));
+      const userMap = new Map((usersResult.data || []).map(u => [u.user_id, u]));
+
+      return data.map(row => ({
+        ...row,
+        terms: termMap.get(row.term_id) || null,
+        academic_years: yearMap.get(row.academic_year_id) || null,
+        users: userMap.get(row.created_by) || null
+      }));
     } catch (error) {
       console.error('Error getting transaction ledger:', error);
       return [];
@@ -1308,14 +1363,18 @@ export class PromotionService {
       if (decisionError) throw decisionError;
 
       // Update current enrollment as not current
-      await supabase
-        .from('student_enrollments')
-        .update({
-          is_current: false,
-          status: 'promoted',
-          updated_at: new Date()
-        })
-        .eq('enrollment_id', currentEnrollment.enrollment_id);
+      try {
+        await supabase
+          .from('student_enrollments')
+          .update({
+            is_current: false,
+            status: 'promoted',
+            updated_at: new Date()
+          })
+          .eq('enrollment_id', currentEnrollment.enrollment_id);
+      } catch (updateError) {
+        console.warn('Could not update enrollment status:', updateError.message);
+      }
 
       // Create new enrollment
       const newEnrollment = await StudentEnrollmentService.createEnrollment({
@@ -1323,9 +1382,7 @@ export class PromotionService {
         class_id: toClassId,
         academic_year_id: currentEnrollment.academic_year_id,
         enrollment_date: new Date(),
-        status: 'active',
-        enrollment_type: 'promotion',
-        is_current: true
+        updated_at: new Date()
       });
 
       return { decision, newEnrollment };

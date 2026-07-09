@@ -112,32 +112,52 @@ router.get("/promotion-eligible", authorize("promotion.view"), async (req, res, 
     const { schoolId } = req.user;
     const { classId } = req.query;
 
-    let query = supabase
+    const { data: enrollments, error } = await supabase
       .from('student_enrollments')
-      .select(`
-        enrollment_id,
-        enrollment_date,
-        status,
-        students:student_id(
-          student_id,
-          first_name,
-          last_name,
-          admission_number,
-          class_name
-        ),
-        classes:class_id(class_name)
-      `)
-      .eq('is_current', true)
-      .eq('status', 'active');
+      .select('enrollment_id, student_id, class_id, enrollment_date, status, is_current')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
 
-    if (classId) {
-      query = query.eq('class_id', classId);
-    }
-
-    const { data, error } = await query;
     if (error) throw error;
 
-    res.json(data || []);
+    let rows = (enrollments || []).filter(row => {
+      const status = row.status || 'active';
+      const isCurrent = row.is_current ?? true;
+      return status === 'active' && isCurrent;
+    });
+
+    if (classId) {
+      rows = rows.filter(row => String(row.class_id) === String(classId));
+    }
+
+    const studentIds = [...new Set(rows.map(r => r.student_id).filter(Boolean))];
+    const classIds = [...new Set(rows.map(r => r.class_id).filter(Boolean))];
+
+    const [studentsResult, classesResult] = await Promise.all([
+      studentIds.length
+        ? supabase.from('students').select('student_id, first_name, last_name, admission_number, class_name').in('student_id', studentIds)
+        : { data: [] },
+      classIds.length
+        ? supabase.from('classes').select('class_id, class_name').in('class_id', classIds)
+        : { data: [] }
+    ]);
+
+    if (studentsResult.error) throw studentsResult.error;
+    if (classesResult.error) throw classesResult.error;
+
+    const studentMap = new Map((studentsResult.data || []).map(s => [s.student_id, s]));
+    const classMap = new Map((classesResult.data || []).map(c => [c.class_id, c]));
+
+    const result = rows.map(row => ({
+      enrollment_id: row.enrollment_id,
+      enrollment_date: row.enrollment_date,
+      status: row.status,
+      is_current: row.is_current,
+      students: studentMap.get(row.student_id) || null,
+      classes: classMap.get(row.class_id) || null,
+    }));
+
+    res.json(result);
   } catch (err) {
     console.error('Error fetching promotion-eligible students:', err);
     res.status(500).json({ message: "Failed to fetch promotion-eligible students" });

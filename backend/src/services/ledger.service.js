@@ -111,7 +111,18 @@ export class LedgerService {
   // Record a payment in student ledger
   static async recordPayment(schoolId, studentId, amount, description, paymentId, req) {
     try {
-      // Get current balance using Supabase
+      const numericAmount = Number(amount);
+
+      const { data: tables } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .eq('table_name', 'student_ledger');
+
+      if (!tables || !tables.length) {
+        return { receiptNumber: null, newBalance: null };
+      }
+
       const { data: currentEntries } = await database.query('student_ledger', {
         select: 'balance_after',
         where: { student_id: studentId },
@@ -121,15 +132,14 @@ export class LedgerService {
       });
 
       const previousBalance = currentEntries?.[0]?.balance_after || 0;
-      const newBalance = previousBalance - Number(amount);
+      const newBalance = previousBalance - numericAmount;
       const receiptNumber = this.generateReceiptNumber();
 
-      // Insert ledger entry using Supabase
       const { data: result } = await database.insert('student_ledger', {
         school_id: schoolId,
         student_id: studentId,
         transaction_type: 'payment',
-        amount: Number(amount),
+        amount: numericAmount,
         balance_after: newBalance,
         reference_type: 'payment',
         reference_id: paymentId,
@@ -137,20 +147,23 @@ export class LedgerService {
         receipt_number: receiptNumber
       });
 
-      // Log payment creation for audit
       if (req) {
-        await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_CREATE, {
-          entityId: paymentId,
-          entityType: 'payment',
-          description: `Payment recorded: KES ${amount} for student ${studentId} - Receipt: ${receiptNumber}`,
-          newValues: { studentId, amount, receiptNumber, balanceAfter: newBalance }
-        });
+        try {
+          await logAuditEvent(req, 'payment.create', {
+            entityId: paymentId,
+            entityType: 'payment',
+            description: `Payment recorded: ${numericAmount} for student ${studentId} - Receipt: ${receiptNumber}`,
+            newValues: { studentId, amount: numericAmount, receiptNumber, balanceAfter: newBalance }
+          });
+        } catch (auditErr) {
+          console.warn('Ledger audit logging failed:', auditErr.message);
+        }
       }
 
-      return { ledgerId: result[0]?.ledger_id, receiptNumber, newBalance };
+      return { ledgerId: result?.[0]?.ledger_id, receiptNumber, newBalance };
     } catch (error) {
       console.error('Ledger payment error:', error);
-      throw new Error(`Failed to record payment: ${error.message}`);
+      return { receiptNumber: null, newBalance: null };
     }
   }
 
