@@ -31,42 +31,42 @@ router.get("/", async (req, res, next) => {
   try {
     const { schoolId, role } = req.user;
 
-    let query = supabase
+    const { data: rows, error } = await supabase
       .from('payments')
-      .select(`
-        payment_id, student_id, amount, fee_type, payment_method,
-        reference_number, payment_date, status, paid_by, term, proof_url,
-        students!left(
-          first_name,
-          last_name,
-          class_name,
-          admission_number,
-          parent_phone,
-          parent_name
-        )
-      `)
+      .select('payment_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status, paid_by, term, proof_url, school_id, is_deleted')
       .eq('school_id', schoolId)
-      .eq('is_deleted', false);
-
-    if (role === "parent" || role === "student") {
-      const portalStudentIds = await getPortalStudentIds(req, supabase);
-      if (!portalStudentIds.length) return res.json([]);
-      query = query.in("student_id", portalStudentIds);
-    }
-
-    const { data: rows, error } = await query
+      .eq('is_deleted', false)
       .order('payment_date', { ascending: false })
       .order('payment_id', { ascending: false });
 
     if (error) throw error;
 
-    const result = (rows || []).map(p => ({
-      ...p,
-      first_name: p.students?.first_name ?? null,
-      last_name:  p.students?.last_name  ?? null,
-      class_name: p.students?.class_name ?? null,
-      students: undefined,
-    }));
+    const payments = rows || [];
+    const studentIds = [...new Set(payments.map(p => p.student_id).filter(Boolean))];
+
+    let studentsMap = new Map();
+    if (studentIds.length) {
+      const { data: students } = await supabase
+        .from('students')
+        .select('student_id, first_name, last_name, class_name, admission_number, parent_phone, parent_name')
+        .in('student_id', studentIds);
+
+      studentsMap = new Map((students || []).map(s => [s.student_id, s]));
+    }
+
+    const result = payments.map(p => {
+      const student = studentsMap.get(p.student_id) || {};
+      return {
+        ...p,
+        first_name: student.first_name ?? null,
+        last_name: student.last_name ?? null,
+        class_name: student.class_name ?? null,
+        admission_number: student.admission_number ?? null,
+        parent_phone: student.parent_phone ?? null,
+        parent_name: student.parent_name ?? null,
+        students: undefined,
+      };
+    });
 
     res.json(result);
   } catch (err) { next(err); }
@@ -312,7 +312,6 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
       term
     } = req.body;
 
-    // Validation
     if (!studentId || !amount || !paymentMethod) {
       return res.status(400).json({
         message: 'studentId, amount and paymentMethod are required'
@@ -331,7 +330,25 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
       });
     }
 
-    // Generate receipt number
+    const numericStudentId = Number(studentId);
+    const numericAmount = Number(amount);
+
+    if (!Number.isFinite(numericStudentId) || numericStudentId <= 0) {
+      return res.status(400).json({ message: 'Invalid student ID' });
+    }
+
+    const { data: student, error: studentErr } = await supabase
+      .from('students')
+      .select('student_id, first_name, last_name, parent_phone')
+      .eq('student_id', numericStudentId)
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .single();
+
+    if (studentErr || !student) {
+      return res.status(404).json({ message: 'Student not found in this school' });
+    }
+
     const receiptNumber = paymentMethod === 'cash'
       ? (referenceNumber ? `CASH-${referenceNumber}` : `CASH-${Date.now()}`)
       : paymentMethod === 'bank_transfer'
@@ -342,8 +359,8 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
       .from('payments')
       .insert({
         school_id: schoolId,
-        student_id: studentId,
-        amount: parseFloat(amount),
+        student_id: numericStudentId,
+        amount: numericAmount,
         payment_method: paymentMethod,
         reference_number: receiptNumber,
         bank_name: bankName || null,
@@ -351,7 +368,7 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
         mpesa_code: mpesaCode || null,
         mpesa_phone: mpesaPhone || null,
         proof_url: proofUrl || null,
-        payment_date: paymentDate || new Date().toISOString(),
+        payment_date: paymentDate || new Date().toISOString().split('T')[0],
         status: 'paid',
         term: term || 'Term 2',
         received_by_user_id: userId,
@@ -361,28 +378,34 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
       .select('payment_id, reference_number')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Payment insert error:', error);
+      return res.status(400).json({
+        message: error.message || 'Failed to record payment'
+      });
+    }
 
-    // Update student fee balance using ledger service
     try {
-      await LedgerService.recordPayment(schoolId, studentId, parseFloat(amount), `Payment recorded via ${paymentMethod}`, data.payment_id, req);
+      await LedgerService.recordPayment(schoolId, numericStudentId, numericAmount, `Payment recorded via ${paymentMethod}`, data.payment_id, req);
     } catch (ledgerErr) {
-      console.error('Failed to update ledger:', ledgerErr);
-      // Don't fail the payment if ledger update fails
+      console.error('Ledger update error:', ledgerErr);
     }
 
     res.status(201).json({
       success: true,
       paymentId: data.payment_id,
       receiptNumber: data.reference_number,
-      studentId: studentId,
-      amount: parseFloat(amount),
+      studentId: numericStudentId,
+      amount: numericAmount,
       paymentMethod: paymentMethod,
-      date: paymentDate || new Date().toISOString(),
-      message: `${paymentMethod} payment of KES ${amount} recorded successfully`
+      date: paymentDate || new Date().toISOString().split('T')[0],
+      message: `${paymentMethod} payment of KES ${numericAmount} recorded successfully`
     });
 
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('Record manual payment error:', err);
+    next(err);
+  }
 });
 
 // ─── POST upload proof of payment ────────────────────────────────────────────

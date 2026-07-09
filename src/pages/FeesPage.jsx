@@ -124,6 +124,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [bankDepositLoading, setBankDepositLoading] = useState(false);
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [studentDiscounts, setStudentDiscounts] = useState({});
+  const [ledgerBalances, setLedgerBalances] = useState({});
 
   // Update forms when term data changes (skip if a modal is open to avoid overwriting user input)
   useEffect(() => {
@@ -250,6 +251,22 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     }
   }, [auth, setFeeStructures, reloadPayments, canEdit]);
 
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch('/ledger/balances', { token: auth.token })
+      .then(data => {
+        const map = {};
+        (data.students || []).forEach(s => {
+          const sid = s.student_id ?? s.id;
+          if (sid !== undefined && sid !== null) {
+            map[sid] = s.balance_after ?? s.balance ?? 0;
+          }
+        });
+        setLedgerBalances(map);
+      })
+      .catch(e => console.warn('Ledger balances:', e));
+  }, [auth?.token]);
+
   const normalisedPayments   = payments.map(p => p.payment_id ? normalisePayment(p) : p);
   const normalisedStructures = feeStructures.map(f => f.fee_structure_id ? normaliseFeeStruct(f) : f);
 
@@ -264,6 +281,28 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       schoolSettings: schoolData || {}
     });
 
+    const ledgerBalanceAfter = ledgerBalances[sid];
+
+    let balance = balanceInfo.balance;
+    let rawBalance = balanceInfo.rawBalance;
+    let overpaymentAmount = balanceInfo.overpaymentAmount;
+    let isOverpaid = balanceInfo.isOverpaid;
+    let paid = balanceInfo.paid;
+
+    if (typeof ledgerBalanceAfter === 'number') {
+      if (ledgerBalanceAfter > 0) {
+        balance = ledgerBalanceAfter;
+        rawBalance = ledgerBalanceAfter;
+        overpaymentAmount = 0;
+        isOverpaid = false;
+      } else {
+        balance = 0;
+        rawBalance = ledgerBalanceAfter;
+        overpaymentAmount = Math.abs(ledgerBalanceAfter);
+        isOverpaid = true;
+      }
+    }
+
     return {
       studentId: sid,
       name: student.firstName ? `${student.firstName} ${student.lastName}` : `${student.first_name} ${student.last_name}`,
@@ -274,11 +313,12 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       discountPercent: balanceInfo.discountPercent,
       discountType: balanceInfo.discountType,
       discountLabel: balanceInfo.discountLabel,
-      paid: balanceInfo.paid,
-      balance: balanceInfo.balance,
-      rawBalance: balanceInfo.rawBalance,
-      overpaymentAmount: balanceInfo.overpaymentAmount,
-      isOverpaid: balanceInfo.isOverpaid,
+      hasDiscount: balanceInfo.hasDiscount,
+      paid,
+      balance,
+      rawBalance,
+      overpaymentAmount,
+      isOverpaid,
       openingBalance: balanceInfo.openingBalance,
       transportFee: balanceInfo.transportFee,
       lunchFee: balanceInfo.lunchFee,
@@ -288,8 +328,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       email: student.email ?? student.parentEmail ?? "",
       transportDirection: student.transport_direction || 'none',
       lunchEnabled: student.lunch_enabled || false,
-      breakfastEnabled: student.breakfast_enabled || false,
-      hasDiscount: balanceInfo.hasDiscount
+      breakfastEnabled: student.breakfast_enabled || false
     };
   };
 
