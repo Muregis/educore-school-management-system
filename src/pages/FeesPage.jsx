@@ -126,155 +126,35 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [studentDiscounts, setStudentDiscounts] = useState({});
   const [ledgerBalances, setLedgerBalances] = useState({});
 
-  // Update forms when term data changes (skip if a modal is open to avoid overwriting user input)
-  useEffect(() => {
-    if (showPayment || showStruct || showRecordPaymentModal || showPaystack || showMpesa || showBankDeposit) return;
-    setPaymentForm(prev => ({
-      ...prev,
-      date: startDate || prev.date,
-    }));
-    setStructForm(prev => ({
-      ...prev,
-      term: term || prev.term,
-    }));
-  }, [term, startDate, showPayment, showStruct, showRecordPaymentModal, showPaystack, showMpesa, showBankDeposit]);
-
-  // Day End settings (stored in localStorage)
-  const [dayEndTime, setDayEndTime] = useState(() => localStorage.getItem('dayEndTime') || '18:00'); // Default 6 PM
-  const [lastDayClosed, setLastDayClosed] = useState(() => localStorage.getItem('lastDayClosed') || null);
-  const [showDayEndSettings, setShowDayEndSettings] = useState(false);
-
-  const saveDayEndTime = (time) => {
-    setDayEndTime(time);
-    localStorage.setItem('dayEndTime', time);
-  };
-
-  const closeDay = () => {
-    const now = new Date().toISOString();
-    setLastDayClosed(now);
-    localStorage.setItem('lastDayClosed', now);
-    toast('Day closed successfully. New day starts after day end time.', 'success');
-  };
-
-  const getBusinessToday = () => {
-    const now = new Date();
-    const [hours, minutes] = dayEndTime.split(':').map(Number);
-    const dayEnd = new Date(now);
-    dayEnd.setHours(hours, minutes, 0, 0);
-    if (now >= dayEnd) {
-      now.setDate(now.getDate() + 1);
-    }
-    return now.toISOString().slice(0, 10);
-  };
-
-  const [useNewSystem, setUseNewSystem] = useState(true);
-  const [ledgerView, setLedgerView] = useState(false);
-  const { term: currentTerm, isReady: isTermReady } = useCurrentTerm(auth);
-  const displayTerm = currentTerm || "Term 2";
-
-  const reloadPayments = useCallback(async () => {
+  const refreshLedgerBalances = useCallback(async () => {
     if (!auth?.token) return;
-    const data = await apiFetch("/payments", { token: auth.token });
-    setPayments(data.map(normalisePayment));
-  }, [auth, setPayments]);
-
-  useEffect(() => {
-    if (!auth?.token) return;
-    discountService.getAllDiscountedStudents(auth.token)
-      .then(discounts => {
-        const grouped = {};
-        discounts.forEach(d => {
-          const sid = d.student?.student_id || d.student_id;
-          if (!grouped[sid]) grouped[sid] = [];
-          grouped[sid].push(d);
-        });
-        setStudentDiscounts(grouped);
-      })
-      .catch(err => console.error("Failed to load discounts:", err));
-  }, [auth?.token, reloadPayments]);
-
-  useEffect(() => {
-    const ref       = localStorage.getItem("ps_pending_ref");
-    const name      = localStorage.getItem("ps_pending_name");
-    const amount    = localStorage.getItem("ps_pending_amount");
-    const prevBal   = localStorage.getItem("ps_pending_balance");
-    const params    = new URLSearchParams(window.location.search);
-    const urlRef    = params.get("reference") || params.get("trxref");
-    if (ref && urlRef && auth?.token) {
-      localStorage.removeItem("ps_pending_ref");
-      localStorage.removeItem("ps_pending_name");
-      localStorage.removeItem("ps_pending_amount");
-      localStorage.removeItem("ps_pending_balance");
-      window.history.replaceState({}, "", window.location.pathname);
-      apiFetch(`/paystack/verify/${urlRef}`, { token: auth?.token })
-        .then(result => {
-          reloadPayments();
-          const paidAmount = result.amount || amount;
-          const previousBalance = Number(prevBal) || 0;
-          const newBalance = Math.max(0, previousBalance - paidAmount);
-          setReceipt({
-            studentName: name || "Student",
-            amount:      paidAmount,
-            reference:   urlRef,
-            method:      "Paystack (" + (result.channel || "card") + ")",
-            date:        new Date().toLocaleDateString(),
-            balance:     newBalance
-          });
-          setShowReceipt(true);
-          toast("Paystack payment confirmed!", "success");
-        })
-        .catch(() => toast("Payment received but verification failed — contact admin", "warning"));
+    try {
+      const data = await apiFetch('/ledger/balances', { token: auth.token });
+      const map = {};
+      (data.students || []).forEach(s => {
+        const sid = s.student_id ?? s.id;
+        if (sid !== undefined && sid !== null) {
+          map[sid] = s.balance_after ?? s.balance ?? 0;
+        }
+      });
+      setLedgerBalances(map);
+    } catch (e) {
+      console.warn('Ledger balances:', e);
     }
-  }, [auth, reloadPayments, toast]);
-
-  useEffect(() => {
-    if (auth?.token) {
-      apiFetch("/payments/fee-structures", { token: auth.token })
-        .then(data => setFeeStructures(data.map(normaliseFeeStruct)))
-        .catch(e => console.warn("Fee structures:", e));
-      reloadPayments().catch(e => console.warn("Payments:", e));
-      
-      if (canEdit) {
-        apiFetch("/settings/payment-config", { token: auth.token })
-          .then(data => setBankDetails(data))
-          .catch(e => console.warn("Bank details:", e));
-      } else {
-        setBankDetails(null);
-      }
-        
-      apiFetch("/settings/school", { token: auth.token })
-        .then(data => {
-          setSchoolWhatsApp(data?.whatsapp_business_number || "");
-          setSchoolData(data);
-        })
-        .catch(e => console.warn("School settings:", e));
-    }
-  }, [auth, setFeeStructures, reloadPayments, canEdit]);
-
-  useEffect(() => {
-    if (!auth?.token) return;
-    apiFetch('/ledger/balances', { token: auth.token })
-      .then(data => {
-        const map = {};
-        (data.students || []).forEach(s => {
-          const sid = s.student_id ?? s.id;
-          if (sid !== undefined && sid !== null) {
-            map[sid] = s.balance_after ?? s.balance ?? 0;
-          }
-        });
-        setLedgerBalances(map);
-      })
-      .catch(e => console.warn('Ledger balances:', e));
   }, [auth?.token]);
+
+  useEffect(() => {
+    refreshLedgerBalances();
+  }, [refreshLedgerBalances]);
 
   const normalisedPayments   = payments.map(p => p.payment_id ? normalisePayment(p) : p);
   const normalisedStructures = feeStructures.map(f => f.fee_structure_id ? normaliseFeeStruct(f) : f);
 
   const calculateLedgerBalance = (student, studentDiscounts = []) => {
-    const sid = student.id ?? student.student_id;
-    const cls = student.className ?? student.class_name ?? "";
+    const sid = student?.id ?? student?.student_id;
+    const cls = student?.className ?? student?.class_name ?? "";
     const balanceInfo = calculateStudentBalanceLocal({
-      student,
+      student: student || {},
       feeStructures: normalisedStructures,
       payments: normalisedPayments,
       discounts: studentDiscounts,
@@ -305,7 +185,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
     return {
       studentId: sid,
-      name: student.firstName ? `${student.firstName} ${student.lastName}` : `${student.first_name} ${student.last_name}`,
+      name: student?.firstName ? `${student.firstName} ${student.lastName}` : (student?.first_name ? `${student.first_name} ${student.last_name}` : "Unknown"),
       className: cls,
       expected: balanceInfo.expected,
       grossAmount: balanceInfo.grossAmount,
@@ -324,11 +204,11 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       lunchFee: balanceInfo.lunchFee,
       breakfastFee: balanceInfo.breakfastFee,
       baseFee: balanceInfo.baseFee,
-      admissionNumber: student.admission ?? student.admission_number ?? "",
-      email: student.email ?? student.parentEmail ?? "",
-      transportDirection: student.transport_direction || 'none',
-      lunchEnabled: student.lunch_enabled || false,
-      breakfastEnabled: student.breakfast_enabled || false
+      admissionNumber: student?.admission ?? student?.admission_number ?? "",
+      email: student?.email ?? student?.parentEmail ?? "",
+      transportDirection: student?.transport_direction || 'none',
+      lunchEnabled: student?.lunch_enabled || false,
+      breakfastEnabled: student?.breakfast_enabled || false
     };
   };
 
@@ -488,6 +368,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         },
       });
       await reloadPayments();
+      await refreshLedgerBalances();
       setShowPayment(false);
       const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
       const studentBalance = calculateLedgerBalance(s, studentDiscounts[sid] || []);
@@ -625,6 +506,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       });
       
       await reloadPayments();
+      await refreshLedgerBalances();
       setShowBankDeposit(false);
       setBankDepositForm({ studentId: "", amount: "", proofFile: null });
       
@@ -641,10 +523,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         balance: newBalance
       });
       setShowReceipt(true);
-      toast("Bank deposit recorded pending verification", "success");
-    } catch (err) {
-      toast(err.message || "Bank deposit failed", "error");
-    }
+      toast("Bank deposit recorded", "success");
+    } catch (err) { toast(err.message || "Bank deposit failed", "error"); }
     setBankDepositLoading(false);
   };
 
@@ -1458,12 +1338,13 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         toast={toast}
         onSuccess={(response) => {
           reloadPayments();
+          refreshLedgerBalances();
           const sid = String(response.studentId);
           const student = students.find(s => String(s.id || s.student_id) === sid);
           const firstName = student?.firstName || student?.first_name || "";
           const lastName = student?.lastName || student?.last_name || "";
           const studentName = `${firstName} ${lastName}`.trim() || "Student";
-          const studentBalance = calculateLedgerBalance(student, studentDiscounts[response.studentId] || []);
+          const studentBalance = calculateLedgerBalance(student, studentDiscounts[String(response.studentId)] || []);
           const methodLabels = { 'cash': 'Cash', 'bank_transfer': 'Bank Transfer', 'mpesa_manual': 'M-Pesa Manual' };
 
           setReceipt({
