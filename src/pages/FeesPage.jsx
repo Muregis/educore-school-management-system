@@ -654,7 +654,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             {canEdit && tab==="payments" && <Button onClick={() => setShowPayment(true)}>+ Record Payment</Button>}
             {canEdit && tab==="payments" && <Button variant="secondary" onClick={() => setShowRecordPaymentModal(true)}>📝 Manual Payment</Button>}
             {canEdit && tab==="structure" && <Button onClick={() => { setEditStruct(null); setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""}); setShowStruct(true); }}>Set Fee Structure</Button>}
-             {canEdit && <Button variant="ghost" onClick={() => setShowDayEndSettings(true)}>⚙️ Day Settings</Button>}
+            {canEdit && <Button variant="ghost" onClick={() => setShowDayEndSettings(true)}>⚙️ Day Settings</Button>}
+            {canEdit && <Button variant="primary" onClick={closeDay}>🔒 Close Day</Button>}
           </div>
         </div>
       </Card>
