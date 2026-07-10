@@ -1,5 +1,6 @@
 import discountService from "./discountService";
 import { ledgerBalanceService } from "./ledgerBalanceService";
+let _debugLogged = false;
 
 function toNumber(value) {
   const num = Number(value);
@@ -99,6 +100,17 @@ export function calculateStudentBalanceLocal({
   const paid = payments
     .filter(p => String(p?.studentId ?? p?.student_id) === String(studentId) && (p?.status ?? "paid") === "paid")
     .reduce((sum, p) => sum + toNumber(p.amount), 0);
+
+  if (!_debugLogged && (baseFee > 0 || paid > 0)) {
+    _debugLogged = true;
+    console.log('[DEBUG balance]', {
+      studentId, className, baseFee, tuition,
+      transportFee, lunchFee, breakfastFee, openingBalance,
+      grossAmount: discountCalc.grossAmount, netAmount: discountCalc.netAmount, discountAmount: discountCalc.discountAmount,
+      paid,
+      structure: structure ? { tuition: structure.tuition, activity: structure.activity, misc: structure.misc } : 'NO_MATCH'
+    });
+  }
 
   const rawBalance = discountCalc.netAmount - paid;
   const overpaymentAmount = rawBalance < 0 ? Math.abs(rawBalance) : 0;
