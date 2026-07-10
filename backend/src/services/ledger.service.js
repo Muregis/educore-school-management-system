@@ -35,13 +35,14 @@ export class LedgerService {
   }
 
   // Helper: Apply student discount
-  // IMPORTANT: Discount applies ONLY to base fee, not transport/meals/opening balance
-  static applyStudentDiscount(baseFee, student, extraCharges = 0, openingBalanceImpact = 0) {
+  // IMPORTANT: Discount applies ONLY to tuition portion, not activity/misc/transport/meals/opening balance
+  static applyStudentDiscount(baseFee, student, extraCharges = 0, openingBalanceImpact = 0, tuitionBase = null) {
     const discountValue = Number(student?.discount_value || 0);
     if (!discountValue) return baseFee + extraCharges + openingBalanceImpact;
     const isPercentage = student?.discount_is_percentage !== false;
-    // CRITICAL: Discount applies ONLY to base fee
-    const discountAmount = isPercentage ? (baseFee * discountValue) / 100 : discountValue;
+    // CRITICAL: Discount applies ONLY to tuition portion, not activity/misc
+    const discountableAmount = tuitionBase !== null ? tuitionBase : baseFee;
+    const discountAmount = isPercentage ? (discountableAmount * discountValue) / 100 : discountValue;
     const netBaseFee = Math.max(0, baseFee - discountAmount);
     // Add back non-discounted components
     return netBaseFee + extraCharges + openingBalanceImpact;
@@ -62,7 +63,7 @@ export class LedgerService {
   }
 
   // Record a charge (fee assessment) in student ledger
-  static async recordCharge(schoolId, studentId, amount, description, referenceType = null, referenceId = null, includeStudentFactors = true) {
+  static async recordCharge(schoolId, studentId, amount, description, referenceType = null, referenceId = null, includeStudentFactors = true, tuitionAmount = null) {
     try {
       // Get current balance using Supabase
       const { data: currentEntries } = await database.query('student_ledger', {
@@ -82,8 +83,7 @@ export class LedgerService {
         if (student) {
           const openingBalanceImpact = this.getOpeningBalanceImpact(student);
           const extraCharges = this.getStudentExtraCharges(student);
-          // CRITICAL: Apply discount ONLY to base fee, then add back non-discounted components
-          finalAmount = this.applyStudentDiscount(finalAmount, student, extraCharges, openingBalanceImpact);
+          finalAmount = this.applyStudentDiscount(finalAmount, student, extraCharges, openingBalanceImpact, tuitionAmount);
         }
       }
 
@@ -120,6 +120,7 @@ export class LedgerService {
         .eq('table_name', 'student_ledger');
 
       if (!tables || !tables.length) {
+        console.warn('student_ledger table does not exist - payment not recorded in ledger');
         return { receiptNumber: null, newBalance: null };
       }
 
@@ -273,19 +274,31 @@ export class LedgerService {
       // Assess fees for each student
       const results = [];
       for (const student of students || []) {
+        let totalAmount = 0;
+        let tuitionAmount = 0;
+        const itemNames = [];
         for (const feeItem of feeItems || []) {
           if (!feeItem.is_optional) {
-            const ledgerId = await this.recordCharge(
-              schoolId,
-              student.student_id,
-              feeItem.amount,
-              `${feeItem.item_name} - ${term} ${academicYear}`,
-              'fee_item',
-              feeItem.fee_item_id,
-              true // Include student-specific factors
-            );
-            results.push({ studentId: student.student_id, feeItemId: feeItem.fee_item_id, ledgerId });
+            totalAmount += Number(feeItem.amount);
+            itemNames.push(feeItem.item_name);
+            if (feeItem.item_type === 'tuition') {
+              tuitionAmount += Number(feeItem.amount);
+            }
           }
+        }
+
+        if (totalAmount > 0) {
+          const ledgerId = await this.recordCharge(
+            schoolId,
+            student.student_id,
+            totalAmount,
+            `Fee assessment - ${term} ${academicYear} (${itemNames.join(', ')})`,
+            'fee_structure',
+            feeStructureId,
+            true, // Include student-specific factors ONCE
+            tuitionAmount > 0 ? tuitionAmount : null
+          );
+          results.push({ studentId: student.student_id, ledgerId });
         }
       }
 

@@ -168,7 +168,10 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
 
     // Update student ledger balance
     try {
-      await LedgerService.recordPayment(schoolId, studentId, Number(amount), `${feeType} payment`, paymentId, req);
+      const ledgerResult = await LedgerService.recordPayment(schoolId, studentId, Number(amount), `${feeType} payment`, paymentId, req);
+      if (!ledgerResult?.ledgerId) {
+        console.warn('Payment recorded but ledger balance was not updated (student_ledger table may be missing)');
+      }
     } catch (ledgerErr) {
       console.error('Failed to update ledger:', ledgerErr);
       // Don't fail the payment if ledger update fails
