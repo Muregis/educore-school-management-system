@@ -246,20 +246,29 @@ router.post("/bank/reconcile", authRequired, requireRoles("admin", "finance"), a
         .eq('is_deleted', false)
         .maybeSingle();
 
-      if (studentError || !studentRow) { skipped++; continue; }
+       if (studentError || !studentRow) { skipped++; continue; }
 
-      await supabase.from('payments').insert({
-        school_id: schoolId,
-        student_id: studentRow.student_id,
-        amount,
-        fee_type: feeType,
-        payment_method: 'bank',
-        reference_number: reference,
-        payment_date: paymentDate,
-        status: 'paid',
-        term
-      });
-      inserted++;
+       const { data: inserted, error: insertError } = await supabase.from('payments').insert({
+         school_id: schoolId,
+         student_id: studentRow.student_id,
+         amount,
+         fee_type: feeType,
+         payment_method: 'bank',
+         reference_number: reference,
+         payment_date: paymentDate,
+         status: 'paid',
+         term
+       }).select('payment_id').single();
+
+       if (!insertError && inserted) {
+         try {
+           await LedgerService.recordPayment(schoolId, studentRow.student_id, Number(amount), `Bank import payment`, inserted.payment_id, null);
+         } catch (ledgerErr) {
+           console.error('Failed to update ledger for bank import:', ledgerErr);
+         }
+       }
+
+       inserted++;
     }
 
     res.json({ ok: true, inserted, skipped, total: rows.length });

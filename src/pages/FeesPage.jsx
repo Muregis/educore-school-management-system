@@ -90,6 +90,7 @@ function loadPaystackScript() {
 
 export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, canViewTotals, canDeletePayments, toast, linkedStudentId, school }) {
   const { term, academicYear, startDate, endDate } = useCurrentTerm(auth);
+  const displayTerm = term || "Term 2";
   const [tab, setTab]                 = useState("payments");
   const [showPayment, setShowPayment] = useState(false);
   const [showStruct, setShowStruct]   = useState(false);
@@ -131,6 +132,12 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   const [dayEndTime, setDayEndTime] = useState(() => localStorage.getItem('dayEndTime') || '18:00');
   const [lastDayClosed, setLastDayClosed] = useState(() => localStorage.getItem('lastDayClosed') || null);
+  const [showDayEndSettings, setShowDayEndSettings] = useState(false);
+
+  const saveDayEndTime = (time) => {
+    setDayEndTime(time);
+    localStorage.setItem('dayEndTime', time);
+  };
 
   const refreshLedgerBalances = useCallback(async () => {
     if (!auth?.token) return;
@@ -140,7 +147,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       (data.students || []).forEach(s => {
         const sid = s.student_id ?? s.id;
         if (sid !== undefined && sid !== null) {
-          map[sid] = s.balance_after ?? s.balance ?? 0;
+          map[sid] = s.balance_after ?? s.balance ?? null;
         }
       });
       setLedgerBalances(map);
@@ -148,6 +155,12 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       console.warn('Ledger balances:', e);
     }
   }, [auth?.token]);
+
+  const reloadPayments = useCallback(async () => {
+    if (!auth?.token) return;
+    const data = await apiFetch('/payments', { token: auth.token });
+    setPayments((data || []).map(normalisePayment));
+  }, [auth, setPayments]);
 
   useEffect(() => {
     refreshLedgerBalances();
@@ -412,6 +425,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         },
       });
       await reloadPayments();
+      await refreshLedgerBalances();
       setEditingPayment(null);
       toast("Payment updated successfully", "success");
     } catch (err) {
@@ -438,7 +452,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     if (!window.confirm("Delete this payment?")) return;
     try {
       await apiFetch(`/payments/${id}`, { method: "DELETE", token: auth?.token });
-      setPayments(prev => prev.filter(p => (p.id ?? p.payment_id) !== id));
+      await reloadPayments();
+      await refreshLedgerBalances();
       toast("Deleted", "success");
     } catch (err) { toast(err.message || "Delete failed", "error"); }
   };

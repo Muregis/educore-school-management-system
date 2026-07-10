@@ -159,26 +159,29 @@ router.get("/balances",
       }
 
       // Build student list with balances
-      let studentsWithBalance = (students || []).map(s => ({
-        ...s,
-        balance: latestBalanceMap.get(s.student_id)?.balance_after || 0,
-        last_transaction_date: latestBalanceMap.get(s.student_id)?.created_at || null
-      }));
+      let studentsWithBalance = (students || []).map(s => {
+        const entry = latestBalanceMap.get(s.student_id);
+        return {
+          ...s,
+          balance: entry ? Number(entry.balance_after) : null,
+          last_transaction_date: entry?.created_at || null
+        };
+      });
 
       // Filter by balance status if requested
       let filteredStudents = studentsWithBalance;
       if (status === 'owing') {
         filteredStudents = studentsWithBalance.filter(s => s.balance > 0);
       } else if (status === 'paid') {
-        filteredStudents = studentsWithBalance.filter(s => s.balance <= 0);
+        filteredStudents = studentsWithBalance.filter(s => s.balance !== null && s.balance <= 0);
       }
 
       // Calculate summary
       const summary = {
         totalStudents: filteredStudents.length,
         totalOwing: filteredStudents.filter(s => s.balance > 0).length,
-        totalPaid: filteredStudents.filter(s => s.balance <= 0).length,
-        totalBalance: filteredStudents.reduce((sum, s) => sum + Number(s.balance), 0)
+        totalPaid: filteredStudents.filter(s => s.balance !== null && s.balance <= 0).length,
+        totalBalance: filteredStudents.reduce((sum, s) => sum + Number(s.balance || 0), 0)
       };
 
       res.json({
