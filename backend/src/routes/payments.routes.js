@@ -85,7 +85,32 @@ router.get("/fee-structures", async (req, res, next) => {
       .order('class_name');
 
     if (error) throw error;
-    res.json(rows || []);
+
+    const result = [];
+    for (const fs of (rows || [])) {
+      const { data: items } = await supabase
+        .from('fee_items')
+        .select('item_type, amount')
+        .eq('fee_structure_id', fs.fee_structure_id)
+        .eq('is_optional', false);
+
+      const itemTotals = { tuition: 0, activity: 0, misc: 0 };
+      for (const item of (items || [])) {
+        const t = item.item_type;
+        if (t === 'tuition' || t === 'activity' || t === 'misc') {
+          itemTotals[t] += Number(item.amount) || 0;
+        }
+      }
+
+      result.push({
+        ...fs,
+        tuition: Number(fs.tuition) || itemTotals.tuition || 0,
+        activity: Number(fs.activity) || itemTotals.activity || 0,
+        misc: Number(fs.misc) || itemTotals.misc || 0,
+      });
+    }
+
+    res.json(result);
   } catch (err) { next(err); }
 });
 
