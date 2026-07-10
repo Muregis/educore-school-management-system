@@ -125,6 +125,11 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [studentDiscounts, setStudentDiscounts] = useState({});
   const [ledgerBalances, setLedgerBalances] = useState({});
+
+  const getBusinessToday = () => new Date().toISOString().split('T')[0];
+  const businessToday = getBusinessToday();
+
+  const [dayEndTime, setDayEndTime] = useState(() => localStorage.getItem('dayEndTime') || '18:00');
   const [lastDayClosed, setLastDayClosed] = useState(() => localStorage.getItem('lastDayClosed') || null);
 
   const refreshLedgerBalances = useCallback(async () => {
@@ -529,8 +534,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     setBankDepositLoading(false);
   };
 
-  const getBusinessToday = () => new Date().toISOString().split('T')[0];
-  const businessToday = getBusinessToday();
   const todayPayments = normalisedPayments.filter(p => {
     const paymentDate = p.date || p.payment_date;
     if (lastDayClosed && new Date(paymentDate) <= new Date(lastDayClosed)) {
