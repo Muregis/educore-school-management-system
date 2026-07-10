@@ -138,6 +138,16 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     localStorage.setItem('dayEndTime', time);
   };
 
+  const closeDay = () => {
+    const today = getBusinessToday();
+    setLastDayClosed(today);
+    localStorage.setItem('lastDayClosed', today);
+    const dayTotal = normalisedPayments
+      .filter(p => (p?.date || p?.payment_date) === today)
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    toast(`Day closed (${today}) — KES ${Number(dayTotal).toLocaleString()} collected`, "success");
+  };
+
   const reloadPayments = useCallback(async () => {
     if (!auth?.token) return;
     const data = await apiFetch('/payments', { token: auth.token });
