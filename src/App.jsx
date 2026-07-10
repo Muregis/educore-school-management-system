@@ -159,6 +159,7 @@ export default function App() {
   const [notifications, setNotifications] = useLocalState("educore.notifications",  DEFAULTS.notifications);
   const [timetable, setTimetable]         = useLocalState("educore.timetable",      DEFAULTS.timetable);
   const [pendingUpdates, setPendingUpdates] = useLocalState("educore.pendingUpdates", DEFAULTS.pendingUpdates);
+  const [fetchOnMount] = useState(() => Date.now());
 
   const [auth, setAuth] = useState(() => {
     const session = getSession();
@@ -348,7 +349,7 @@ export default function App() {
     hydrateTenantData(auth).catch((err) => {
       console.error("[tenant_hydrate] Failed to refresh tenant data:", err.message);
     });
-  }, [auth?.token, auth?.schoolId, activeSchoolId, hydrateTenantData]);
+  }, [auth?.token, auth?.schoolId, activeSchoolId, hydrateTenantData, fetchOnMount]);
 
   const handleSchoolSwitch = useCallback(async (schoolId, selectedSchool) => {
     const nextSchoolId = Number(schoolId);
