@@ -1,6 +1,7 @@
 import { database } from "../config/db.js";
 import { sendEmail } from "./email.service.js";
 import { sendWhatsAppPaymentReceipt } from "./whatsappService.js";
+import { calculateStudentFeeBalance } from "./feeBalanceCalculator.js";
 
 /**
  * Notification Service
@@ -140,40 +141,32 @@ export class NotificationService {
    */
   static async getStudentsWithOutstandingBalances(schoolId, minBalance = 0) {
     try {
-      // Calculate balances using ledger
-      const { data: payments } = await database.query('payments', {
-        where: { school_id: schoolId, status: 'paid', is_deleted: false }
-      });
-      
+      // Single source of truth for fee balances (same formula used by the
+      // Fees page, Dashboard, Reports and Analytics).
       const { data: students } = await database.query('students', {
         where: { school_id: schoolId, is_deleted: false, status: 'active' }
       });
-      
+
       if (!students || students.length === 0) {
         return [];
       }
-      
-      // For now, use invoice balances as fallback
-      // In production, this should use the ledger
-      const { data: invoices } = await database.query('invoices', {
+
+      const { data: payments } = await database.query('payments', {
+        where: { school_id: schoolId, status: 'paid', is_deleted: false }
+      });
+
+      const { data: feeStructures } = await database.query('fee_structures', {
         where: { school_id: schoolId, is_deleted: false }
       });
-      
-      const studentBalances = {};
-      
-      // Calculate total balance per student from invoices
-      (invoices || []).forEach(invoice => {
-        if (!studentBalances[invoice.student_id]) {
-          studentBalances[invoice.student_id] = 0;
-        }
-        studentBalances[invoice.student_id] += Number(invoice.balance || 0);
-      });
-      
-      // Filter students with outstanding balances
+
       return students
         .map(student => ({
           ...student,
-          balance: studentBalances[student.student_id] || 0
+          balance: calculateStudentFeeBalance({
+            student,
+            feeStructures: feeStructures || [],
+            payments: payments || []
+          }).balance
         }))
         .filter(student => student.balance >= minBalance);
     } catch (error) {

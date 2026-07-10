@@ -125,7 +125,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [bankDepositLoading, setBankDepositLoading] = useState(false);
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [studentDiscounts, setStudentDiscounts] = useState({});
-  const [ledgerBalances, setLedgerBalances] = useState({});
 
   const getBusinessToday = () => new Date().toISOString().split('T')[0];
   const businessToday = getBusinessToday();
@@ -139,23 +138,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     localStorage.setItem('dayEndTime', time);
   };
 
-  const refreshLedgerBalances = useCallback(async () => {
-    if (!auth?.token) return;
-    try {
-      const data = await apiFetch('/ledger/balances', { token: auth.token });
-      const map = {};
-      (data.students || []).forEach(s => {
-        const sid = s.student_id ?? s.id;
-        if (sid !== undefined && sid !== null) {
-          map[sid] = s.balance_after ?? s.balance ?? null;
-        }
-      });
-      setLedgerBalances(map);
-    } catch (e) {
-      console.warn('Ledger balances:', e);
-    }
-  }, [auth?.token]);
-
   const reloadPayments = useCallback(async () => {
     if (!auth?.token) return;
     const data = await apiFetch('/payments', { token: auth.token });
@@ -163,8 +145,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   }, [auth, setPayments]);
 
   useEffect(() => {
-    refreshLedgerBalances();
-  }, [refreshLedgerBalances]);
+    reloadPayments();
+  }, [reloadPayments]);
 
   const normalisedPayments   = payments.map(p => p.payment_id ? normalisePayment(p) : p);
   const normalisedStructures = feeStructures.map(f => f.fee_structure_id ? normaliseFeeStruct(f) : f);
@@ -172,6 +154,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const calculateLedgerBalance = (student, studentDiscounts = []) => {
     const sid = student?.id ?? student?.student_id;
     const cls = student?.className ?? student?.class_name ?? "";
+    // Single source of truth for every fee balance in the app
+    // (see src/services/studentBalanceUtils.js -> calculateStudentBalanceLocal).
     const balanceInfo = calculateStudentBalanceLocal({
       student: student || {},
       feeStructures: normalisedStructures,
@@ -180,27 +164,11 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       schoolSettings: schoolData || {}
     });
 
-    const ledgerBalanceAfter = ledgerBalances[sid];
-
-    let balance = balanceInfo.balance;
-    let rawBalance = balanceInfo.rawBalance;
-    let overpaymentAmount = balanceInfo.overpaymentAmount;
-    let isOverpaid = balanceInfo.isOverpaid;
-    let paid = balanceInfo.paid;
-
-    if (typeof ledgerBalanceAfter === 'number') {
-      if (ledgerBalanceAfter < 0) {
-        balance = Math.abs(ledgerBalanceAfter);
-        rawBalance = ledgerBalanceAfter;
-        overpaymentAmount = 0;
-        isOverpaid = false;
-      } else {
-        balance = 0;
-        rawBalance = ledgerBalanceAfter;
-        overpaymentAmount = ledgerBalanceAfter;
-        isOverpaid = true;
-      }
-    }
+    const balance = balanceInfo.balance;
+    const rawBalance = balanceInfo.rawBalance;
+    const overpaymentAmount = balanceInfo.overpaymentAmount;
+    const isOverpaid = balanceInfo.isOverpaid;
+    const paid = balanceInfo.paid;
 
     return {
       studentId: sid,
@@ -387,7 +355,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         },
       });
       await reloadPayments();
-      await refreshLedgerBalances();
       setShowPayment(false);
       const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
       const studentBalance = calculateLedgerBalance(s, studentDiscounts[sid] || []);
@@ -425,7 +392,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         },
       });
       await reloadPayments();
-      await refreshLedgerBalances();
       setEditingPayment(null);
       toast("Payment updated successfully", "success");
     } catch (err) {
@@ -453,7 +419,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     try {
       await apiFetch(`/payments/${id}`, { method: "DELETE", token: auth?.token });
       await reloadPayments();
-      await refreshLedgerBalances();
       toast("Deleted", "success");
     } catch (err) { toast(err.message || "Delete failed", "error"); }
   };
@@ -527,7 +492,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       });
       
       await reloadPayments();
-      await refreshLedgerBalances();
       setShowBankDeposit(false);
       setBankDepositForm({ studentId: "", amount: "", proofFile: null });
       
@@ -1357,7 +1321,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         toast={toast}
         onSuccess={(response) => {
           reloadPayments();
-          refreshLedgerBalances();
           const sid = String(response.studentId);
           const student = students.find(s => String(s.id || s.student_id) === sid);
           const firstName = student?.firstName || student?.first_name || "";

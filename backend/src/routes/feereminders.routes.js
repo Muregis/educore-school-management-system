@@ -16,7 +16,7 @@ import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { sendPaymentReceipt } from "../utils/smsUtils.js";
-import { LedgerService } from "../services/ledger.service.js";
+import { calculateStudentFeeBalance } from "../services/feeBalanceCalculator.js";
 
 const router = Router();
 router.use(authRequired);
@@ -47,12 +47,6 @@ router.post("/send-reminders", requireRoles("admin", "finance", "director", "sup
       .eq("term", term);
     if (fErr) throw fErr;
 
-    const feeByClass = new Map();
-    for (const fs of (feeStructures || [])) {
-      const total = Number(fs.tuition || 0) + Number(fs.activity || 0) + Number(fs.misc || 0);
-      feeByClass.set(fs.class_name, total);
-    }
-
     // 3. Load all paid payments for this term (read-only)
     const { data: payments, error: pErr } = await supabase
       .from("payments")
@@ -63,26 +57,20 @@ router.post("/send-reminders", requireRoles("admin", "finance", "director", "sup
       .eq("is_deleted", false);
     if (pErr) throw pErr;
 
-    // Sum payments per student
-    const paidByStudent = new Map();
-    for (const p of (payments || [])) {
-      const prev = paidByStudent.get(p.student_id) || 0;
-      paidByStudent.set(p.student_id, prev + Number(p.amount || 0));
-    }
-
-    // 4. Compute defaulters
+    // 4. Compute defaulters using the single canonical fee-balance formula
+    //    (shared with the Fees page, Dashboard, Reports and Analytics).
     const defaulters = [];
     for (const s of (students || [])) {
-      // Include current-term fees + carryover balance (owing or credit)
-      const classFee = feeByClass.get(s.class_name) || 0;
-      const extraCharges = LedgerService.getStudentExtraCharges(s);
-      const openingBalanceImpact = LedgerService.getOpeningBalanceImpact(s);
-      // CRITICAL: Apply discount ONLY to base fee (classFee), then add back non-discounted components
-      const expected = LedgerService.applyStudentDiscount(classFee, s, extraCharges, openingBalanceImpact);
+      const balanceInfo = calculateStudentFeeBalance({
+        student: s,
+        feeStructures: feeStructures || [],
+        payments: (payments || []).filter(p => p.student_id === s.student_id)
+      });
+      const expected = balanceInfo.expected;
+      const paid     = balanceInfo.paid;
+      const balance  = balanceInfo.balance;
       if (expected <= 0) continue; // no fee structure for this class — skip
-      const paid    = paidByStudent.get(s.student_id) || 0;
-      const balance = expected - paid;
-      if (balance <= 0) continue; // fully paid — skip
+      if (balance <= 0) continue;  // fully paid — skip
 
       defaulters.push({
         student_id:       s.student_id,

@@ -7,6 +7,7 @@ import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { Msg } from "../components/Helpers";
 import { ALL_CLASSES } from "../lib/constants";
+import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 import { 
   deduplicateStudents, 
   deduplicatePayments, 
@@ -140,13 +141,12 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
       if (s.outstanding_balance !== undefined && s.outstanding_balance !== null) {
         balance = Number(s.outstanding_balance);
       } else {
-        const studentId = s.id ?? s.student_id;
-        const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
-        const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
-        const paidAmount = optimizedPayments
-          .filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid")
-          .reduce((sum, p) => sum + Number(p.amount || 0), 0);
-        balance = expectedAmount - paidAmount;
+        const balanceInfo = calculateStudentBalanceLocal({
+          student: s,
+          feeStructures: feeStructures || [],
+          payments: optimizedPayments || [],
+        });
+        balance = balanceInfo.balance;
       }
       return balance > Number(exportDefaulterAmount || 0);
     }).length;
@@ -361,11 +361,12 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
         if (s.outstanding_balance !== undefined && s.outstanding_balance !== null) {
           balance = Number(s.outstanding_balance);
         } else {
-          // Fallback to calculating from fee structures and payments
-          const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
-          const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
-          const paidAmount = allPayments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid").reduce((sum, p) => sum + Number(p.amount || 0), 0);
-          balance = expectedAmount - paidAmount;
+          const balanceInfo = calculateStudentBalanceLocal({
+            student: s,
+            feeStructures: feeStructures || [],
+            payments: allPayments || [],
+          });
+          balance = balanceInfo.balance;
         }
         
         return balance > exportDefaulterAmount;
@@ -393,10 +394,13 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
         // For total_fees_paid, use payments
         paidAmount = studentPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
       } else {
-        const expected = feeStructures.find(f => (f.className || f.class_name) === (s.className || s.class_name));
-        const expectedAmount = expected ? Number(expected.tuition || 0) + Number(expected.activity || 0) + Number(expected.misc || 0) : 0;
-        paidAmount = studentPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-        balance = expectedAmount - paidAmount;
+        const balanceInfo = calculateStudentBalanceLocal({
+          student: s,
+          feeStructures: feeStructures || [],
+          payments: allPayments || [],
+        });
+        balance = balanceInfo.balance;
+        paidAmount = balanceInfo.paid;
       }
       const lastPaymentDate = studentPayments.length > 0 ? 
         new Date(Math.max(...studentPayments.map(p => new Date(p.createdAt || p.created_at)))).toLocaleDateString() : "";

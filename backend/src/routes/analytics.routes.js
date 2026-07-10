@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
-import { LedgerService } from "../services/ledger.service.js";
+import { calculateStudentFeeBalance } from "../services/feeBalanceCalculator.js";
 import { getExpenditureSummary } from "../services/expenditure.service.js";
 
 const router = Router();
@@ -207,12 +207,6 @@ router.get("/", async (req, res, next) => {
         .eq('is_deleted', false);
       if (feeErr) throw feeErr;
 
-      const feeMap = {};
-      feeStructures?.forEach(fs => {
-        const expected = Number(fs.tuition) + Number(fs.activity) + Number(fs.misc);
-        feeMap[fs.class_name] = expected;
-      });
-
       const studentIds = allStudents?.map(s => s.student_id) || [];
       if (studentIds.length > 0) {
         const { data: allPayments, error: payListErr } = await supabase
@@ -225,22 +219,16 @@ router.get("/", async (req, res, next) => {
           .in('student_id', studentIds);
         if (payListErr) throw payListErr;
 
-        const paymentMap = {};
-        allPayments?.forEach(p => {
-          paymentMap[p.student_id] = (paymentMap[p.student_id] || 0) + Number(p.amount);
-        });
-
-        // Count students with outstanding balance using current-term fees plus brought-forward debit/credit.
+        // Count students with an outstanding balance using the canonical
+        // fee-balance formula (single source of truth shared with the Fees
+        // page / Dashboard / Reports).
         defaultersCount = allStudents?.filter(s => {
-          const classFee = feeMap[s.class_name] || 0;
-          const extraCharges = LedgerService.getStudentExtraCharges(s);
-          const openingBalanceImpact = LedgerService.getOpeningBalanceImpact(s);
-          // CRITICAL: Apply discount ONLY to base fee (classFee), then add back non-discounted components
-          const currentTermExpected = LedgerService.applyStudentDiscount(classFee, s, extraCharges, openingBalanceImpact);
-          const paid = paymentMap[s.student_id] || 0;
-          // Outstanding = (current term charges +/- carry-forward) - current term paid
-          const balance = Math.max(0, currentTermExpected - paid);
-          return balance > 0;
+          const balanceInfo = calculateStudentFeeBalance({
+            student: s,
+            feeStructures,
+            payments: allPayments || [],
+          });
+          return balanceInfo.balance > 0;
         }).length || 0;
       }
     } catch { /* ignore */ }

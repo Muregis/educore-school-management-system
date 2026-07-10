@@ -3,93 +3,21 @@ import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { getExpenditureSummary } from "../services/expenditure.service.js";
-import { LedgerService } from "../services/ledger.service.js";
+import { calculateStudentFeeBalance } from "../services/feeBalanceCalculator.js";
 import { isMissingTableError } from "../utils/missingTableError.js";
 
 const router = Router();
 router.use(authRequired);
 router.use(requireRoles("admin", "teacher", "finance", "director", "superadmin"));
 
-async function getCarryForwardMap(schoolId, termName) {
-  try {
-    const { data: termRow, error: termErr } = await supabase
-      .from('terms')
-      .select('term_id')
-      .eq('school_id', schoolId)
-      .eq('term_name', termName)
-      .limit(1)
-      .maybeSingle();
-
-    if (termErr || !termRow?.term_id) return new Map();
-
-    const { data: ledgerRows, error: ledgerErr } = await supabase
-      .from('fee_balance_ledger')
-      .select('student_id, amount')
-      .eq('school_id', schoolId)
-      .eq('term_id', termRow.term_id)
-      .eq('transaction_type', 'carry_forward');
-
-    if (ledgerErr || !ledgerRows?.length) return new Map();
-
-    const carryMap = new Map();
-    ledgerRows.forEach((row) => {
-      carryMap.set(row.student_id, (carryMap.get(row.student_id) || 0) + Number(row.amount || 0));
-    });
-    return carryMap;
-  } catch {
-    return new Map();
-  }
-}
-
 function toNumber(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : 0;
 }
 
-function getTransportFeeLikeFeesPage(student) {
-  const direction = student?.transport_direction ?? "none";
-  if (!direction || direction === "none") return 0;
-  return toNumber(student?.transport_base_fee);
-}
-
-function getLunchFeeLikeFeesPage(student) {
-  const enabled = Boolean(student?.lunch_enabled);
-  if (!enabled) return 0;
-  const rate = toNumber(student?.lunch_daily_rate);
-  const days = toNumber(student?.lunch_days || 66);
-  return student?.lunch_billing_type === "termly" ? rate : rate * days;
-}
-
-function getBreakfastFeeLikeFeesPage(student) {
-  const enabled = Boolean(student?.breakfast_enabled);
-  if (!enabled) return 0;
-  const rate = toNumber(student?.breakfast_daily_rate);
-  const days = toNumber(student?.breakfast_days || 66);
-  return student?.breakfast_billing_type === "termly" ? rate : rate * days;
-}
-
-function calculateReportBalanceLikeFeesPage(student, classFee, paidAmount) {
-  const openingBalance = LedgerService.getOpeningBalanceImpact(student);
-  const transportFee = getTransportFeeLikeFeesPage(student);
-  const lunchFee = getLunchFeeLikeFeesPage(student);
-  const breakfastFee = getBreakfastFeeLikeFeesPage(student);
-  const extraCharges = transportFee + lunchFee + breakfastFee;
-  // CRITICAL: Apply discount ONLY to base fee (classFee), then add back non-discounted components
-  const expected = LedgerService.applyStudentDiscount(classFee, student, extraCharges, openingBalance);
-  const rawBalance = expected - toNumber(paidAmount);
-
-  return {
-    openingBalance,
-    transportFee,
-    lunchFee,
-    breakfastFee,
-    currentTermCharge: classFee + transportFee + lunchFee + breakfastFee,
-    expected,
-    rawBalance,
-    balance: Math.max(0, rawBalance),
-    overpaymentAmount: rawBalance < 0 ? Math.abs(rawBalance) : 0,
-  };
-}
+// All per-student fee balances are computed through `calculateStudentFeeBalance`
+// (the single source of truth in services/feeBalanceCalculator.js) so that the
+// school total, defaulters, class summary and the Fees page can never diverge.
 
 
 // ─── Summary dashboard stats ──────────────────────────────────────────────────
@@ -154,55 +82,16 @@ router.get("/summary", async (req, res, next) => {
       .eq('is_deleted', false);
     if (feeErr) throw feeErr;
 
-    // Build fee structure map (check for duplicates)
-    const feeMap = {};
-    const duplicateClasses = new Set();
-    feeStructures?.forEach(fs => {
-      const expected = Number(fs.tuition) + Number(fs.activity) + Number(fs.misc);
-      if (feeMap[fs.class_name]) {
-        duplicateClasses.add(fs.class_name);
-        console.warn(`[FEE STRUCTURE DUPLICATE] Class ${fs.class_name} has multiple fee structures. Using latest value.`);
-      }
-      feeMap[fs.class_name] = expected;
-    });
-    if (duplicateClasses.size > 0) {
-      console.warn(`[FEE STRUCTURE DUPLICATES] Found duplicates for classes: ${Array.from(duplicateClasses).join(', ')}`);
-    }
-    console.log(`[FEE STRUCTURES] Loaded ${Object.keys(feeMap).length} unique class fees for term ${currentTerm}`);
-
-    // Build payment map per student (filter by current term)
-    const paymentMap = {};
-    paidPayments?.forEach(payment => {
-      // Only include payments for the current term
-      if (payment.term === currentTerm) {
-        if (!paymentMap[payment.student_id]) {
-          paymentMap[payment.student_id] = 0;
-        }
-        paymentMap[payment.student_id] += Number(payment.amount);
-      }
-    });
-
-    // Calculate outstanding using student_ledger as source of truth
-    const { data: ledgerEntries, error: ledgerErr } = await supabase
-      .from('student_ledger')
-      .select('student_id, balance_after')
-      .eq('school_id', schoolId)
-      .order('ledger_id', { ascending: false });
-    if (ledgerErr) throw ledgerErr;
-
-    const latestBalanceMap = new Map();
-    for (const entry of ledgerEntries || []) {
-      if (!latestBalanceMap.has(entry.student_id)) {
-        latestBalanceMap.set(entry.student_id, Number(entry.balance_after || 0));
-      }
-    }
-
+    // Calculate outstanding using the canonical fee-balance formula
+    // (single source of truth shared with the Fees page, Dashboard, etc.).
     let totalOutstanding = 0;
     students?.forEach(student => {
-      const balance = latestBalanceMap.get(student.student_id);
-      if (typeof balance === 'number') {
-        totalOutstanding += Math.max(0, balance);
-      }
+      const balanceInfo = calculateStudentFeeBalance({
+        student,
+        feeStructures,
+        payments: paidPayments || [],
+      });
+      totalOutstanding += balanceInfo.balance;
     });
 
     // Get pending plans count (if payment_plans table exists)
@@ -426,12 +315,6 @@ router.get("/fee-defaulters", async (req, res, next) => {
     const { data: payments, error: payErr } = await payQuery;
     if (payErr) throw payErr;
 
-    const feeMap = {};
-    feeStructures?.forEach(fs => {
-      const expected = Number(fs.tuition) + Number(fs.activity) + Number(fs.misc);
-      feeMap[fs.class_name] = expected;
-    });
-
     const paymentMap = {};
     payments?.forEach(payment => {
       if (!paymentMap[payment.student_id]) {
@@ -446,13 +329,16 @@ router.get("/fee-defaulters", async (req, res, next) => {
 
     const defaultersList = [];
     for (const student of (allStudents || [])) {
-      // Compute balance from fee structures + payments (matches the Fees page),
-      // rather than relying on a possibly stale student_ledger snapshot.
-      const classFee = feeMap[student.class_name] || 0;
-      const paidAmount = paymentMap[student.student_id]?.total || 0;
-      const balanceInfo = calculateReportBalanceLikeFeesPage(student, classFee, paidAmount);
+      // Canonical balance calculation (single source of truth shared with the
+      // Fees page / Dashboard). feeMap/classFee is intentionally ignored here.
+      const balanceInfo = calculateStudentFeeBalance({
+        student,
+        feeStructures,
+        payments,
+      });
 
       const balance = balanceInfo.balance;
+      const paidAmount = balanceInfo.paid;
       const lastPaymentDate = paymentMap[student.student_id]?.lastPaymentDate || null;
 
       if (balance > 0) {
@@ -463,7 +349,7 @@ router.get("/fee-defaulters", async (req, res, next) => {
           class_name: student.class_name,
           parent_phone: student.parent_phone,
           expected_amount: balanceInfo.expected,
-          current_term_charge: balanceInfo.currentTermCharge,
+          current_term_charge: balanceInfo.baseFee + balanceInfo.transportFee + balanceInfo.lunchFee + balanceInfo.breakfastFee,
           paid_amount: paidAmount,
           balance,
           last_payment_date: lastPaymentDate,
@@ -512,24 +398,9 @@ router.get("/class-fee-summary", async (req, res, next) => {
       .eq('term', currentTerm)
       .eq('is_deleted', false);
     if (payErr) throw payErr;
-    
-    // Build fee structure map
-    const feeMap = {};
-    feeStructures?.forEach(fs => {
-      const expected = Number(fs.tuition) + Number(fs.activity) + Number(fs.misc);
-      feeMap[fs.class_name] = expected;
-    });
-    
-    // Build payment map per student for the already-filtered term
-    const paymentMap = {};
-    payments?.forEach(payment => {
-      if (!paymentMap[payment.student_id]) {
-        paymentMap[payment.student_id] = 0;
-      }
-      paymentMap[payment.student_id] += Number(payment.amount);
-    });
-    
-    // Calculate per-class summary using current-term fees plus brought-forward debit/credit.
+
+    // Calculate per-class summary using the canonical fee-balance formula
+    // (single source of truth shared with the Fees page / Dashboard).
     const classSummary = {};
     allStudents?.forEach(student => {
       const cls = student.class_name;
@@ -542,16 +413,17 @@ router.get("/class-fee-summary", async (req, res, next) => {
           total_outstanding: 0
         };
       }
-      
-      const paid = paymentMap[student.student_id] || 0;
-      const classFee = feeMap[student.class_name] || 0;
-      const balanceInfo = calculateReportBalanceLikeFeesPage(student, classFee, paid);
-      const outstanding = balanceInfo.balance;
-      
+
+      const balanceInfo = calculateStudentFeeBalance({
+        student,
+        feeStructures,
+        payments,
+      });
+
       classSummary[cls].student_count += 1;
       classSummary[cls].total_expected += balanceInfo.expected;
-      classSummary[cls].total_paid += paid;
-      classSummary[cls].total_outstanding += outstanding;
+      classSummary[cls].total_paid += balanceInfo.paid;
+      classSummary[cls].total_outstanding += balanceInfo.balance;
     });
     
     // Convert to array and sort by class name
