@@ -180,6 +180,12 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     const isOverpaid = balanceInfo.isOverpaid;
     const paid = balanceInfo.paid;
 
+    if (sid === (students?.[0]?.id ?? students?.[0]?.student_id)) {
+      console.log('[FeesPage DEBUG] Student 0:', { sid, cls, expected: balanceInfo.expected, paid, balance, rawBalance, openingBalance: balanceInfo.openingBalance, baseFee: balanceInfo.baseFee, grossAmount: balanceInfo.grossAmount, netAmount: balanceInfo.netAmount, tuition: balanceInfo.tuition, activity: balanceInfo.activity, misc: balanceInfo.misc });
+      const matchedStruct = normalisedStructures.find(f => (f.className || f.class_name) === cls);
+      console.log('[FeesPage DEBUG] Matched FeeStructure:', matchedStruct ? { className: matchedStruct.className || matchedStruct.class_name, tuition: matchedStruct.tuition, activity: matchedStruct.activity, misc: matchedStruct.misc, fee_items: matchedStruct.fee_items } : 'NONE');
+    }
+
     return {
       studentId: sid,
       name: student?.firstName ? `${student.firstName} ${student.lastName}` : (student?.first_name ? `${student.first_name} ${student.last_name}` : "Unknown"),
