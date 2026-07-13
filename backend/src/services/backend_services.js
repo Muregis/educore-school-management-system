@@ -5,6 +5,7 @@
 
 import { supabase } from '../config/supabaseClient.js';
 import { logAuditEvent } from '../helpers/audit.logger.js';
+import { calculateStudentFeeBalance } from './feeBalanceCalculator.js';
 
 // =====================================================
 // ACADEMIC YEAR SERVICE
@@ -671,27 +672,44 @@ export class TermTransitionService {
       }
 
       if (carryForwardBalances) {
-        const { data: unpaidBalances } = await supabase
-          .from('fee_balance_ledger')
-          .select('student_id, balance_after, academic_year_id')
+        const { data: allStudents } = await supabase
+          .from('students')
+          .select('*')
           .eq('school_id', schoolId)
-          .eq('academic_year_id', academicYearId)
-          .gt('balance_after', 0);
+          .eq('is_deleted', false);
 
-        if (unpaidBalances?.length) {
-          const nextYearId = createNextYear ? (await this.createNextAcademicYear(schoolId, year, userId))?.academic_year_id : null;
+        const { data: feeStructures } = await supabase
+          .from('fee_structures')
+          .select('*')
+          .eq('school_id', schoolId)
+          .eq('is_deleted', false);
 
-          for (const balance of unpaidBalances) {
+        const { data: payments } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('school_id', schoolId)
+          .eq('is_deleted', false)
+          .in('status', ['paid', 'completed', 'success']);
+
+        const nextYearId = createNextYear ? (await this.createNextAcademicYear(schoolId, year, userId))?.academic_year_id : null;
+
+        let carriedCount = 0;
+        for (const student of allStudents || []) {
+          const balanceInfo = calculateStudentFeeBalance({ student, feeStructures: feeStructures || [], payments: payments || [] });
+
+          const amount = balanceInfo.balance > 0 ? balanceInfo.balance : (balanceInfo.isOverpaid ? balanceInfo.overpaymentAmount : 0);
+          if (amount > 0) {
             await supabase.from('fee_balance_ledger').insert({
               school_id: schoolId,
-              student_id: balance.student_id,
-              academic_year_id: nextYearId || balance.academic_year_id,
-              balance_after: balance.balance_after,
+              student_id: student.student_id,
+              academic_year_id: nextYearId || academicYearId,
+              balance_after: amount,
               created_at: new Date(),
             });
+            carriedCount++;
           }
-          summary.balancesCarriedForward = unpaidBalances.length;
         }
+        summary.balancesCarriedForward = carriedCount;
       }
 
       await supabase
