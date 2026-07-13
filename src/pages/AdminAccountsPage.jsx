@@ -140,7 +140,7 @@ export default function AdminAccountsPage({ auth, students, toast }) {
 
   const openAddPortal = () => {
     const first = students[0];
-    setPortalForm({ studentId: first ? String(first.id ?? first.student_id) : "", role: "parent", password: "", confirmPassword: "", name: "" });
+    setPortalForm({ studentId: first ? String(first.student_id ?? first.id) : "", role: "parent", password: "", confirmPassword: "", name: "" });
     setShowPortal(true);
   };
 
@@ -377,7 +377,7 @@ export default function AdminAccountsPage({ auth, students, toast }) {
                 onChange={e => setPortalForm({ ...portalForm, studentId: e.target.value })}>
                 <option value="">-- Select student --</option>
                 {students.map(s => {
-                  const sid  = s.id ?? s.student_id;
+                  const sid  = s.student_id ?? s.id;
                   const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
                   const cls  = s.className ?? s.class_name ?? "";
                   const adm  = s.admission ?? s.admission_number ?? "";

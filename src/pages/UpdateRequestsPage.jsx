@@ -48,7 +48,7 @@ export default function UpdateRequestsPage({ auth, students, pendingUpdates, set
     
     // Parents can only see their children's update requests
     if (isParent) {
-      const myChildIds = myChildren.map(c => c.id ?? c.student_id);
+      const myChildIds = myChildren.map(c => c.student_id ?? c.id);
       updates = updates.filter(u => myChildIds.includes(u.studentId));
     }
     
@@ -97,7 +97,7 @@ export default function UpdateRequestsPage({ auth, students, pendingUpdates, set
     setEditId(null);
     setErr("");
     setF({
-      studentId: myChildren[0]?.id ?? myChildren[0]?.student_id ?? "",
+      studentId: myChildren[0]?.student_id ?? myChildren[0]?.id ?? "",
       field: "",
       oldValue: "",
       newValue: "",
@@ -363,7 +363,7 @@ export default function UpdateRequestsPage({ auth, students, pendingUpdates, set
               options={[
                 { value: "", label: "Select Student" },
                 ...myChildren.map(child => ({
-                  value: child.id ?? child.student_id,
+                  value: child.student_id ?? child.id,
                   label: `${child.firstName ?? child.first_name} ${child.lastName ?? child.last_name}`
                 }))
               ]}

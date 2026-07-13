@@ -269,7 +269,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginLeft: "var(--space-2)" }}>
                   {grouped[cls].map(s => {
-                    const sid = s.id ?? s.student_id;
+                    const sid = s.student_id ?? s.id;
                     const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
                     const card = reportCards.find(r => String(r.student_id) === String(sid));
                     const isSelected = selected === sid;
@@ -416,7 +416,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
               options={[
                 { value: "", label: formClass ? "-- Select student --" : "-- Select class first --" },
                 ...students.filter(s => (s.className ?? s.class_name) === formClass).map(s => ({
-                  value: s.id ?? s.student_id,
+                  value: s.student_id ?? s.id,
                   label: s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`
                 }))
               ]}

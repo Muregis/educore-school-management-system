@@ -129,7 +129,7 @@ export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId =
               <select style={inputStyle} value={f.studentId} onChange={e => setF({ ...f, studentId: e.target.value })}>
                 <option value="">-- Select Student --</option>
                 {filteredStudents.map(s => (
-                  <option key={s.id ?? s.student_id} value={s.id ?? s.student_id}>
+                  <option key={s.student_id ?? s.id} value={s.student_id ?? s.id}>
                     {s.firstName || s.first_name} {s.lastName || s.last_name} ({s.admission_number || s.admission})
                   </option>
                 ))}

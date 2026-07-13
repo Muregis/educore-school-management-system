@@ -465,7 +465,7 @@ const Sidebar = ({
               }}
             >
               {myChildren.map((s) => {
-                const sid = s.id ?? s.student_id;
+                const sid = s.student_id ?? s.id;
                 const name = s.firstName
                   ? `${s.firstName} ${s.lastName}`
                   : `${s.first_name} ${s.last_name}`;

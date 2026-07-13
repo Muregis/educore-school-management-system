@@ -126,12 +126,12 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
 
    // Calculate rankings when results change
    const getStudentClass = s => (s.className ?? s.class_name ?? "").toString().trim();
-   const getStudentId = s => s.id ?? s.student_id ?? "";
+   const getStudentId = s => s.student_id ?? s.id ?? "";
    const getStudentName = s => `${s.firstName ?? s.first_name ?? ""} ${s.lastName ?? s.last_name ?? ""}`.trim();
    const getAdmissionNumber = s =>
      (s.admissionNumber ?? s.admission_number ?? s.admission ?? "").toString().trim();
    const normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
-   const findStudentById = id => students.find(x => `${x.id ?? x.student_id ?? ""}` === `${id}`);
+   const findStudentById = id => students.find(x => `${x.student_id ?? x.id ?? ""}` === `${id}`);
 
    const classesForDropdown = useMemo(() => {
      const fromApi = classOptions.map(c => (c.class_name ?? c.className ?? "").toString().trim()).filter(Boolean);

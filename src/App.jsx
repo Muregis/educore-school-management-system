@@ -257,7 +257,7 @@ export default function App() {
 
   const myChildren = useMemo(() => {
     if (!isParent) return [];
-    const loginStudent = students.find(s => (s.id ?? s.student_id) === auth?.studentId);
+    const loginStudent = students.find(s => (s.student_id ?? s.id) === auth?.studentId);
     if (!loginStudent) return [];
     const phone = loginStudent.parentPhone ?? loginStudent.parent_phone ?? "";
     if (!phone) return [loginStudent];
@@ -266,12 +266,12 @@ export default function App() {
 
   const linkedStudentId = useMemo(() => {
     if (auth?.role === "student") return auth?.studentId ?? null;
-    if (isParent) return activeChildId || auth?.studentId || (myChildren[0]?.id ?? myChildren[0]?.student_id ?? null);
+    if (isParent) return activeChildId || auth?.studentId || (myChildren[0]?.student_id ?? myChildren[0]?.id ?? null);
     return null;
   }, [isParent, auth, activeChildId, myChildren]);
 
   const activeChild = useMemo(() =>
-    myChildren.find(s => (s.id ?? s.student_id) === linkedStudentId) || myChildren[0],
+    myChildren.find(s => (s.student_id ?? s.id) === linkedStudentId) || myChildren[0],
     [myChildren, linkedStudentId]
   );
 
@@ -279,7 +279,7 @@ export default function App() {
   const validLinkedId = linkedStudentId && Number(linkedStudentId) > 0 ? Number(linkedStudentId) : null;
   
   const myStudents   = isPortal 
-    ? (validLinkedId ? students.filter(s => Number(s.id ?? s.student_id) === validLinkedId) : []) 
+    ? (validLinkedId ? students.filter(s => Number(s.student_id ?? s.id) === validLinkedId) : []) 
     : students;
   const myAttendance = isPortal 
     ? (validLinkedId ? attendance.filter(a => Number(a.studentId ?? a.student_id) === validLinkedId) : []) 

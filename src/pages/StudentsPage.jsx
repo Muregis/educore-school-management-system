@@ -241,7 +241,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
         // Only update local state and show success if both PUT and PATCH succeeded
         setStudents(prev => prev.map(s =>
-          (s.id === editId || s.student_id === editId)
+          (s.student_id === editId || s.id === editId)
             ? { ...normalise(s), ...f, id: editId }
             : s
         ));
@@ -344,7 +344,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
       const scannedId = String(parsedQr.studentId).trim();
       const student = students.find(s =>
-        String(s.id ?? s.student_id ?? "") === scannedId ||
+        String(s.student_id ?? s.id ?? "") === scannedId ||
         String(s.admission ?? s.admission_number ?? "") === scannedId
       );
 
@@ -618,7 +618,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         <>
           <Button variant="ghost" onClick={() => { setProfile(null); setIdCardStudent(profile); }}>🪪 View ID Card</Button>
           <Button variant="primary" onClick={() => { 
-            const rowsHtml = results.filter(r => (r.studentId ?? r.student_id) === profile.id).map(r => `<li>${r.subject}: ${r.marks}/${r.total || r.total_marks} (${r.grade})</li>`).join(""); 
+            const rowsHtml = results.filter(r => (r.studentId ?? r.student_id) === (profile.student_id ?? profile.id)).map(r => `<li>${r.subject}: ${r.marks}/${r.total || r.total_marks} (${r.grade})</li>`).join(""); 
             const html = `<h2>${profile.firstName} ${profile.lastName}</h2><p>${profile.admission}</p><ul>${rowsHtml||"<li>No results</li>"}</ul>`;
             printHTML(html, { title: `Report - ${profile.firstName} ${profile.lastName}` });
           }}>Export Report (Print/PDF)</Button>
@@ -678,14 +678,14 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: 700 }}>Paid Amount</div>
                 <div style={{ color: "var(--color-success)", fontWeight: 700, fontSize: "18px", marginTop: "4px" }}>
-                  {money(payments.filter(p => (p.studentId ?? p.student_id) === profile.id && p.status === "paid").reduce((s, p) => s + Number(p.amount), 0))}
+                  {money(payments.filter(p => (p.studentId ?? p.student_id) === (profile.student_id ?? profile.id) && p.status === "paid").reduce((s, p) => s + Number(p.amount), 0))}
                 </div>
               </div>
             </div>
             
             <div style={{ background: "var(--color-bg-base)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ fontSize: "13px", color: "var(--color-text-primary)", fontWeight: 600 }}>Results Recorded</div>
-              <Badge text={results.filter(r => (r.studentId ?? r.student_id) === profile.id).length.toString()} variant="primary" />
+              <Badge text={results.filter(r => (r.studentId ?? r.student_id) === (profile.student_id ?? profile.id)).length.toString()} variant="primary" />
             </div>
           </div>
         )}

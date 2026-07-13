@@ -229,7 +229,7 @@ export default function MpesaReconciliationPage({ auth, students, toast }) {
                 .filter(s => s.status === 'active' || s.status === 'Active')
                 .sort((a, b) => (a.className || "").localeCompare(b.className || ""))
                 .map(s => {
-                  const sid = s.id ?? s.student_id;
+                  const sid = s.student_id ?? s.id;
                   const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
                   return (
                     <option key={sid} value={sid}>

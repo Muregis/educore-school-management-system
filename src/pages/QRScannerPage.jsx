@@ -47,7 +47,7 @@ export default function QRScannerPage({ auth, students, payments, feeStructures,
 
       // Find student by ID or admission
       const student = students.find(s =>
-        (s.id || s.student_id) === data.id ||
+        (s.student_id || s.id) === data.id ||
         (s.admission || s.admission_number) === data.admission
       );
 

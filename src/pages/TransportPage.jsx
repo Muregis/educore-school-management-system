@@ -247,7 +247,7 @@ export default function TransportPage({ auth, canEdit, toast, students }) {
                 options={[
                   { value: "", label: "-- Select Student --" },
                   ...filteredStudents.map(s => ({
-                    value: s.id ?? s.student_id,
+                    value: s.student_id ?? s.id,
                     label: `${s.firstName || s.first_name} ${s.lastName || s.last_name} (${s.admission_number || s.admission})`
                   }))
                 ]}

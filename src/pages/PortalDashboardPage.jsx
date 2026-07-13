@@ -21,7 +21,7 @@ export default function PortalDashboardPage({
   onViewFees,
   onViewAttendance 
 }) {
-  const studentId = student?.id ?? student?.student_id;
+  const studentId = student?.student_id ?? student?.id;
   
   // Calculate stats
   const studentAttendance = useMemo(() => 

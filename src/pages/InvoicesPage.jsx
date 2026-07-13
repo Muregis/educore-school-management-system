@@ -204,7 +204,7 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
             <Field label="Student" style={{ gridColumn: "1 / -1" }}>
               <select style={inputStyle} value={singleForm.studentId} onChange={e => setSingleForm({ ...singleForm, studentId: e.target.value })} disabled={!singleFormClass}>
                 <option value="">{singleFormClass ? "-- Select student --" : "-- Select class first --"}</option>
-                {students.filter(s => (s.className ?? s.class_name) === singleFormClass).map(s => { const id = s.id ?? s.student_id; const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`; return <option key={id} value={id}>{name}</option>; })}
+                {students.filter(s => (s.className ?? s.class_name) === singleFormClass).map(s => { const id = s.student_id ?? s.id; const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`; return <option key={id} value={id}>{name}</option>; })}
               </select>
             </Field>
             <Field label="Term"><select style={inputStyle} value={singleForm.term} onChange={e => setSingleForm({ ...singleForm, term: e.target.value })}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></Field>

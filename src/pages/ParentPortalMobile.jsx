@@ -36,17 +36,17 @@ export default function ParentPortalMobile({
 
   // Filtered data for active child
   const childAttendance = useMemo(() =>
-    attendance.filter(a => (a.studentId ?? a.student_id) === (activeChild?.id ?? activeChild?.student_id)),
+    attendance.filter(a => (a.studentId ?? a.student_id) === (activeChild?.student_id ?? activeChild?.id)),
     [attendance, activeChild]
   );
 
   const childResults = useMemo(() =>
-    results.filter(r => (r.studentId ?? r.student_id) === (activeChild?.id ?? activeChild?.student_id)),
+    results.filter(r => (r.studentId ?? r.student_id) === (activeChild?.student_id ?? activeChild?.id)),
     [results, activeChild]
   );
 
   const childPayments = useMemo(() =>
-    payments.filter(p => (p.studentId ?? p.student_id) === (activeChild?.id ?? activeChild?.student_id)),
+    payments.filter(p => (p.studentId ?? p.student_id) === (activeChild?.student_id ?? activeChild?.id)),
     [payments, activeChild]
   );
 
@@ -88,9 +88,9 @@ export default function ParentPortalMobile({
           <div className="mobile-chips">
             {myChildren.map(child => (
               <button
-                key={child.id ?? child.student_id}
-                className={`mobile-chip ${(activeChild?.id ?? activeChild?.student_id) === (child.id ?? child.student_id) ? 'active' : ''}`}
-                onClick={() => setActiveChildId(child.id ?? child.student_id)}
+                key={child.student_id ?? child.id}
+                className={`mobile-chip ${(activeChild?.student_id ?? activeChild?.id) === (child.student_id ?? child.id) ? 'active' : ''}`}
+                onClick={() => setActiveChildId(child.student_id ?? child.id)}
               >
                 {child.firstName ?? child.first_name} {child.lastName ?? child.last_name}
               </button>

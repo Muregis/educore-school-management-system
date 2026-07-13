@@ -94,7 +94,7 @@ export default function AttendancePage({
   useEffect(() => {
     if (showBulk) {
       setBulk(classStudents.map(s => ({ 
-        studentId: s.id ?? s.student_id, 
+        studentId: s.student_id ?? s.id, 
         status: "" // Default to empty instead of hardcoded "present"
       })));
     }
@@ -189,7 +189,7 @@ export default function AttendancePage({
       const scannedId = String(parsedQr.studentId).trim();
 
       const student = students.find(s =>
-        String(s.id ?? s.student_id ?? "") === scannedId ||
+        String(s.student_id ?? s.id ?? "") === scannedId ||
         String(s.admission ?? s.admission_number ?? "") === scannedId
       );
 
@@ -380,7 +380,7 @@ export default function AttendancePage({
             background: "var(--color-bg-base)"
           }}>
             {classStudents.map(s => {
-              const sid = s.id ?? s.student_id;
+              const sid = s.student_id ?? s.id;
               const idx = bulk.findIndex(b => b.studentId === sid);
               const val = idx >= 0 ? bulk[idx].status : "present";
               const name = s.firstName 

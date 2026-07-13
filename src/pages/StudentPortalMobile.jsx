@@ -18,17 +18,17 @@ export default function StudentPortalMobile({
 
   // Calculate stats
   const studentAttendance = useMemo(() =>
-    attendance.filter(a => (a.studentId ?? a.student_id) === (student?.id ?? student?.student_id)),
+    attendance.filter(a => (a.studentId ?? a.student_id) === (student?.student_id ?? student?.id)),
     [attendance, student]
   );
 
   const studentResults = useMemo(() =>
-    results.filter(r => (r.studentId ?? r.student_id) === (student?.id ?? student?.student_id)),
+    results.filter(r => (r.studentId ?? r.student_id) === (student?.student_id ?? student?.id)),
     [results, student]
   );
 
   const studentBooks = useMemo(() =>
-    library.filter(b => (b.studentId ?? b.student_id) === (student?.id ?? student?.student_id) && b.status === 'borrowed'),
+    library.filter(b => (b.studentId ?? b.student_id) === (student?.student_id ?? student?.id) && b.status === 'borrowed'),
     [library, student]
   );
 

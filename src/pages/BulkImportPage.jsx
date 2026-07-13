@@ -354,7 +354,7 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
       filteredStudents = allStudents.filter(s => (s.className || s.class_name) === exportClass);
     } else if (exportFilter === "defaulter") {
       filteredStudents = allStudents.filter(s => {
-        const studentId = s.id ?? s.student_id;
+        const studentId = s.student_id ?? s.id;
         
         // Use student's outstanding_balance if available
         let balance;
@@ -384,7 +384,7 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
     ];
     
     const rows = filteredStudents.map(s => {
-      const studentId = s.id ?? s.student_id;
+      const studentId = s.student_id ?? s.id;
       const studentPayments = allPayments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid");
       
       // Fee calculations
@@ -763,7 +763,7 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
                 <div style={{ color: C.textSub, marginBottom: 8 }}>Select students ({selectedStudents.length} selected):</div>
                 <div style={{ maxHeight: 200, overflow: "auto", background: C.bg, padding: 10, borderRadius: 8 }}>
                   {students.map(s => {
-                    const sid = s.id ?? s.student_id;
+                    const sid = s.student_id ?? s.id;
                     return (
                       <label key={sid} style={{ display: "flex", alignItems: "center", gap: 8, padding: 4, cursor: "pointer" }}>
                         <input 
