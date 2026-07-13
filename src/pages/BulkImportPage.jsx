@@ -372,7 +372,7 @@ Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,acti
         return balance > exportDefaulterAmount;
       });
     } else if (exportFilter === "individual") {
-      filteredStudents = allStudents.filter(s => selectedStudents.includes(s.id ?? s.student_id));
+      filteredStudents = allStudents.filter(s => selectedStudents.includes(s.student_id ?? s.id));
     }
 
     const headers = [

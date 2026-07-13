@@ -59,7 +59,7 @@ export default function QRScannerPage({ auth, students, payments, feeStructures,
 
       // Get student's payments
       const studentPayments = payments.filter(p =>
-        (p.studentId || p.student_id) === (student.id || student.student_id)
+        (p.studentId || p.student_id) === (student.student_id || student.id)
       );
 
       const balanceInfo = calculateStudentBalanceLocal({

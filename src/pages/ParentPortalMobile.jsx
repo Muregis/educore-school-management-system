@@ -21,7 +21,7 @@ export default function ParentPortalMobile({
 
   // Get children for this parent
   const myChildren = useMemo(() => {
-    const loginStudent = students.find(s => (s.id ?? s.student_id) === auth?.studentId);
+    const loginStudent = students.find(s => (s.student_id ?? s.id) === auth?.studentId);
     if (!loginStudent) return [];
     const phone = loginStudent.parentPhone ?? loginStudent.parent_phone ?? '';
     if (!phone) return [loginStudent];
@@ -30,7 +30,7 @@ export default function ParentPortalMobile({
 
   // Active child
   const activeChild = useMemo(() =>
-    myChildren.find(s => (s.id ?? s.student_id) === activeChildId) || myChildren[0],
+    myChildren.find(s => (s.student_id ?? s.id) === activeChildId) || myChildren[0],
     [myChildren, activeChildId]
   );
 

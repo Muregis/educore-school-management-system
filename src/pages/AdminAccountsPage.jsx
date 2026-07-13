@@ -136,7 +136,7 @@ export default function AdminAccountsPage({ auth, students, toast }) {
   };
 
   // ── Portal account actions ────────────────────────────────────────────────
-  const selectedStudent = students.find(s => String(s.id ?? s.student_id) === String(portalForm.studentId));
+  const selectedStudent = students.find(s => String(s.student_id ?? s.id) === String(portalForm.studentId));
 
   const openAddPortal = () => {
     const first = students[0];

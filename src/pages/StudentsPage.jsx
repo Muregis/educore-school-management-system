@@ -284,7 +284,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     if (!window.confirm("Delete this student?")) return;
     try {
       await apiFetch(`/students/${id}`, { method: "DELETE", token: auth?.token });
-      setStudents(prev => prev.filter(s => (s.id ?? s.student_id) !== id));
+      setStudents(prev => prev.filter(s => (s.student_id ?? s.id) !== id));
       toast("Student deleted", "success");
     } catch (err) { toast(err.message || "Delete failed", "error"); }
   };

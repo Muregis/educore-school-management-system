@@ -450,7 +450,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     const normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
     const myClasses = Array.isArray(teacherClasses) ? teacherClasses.map(normalizeClassName) : [];
     const myStudents = students.filter(s => myClasses.includes(normalizeClassName(s.className ?? s.class_name)));
-    const myStudentIds = new Set(myStudents.map(s => String(s.id ?? s.student_id ?? s.studentId ?? "")));
+    const myStudentIds = new Set(myStudents.map(s => String(s.student_id ?? s.id ?? s.studentId ?? "")));
     const myAttendance = attendance.filter(a => myStudentIds.has(String(a.studentId ?? a.student_id ?? "")));
     const myResults = results.filter(r => myStudentIds.has(String(r.studentId ?? r.student_id ?? "")));
      
@@ -558,7 +558,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     
     const outstandingByClass = students.map(s => {
       const cls = s.className ?? s.class_name ?? "";
-      const balanceInfo = studentBalances.find(item => String(item.studentId) === String(s.id ?? s.student_id ?? s.studentId));
+      const balanceInfo = studentBalances.find(item => String(item.studentId) === String(s.student_id ?? s.id ?? s.studentId));
       return { className: cls, outstanding: balanceInfo?.balance || 0 };
     }).reduce((acc, item) => {
       acc[item.className] = (acc[item.className] || 0) + item.outstanding;
@@ -637,15 +637,15 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     });
 
     const myAttendance = attendance.filter(a => 
-      myChildrenStudents.some(s => (s.id ?? s.student_id) === (a.studentId ?? a.student_id))
+      myChildrenStudents.some(s => (s.student_id ?? s.id) === (a.studentId ?? a.student_id))
     );
     
     const myResults = results.filter(r => 
-      myChildrenStudents.some(s => (s.id ?? s.student_id) === (r.studentId ?? r.student_id))
+      myChildrenStudents.some(s => (s.student_id ?? s.id) === (r.studentId ?? r.student_id))
     );
     
     const myPayments = payments.filter(p => 
-      myChildrenStudents.some(s => (s.id ?? s.student_id) === (p.studentId))
+      myChildrenStudents.some(s => (s.student_id ?? s.id) === (p.studentId))
     );
 
     const attendanceRate = myAttendance.length > 0 
@@ -751,7 +751,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
 
   // Student dashboard
   if (auth?.role === "student") {
-    const myStudentData = students.find(s => (s.id ?? s.student_id) === auth.studentId);
+    const myStudentData = students.find(s => (s.student_id ?? s.id) === auth.studentId);
     const myAttendance = attendance.filter(a => (a.studentId ?? a.student_id) === auth.studentId);
     const myResults = results.filter(r => (r.studentId ?? r.student_id) === auth.studentId);
 

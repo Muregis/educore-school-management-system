@@ -214,7 +214,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     };
   };
 
-  const balances = students.map(s => calculateLedgerBalance(s, studentDiscounts[s.id ?? s.student_id] || []))
+  const balances = students.map(s => calculateLedgerBalance(s, studentDiscounts[s.student_id ?? s.id] || []))
     .filter(b => filterClass === "all" || b.className === filterClass)
     .filter(b => (!filterClass || filterClass === "all" || b.className === filterClass))
     .filter(b => {
@@ -338,7 +338,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   const savePayment = async () => {
     const sid = Number(paymentForm.studentId);
-    const s   = students.find(x => (x.id ?? x.student_id) === sid);
+    const s   = students.find(x => (x.student_id ?? x.id) === sid);
     const amt = Number(paymentForm.amount);
     const balance = balances.find(b => b.studentId === sid)?.balance || 0;
 
@@ -462,7 +462,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   const saveBankDeposit = async () => {
     const sid = Number(bankDepositForm.studentId);
-    const s = students.find(x => (x.id ?? x.student_id) === sid);
+    const s = students.find(x => (x.student_id ?? x.id) === sid);
     const amt = Number(bankDepositForm.amount);
     const balance = balances.find(b => b.studentId === sid)?.balance || 0;
 
@@ -726,7 +726,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
               return (
               <Card style={{ marginBottom: "var(--space-4)", background: "var(--color-info-muted)", borderColor: "var(--color-info-border)" }}>
                 <div style={{ fontWeight: 700, marginBottom: "var(--space-2)", color: "var(--color-info)" }}>
-                  📊 Payment Progress for {students.find(s => String(s.id ?? s.student_id) === activeStudentIdForProgress)?.first_name} {students.find(s => String(s.id ?? s.student_id) === activeStudentIdForProgress)?.last_name}
+                  📊 Payment Progress for {students.find(s => String(s.student_id ?? s.id) === activeStudentIdForProgress)?.first_name} {students.find(s => String(s.student_id ?? s.id) === activeStudentIdForProgress)?.last_name}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "var(--space-3)" }}>
                   <div>
@@ -1077,7 +1077,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
               options={[
                 { value: "", label: paymentClass ? "-- Select student --" : "-- Select class first --" },
                 ...students.filter(s => (s.className ?? s.class_name) === paymentClass).map(s => ({
-                  value: s.id ?? s.student_id,
+                  value: s.student_id ?? s.id,
                   label: s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`
                 }))
               ]}
@@ -1375,7 +1375,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         onSuccess={(response) => {
           reloadPayments();
           const sid = String(response.studentId);
-          const student = students.find(s => String(s.id || s.student_id) === sid);
+          const student = students.find(s => String(s.student_id || s.id) === sid);
           const firstName = student?.firstName || student?.first_name || "";
           const lastName = student?.lastName || student?.last_name || "";
           const studentName = `${firstName} ${lastName}`.trim() || "Student";

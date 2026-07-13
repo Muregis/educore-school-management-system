@@ -35,7 +35,7 @@ export default function UpdateRequestsPage({ auth, students, pendingUpdates, set
   // Get parent's children for filtering
   const myChildren = useMemo(() => {
     if (!isParent) return [];
-    const loginStudent = students.find(s => (s.id ?? s.student_id) === auth?.studentId);
+    const loginStudent = students.find(s => (s.student_id ?? s.id) === auth?.studentId);
     if (!loginStudent) return [];
     const phone = loginStudent.parentPhone ?? loginStudent.parent_phone ?? "";
     if (!phone) return [loginStudent];
@@ -60,7 +60,7 @@ export default function UpdateRequestsPage({ auth, students, pendingUpdates, set
     // Apply search filter
     if (q) {
       updates = updates.filter(u => {
-        const student = students.find(s => (s.id ?? s.student_id) === u.studentId);
+        const student = students.find(s => (s.student_id ?? s.id) === u.studentId);
         const studentName = student ? `${student.firstName ?? student.first_name} ${student.lastName ?? student.last_name}` : "";
         return (
           studentName.toLowerCase().includes(q.toLowerCase()) ||
@@ -114,7 +114,7 @@ export default function UpdateRequestsPage({ auth, students, pendingUpdates, set
     if (!f.reason.trim()) return setErr("Please provide a reason for the update.");
 
     try {
-      const student = students.find(s => (s.id ?? s.student_id) === f.studentId);
+      const student = students.find(s => (s.student_id ?? s.id) === f.studentId);
       if (!student) return setErr("Student not found.");
 
       // Get current value for the field
@@ -283,7 +283,7 @@ export default function UpdateRequestsPage({ auth, students, pendingUpdates, set
           <Table 
             headers={headers} 
             data={rows.map(row => {
-              const student = students.find(s => (s.id ?? s.student_id) === row.studentId);
+              const student = students.find(s => (s.student_id ?? s.id) === row.studentId);
               const name = student ? `${student.firstName ?? student.first_name} ${student.lastName ?? student.last_name}` : "Unknown";
               
               const tableRow = [

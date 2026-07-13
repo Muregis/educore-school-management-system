@@ -209,7 +209,7 @@ export default function AttendancePage({
           classId: resolvedClassId,
           className: student.className || student.class_name,
           date: today,
-          records: [{ studentId: student.id || student.student_id, status: "present" }]
+          records: [{ studentId: student.student_id || student.id, status: "present" }]
         },
         token: auth?.token,
       });
