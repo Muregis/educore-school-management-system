@@ -558,6 +558,26 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     setReconciling(false);
   };
 
+  const [resettingOpening, setResettingOpening] = useState(false);
+
+  const resetOpeningBalances = async () => {
+    if (!confirm("This will recompute opening_balance for all students from raw payment data. Continue?")) return;
+    setResettingOpening(true);
+    try {
+      const res = await apiFetch("/ledger/reset-opening-balances", {
+        method: "POST",
+        token: auth?.token,
+        timeoutMs: 180000,
+        retries: 0,
+      });
+      toast(`Opening balances reset: ${res.summary.studentsFixed} of ${res.summary.totalStudents} students updated`, "success");
+      reloadPayments();
+    } catch (err) {
+      toast(err.message || "Reset failed", "error");
+    }
+    setResettingOpening(false);
+  };
+
   const filteredBalances = filterDate === "today"
     ? balances.filter(b => {
         const hasPaymentToday = todayPayments.some(p => String(p.studentId) === String(b.studentId));
@@ -710,6 +730,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             {canEdit && <Button variant="ghost" onClick={() => setShowDayEndSettings(true)}>⚙️ Day Settings</Button>}
             {canEdit && <Button variant="primary" onClick={closeDay}>🔒 Close Day</Button>}
             {canEdit && <Button variant="outline" onClick={() => { setReconcileResult(null); setShowReconcile(true); }}>🔄 Reconcile Ledger</Button>}
+            {canEdit && <Button variant="outline" onClick={resetOpeningBalances} disabled={resettingOpening}>{resettingOpening ? "⏳ Resetting..." : "🆕 Reset Opening Balances"}</Button>}
           </div>
         </div>
       </Card>

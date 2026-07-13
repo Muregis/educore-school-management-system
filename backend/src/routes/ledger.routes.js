@@ -1,203 +1,102 @@
 import { Router } from "express";
+import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
-import { LedgerService } from "../services/ledger.service.js";
-import { supabase } from "../config/supabaseClient.js";
-import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
+import { logActivity } from "../helpers/activity.logger.js";
+import LedgerService from "../services/ledger.service.js";
+import { calculateStudentFeeBalance } from "../services/feeBalanceCalculator.js";
 
 const router = Router();
 router.use(authRequired);
 
-// ─── GET /api/ledger/student/:studentId ───────────────────────────────────────
+// ─── GET /api/ledger/student/:studentId ──────────────────────────────────────
 router.get("/student/:studentId", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
-    const { limit = 50, offset = 0 } = req.query;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
 
-    // Verify student belongs to school
-    const { data: student, error: studentError } = await supabase
-      .from('students')
-      .select('student_id, first_name, last_name')
-      .eq('student_id', studentId)
-      .eq('school_id', schoolId)
-      .eq('is_deleted', false)
-      .single();
-
-    if (studentError || !student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    const ledger = await LedgerService.getStudentLedger(schoolId, studentId, parseInt(limit), parseInt(offset));
+    const ledger = await LedgerService.getStudentLedger(schoolId, studentId, limit, offset);
     const balance = await LedgerService.getStudentBalance(schoolId, studentId);
 
-    res.json({
-      student: {
-        studentId: student.student_id,
-        name: `${student.first_name} ${student.last_name}`
-      },
-      balance,
-      transactions: ledger
-    });
-
-  } catch (error) {
-    next(error);
-  }
+    res.json({ ledger, balance });
+  } catch (err) { next(err); }
 });
 
-// ─── GET /api/ledger/student/:studentId/statement ───────────────────────────────
+// ─── GET /api/ledger/student/:studentId/statement ────────────────────────────
 router.get("/student/:studentId/statement", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { studentId } = req.params;
     const { term } = req.query;
 
-    // Verify student belongs to school
-    const { data: student, error: studentError } = await supabase
-      .from('students')
-      .select('student_id, first_name, last_name')
-      .eq('student_id', studentId)
-      .eq('school_id', schoolId)
-      .eq('is_deleted', false)
-      .single();
-
-    if (studentError || !student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
     const statement = await LedgerService.getFeeStatement(schoolId, studentId, term);
-
     res.json(statement);
-
-  } catch (error) {
-    next(error);
-  }
+  } catch (err) { next(err); }
 });
 
-// ─── POST /api/ledger/assess-fees ─────────────────────────────────────────────
-router.post("/assess-fees", 
-  requireRoles("admin", "finance", "director", "superadmin"), 
-  async (req, res, next) => {
-    try {
-      const { schoolId } = req.user;
-      const { classId, feeStructureId, term, academicYear } = req.body;
+// ─── GET /api/ledger/all/balances ────────────────────────────────────────────
+router.get("/all/balances", async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const { term } = req.query;
 
-      if (!classId || !feeStructureId || !term || !academicYear) {
-        return res.status(400).json({ 
-          message: "classId, feeStructureId, term, and academicYear are required" 
-        });
-      }
-
-      // Verify class belongs to school
-    const { data: cls, error: classError } = await supabase
-      .from('classes')
-      .select('class_id, class_name')
-      .eq('class_id', classId)
+    // Fetch all students
+    const { data: students, error: stuErr } = await supabase
+      .from('students')
+      .select('student_id, first_name, last_name, class_name')
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
-      .single();
+      .eq('status', 'active');
+    if (stuErr) throw stuErr;
 
-    if (classError || !cls) {
-      return res.status(404).json({ message: "Class not found" });
-    }
+    const { data: feeStructures } = await supabase
+      .from('fee_structures')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
 
-      const results = await LedgerService.assessFeesForClass(
-        schoolId, classId, feeStructureId, term, academicYear
-      );
+    let query = supabase
+      .from('payments')
+      .select('student_id, amount, status')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false)
+      .in('status', ['paid', 'completed', 'success']);
+    if (term) query = query.eq('term', term);
+    const { data: payments } = await query;
 
-      res.json({
-        message: "Fees assessed successfully",
-        className: cls.class_name,
-        term,
-        academicYear,
-        assessments: results.length
-      });
-
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// ─── GET /api/ledger/balances ─────────────────────────────────────────────────
-router.get("/balances", 
-  requireRoles("admin", "finance", "teacher"), 
-  async (req, res, next) => {
-    try {
-      const { schoolId } = req.user;
-      const { classId, status } = req.query;
-
-      // Get all students for this school
-      let studentQuery = supabase
-        .from('students')
-        .select('student_id, admission_number, first_name, last_name, class_name')
-        .eq('school_id', schoolId)
-        .eq('is_deleted', false);
-
-      if (classId) {
-        studentQuery = studentQuery.eq('class_id', classId);
-      }
-
-      const { data: students, error: studentError } = await studentQuery.order('class_name').order('first_name');
-      if (studentError) throw studentError;
-
-      // Get latest ledger entries for each student
-      const { data: ledgerEntries, error: ledgerError } = await supabase
-        .from('student_ledger')
-        .select('student_id, balance_after, created_at')
-        .eq('school_id', schoolId)
-        .order('ledger_id', { ascending: false });
-
-      if (ledgerError) throw ledgerError;
-
-      // Map latest balance for each student
-      const latestBalanceMap = new Map();
-      for (const entry of ledgerEntries || []) {
-        if (!latestBalanceMap.has(entry.student_id)) {
-          latestBalanceMap.set(entry.student_id, entry);
-        }
-      }
-
-      // Build student list with balances
-      let studentsWithBalance = (students || []).map(s => {
-        const entry = latestBalanceMap.get(s.student_id);
-        return {
-          ...s,
-          balance: entry ? Number(entry.balance_after) : null,
-          last_transaction_date: entry?.created_at || null
-        };
-      });
-
-      // Filter by balance status if requested
-      let filteredStudents = studentsWithBalance;
-      if (status === 'owing') {
-        filteredStudents = studentsWithBalance.filter(s => s.balance > 0);
-      } else if (status === 'paid') {
-        filteredStudents = studentsWithBalance.filter(s => s.balance !== null && s.balance <= 0);
-      }
-
-      // Calculate summary
-      const summary = {
-        totalStudents: filteredStudents.length,
-        totalOwing: filteredStudents.filter(s => s.balance > 0).length,
-        totalPaid: filteredStudents.filter(s => s.balance !== null && s.balance <= 0).length,
-        totalBalance: filteredStudents.reduce((sum, s) => sum + Number(s.balance || 0), 0)
+    const studentBalances = (students || []).map(s => {
+      const balanceInfo = calculateStudentFeeBalance({ student: s, feeStructures: feeStructures || [], payments: payments || [] });
+      return {
+        student_id: s.student_id,
+        name: `${s.first_name || ''} ${s.last_name || ''}`.trim(),
+        class: s.class_name,
+        expected: balanceInfo.expected,
+        paid: balanceInfo.paid,
+        balance: balanceInfo.balance,
+        isOverpaid: balanceInfo.isOverpaid,
       };
+    });
 
-      res.json({
-        summary,
-        students: filteredStudents
-      });
+    const totalExpected = studentBalances.reduce((s, b) => s + b.expected, 0);
+    const totalPaid = studentBalances.reduce((s, b) => s + b.paid, 0);
+    const totalOutstanding = studentBalances.reduce((s, b) => s + b.balance, 0);
+    const defaulters = studentBalances.filter(b => b.balance > 0);
+    const cleared = studentBalances.filter(b => b.balance === 0 && !b.isOverpaid);
+    const overpaid = studentBalances.filter(b => b.isOverpaid);
 
-    } catch (error) {
-      next(error);
-    }
-  }
-);
+    res.json({
+      summary: { totalExpected, totalPaid, totalOutstanding, totalStudents: studentBalances.length, defaulters: defaulters.length, cleared: cleared.length, overpaid: overpaid.length },
+      students: studentBalances,
+      defaulters,
+      cleared,
+      overpaid,
+    });
+  } catch (err) { next(err); }
+});
 
 // ─── POST /api/ledger/reconcile ──────────────────────────────────────────────
-// Rebuilds the student_ledger from scratch using the canonical formula.
-// Clears existing entries and recreates charges + payments to match the formula.
 router.post("/reconcile",
   requireRoles("admin", "director", "superadmin"),
   async (req, res, next) => {
@@ -206,12 +105,7 @@ router.post("/reconcile",
 
       const result = await LedgerService.reconcileLedger(schoolId, userId);
 
-      await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_UPDATE, {
-        entityId: null,
-        entityType: 'ledger_reconciliation',
-        description: `Ledger reconciliation: ${result.fixed} of ${result.processed} students fixed, ${result.errors.length} errors`,
-        newValues: { processed: result.processed, fixed: result.fixed, errors: result.errors.length }
-      });
+      await logActivity(req, { action: "payment.update", entity: "ledger", entityId: null, description: `Ledger reconciliation: ${result.fixed} of ${result.processed} students fixed, ${result.errors.length} errors` });
 
       res.json({
         message: `Reconciliation complete. ${result.fixed} of ${result.processed} students updated.`,
@@ -220,99 +114,84 @@ router.post("/reconcile",
           studentsFixed: result.fixed,
           errors: result.errors.length,
         },
-        details: result.details.slice(0, 500),
-        errors: result.errors,
+        errors: result.errors.slice(0, 10),
       });
-    } catch (error) {
-      next(error);
-    }
+    } catch (err) { next(err); }
   }
 );
 
-// ─── POST /api/ledger/adjustment ───────────────────────────────────────────────
-router.post("/adjustment", 
-  requireRoles("admin", "finance", "director", "superadmin"), 
+// ─── POST /api/ledger/reset-opening-balances ─────────────────────────────────
+// ONE-TIME recovery: recomputes students.opening_balance from raw payment data.
+// This undoes corruption caused by the UUID bug that wrote inflated values.
+router.post("/reset-opening-balances",
+  requireRoles("admin", "director", "superadmin"),
   async (req, res, next) => {
     try {
-      const { schoolId } = req.user;
-      const { studentId, amount, description, adjustmentType = 'manual' } = req.body;
+      const { schoolId, userId } = req.user;
 
-      if (!studentId || !amount || !description) {
-        return res.status(400).json({ 
-          message: "studentId, amount, and description are required" 
-        });
-      }
-
-      // Verify student belongs to school
-      const { data: student, error: studentError } = await supabase
+      const { data: students } = await supabase
         .from('students')
-        .select('student_id, first_name, last_name')
-        .eq('student_id', studentId)
+        .select('student_id, first_name, last_name, class_name, opening_balance, opening_balance_type')
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false);
+
+      if (!students?.length) return res.json({ message: 'No students found', fixed: 0 });
+
+      const { data: feeStructures } = await supabase
+        .from('fee_structures')
+        .select('*')
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false);
+
+      const { data: allPayments } = await supabase
+        .from('payments')
+        .select('*')
         .eq('school_id', schoolId)
         .eq('is_deleted', false)
-        .single();
+        .in('status', ['paid', 'completed', 'success']);
 
-      if (studentError || !student) {
-        return res.status(404).json({ message: "Student not found" });
+      let fixed = 0;
+      let errors = [];
+      for (const student of students) {
+        try {
+          // Compute correct balance with opening_balance=0 (pure formula from raw data)
+          const correctFormula = calculateStudentFeeBalance({
+            student: { ...student, opening_balance: 0, opening_balance_type: 'owing' },
+            feeStructures: feeStructures || [],
+            payments: allPayments || [],
+          });
+
+          const correctBalance = correctFormula.balance;
+          const correctType = correctFormula.isOverpaid ? 'credit' : 'owing';
+
+          // Only update if current stored value differs
+          const currentBalance = Number(student.opening_balance) || 0;
+          const needsUpdate = currentBalance !== correctBalance ||
+            (student.opening_balance_type || 'owing') !== correctType;
+
+          if (needsUpdate) {
+            await supabase.from('students')
+              .update({
+                opening_balance: correctBalance,
+                opening_balance_type: correctType,
+                updated_at: new Date(),
+              })
+              .eq('student_id', student.student_id);
+            fixed++;
+          }
+        } catch (err) {
+          errors.push({ studentId: student.student_id, error: err.message });
+        }
       }
 
-      try {
-        // Get current balance
-        const { data: latestLedger, error: balanceError } = await supabase
-          .from('student_ledger')
-          .select('balance_after')
-          .eq('student_id', studentId)
-          .eq('school_id', schoolId)
-          .order('ledger_id', { ascending: false })
-          .limit(1)
-          .single();
+      await logActivity(req, { action: "payment.update", entity: "ledger", entityId: null, description: `Opening balance reset: ${fixed} of ${students.length} students updated, ${errors.length} errors` });
 
-        if (balanceError && balanceError.code !== 'PGRST116') throw balanceError; // PGRST116 = no rows
-
-        const previousBalance = latestLedger?.balance_after || 0;
-        const newBalance = previousBalance + Number(amount);
-
-        // Insert adjustment entry
-        const { data: inserted, error: insertError } = await supabase
-          .from('student_ledger')
-          .insert({
-            school_id: schoolId,
-            student_id: studentId,
-            transaction_type: 'adjustment',
-            amount: amount,
-            balance_after: newBalance,
-            reference_type: 'adjustment',
-            reference_id: null,
-            description: description
-          })
-          .select('ledger_id')
-          .single();
-
-        if (insertError) throw insertError;
-
-        // Log adjustment for audit
-        await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_UPDATE, {
-          entityId: inserted.ledger_id,
-          entityType: 'ledger_adjustment',
-          description: `Ledger adjustment for student ${studentId}: ${amount} (${description})`,
-          newValues: { studentId, amount, previousBalance, newBalance, description }
-        });
-
-        res.json({
-          message: "Adjustment recorded successfully",
-          adjustmentId: inserted.ledger_id,
-          previousBalance,
-          newBalance,
-          amount
-        });
-
-      } catch (error) {
-        throw error;
-      }
-
-    } catch (error) {
-      next(error);
-    }
+      res.json({
+        message: `Opening balances recomputed. ${fixed} of ${students.length} students updated.`,
+        summary: { totalStudents: students.length, studentsFixed: fixed, errors: errors.length },
+        errors: errors.slice(0, 10),
+      });
+    } catch (err) { next(err); }
   }
 );
 

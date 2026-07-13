@@ -379,32 +379,15 @@ export class LedgerService {
 
         if (diff < 1) continue;
 
-        // Mismatch found – rebuild both ledger entries and opening_balance
-        // Step A: Delete existing ledger entries
+        // Mismatch found – rebuild ledger entries
+        // Step A: Delete existing entries
         await supabase
           .from('student_ledger')
           .delete()
           .eq('student_id', sid)
           .eq('school_id', schoolId);
 
-        // Step B: Compute balance without stored opening_balance to get true position
-        const cleanFormula = calculateStudentFeeBalance({
-          student: { ...student, opening_balance: 0, opening_balance_type: 'owing' },
-          feeStructures: structures || [],
-          payments: paidPayments,
-          discounts: studentDiscs,
-        });
-
-        // Step B1: Update stored opening_balance to match formula (no carry-forward)
-        const correctOpening = cleanFormula.balance > 0 ? cleanFormula.balance : (cleanFormula.isOverpaid ? -cleanFormula.overpaymentAmount : 0);
-        const correctType = cleanFormula.isOverpaid ? 'credit' : 'owing';
-        await supabase.from('students').update({
-          opening_balance: correctOpening,
-          opening_balance_type: correctType,
-          updated_at: new Date(),
-        }).eq('student_id', sid);
-
-        // Step B2: Insert charge for expected amount (without double-counting opening_balance)
+        // Step B: Insert charge for expected amount
         let runningBalance = 0;
         if (formula.expected > 0) {
           runningBalance = formula.expected;
