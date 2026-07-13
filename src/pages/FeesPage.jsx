@@ -150,9 +150,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
   const reloadPayments = useCallback(async () => {
     if (!auth?.token) return;
-    const data = await apiFetch('/payments', { token: auth.token });
+    const data = await apiFetch(`/payments${term ? `?term=${encodeURIComponent(term)}` : ''}`, { token: auth.token });
     setPayments((data || []).map(normalisePayment));
-  }, [auth, setPayments]);
+  }, [auth, setPayments, term]);
 
   useEffect(() => {
     reloadPayments();
@@ -419,7 +419,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         body: { className: structForm.className, term: structForm.term || "Term 1", tuition: Number(structForm.tuition)||0, activity: Number(structForm.activity)||0, misc: Number(structForm.misc)||0 },
         token: auth?.token,
       });
-      const data = await apiFetch("/payments/fee-structures", { token: auth?.token });
+      const data = await apiFetch(`/payments/fee-structures${term ? `?term=${encodeURIComponent(term)}` : ''}`, { token: auth?.token });
       setFeeStructures(data.map(normaliseFeeStruct));
       setShowStruct(false); setEditStruct(null);
       toast("Fee structure saved", "success");

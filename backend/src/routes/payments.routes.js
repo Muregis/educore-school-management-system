@@ -30,12 +30,19 @@ router.use(authRequired);
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId, role } = req.user;
+    const { term } = req.query;
 
-    const { data: rows, error } = await supabase
+    let query = supabase
       .from('payments')
       .select('payment_id, student_id, amount, fee_type, payment_method, reference_number, payment_date, status, paid_by, term, proof_url, school_id, is_deleted')
       .eq('school_id', schoolId)
-      .eq('is_deleted', false)
+      .eq('is_deleted', false);
+
+    if (term) {
+      query = query.eq('term', term);
+    }
+
+    const { data: rows, error } = await query
       .order('payment_date', { ascending: false })
       .order('payment_id', { ascending: false });
 
@@ -76,13 +83,19 @@ router.get("/", async (req, res, next) => {
 router.get("/fee-structures", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    const { term } = req.query;
 
-    const { data: rows, error } = await supabase
+    let query = supabase
       .from('fee_structures')
       .select('fee_structure_id, class_name, term, tuition, activity, misc')
       .eq('school_id', schoolId)
-      .eq('is_deleted', false)
-      .order('class_name');
+      .eq('is_deleted', false);
+
+    if (term) {
+      query = query.eq('term', term);
+    }
+
+    const { data: rows, error } = await query.order('class_name');
 
     if (error) throw error;
 

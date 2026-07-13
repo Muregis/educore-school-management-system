@@ -3,6 +3,7 @@ import { DEFAULTS, NAV, ROLE, NAV_EXTRAS } from "./lib/constants";
 import { C, applyBrandColorTokens } from "./lib/theme";
 import { genId } from "./lib/utils";
 import { useLocalState } from "./hooks/useLocalState";
+import { useCurrentTerm } from "./hooks/useCurrentTerm";
 import Btn from "./components/Btn";
 import LoginView from "./pages/LoginView";
 import DashboardPage from "./pages/DashboardPage";
@@ -308,17 +309,20 @@ export default function App() {
     setTimetable(DEFAULTS.timetable); setPendingUpdates(DEFAULTS.pendingUpdates);
   }, [setSchool, setUsers, setStudents, setTeachers, setAttendance, setResults, setFeeStructures, setPayments, setNotifications, setTimetable, setPendingUpdates]);
 
+  const { term: currentTerm } = useCurrentTerm(auth);
+
   const hydrateTenantData = useCallback(async (loggedInAuth) => {
     if (!loggedInAuth?.token) return;
     const token = loggedInAuth.token;
+    const termParam = currentTerm ? `?term=${encodeURIComponent(currentTerm)}` : '';
     const [schoolRes, studentsRes, teachersRes, attendanceRes, gradesRes, paymentsRes, feeRes, timetableRes] = await Promise.allSettled([
       apiFetch("/settings/school", { token }),
       apiFetch("/students", { token }),
       apiFetch("/teachers", { token }),
       apiFetch("/attendance", { token }),
       apiFetch("/grades", { token }),
-      apiFetch("/payments", { token }),
-      apiFetch("/payments/fee-structures", { token }),
+      apiFetch(`/payments${termParam}`, { token }),
+      apiFetch(`/payments/fee-structures${termParam}`, { token }),
       apiFetch("/timetable", { token }),
     ]);
 
@@ -335,7 +339,7 @@ export default function App() {
     setPayments(paymentsRes.status === "fulfilled" ? (paymentsRes.value || []) : []);
     setFeeStructures(feeRes.status === "fulfilled" ? (feeRes.value || []) : []);
     setTimetable(timetableRes.status === "fulfilled" ? (timetableRes.value || []) : []);
-  }, [setSchool, setStudents, setTeachers, setAttendance, setResults, setPayments, setFeeStructures, setTimetable]);
+  }, [setSchool, setStudents, setTeachers, setAttendance, setResults, setPayments, setFeeStructures, setTimetable, currentTerm]);
 
   useEffect(() => {
     const ping = () => fetch(`${API_BASE}/health`).catch(() => {});
