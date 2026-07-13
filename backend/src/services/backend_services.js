@@ -697,6 +697,21 @@ export class TermTransitionService {
         for (const student of allStudents || []) {
           const balanceInfo = calculateStudentFeeBalance({ student, feeStructures: feeStructures || [], payments: payments || [] });
 
+          // Update student's opening_balance for the next year
+          if (balanceInfo.balance > 0) {
+            await supabase.from('students').update({
+              opening_balance: balanceInfo.balance,
+              opening_balance_type: 'owing',
+              updated_at: new Date(),
+            }).eq('student_id', student.student_id);
+          } else if (balanceInfo.isOverpaid) {
+            await supabase.from('students').update({
+              opening_balance: balanceInfo.overpaymentAmount,
+              opening_balance_type: 'credit',
+              updated_at: new Date(),
+            }).eq('student_id', student.student_id);
+          }
+
           const amount = balanceInfo.balance > 0 ? balanceInfo.balance : (balanceInfo.isOverpaid ? balanceInfo.overpaymentAmount : 0);
           if (amount > 0) {
             await supabase.from('fee_balance_ledger').insert({
@@ -757,7 +772,7 @@ export class TermTransitionService {
         metadata: summary,
       });
 
-      return { success: true, summary, year };
+      return { success: true, summary: { ...summary, promoted: summary.studentsPromoted }, year };
     } catch (error) {
       console.error('Error ending academic year:', error);
       throw error;

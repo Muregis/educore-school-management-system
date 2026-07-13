@@ -229,6 +229,31 @@ export class TermService {
     }
   }
   
+  static async findNextTerm(schoolId, currentTermId) {
+    try {
+      const allTerms = await this.getTerms(schoolId, 'upcoming');
+      const currentTerm = await this.getTerm(schoolId, currentTermId);
+      if (!currentTerm) return null;
+
+      // First try to find the next term in the same academic year
+      const sameYear = allTerms
+        .filter(t => t.academic_year === currentTerm.academic_year && t.term_id !== currentTermId)
+        .sort((a, b) => (a.term_order || 0) - (b.term_order || 0));
+
+      if (sameYear.length > 0) return sameYear[0].term_id;
+
+      // Fall back to the first upcoming term in the next academic year
+      const nextYear = allTerms
+        .filter(t => t.academic_year > currentTerm.academic_year)
+        .sort((a, b) => a.academic_year - b.academic_year || (a.term_order || 0) - (b.term_order || 0));
+
+      return nextYear.length > 0 ? nextYear[0].term_id : null;
+    } catch (error) {
+      console.error('Find next term error:', error);
+      return null;
+    }
+  }
+
   /**
    * End term transition - comprehensive term end workflow
    * Handles closing term, archiving data, and preparing for next term
@@ -356,11 +381,11 @@ export class TermService {
         }
       }
       
-      // Step 4: If next term ID provided, activate it
-      if (nextTermId) {
-        await this.activateTerm(schoolId, nextTermId, userId);
+      // Step 4: Activate next term and copy fee structures
+      const nextTermToActivate = nextTermId || await this.findNextTerm(schoolId, termId);
+      if (nextTermToActivate) {
+        await this.activateTerm(schoolId, nextTermToActivate, userId);
         
-        // Copy fee structures to next term
         const { data: currentFeeStructures } = await client.query('fee_structures', {
           where: { 
             school_id: schoolId,
@@ -369,10 +394,9 @@ export class TermService {
         });
         
         if (currentFeeStructures && currentFeeStructures.length > 0) {
-          const nextTerm = await this.getTerm(schoolId, nextTermId);
+          const nextTerm = await this.getTerm(schoolId, nextTermToActivate);
           if (nextTerm) {
             for (const feeStruct of currentFeeStructures) {
-              // Check if fee structure already exists for next term
               const { data: existing } = await client.query('fee_structures', {
                 where: {
                   class_name: feeStruct.class_name,
@@ -410,7 +434,10 @@ export class TermService {
       
       return {
         term: { ...term, status: 'closed' },
-        summary
+        summary: {
+          ...summary,
+          promoted: summary.studentsProcessed,
+        }
       };
     } catch (error) {
       console.error('End term transition error:', error);
