@@ -544,6 +544,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       const res = await apiFetch("/ledger/reconcile", {
         method: "POST",
         token: auth?.token,
+        timeoutMs: 180000,
+        retries: 0,
       });
       setReconcileResult({ summary: res.summary });
       setShowReconcile(false);
