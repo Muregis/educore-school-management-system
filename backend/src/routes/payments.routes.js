@@ -278,6 +278,18 @@ router.put("/:id", requireRoles("admin", "director", "superadmin"), async (req, 
     const { schoolId } = req.user;
     const { amount, feeType, paymentMethod, referenceNumber, paymentDate, status, paidBy } = req.body;
 
+    // Fetch the original payment to get student_id and old amount
+    const { data: originalPayment, error: fetchError } = await supabase
+      .from('payments')
+      .select('payment_id, student_id, amount')
+      .eq('payment_id', req.params.id)
+      .eq('school_id', schoolId)
+      .single();
+
+    if (fetchError || !originalPayment) {
+      return res.status(404).json({ message: "Payment not found" });
+    }
+
     const { data: updated, error } = await supabase
       .from('payments')
       .update({
@@ -297,6 +309,39 @@ router.put("/:id", requireRoles("admin", "director", "superadmin"), async (req, 
 
     if (error) throw error;
     if (!updated) return res.status(404).json({ message: "Payment not found" });
+
+    // Sync ledger: reverse old payment, record new one
+    try {
+      const { data: currentEntries } = await supabase
+        .from('student_ledger')
+        .select('balance_after, ledger_id')
+        .eq('reference_type', 'payment')
+        .eq('reference_id', req.params.id)
+        .eq('school_id', schoolId)
+        .order('ledger_id', { ascending: false })
+        .limit(1);
+
+      const oldEntry = currentEntries?.[0];
+      if (oldEntry) {
+        // Delete the old ledger entry
+        await supabase
+          .from('student_ledger')
+          .delete()
+          .eq('ledger_id', oldEntry.ledger_id);
+      }
+
+      // Record new payment in ledger
+      await LedgerService.recordPayment(
+        schoolId,
+        originalPayment.student_id,
+        Number(amount),
+        `Payment updated – ${feeType || 'tuition'}`,
+        req.params.id,
+        req
+      );
+    } catch (ledgerErr) {
+      console.error('Failed to sync ledger on payment update:', ledgerErr);
+    }
 
     await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_UPDATE, {
       entityId: req.params.id,
@@ -319,15 +364,38 @@ router.delete("/:id", requireRoles("director", "superadmin"), async (req, res, n
       .update({ is_deleted: true })
       .eq('payment_id', req.params.id)
       .eq('school_id', schoolId)
-      .select('payment_id')
+      .select('payment_id, student_id, amount')
       .single();
 
     if (error) throw error;
     if (!deleted) return res.status(404).json({ message: "Payment not found" });
 
+    // Reverse the ledger entry for this payment
+    try {
+      const { data: ledgerEntry } = await supabase
+        .from('student_ledger')
+        .select('ledger_id')
+        .eq('reference_type', 'payment')
+        .eq('reference_id', req.params.id)
+        .eq('school_id', schoolId)
+        .order('ledger_id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (ledgerEntry) {
+        await supabase
+          .from('student_ledger')
+          .delete()
+          .eq('ledger_id', ledgerEntry.ledger_id);
+      }
+    } catch (ledgerErr) {
+      console.error('Failed to remove ledger entry on payment delete:', ledgerErr);
+    }
+
     await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_DELETE, {
       entityId: req.params.id,
       entityType: 'payment',
+      description: `Payment deleted: ID ${req.params.id}`,
     });
 
     res.json({ deleted: true });

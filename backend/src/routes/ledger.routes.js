@@ -195,6 +195,40 @@ router.get("/balances",
   }
 );
 
+// ─── POST /api/ledger/reconcile ──────────────────────────────────────────────
+// Rebuilds the student_ledger from scratch using the canonical formula.
+// Clears existing entries and recreates charges + payments to match the formula.
+router.post("/reconcile",
+  requireRoles("admin", "director", "superadmin"),
+  async (req, res, next) => {
+    try {
+      const { schoolId, userId } = req.user;
+
+      const result = await LedgerService.reconcileLedger(schoolId, userId);
+
+      await logAuditEvent(req, AUDIT_ACTIONS.PAYMENT_UPDATE, {
+        entityId: null,
+        entityType: 'ledger_reconciliation',
+        description: `Ledger reconciliation: ${result.fixed} of ${result.processed} students fixed, ${result.errors.length} errors`,
+        newValues: { processed: result.processed, fixed: result.fixed, errors: result.errors.length }
+      });
+
+      res.json({
+        message: `Reconciliation complete. ${result.fixed} of ${result.processed} students updated.`,
+        summary: {
+          totalStudents: result.processed,
+          studentsFixed: result.fixed,
+          errors: result.errors.length,
+        },
+        details: result.details.slice(0, 500),
+        errors: result.errors,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // ─── POST /api/ledger/adjustment ───────────────────────────────────────────────
 router.post("/adjustment", 
   requireRoles("admin", "finance", "director", "superadmin"), 

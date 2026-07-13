@@ -1,6 +1,7 @@
 import { database } from "../config/db.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import { supabase } from "../config/supabaseClient.js";
+import { calculateStudentFeeBalance } from "./feeBalanceCalculator.js";
 
 // Student Ledger Service for fee balance tracking
 export class LedgerService {
@@ -307,6 +308,134 @@ export class LedgerService {
       console.error('Fee assessment error:', error);
       throw new Error(`Failed to assess fees: ${error.message}`);
     }
+  }
+
+  // ── Reconcile student ledger ─────────────────────────────────────────────────
+  // Rebuilds the student_ledger from scratch using the canonical formula.
+  // Clears existing ledger entries for each student and recreates them with
+  // a single charge (the expected amount) and individual payment entries.
+  static async reconcileLedger(schoolId, userId) {
+    const PAID_STATUSES = ["paid", "completed", "success"];
+    const results = { processed: 0, fixed: 0, errors: [], details: [] };
+
+    // 1. Load reference data
+    const { data: students } = await supabase
+      .from('students')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
+
+    if (!students?.length) return { ...results, message: 'No students found' };
+    results.processed = students.length;
+
+    const { data: structures } = await supabase
+      .from('fee_structures')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
+
+    const { data: allPayments } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
+
+    const paidPayments = (allPayments || []).filter(p =>
+      PAID_STATUSES.includes(String(p.status).toLowerCase())
+    );
+
+    let sDiscounts = [];
+    try {
+      const { data: sd } = await supabase
+        .from('student_discounts')
+        .select('*')
+        .eq('school_id', schoolId);
+      if (sd) sDiscounts = sd;
+    } catch (_) {}
+
+    // 2. Process each student
+    for (const student of students) {
+      try {
+        const sid = student.student_id ?? student.id;
+        const studentDiscs = sDiscounts.filter(d => String(d.student_id ?? d.id) === String(sid));
+
+        const formula = calculateStudentFeeBalance({
+          student,
+          feeStructures: structures || [],
+          payments: paidPayments,
+          discounts: studentDiscs,
+        });
+
+        const { data: ledgerEntries } = await supabase
+          .from('student_ledger')
+          .select('balance_after')
+          .eq('student_id', sid)
+          .eq('school_id', schoolId)
+          .order('ledger_id', { ascending: false })
+          .limit(1);
+
+        const ledgerBalance = ledgerEntries?.[0]?.balance_after ?? 0;
+        const diff = Math.abs(formula.rawBalance - Number(ledgerBalance));
+
+        if (diff < 1) continue;
+
+        // Mismatch found – rebuild ledger entries
+        // Step A: Delete existing entries
+        await supabase
+          .from('student_ledger')
+          .delete()
+          .eq('student_id', sid)
+          .eq('school_id', schoolId);
+
+        // Step B: Insert charge for expected amount
+        let runningBalance = 0;
+        if (formula.expected > 0) {
+          runningBalance = formula.expected;
+          await supabase.from('student_ledger').insert({
+            school_id: schoolId,
+            student_id: sid,
+            transaction_type: 'charge',
+            amount: formula.expected,
+            balance_after: runningBalance,
+            reference_type: 'reconciliation',
+            description: `Reconciliation charge – expected fees`,
+          });
+        }
+
+        // Step C: Insert each payment
+        const studentPayments = paidPayments.filter(p =>
+          String(p.student_id ?? p.id) === String(sid)
+        );
+        for (const pay of studentPayments) {
+          runningBalance -= Number(pay.amount);
+          await supabase.from('student_ledger').insert({
+            school_id: schoolId,
+            student_id: sid,
+            transaction_type: 'payment',
+            amount: Number(pay.amount),
+            balance_after: runningBalance,
+            reference_type: 'payment',
+            reference_id: pay.payment_id ?? pay.id,
+            description: `Payment – ${pay.payment_method || 'cash'} (${pay.reference_number || pay.payment_id || ''})`,
+            receipt_number: pay.reference_number || null,
+          });
+        }
+
+        results.fixed++;
+        results.details.push({
+          studentId: sid,
+          name: `${student.first_name || ''} ${student.last_name || ''}`.trim() || 'Unknown',
+          wasBalance: ledgerBalance,
+          nowBalance: runningBalance,
+          expected: formula.expected,
+          paid: formula.paid,
+        });
+      } catch (err) {
+        results.errors.push({ studentId: student.student_id ?? student.id, error: err.message });
+      }
+    }
+
+    return results;
   }
 }
 

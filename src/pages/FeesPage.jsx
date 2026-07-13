@@ -125,6 +125,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [bankDepositLoading, setBankDepositLoading] = useState(false);
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [studentDiscounts, setStudentDiscounts] = useState({});
+  const [showReconcile, setShowReconcile] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
+  const [reconcileResult, setReconcileResult] = useState(null);
 
   const getBusinessToday = () => new Date().toISOString().split('T')[0];
   const businessToday = getBusinessToday();
@@ -534,6 +537,26 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   });
   const todayCollection = todayPayments.reduce((s, p) => s + Number(p.amount), 0);
 
+  const handleReconcile = async () => {
+    setReconciling(true);
+    setReconcileResult(null);
+    try {
+      const token = auth?.token;
+      const res = await fetch("/api/ledger/reconcile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Reconciliation failed");
+      setReconcileResult({ success: true, summary: data.summary });
+      toast(`Reconciliation complete: ${data.summary.studentsFixed} of ${data.summary.totalStudents} students fixed`, "success");
+    } catch (err) {
+      setReconcileResult({ success: false, error: err.message });
+      toast(err.message || "Reconciliation failed", "error");
+    }
+    setReconciling(false);
+  };
+
   const filteredBalances = filterDate === "today"
     ? balances.filter(b => {
         const hasPaymentToday = todayPayments.some(p => String(p.studentId) === String(b.studentId));
@@ -668,6 +691,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             {canEdit && tab==="structure" && <Button onClick={() => { setEditStruct(null); setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""}); setShowStruct(true); }}>Set Fee Structure</Button>}
             {canEdit && <Button variant="ghost" onClick={() => setShowDayEndSettings(true)}>⚙️ Day Settings</Button>}
             {canEdit && <Button variant="primary" onClick={closeDay}>🔒 Close Day</Button>}
+            {canEdit && <Button variant="outline" onClick={() => { setReconcileResult(null); setShowReconcile(true); }}>🔄 Reconcile Ledger</Button>}
           </div>
         </div>
       </Card>
@@ -1353,6 +1377,63 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           setShowReceipt(true);
         }}
       />
+
+      {/* Reconciliation Modal */}
+      {showReconcile && (
+        <Modal onClose={() => { if (!reconciling) setShowReconcile(false); }}>
+          <div style={{ padding: "var(--space-4)", maxWidth: 520 }}>
+            {reconcileResult?.success ? (
+              <>
+                <div style={{ textAlign: "center", marginBottom: "var(--space-4)" }}>
+                  <span style={{ fontSize: 48 }}>✅</span>
+                  <h3 style={{ margin: "var(--space-2) 0" }}>Reconciliation Complete</h3>
+                </div>
+                <div style={{ display: "flex", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+                  <div style={{ flex: 1, textAlign: "center", padding: "var(--space-3)", background: "var(--color-surface)", borderRadius: 8 }}>
+                    <div style={{ fontSize: 24, fontWeight: 700 }}>{reconcileResult.summary.totalStudents}</div>
+                    <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Total Students</div>
+                  </div>
+                  <div style={{ flex: 1, textAlign: "center", padding: "var(--space-3)", background: "var(--color-success-bg)", borderRadius: 8 }}>
+                    <div style={{ fontSize: 24, fontWeight: 700 }}>{reconcileResult.summary.studentsFixed}</div>
+                    <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Students Fixed</div>
+                  </div>
+                  <div style={{ flex: 1, textAlign: "center", padding: "var(--space-3)", background: "var(--color-error-bg)", borderRadius: 8 }}>
+                    <div style={{ fontSize: 24, fontWeight: 700 }}>{reconcileResult.summary.errors}</div>
+                    <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Errors</div>
+                  </div>
+                </div>
+                <Button style={{ width: "100%" }} onClick={() => setShowReconcile(false)}>Done</Button>
+              </>
+            ) : reconcileResult && !reconcileResult.success ? (
+              <>
+                <div style={{ textAlign: "center", marginBottom: "var(--space-4)" }}>
+                  <span style={{ fontSize: 48 }}>❌</span>
+                  <h3 style={{ margin: "var(--space-2) 0" }}>Reconciliation Failed</h3>
+                  <p style={{ color: "var(--color-error)" }}>{reconcileResult.error}</p>
+                </div>
+                <Button style={{ width: "100%" }} onClick={() => setShowReconcile(false)}>Close</Button>
+              </>
+            ) : (
+              <>
+                <div style={{ textAlign: "center", marginBottom: "var(--space-4)" }}>
+                  <span style={{ fontSize: 48 }}>🔄</span>
+                  <h3 style={{ margin: "var(--space-2) 0" }}>Reconcile Student Ledger</h3>
+                  <p style={{ color: "var(--color-text-muted)", fontSize: 14 }}>
+                    This will scan all students, compare formula-based balances against the ledger,
+                    and rebuild ledger entries for any mismatches. <strong>This action cannot be undone.</strong>
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                  <Button variant="ghost" style={{ flex: 1 }} onClick={() => setShowReconcile(false)} disabled={reconciling}>Cancel</Button>
+                  <Button style={{ flex: 1 }} onClick={handleReconcile} disabled={reconciling}>
+                    {reconciling ? "Reconciling..." : "Reconcile Now"}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </Modal>
+      )}
 
       {/* Receipt Modal Component (External) */}
       <PaymentReceipt
