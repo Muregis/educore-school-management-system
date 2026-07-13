@@ -808,7 +808,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                   {ALL_CLASSES.map(cls => {
                     const classBalances = balances.filter(b => b.className === cls);
                     const classStudents = classBalances.length;
-                    const totalOutstanding = classBalances.reduce((sum, b) => sum + b.balance, 0);
+                    const totalOutstanding = classBalances.reduce((sum, b) => sum + Math.max(0, b.balance), 0);
                     const totalPaid = classBalances.reduce((sum, b) => sum + b.paid, 0);
                     const totalExpected = classBalances.reduce((sum, b) => sum + b.expected, 0);
                     if (classStudents === 0) return null;

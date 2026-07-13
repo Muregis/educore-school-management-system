@@ -93,7 +93,9 @@ router.get("/summary", async (req, res, next) => {
         feeStructures,
         payments: paidPayments || [],
       });
-      totalOutstanding += balanceInfo.balance;
+      if (balanceInfo.balance > 0) {
+        totalOutstanding += balanceInfo.balance;
+      }
     });
 
     // Get pending plans count (if payment_plans table exists)
@@ -425,7 +427,9 @@ router.get("/class-fee-summary", async (req, res, next) => {
       classSummary[cls].student_count += 1;
       classSummary[cls].total_expected += balanceInfo.expected;
       classSummary[cls].total_paid += balanceInfo.paid;
-      classSummary[cls].total_outstanding += balanceInfo.balance;
+      if (balanceInfo.balance > 0) {
+        classSummary[cls].total_outstanding += balanceInfo.balance;
+      }
     });
     
     // Convert to array and sort by class name

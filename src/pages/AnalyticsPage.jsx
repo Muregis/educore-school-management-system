@@ -133,7 +133,7 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
     const payrollExpenses = Number(expenditureSummary?.totals?.payroll || 0);
     const manualExpenses = Number(expenditureSummary?.totals?.manual || 0);
     const pendingFees = students.reduce(
-      (sum, student) => sum + calculateStudentBalanceLocal({ student, feeStructures, payments }).balance,
+      (sum, student) => sum + Math.max(0, calculateStudentBalanceLocal({ student, feeStructures, payments }).balance),
       0
     );
 
@@ -391,7 +391,7 @@ Provide a structured analysis with:
                   );
                   const classExpected = classBalanceInfo.reduce((sum, item) => sum + item.expected, 0);
                   const classPaid = classBalanceInfo.reduce((sum, item) => sum + item.paid, 0);
-                  const classOutstanding = classBalanceInfo.reduce((sum, item) => sum + item.balance, 0);
+                  const classOutstanding = classBalanceInfo.reduce((sum, item) => sum + Math.max(0, item.balance), 0);
                   
                   return (
                     <div key={cls} style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
