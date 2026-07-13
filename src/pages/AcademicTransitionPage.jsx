@@ -12,6 +12,7 @@ export default function AcademicTransitionPage({ auth }) {
   const [current, setCurrent] = useState(null);
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState(0);
+  const [termFinancials, setTermFinancials] = useState(null);
 
   const [closingTerm, setClosingTerm] = useState(false);
   const [endingYear, setEndingYear] = useState(false);
@@ -38,6 +39,26 @@ export default function AcademicTransitionPage({ auth }) {
       });
       setClasses(classesRes?.data || classesRes || []);
       setStudents((studentsRes?.data || studentsRes || []).length);
+
+      // Load term financials if we have a current term
+      if (termRes?.data?.term_name || termRes?.term_name) {
+        const termName = termRes?.data?.term_name || termRes?.term_name;
+        try {
+          const financialsRes = await apiFetch(`/reports/fee-defaulters?term=${encodeURIComponent(termName)}`, { token: auth?.token });
+          const defaulters = financialsRes || [];
+          const totalOutstanding = defaulters.reduce((sum, d) => sum + (d.balance || 0), 0);
+          const totalPaid = defaulters.reduce((sum, d) => sum + (d.paid_amount || 0), 0);
+          setTermFinancials({
+            totalOutstanding,
+            totalPaid,
+            defaulterCount: defaulters.length,
+            termName
+          });
+        } catch (err) {
+          console.error('Error loading term financials:', err);
+          setTermFinancials(null);
+        }
+      }
     } catch (error) {
       console.error('Error loading academic data:', error);
     } finally {
@@ -182,23 +203,23 @@ export default function AcademicTransitionPage({ auth }) {
         </Card>
 
         <Card>
-          <div style={{ color: C.textSub, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Promotion Chain</div>
+          <div style={{ color: C.textSub, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Term Outstanding</div>
           <div style={{ color: C.text, fontSize: 20, fontWeight: 700, marginTop: 6 }}>
-            {classes.length} classes
+            {termFinancials ? `KES ${(termFinancials.totalOutstanding || 0).toLocaleString()}` : 'Loading...'}
           </div>
-          <div style={{ marginTop: 8 }}>
-            <Badge status={hasPromotionChain ? 'success' : 'warning'}>
-              {hasPromotionChain ? 'Configured' : 'Not configured'}
-            </Badge>
+          <div style={{ marginTop: 8, color: C.textSub, fontSize: 12 }}>
+            {termFinancials?.defaulterCount || 0} students with balance
           </div>
         </Card>
 
         <Card>
-          <div style={{ color: C.textSub, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Eligible Students</div>
+          <div style={{ color: C.textSub, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Term Collected</div>
           <div style={{ color: C.text, fontSize: 20, fontWeight: 700, marginTop: 6 }}>
-            {students}
+            {termFinancials ? `KES ${(termFinancials.totalPaid || 0).toLocaleString()}` : 'Loading...'}
           </div>
-          <div style={{ marginTop: 8, color: C.textSub, fontSize: 12 }}>Ready for promotion</div>
+          <div style={{ marginTop: 8, color: C.textSub, fontSize: 12 }}>
+            Fees collected this term
+          </div>
         </Card>
       </div>
 
@@ -262,6 +283,7 @@ export default function AcademicTransitionPage({ auth }) {
         loading={closingTerm}
         term={activeTerm}
         classes={classes}
+        financials={termFinancials}
       />
 
       <YearConfirmModal
@@ -281,7 +303,7 @@ AcademicTransitionPage.propTypes = {
   auth: PropTypes.object,
 };
 
-function TermConfirmModal({ show, onHide, onConfirm, loading, term, classes }) {
+function TermConfirmModal({ show, onHide, onConfirm, loading, term, classes, financials }) {
   const promotedCount = classes.filter(c => c.next_class_name).length;
   const finalClasses = classes.filter(c => !c.next_class_name).length;
 
@@ -292,6 +314,26 @@ function TermConfirmModal({ show, onHide, onConfirm, loading, term, classes }) {
           <strong>Warning:</strong> This will lock {term?.term_name || 'the term'} and promote students to their next class. This action cannot be undone.
         </div>
 
+        {financials && (
+          <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid #22C55E', borderRadius: 8, padding: '12px 14px', fontSize: 13 }}>
+            <div style={{ fontWeight: 600, color: '#22C55E', marginBottom: 8 }}>Term Financial Summary</div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: C.textSub }}>Total Collected</span>
+                <span style={{ fontWeight: 600, color: C.text }}>KES {(financials.totalPaid || 0).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: C.textSub }}>Outstanding Balance</span>
+                <span style={{ fontWeight: 600, color: '#F59E0B' }}>KES {(financials.totalOutstanding || 0).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: C.textSub }}>Students with Balance</span>
+                <span style={{ fontWeight: 600, color: C.text }}>{financials.defaulterCount || 0}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'grid', gap: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: C.text }}>
             <span>Archive grades</span>
@@ -301,6 +343,12 @@ function TermConfirmModal({ show, onHide, onConfirm, loading, term, classes }) {
             <span>Carry forward unpaid balances</span>
             <span style={{ color: '#22C55E' }}>Yes</span>
           </div>
+          {financials && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: C.text }}>
+              <span>Balance to carry forward</span>
+              <span style={{ fontWeight: 600, color: '#F59E0B' }}>KES {(financials.totalOutstanding || 0).toLocaleString()}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: C.text }}>
             <span>Promote students to next class</span>
             <span style={{ color: '#22C55E' }}>{promotedCount} chains</span>
@@ -329,6 +377,7 @@ TermConfirmModal.propTypes = {
   loading: PropTypes.bool,
   term: PropTypes.object,
   classes: PropTypes.array,
+  financials: PropTypes.object,
 };
 
 function YearConfirmModal({ show, onHide, onConfirm, loading, year, classes, students }) {

@@ -965,12 +965,12 @@ export default function ReportsPage({ auth }) {
     let ignore = false;
     setLoading(true);
     Promise.all([
-      apiFetch("/reports/summary",                { token }),
+      apiFetch(`/reports/summary${currentTerm ? `?term=${encodeURIComponent(currentTerm)}` : ""}`, { token }),
       apiFetch("/reports/monthly-fee-collection", { token }),
       apiFetch("/reports/attendance-rate",        { token }),
       apiFetch(`/reports/fee-defaulters${currentTerm ? `?term=${encodeURIComponent(currentTerm)}` : ""}`, { token }),
       apiFetch(`/reports/grade-distribution${filterClass !== "all" ? `?class_name=${encodeURIComponent(filterClass)}` : ""}`, { token }),
-      apiFetch("/reports/class-fee-summary",      { token }), // New endpoint for class-wise fees
+      apiFetch(`/reports/class-fee-summary${currentTerm ? `?term=${encodeURIComponent(currentTerm)}` : ""}`, { token }), // New endpoint for class-wise fees
       apiFetch("/reports/expenditure-summary",    { token }),
     ]).then(([s, m, a, d, g, cfs, es]) => {
       if (ignore) return;

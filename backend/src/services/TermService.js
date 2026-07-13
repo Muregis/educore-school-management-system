@@ -1,5 +1,6 @@
 import { database } from "../config/db.js";
 import { logAuditEvent } from "../helpers/audit.logger.js";
+import { calculateStudentFeeBalance } from "./feeBalanceCalculator.js";
 
 /**
  * Term Lifecycle Service
@@ -299,39 +300,49 @@ export class TermService {
           }
         });
         
+        // Get fee structures for current term
+        const { data: feeStructures } = await client.query('fee_structures', {
+          where: { 
+            school_id: schoolId,
+            term: term.term_name
+          }
+        });
+        
+        // Get payments for current term only
+        const { data: payments } = await client.query('payments', {
+          where: { 
+            school_id: schoolId,
+            term: term.term_name,
+            status: 'paid'
+          }
+        });
+        
         if (students && students.length > 0) {
           let balanceCount = 0;
           for (const student of students) {
-            // Calculate current balance from payments and fee structures
-            const { data: payments } = await client.query('payments', {
-              where: { 
-                student_id: student.student_id,
-                status: 'paid'
-              }
+            // Use canonical balance calculator for accurate calculation
+            const balanceInfo = calculateStudentFeeBalance({
+              student,
+              feeStructures: feeStructures || [],
+              payments: payments || []
             });
-            
-            const totalPaid = payments?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
-            
-            // Get fee structure for student's class
-            const { data: feeStructures } = await client.query('fee_structures', {
-              where: { 
-                class_name: student.class_name,
-                term: term.term_name
-              },
-              limit: 1
-            });
-            
-            const expectedFees = feeStructures?.[0] 
-              ? Number(feeStructures[0].tuition || 0) + Number(feeStructures[0].activity || 0) + Number(feeStructures[0].misc || 0)
-              : 0;
-            
-            const currentBalance = expectedFees - totalPaid;
             
             // If student has outstanding balance, carry it forward as opening balance
-            if (currentBalance > 0) {
+            if (balanceInfo.balance > 0) {
               await client.update('students', {
-                opening_balance: currentBalance,
+                opening_balance: balanceInfo.balance,
                 opening_balance_type: 'owing',
+                opening_balance_term: term.term_name,
+                updated_at: new Date().toISOString()
+              }, {
+                student_id: student.student_id
+              });
+              balanceCount++;
+            } else if (balanceInfo.isOverpaid) {
+              // Handle overpayments as credit
+              await client.update('students', {
+                opening_balance: balanceInfo.overpaymentAmount,
+                opening_balance_type: 'credit',
                 opening_balance_term: term.term_name,
                 updated_at: new Date().toISOString()
               }, {

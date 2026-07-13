@@ -49,12 +49,14 @@ router.get("/summary", async (req, res, next) => {
     if (teaErr) throw teaErr;
 
     // Get all paid payments for total collection (filter by term for balance calculation)
-    const { data: paidPayments, error: paidErr } = await supabase
+    const payQuery = supabase
       .from('payments')
       .select('amount, payment_date, student_id, term')
       .eq('school_id', schoolId)
       .in('status', ['paid', 'completed', 'success'])
       .eq('is_deleted', false);
+    if (currentTerm) payQuery.eq('term', currentTerm);
+    const { data: paidPayments, error: paidErr } = await payQuery;
     if (paidErr) throw paidErr;
     const totalCollected = paidPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
 
