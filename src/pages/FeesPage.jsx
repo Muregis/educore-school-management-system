@@ -165,7 +165,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const normalisedStructures = feeStructures.map(f => f.fee_structure_id ? normaliseFeeStruct(f) : f);
 
   const calculateLedgerBalance = (student, studentDiscounts = []) => {
-    const sid = student?.id ?? student?.student_id;
+    const sid = student?.student_id ?? student?.id;
     const cls = student?.className ?? student?.class_name ?? "";
     // Single source of truth for every fee balance in the app
     // (see src/services/studentBalanceUtils.js -> calculateStudentBalanceLocal).
@@ -214,18 +214,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     };
   };
 
-  const rawBalances = students.map(s => calculateLedgerBalance(s, studentDiscounts[s.id ?? s.student_id] || []));
-  // Debug: log first 3 balances to check paid vs expected
-  if (rawBalances.length > 0) {
-    const dbg = rawBalances.slice(0, 3);
-    dbg.forEach(b => console.log('[DEBUG] FeePage balance:', b.studentId, b.name, 'expected:', b.expected, 'paid:', b.paid, 'balance:', b.balance, 'payments count:', normalisedPayments.filter(p => String(p.studentId ?? p.student_id) === String(b.studentId) && (p.status ?? 'paid') === 'paid').length));
-    console.log('[DEBUG] Total normalisedPayments:', normalisedPayments.length);
-    if (normalisedPayments.length > 0) {
-      console.log('[DEBUG] Sample payment keys:', Object.keys(normalisedPayments[0]).join(','));
-      console.log('[DEBUG] Sample payment:', JSON.stringify(normalisedPayments[0]));
-    }
-  }
-  const balances = rawBalances
+  const balances = students.map(s => calculateLedgerBalance(s, studentDiscounts[s.id ?? s.student_id] || []))
     .filter(b => filterClass === "all" || b.className === filterClass)
     .filter(b => (!filterClass || filterClass === "all" || b.className === filterClass))
     .filter(b => {

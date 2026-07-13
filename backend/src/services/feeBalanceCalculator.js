@@ -226,7 +226,7 @@ export function calculateStudentFeeBalance({
   discounts = [],
   schoolSettings = {},
 } = {}) {
-  const studentId = student?.id ?? student?.student_id ?? student?.studentId ?? null;
+  const studentId = student?.student_id ?? student?.id ?? student?.studentId ?? null;
   const className = student?.className ?? student?.class_name ?? "";
 
   const baseFee = getStudentBaseFee(student, feeStructures);

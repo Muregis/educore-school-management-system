@@ -7,7 +7,7 @@ function toNumber(value) {
 }
 
 export function getStudentId(student) {
-  return student?.id ?? student?.student_id ?? student?.studentId ?? null;
+  return student?.student_id ?? student?.id ?? student?.studentId ?? null;
 }
 
 export function getStudentClassName(student) {
