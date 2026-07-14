@@ -1,53 +1,72 @@
-import fs from "fs";
-import path from "path";
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../config/env.js";
 
-const BACKUP_DIR = path.resolve("backups");
+const BUCKET_NAME = "backups";
 const KEEP_LAST = 7;
 
-function ensureDir() {
-  if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+let _supabase = null;
+let _bucketEnsured = false;
+
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(env.supabaseUrl, env.supabaseServiceKey);
+  }
+  return _supabase;
 }
 
-// ── List backups (newest first) ───────────────────────────────────────────────
-export function listBackups() {
-  ensureDir();
-  return fs.readdirSync(BACKUP_DIR)
-    .filter(f => f.startsWith("backup_") && f.endsWith(".sql"))
-    .map(filename => {
-      const stat = fs.statSync(path.join(BACKUP_DIR, filename));
-      return { filename, size: stat.size, createdAt: stat.mtime };
-    })
-    .sort((a, b) => b.createdAt - a.createdAt);
-}
-
-// ── Delete old backups beyond KEEP_LAST ───────────────────────────────────────
-function rotate() {
-  const all = listBackups();
-  if (all.length > KEEP_LAST) {
-    all.slice(KEEP_LAST).forEach(b => {
-      try {
-        fs.unlinkSync(path.join(BACKUP_DIR, b.filename));
-        console.log(`[backup] Deleted old backup: ${b.filename}`);
-      } catch (_) {}
+async function ensureBucket() {
+  if (_bucketEnsured) return;
+  const supabase = getSupabase();
+  const { data: buckets } = await supabase.storage.listBuckets();
+  if (!buckets?.find(b => b.name === BUCKET_NAME)) {
+    const { error } = await supabase.storage.createBucket(BUCKET_NAME, {
+      public: false,
     });
+    if (error) throw new Error(`Failed to create bucket: ${error.message}`);
+  }
+  _bucketEnsured = true;
+}
+
+export async function listBackups() {
+  try {
+    await ensureBucket();
+    const supabase = getSupabase();
+    const { data, error } = await supabase.storage.from(BUCKET_NAME).list();
+    if (error) return [];
+
+    return data
+      .filter(f => f.name.startsWith("backup_") && f.name.endsWith(".sql"))
+      .map(f => ({
+        filename: f.name,
+        size: f.metadata?.size || 0,
+        createdAt: f.created_at || f.updated_at,
+      }))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  } catch (err) {
+    console.error("[backup] listBackups error:", err.message);
+    return [];
   }
 }
 
-// ── Run one backup using Supabase ─────────────────────────────────────────────
-export async function runBackup() {
-  ensureDir();
+async function rotate() {
+  const all = await listBackups();
+  if (all.length > KEEP_LAST) {
+    const toDelete = all.slice(KEEP_LAST).map(b => b.filename);
+    const supabase = getSupabase();
+    const { error } = await supabase.storage.from(BUCKET_NAME).remove(toDelete);
+    if (error) console.error("[backup] rotate cleanup error:", error.message);
+    else console.log(`[backup] Cleaned up ${toDelete.length} old backup(s)`);
+  }
+}
 
+export async function runBackup() {
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const filename = `backup_${ts}.sql`;
-  const filepath = path.join(BACKUP_DIR, filename);
 
   try {
-    // Initialize Supabase client with service role key for full access
-    const supabase = createClient(env.supabaseUrl, env.supabaseServiceKey);
+    await ensureBucket();
+    const supabase = getSupabase();
 
-    // List of tables to backup
     const tables = [
       'schools', 'classes', 'students', 'teachers', 'subjects',
       'enrollments', 'grades', 'attendance', 'payments', 'invoices',
@@ -82,16 +101,15 @@ export async function runBackup() {
         if (data && data.length > 0) {
           backupContent += `-- Table: ${table} (${data.length} records)\n`;
           backupContent += `INSERT INTO ${table} (`;
-          
+
           const columns = Object.keys(data[0]);
           backupContent += columns.join(', ') + ') VALUES\n';
-          
+
           data.forEach((row, index) => {
             const values = columns.map(col => {
               const val = row[col];
               if (val === null) return 'NULL';
               if (typeof val === 'string') {
-                // Escape single quotes for SQL
                 return `'${val.replace(/'/g, "''")}'`;
               }
               if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
@@ -111,30 +129,47 @@ export async function runBackup() {
       }
     }
 
-    // Write backup file
-    fs.writeFileSync(filepath, backupContent, 'utf8');
+    const sizeBytes = Buffer.byteLength(backupContent, 'utf8');
+    if (sizeBytes < 100) throw new Error("Backup content too small or empty");
 
-    const stat = fs.existsSync(filepath) ? fs.statSync(filepath) : null;
-    if (!stat || stat.size < 100) throw new Error("Backup file empty or missing");
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(filename, backupContent, {
+        contentType: 'text/plain',
+        upsert: false,
+      });
 
-    console.log(`[backup] ✅ ${filename} (${(stat.size / 1024).toFixed(1)} KB)`);
-    rotate();
-    return { success: true, filename, size: stat.size, filepath };
+    if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+    console.log(`[backup] Uploaded ${filename} (${(sizeBytes / 1024).toFixed(1)} KB)`);
+    await rotate();
+    return { success: true, filename, size: sizeBytes };
   } catch (err) {
-    console.error("[backup] ❌ Failed:", err.message);
-    if (fs.existsSync(filepath)) {
-      try { fs.unlinkSync(filepath); } catch (_) {}
-    }
+    console.error("[backup] Failed:", err.message);
     return { success: false, error: err.message };
   }
 }
 
-// ── Daily scheduler — fires at midnight ──────────────────────────────────────
-let _started = false;
+export async function downloadBackup(filename) {
+  await ensureBucket();
+  const supabase = getSupabase();
+  const { data, error } = await supabase.storage.from(BUCKET_NAME).download(filename);
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function deleteBackup(filename) {
+  await ensureBucket();
+  const supabase = getSupabase();
+  const { error } = await supabase.storage.from(BUCKET_NAME).remove([filename]);
+  if (error) throw new Error(error.message);
+}
+
+let _schedulerStarted = false;
 
 export function startBackupScheduler() {
-  if (_started) return;
-  _started = true;
+  if (_schedulerStarted) return;
+  _schedulerStarted = true;
 
   function scheduleNext() {
     const now  = new Date();

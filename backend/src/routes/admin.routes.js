@@ -1,27 +1,26 @@
 import { Router } from "express";
-import path from "path";
-import fs from "fs";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { adminActionRateLimit, passwordResetRateLimit } from "../middleware/rateLimit.js";
-import { runBackup, listBackups } from "../services/backup.service.js";
+import { runBackup, listBackups, downloadBackup, deleteBackup } from "../services/backup.service.js";
 import { AdminService } from "../services/admin.service.js";
 import { supabase } from "../config/supabaseClient.js";
 import { logTenantContext, logTenantQuery } from "../helpers/tenant-debug.logger.js";
 
 const router  = Router();
-const BACKUP_DIR = path.resolve("backups");
 
 router.use(authRequired);
 router.use(requireRoles("admin", "director", "superadmin"));
 // ── GET /api/admin/backups ────────────────────────────────────────────────────
-router.get("/backups", (req, res) => {
-  const backups = listBackups().map(b => ({
-    filename:  b.filename,
-    sizeKb:    Math.round(b.size / 1024),
-    createdAt: b.createdAt,
-  }));
-  res.json({ backups, count: backups.length });
+router.get("/backups", async (req, res, next) => {
+  try {
+    const backups = (await listBackups()).map(b => ({
+      filename:  b.filename,
+      sizeKb:    Math.round(b.size / 1024),
+      createdAt: b.createdAt,
+    }));
+    res.json({ backups, count: backups.length });
+  } catch (err) { next(err); }
 });
 
 // ── POST /api/admin/backups ───────────────────────────────────────────────────
@@ -38,27 +37,40 @@ router.post("/backups", async (req, res, next) => {
 });
 
 // ── GET /api/admin/backups/:filename/download ─────────────────────────────────
-router.get("/backups/:filename/download", (req, res) => {
-  const { filename } = req.params;
-  // Sanitise — only allow backup_*.sql filenames to prevent path traversal
-  if (!/^backup_[\d\-T]+\.sql$/.test(filename)) {
-    return res.status(400).json({ message: "Invalid filename" });
+router.get("/backups/:filename/download", async (req, res, next) => {
+  try {
+    const { filename } = req.params;
+    if (!/^backup_[\d\-T]+\.sql$/.test(filename)) {
+      return res.status(400).json({ message: "Invalid filename" });
+    }
+    const blob = await downloadBackup(filename);
+    const buffer = Buffer.from(await blob.arrayBuffer());
+    res.setHeader("Content-Type", "application/sql");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (err) {
+    if (err.message.includes("not found") || err.message.includes("404")) {
+      return res.status(404).json({ message: "Backup not found" });
+    }
+    next(err);
   }
-  const filepath = path.join(BACKUP_DIR, filename);
-  if (!fs.existsSync(filepath)) return res.status(404).json({ message: "Backup not found" });
-  res.download(filepath, filename);
 });
 
 // ── DELETE /api/admin/backups/:filename ───────────────────────────────────────
-router.delete("/backups/:filename", (req, res) => {
-  const { filename } = req.params;
-  if (!/^backup_[\d\-T]+\.sql$/.test(filename)) {
-    return res.status(400).json({ message: "Invalid filename" });
+router.delete("/backups/:filename", async (req, res, next) => {
+  try {
+    const { filename } = req.params;
+    if (!/^backup_[\d\-T]+\.sql$/.test(filename)) {
+      return res.status(400).json({ message: "Invalid filename" });
+    }
+    await deleteBackup(filename);
+    res.json({ deleted: true, filename });
+  } catch (err) {
+    if (err.message.includes("not found") || err.message.includes("404")) {
+      return res.status(404).json({ message: "Backup not found" });
+    }
+    next(err);
   }
-  const filepath = path.join(BACKUP_DIR, filename);
-  if (!fs.existsSync(filepath)) return res.status(404).json({ message: "Backup not found" });
-  fs.unlinkSync(filepath);
-  res.json({ deleted: true, filename });
 });
 
 // ── POST /api/admin/reset-password ─────────────────────────────────────────────
