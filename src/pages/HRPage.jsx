@@ -186,8 +186,12 @@ export default function HRPage({ auth, canEdit, toast, school }) {
     setGen(true);
     try {
       const res = await apiFetch("/hr/payslips/generate", { method:"POST", body:{ month:payMonth, year:payYear }, token:auth.token });
-      toast(`Generated ${res.generated} payslips`, "success");
-      load();
+      if (!res.generated) {
+        toast(res.message || "No payslips were generated", "error");
+      } else {
+        toast(`Generated ${res.generated} payslips`, "success");
+      }
+      await load();
     } catch(e) { toast(e.message, "error"); }
     setGen(false);
   };
@@ -367,7 +371,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
   const { pages:sPages, rows:sRows } = pager(filteredStaff, sPage);
   const { pages:lPages, rows:lRows } = pager(leave, lPage);
 
-  const curPayslips = payslips.filter(p => p.month === payMonth && p.year === payYear);
+  const curPayslips = payslips.filter(p => Number(p.month) === Number(payMonth) && Number(p.year) === Number(payYear));
   const { pages:pPages, rows:pRows } = pager(curPayslips, pPage);
 
   const attToday = attendance.filter(a => a.attendance_date?.slice(0,10) === attDate);

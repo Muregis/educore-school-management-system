@@ -390,17 +390,24 @@ router.post("/payslips/generate", requireRoles(...HR_ROLES), async (req, res, ne
     const { month, year, allowances = 0, notes } = req.body;
     if (!month || !year) return res.status(400).json({ message: "month and year are required" });
 
-    const { data: activeStaff, error: staffError } = await supabase
+    const { data: staffRows, error: staffError } = await supabase
       .from('hr_staff')
       .select('*')
       .eq('school_id', schoolId)
-      .eq('is_deleted', false)
-      .eq('status', 'active');
+      .eq('is_deleted', false);
 
     if (staffError) throw staffError;
 
-    let generated = 0;
-    for (const s of activeStaff || []) {
+    const activeStaff = (staffRows || []).filter(s => String(s.status || '').toLowerCase() === 'active');
+
+    if (!activeStaff?.length) {
+      return res.status(400).json({
+        message: "No active staff found. Add active staff members with salaries before generating payslips.",
+        generated: 0
+      });
+    }
+
+    const payslipRows = activeStaff.map((s) => {
       const basic    = Number(s.salary) || 0;
       const allow    = Number(allowances) || 0;
       // Simplified KE statutory deductions
@@ -410,30 +417,39 @@ router.post("/payslips/generate", requireRoles(...HR_ROLES), async (req, res, ne
       const deduct   = paye + nhif + nssf;
       const netPay   = basic + allow - deduct;
 
-      const { error: upsertError } = await supabase
-        .from('hr_payslips')
-        .upsert({
-          school_id: schoolId,
-          staff_id: s.staff_id,
-          month,
-          year,
-          basic_salary: basic,
-          allowances: allow,
-          deductions: deduct,
-          net_pay: netPay,
-          paye,
-          nhif,
-          nssf,
-          notes: notes || null,
-          status: 'draft',
-          generated_by: userId,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'school_id,staff_id,month,year' });
+      return {
+        school_id: schoolId,
+        staff_id: s.staff_id,
+        month: Number(month),
+        year: Number(year),
+        basic_salary: basic,
+        allowances: allow,
+        deductions: deduct,
+        net_pay: netPay,
+        paye,
+        nhif,
+        nssf,
+        notes: notes || null,
+        status: 'draft',
+        generated_by: userId || null,
+        updated_at: new Date().toISOString()
+      };
+    });
 
-      if (upsertError) console.error('Payslip upsert error:', upsertError);
-      else generated++;
+    const { data: generatedRows, error: upsertError } = await supabase
+      .from('hr_payslips')
+      .upsert(payslipRows, { onConflict: 'school_id,staff_id,month,year' })
+      .select('payslip_id');
+
+    if (upsertError) {
+      console.error('Payslip upsert error:', upsertError);
+      return res.status(500).json({
+        message: `Failed to generate payslips: ${upsertError.message}`,
+        generated: 0
+      });
     }
-    res.status(201).json({ generated });
+
+    res.status(201).json({ generated: generatedRows?.length || 0 });
   } catch (err) { next(err); }
 });
 

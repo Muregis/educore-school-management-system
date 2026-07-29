@@ -11,6 +11,16 @@ export function cacheMiddleware(ttl = 300) {
       return next();
     }
 
+    const livePrefixes = [
+      '/api/expenditures',
+      '/api/hr',
+      '/api/finance',
+      '/api/reports',
+    ];
+    if (livePrefixes.some(prefix => req.originalUrl.startsWith(prefix))) {
+      return next();
+    }
+
     // Skip caching if user not authenticated
     if (!req.user || !req.user.schoolId) {
       return next();
