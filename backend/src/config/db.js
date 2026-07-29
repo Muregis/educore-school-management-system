@@ -80,6 +80,64 @@ export async function applyDatabaseMigrations() {
     }
     
     console.log('✅ Database migrations applied successfully');
+
+    // Custom Fixes for HR Payroll triggers and Expenditures approved_by column type (UUID -> BIGINT)
+    console.log('🔧 Applying custom database fixes for HR payroll triggers & expenditures...');
+    const customFixes = [
+      `CREATE OR REPLACE FUNCTION update_hr_updated_at_column()
+       RETURNS TRIGGER AS $$
+       BEGIN
+           NEW.updated_at = NOW();
+           RETURN NEW;
+       END;
+       $$ LANGUAGE plpgsql;`,
+
+      `DROP TRIGGER IF EXISTS update_hr_payslips_updated_at ON public.hr_payslips;`,
+      `CREATE TRIGGER update_hr_payslips_updated_at 
+           BEFORE UPDATE ON public.hr_payslips 
+           FOR EACH ROW EXECUTE FUNCTION update_hr_updated_at_column();`,
+
+      `DROP TRIGGER IF EXISTS update_hr_attendance_updated_at ON public.hr_attendance;`,
+      `CREATE TRIGGER update_hr_attendance_updated_at 
+           BEFORE UPDATE ON public.hr_attendance 
+           FOR EACH ROW EXECUTE FUNCTION update_hr_updated_at_column();`,
+
+      `DROP TRIGGER IF EXISTS update_hr_staff_updated_at ON public.hr_staff;`,
+      `CREATE TRIGGER update_hr_staff_updated_at 
+           BEFORE UPDATE ON public.hr_staff 
+           FOR EACH ROW EXECUTE FUNCTION update_hr_updated_at_column();`,
+
+      `DROP TRIGGER IF EXISTS update_hr_leave_updated_at ON public.hr_leave;`,
+      `CREATE TRIGGER update_hr_leave_updated_at 
+           BEFORE UPDATE ON public.hr_leave 
+           FOR EACH ROW EXECUTE FUNCTION update_hr_updated_at_column();`,
+
+      `DROP TRIGGER IF EXISTS update_payroll_updated_at ON public.payroll;`,
+      `CREATE TRIGGER update_payroll_updated_at 
+           BEFORE UPDATE ON public.payroll 
+           FOR EACH ROW EXECUTE FUNCTION update_hr_updated_at_column();`,
+
+      `DROP TRIGGER IF EXISTS update_leave_balances_updated_at ON public.leave_balances;`,
+      `CREATE TRIGGER update_leave_balances_updated_at 
+           BEFORE UPDATE ON public.leave_balances 
+           FOR EACH ROW EXECUTE FUNCTION update_hr_updated_at_column();`,
+
+      `ALTER TABLE public.expenditures DROP CONSTRAINT IF EXISTS expenditures_approved_by_fkey;`,
+      `ALTER TABLE public.expenditures ALTER COLUMN approved_by TYPE BIGINT USING NULL;`,
+      `ALTER TABLE public.expenditures 
+           ADD CONSTRAINT expenditures_approved_by_fkey 
+           FOREIGN KEY (approved_by) REFERENCES public.users(user_id) 
+           ON DELETE SET NULL;`
+    ];
+
+    for (const fix of customFixes) {
+      try {
+        await pgPool.query(fix);
+      } catch (err) {
+        console.warn('⚠️ Custom fix statement failed or already applied:', err.message);
+      }
+    }
+    console.log('✅ Custom database fixes applied successfully');
   } catch (err) {
     console.error('❌ Failed to apply database migrations:', err.message);
     // Don't throw - migrations are important but not critical for startup
