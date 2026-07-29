@@ -442,17 +442,35 @@ router.patch("/payslips/approve", requireRoles(...HR_ROLES), async (req, res, ne
   try {
     const { schoolId } = req.user;
     const { month, year } = req.body;
-    const { error } = await supabase
+    
+    if (!month || !year) {
+      return res.status(400).json({ message: "month and year are required" });
+    }
+    
+    const { error, data } = await supabase
       .from('hr_payslips')
       .update({ status: 'approved', updated_at: new Date().toISOString() })
       .eq('school_id', schoolId)
       .eq('month', month)
       .eq('year', year)
       .eq('status', 'draft')
-      .eq('is_deleted', false);
-    if (error) throw error;
-    res.json({ approved: true });
-  } catch (err) { next(err); }
+      .eq('is_deleted', false)
+      .select();
+    
+    if (error) {
+      console.error('Approve payslips error:', error);
+      throw error;
+    }
+    
+    if (!data || data.length === 0) {
+      return res.status(404).json({ message: "No draft payslips found for the specified month and year" });
+    }
+    
+    res.json({ approved: true, count: data.length });
+  } catch (err) { 
+    console.error('Approve payroll error:', err);
+    next(err); 
+  }
 });
 
 // Mark payslips as paid for a month (supports professional payment recording)

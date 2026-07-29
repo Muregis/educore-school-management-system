@@ -73,14 +73,16 @@ export default function Input({
             ...inputStyle
           }}
           onFocus={(e) => {
-            if (!hasError) {
+            // Don't interfere with date inputs to allow native picker to work
+            if (props.type !== 'date' && !hasError) {
               e.currentTarget.style.borderColor = hasSuccess ? "var(--color-success)" : "var(--color-border-focus)";
               e.currentTarget.style.boxShadow = hasSuccess ? "0 0 0 3px color-mix(in srgb, var(--color-success) 16%, transparent)" : "0 0 0 3px var(--color-primary-ring)";
             }
             props.onFocus?.(e);
           }}
           onBlur={(e) => {
-            if (!hasError) {
+            // Don't interfere with date inputs to allow native picker to work
+            if (props.type !== 'date' && !hasError) {
               e.currentTarget.style.borderColor = hasSuccess ? "var(--color-success)" : "var(--color-border)";
               e.currentTarget.style.boxShadow = hasSuccess ? "0 0 0 3px color-mix(in srgb, var(--color-success) 16%, transparent)" : "var(--shadow-xs)";
             }
