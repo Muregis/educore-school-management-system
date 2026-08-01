@@ -66,7 +66,7 @@ async function getAdminForSso(userId, schoolId) {
 
   let query = supabase
     .from("users")
-    .select("user_id, email, first_name, last_name, role, school_id")
+    .select("user_id, email, full_name, role, school_id")
     .eq("user_id", userId)
     .eq("is_deleted", false);
 
@@ -101,34 +101,28 @@ router.post(
         return res.status(404).json({ message: "School not found" });
       }
 
-      const firstName = admin?.first_name || req.user.first_name || req.user.firstName || "";
-      const lastName = admin?.last_name || req.user.last_name || req.user.lastName || "";
-      const adminName = `${firstName} ${lastName}`.trim() || req.user.name || req.user.email || "EduCore Admin";
+      // FIX: Use full_name instead of first_name/last_name
+      const adminName = admin?.full_name?.trim() || req.user.name || req.user.email || "EduCore Admin";
 
+      // FIX: Build payload matching what sso.php expects
       const payload = {
-        iss: "educore",
-        aud: "fet-timetable",
-        sub: String(userId),
-        user_id: userId,
-        email: admin?.email || req.user.email || null,
-        name: adminName,
-        role: req.user.role,
-        school_id: school.school_id,
-        school_name: school.name,
-        school_code: school.code || null,
-        school_email: school.email || null,
+        educore_school_id: String(school.school_id),
+        educore_school_name: school.name,
+        educore_admin_username: adminName,
+        exp: Math.floor(Date.now() / 1000) + (5 * 60) // 5 minutes
       };
 
       const token = jwt.sign(payload, env.fetTimetableJwtSecret, {
         algorithm: "HS256",
-        expiresIn: env.fetTimetableJwtExpiresIn,
+        expiresIn: env.fetTimetableJwtExpiresIn || "5m",
       });
 
       return res.json({
         url: buildTimetableSsoUrl(token),
-        expiresIn: env.fetTimetableJwtExpiresIn,
+        expiresIn: env.fetTimetableJwtExpiresIn || "5m",
       });
     } catch (err) {
+      console.error("Error generating SSO URL:", err);
       next(err);
     }
   }
