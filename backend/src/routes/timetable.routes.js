@@ -1,5 +1,7 @@
 import { Router } from "express";
+import jwt from "jsonwebtoken";
 import { supabase } from "../config/supabaseClient.js";
+import { env } from "../config/env.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
@@ -37,6 +39,100 @@ function normalise(r) {
     school_id: r.school_id,
   };
 }
+
+function buildTimetableSsoUrl(token) {
+  const baseUrl = String(env.fetTimetableBaseUrl || "/fet-timetable").replace(/\/+$/, "");
+  const ssoPath = baseUrl.endsWith("/sso.php") ? baseUrl : `${baseUrl}/sso.php`;
+  const separator = ssoPath.includes("?") ? "&" : "?";
+  return `${ssoPath}${separator}token=${encodeURIComponent(token)}`;
+}
+
+async function getSchoolForSso(schoolId) {
+  if (!schoolId) return null;
+
+  const { data, error } = await supabase
+    .from("schools")
+    .select("school_id, name, code, email, phone, address, county, country")
+    .eq("school_id", schoolId)
+    .eq("is_deleted", false)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || null;
+}
+
+async function getAdminForSso(userId, schoolId) {
+  if (!userId) return null;
+
+  let query = supabase
+    .from("users")
+    .select("user_id, email, first_name, last_name, role, school_id")
+    .eq("user_id", userId)
+    .eq("is_deleted", false);
+
+  if (schoolId) query = query.eq("school_id", schoolId);
+
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+// ================= FET TIMETABLE SSO =================
+router.post(
+  "/sso-url",
+  requireRoles("admin", "director", "superadmin"),
+  async (req, res, next) => {
+    try {
+      const schoolId = Number(req.user.schoolId || req.user.school_id);
+      const userId = req.user.userId || req.user.user_id;
+
+      if (!schoolId || Number.isNaN(schoolId)) {
+        return res.status(400).json({
+          message: "Select a school before opening the timetable generator.",
+        });
+      }
+
+      const [school, admin] = await Promise.all([
+        getSchoolForSso(schoolId),
+        getAdminForSso(userId, schoolId),
+      ]);
+
+      if (!school) {
+        return res.status(404).json({ message: "School not found" });
+      }
+
+      const firstName = admin?.first_name || req.user.first_name || req.user.firstName || "";
+      const lastName = admin?.last_name || req.user.last_name || req.user.lastName || "";
+      const adminName = `${firstName} ${lastName}`.trim() || req.user.name || req.user.email || "EduCore Admin";
+
+      const payload = {
+        iss: "educore",
+        aud: "fet-timetable",
+        sub: String(userId),
+        user_id: userId,
+        email: admin?.email || req.user.email || null,
+        name: adminName,
+        role: req.user.role,
+        school_id: school.school_id,
+        school_name: school.name,
+        school_code: school.code || null,
+        school_email: school.email || null,
+      };
+
+      const token = jwt.sign(payload, env.fetTimetableJwtSecret, {
+        algorithm: "HS256",
+        expiresIn: env.fetTimetableJwtExpiresIn,
+      });
+
+      return res.json({
+        url: buildTimetableSsoUrl(token),
+        expiresIn: env.fetTimetableJwtExpiresIn,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 // ================= GET TIMETABLE =================
 router.get("/", async (req, res, next) => {

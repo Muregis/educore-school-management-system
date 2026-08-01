@@ -1,12 +1,54 @@
 import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
-import { requireRoles, requireDirector } from "../middleware/roles.js";
+import { requireRoles } from "../middleware/roles.js";
 
 const router = Router();
 router.use(authRequired);
 
 const HR_ROLES = ["admin", "hr", "director"];
+
+function isTeachingStaff({ department, jobTitle }) {
+  const title = String(jobTitle || "");
+  const dept = String(department || "");
+  const teacherRole = /teacher|tutor|instructor|lecturer|professor|educator|class teacher|subject teacher|teaching assistant|ta|graduate assistant/i.test(title);
+  const academicDept = /academic|teaching|education|curriculum/i.test(dept);
+  const teacherDept = /teacher|tutor|instructor|lecturer/i.test(dept);
+  const nonTeachingRole = /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress|bursar|finance|bursary|human resources|hr|operations|logistics|procurement|marketing|sales|legal|compliance|audit|quality assurance|health and safety|communications|public relations|events|fundraising|admissions|enrollment|records|technology|ict|information technology|data|strategy|planning|risk|governance|board|trustee|council|committee/i.test(title);
+  return (teacherRole || academicDept || teacherDept) && !nonTeachingRole;
+}
+
+async function syncStaffToTeacher({ schoolId, staffId, fullName, email, phone, department, jobTitle, startDate, status }) {
+  if (!email) return;
+
+  const firstName = fullName?.split(' ')[0] || fullName || "Teacher";
+  const lastName = fullName?.split(' ').slice(1).join(' ') || "";
+  const teacherStatus = String(status || "").toLowerCase() === "active" ? "active" : "inactive";
+
+  if (!isTeachingStaff({ department, jobTitle })) {
+    await supabase
+      .from('teachers')
+      .update({ status: 'inactive', updated_at: new Date().toISOString() })
+      .eq('school_id', schoolId)
+      .eq('email', email)
+      .eq('is_deleted', false);
+    return;
+  }
+
+  await supabase.from('teachers').upsert({
+    school_id: schoolId,
+    first_name: firstName,
+    last_name: lastName,
+    email,
+    phone: phone || null,
+    department: department || 'Academic',
+    qualification: jobTitle || 'Teacher',
+    status: teacherStatus,
+    hire_date: startDate || null,
+    staff_id: staffId,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'school_id,email' });
+}
 
 function isMissingColumnError(error) {
   const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
@@ -60,29 +102,10 @@ router.post("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
       .single();
     if (insertError) throw insertError;
 
-    // Sync to teachers table if job title indicates teacher OR department is Academic
-    const isTeacherRole = jobTitle && /teacher|tutor|instructor|lecturer|professor|educator|class teacher|subject teacher|teaching assistant|ta|graduate assistant/i.test(jobTitle);
-    const isAcademicDept = department && /academic|teaching|education|curriculum/i.test(department);
-    const isTeacherDept = department && /teacher|tutor|instructor|lecturer/i.test(department);
-    const nonTeachingRole = jobTitle && /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress|bursar|finance|bursary|human resources|hr|operations|logistics|procurement|marketing|sales|legal|compliance|audit|internal audit|external audit|quality assurance|qa|health and safety|hse|environmental|sustainability|communications|public relations|pr|events|fundraising|development|alumni|admissions|enrollment|registration|records|archives|research|innovation|technology|ict|information technology|data|analytics|business intelligence|bi|strategy|planning|performance|risk|compliance|governance|board|trustee|council|committee/i.test(jobTitle);
-    if ((isTeacherRole || isAcademicDept || isTeacherDept) && !nonTeachingRole) {
-      try {
-        await supabase.from('teachers').upsert({
-          school_id: schoolId,
-          first_name: fullName.split(' ')[0] || fullName,
-          last_name: fullName.split(' ').slice(1).join(' ') || '',
-          email: email || null,
-          phone: phone || null,
-          department: department || 'Academic',
-          qualification: jobTitle,
-          status: status || 'active',
-          hire_date: startDate || null,
-          staff_id: inserted.staff_id
-        }, { onConflict: 'school_id,email' });
-      } catch (e) {
-        // Teacher sync failed, but staff was created successfully
-        console.log('Teacher sync failed:', e.message);
-      }
+    try {
+      await syncStaffToTeacher({ schoolId, staffId: inserted.staff_id, fullName, email, phone, department, jobTitle, startDate, status });
+    } catch (e) {
+      console.log('Teacher sync failed:', e.message);
     }
     const { data: row, error: selectError } = await supabase
       .from('hr_staff')
@@ -95,7 +118,7 @@ router.post("/staff", requireRoles(...HR_ROLES), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put("/staff/:id", requireRoles(...HR_ROLES), requireDirector(), async (req, res, next) => {
+router.put("/staff/:id", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { fullName, email, phone, department, jobTitle, contractType, startDate, salary, status, nationalId, notes } = req.body;
@@ -123,28 +146,10 @@ router.put("/staff/:id", requireRoles(...HR_ROLES), requireDirector(), async (re
     if (error) throw error;
     if (!updated) return res.status(404).json({ message: "Staff not found" });
 
-    // Sync updates to teachers table if academic department or teacher role
-    const isTeacherRole = jobTitle && /teacher|tutor|instructor|lecturer|professor|educator|class teacher|subject teacher|teaching assistant|ta|graduate assistant/i.test(jobTitle);
-    const isAcademicDept = department && /academic|teaching|education|curriculum/i.test(department);
-    const isTeacherDept = department && /teacher|tutor|instructor|lecturer/i.test(department);
-    const nonTeachingRole = jobTitle && /admin|administrator|secretary|accountant|cleaner|security|driver|cook|nurse|doctor|librarian|lab technician|it support|maintenance|groundskeeper|receptionist|clerk|assistant|officer|manager|director|principal|headmaster|headmistress|bursar|finance|bursary|human resources|hr|operations|logistics|procurement|marketing|sales|legal|compliance|audit|internal audit|external audit|quality assurance|qa|health and safety|hse|environmental|sustainability|communications|public relations|pr|events|fundraising|development|alumni|admissions|enrollment|registration|records|archives|research|innovation|technology|ict|information technology|data|analytics|business intelligence|bi|strategy|planning|performance|risk|compliance|governance|board|trustee|council|committee/i.test(jobTitle);
-    if ((isTeacherRole || isAcademicDept || isTeacherDept) && !nonTeachingRole && email) {
-      try {
-        await supabase.from('teachers').upsert({
-          school_id: schoolId,
-          first_name: fullName?.split(' ')[0] || fullName,
-          last_name: fullName?.split(' ').slice(1).join(' ') || '',
-          email: email,
-          phone: phone || null,
-          department: department || 'Academic',
-          qualification: jobTitle,
-          status: status || 'active',
-          hire_date: startDate || null,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'school_id,email' });
-      } catch (e) {
-        console.log('Teacher sync on update failed:', e.message);
-      }
+    try {
+      await syncStaffToTeacher({ schoolId, staffId: req.params.id, fullName, email, phone, department, jobTitle, startDate, status });
+    } catch (e) {
+      console.log('Teacher sync on update failed:', e.message);
     }
 
     res.json({ updated: true });
@@ -154,12 +159,34 @@ router.put("/staff/:id", requireRoles(...HR_ROLES), requireDirector(), async (re
 router.delete("/staff/:id", requireRoles(...HR_ROLES), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
+    const { data: existingStaff } = await supabase
+      .from('hr_staff')
+      .select('email')
+      .eq('staff_id', req.params.id)
+      .eq('school_id', schoolId)
+      .maybeSingle();
+
     const { error } = await supabase
       .from('hr_staff')
       .update({ is_deleted: true, updated_at: new Date().toISOString() })
       .eq('staff_id', req.params.id)
       .eq('school_id', schoolId);
     if (error) throw error;
+
+    await supabase
+      .from('teachers')
+      .update({ is_deleted: true, status: 'inactive', updated_at: new Date().toISOString() })
+      .eq('staff_id', req.params.id)
+      .eq('school_id', schoolId);
+
+    if (existingStaff?.email) {
+      await supabase
+        .from('teachers')
+        .update({ is_deleted: true, status: 'inactive', updated_at: new Date().toISOString() })
+        .eq('email', existingStaff.email)
+        .eq('school_id', schoolId);
+    }
+
     res.json({ deleted: true });
   } catch (err) { next(err); }
 });

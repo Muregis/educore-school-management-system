@@ -24,9 +24,10 @@ router.get("/", async (req, res, next) => {
     const { schoolId } = req.user;
     const { data: rows, error } = await supabase
       .from("teachers")
-      .select("teacher_id, user_id, staff_number, national_id, first_name, last_name, email, phone, gender, department, qualification, status, hire_date, created_at")
+      .select("teacher_id, user_id, staff_id, staff_number, national_id, first_name, last_name, email, phone, gender, department, qualification, status, hire_date, created_at")
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
+      .eq("status", "active")
       .order("first_name");
 
     if (error) throw error;

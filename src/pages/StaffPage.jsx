@@ -29,7 +29,7 @@ const DEPARTMENTS    = ["Administration","Academic","Finance","HR","Library","Tr
 
 function money(n) { return `KES ${Number(n||0).toLocaleString()}`; }
 
-export default function StaffPage({ auth, canEdit, toast }) {
+export default function StaffPage({ auth, canEdit, toast, onTeachersChanged }) {
   const [staff, setStaff]         = useState([]);
   const [users, setUsers]         = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -56,6 +56,16 @@ export default function StaffPage({ auth, canEdit, toast }) {
       setUsers(Array.isArray(u) ? u : []);
     } catch (e) { if (e?.code !== "EABORT") { /**/ } }
     setLoading(false);
+  };
+
+  const refreshTeachers = async () => {
+    if (!onTeachersChanged) return;
+    try {
+      const nextTeachers = await apiFetch("/teachers", { token: auth.token });
+      onTeachersChanged(Array.isArray(nextTeachers) ? nextTeachers : []);
+    } catch {
+      // Staff changes still succeed even if the dashboard refresh fails.
+    }
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -86,7 +96,9 @@ export default function StaffPage({ auth, canEdit, toast }) {
         await apiFetch("/hr/staff", { method:"POST", body:form, token:auth.token });
         toast("Staff added", "success");
       }
-      setShowModal(false); setEditing(null); setForm(blank); load();
+      setShowModal(false); setEditing(null); setForm(blank);
+      await load();
+      await refreshTeachers();
     } catch (e) { toast(e.message || "Save failed", "error"); }
   };
 
@@ -95,6 +107,7 @@ export default function StaffPage({ auth, canEdit, toast }) {
     try {
       await apiFetch(`/hr/staff/${id}`, { method:"DELETE", token:auth.token });
       setStaff(prev => prev.filter(s => s.staff_id !== id));
+      await refreshTeachers();
       toast("Removed", "success");
     } catch (e) { toast(e.message, "error"); }
   };
@@ -281,4 +294,9 @@ export default function StaffPage({ auth, canEdit, toast }) {
   );
 }
 
-StaffPage.propTypes = { auth:PropTypes.object, canEdit:PropTypes.bool, toast:PropTypes.func.isRequired };
+StaffPage.propTypes = {
+  auth: PropTypes.object,
+  canEdit: PropTypes.bool,
+  toast: PropTypes.func.isRequired,
+  onTeachersChanged: PropTypes.func,
+};

@@ -45,8 +45,27 @@ router.get("/summary", async (req, res, next) => {
       .from('teachers')
       .select('*', { count: 'exact', head: true })
       .eq('school_id', schoolId)
-      .eq('is_deleted', false);
+      .eq('is_deleted', false)
+      .eq('status', 'active');
     if (teaErr) throw teaErr;
+
+    const { count: totalStaff, error: staffErr } = await supabase
+      .from('hr_staff')
+      .select('*', { count: 'exact', head: true })
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
+    if (staffErr) throw staffErr;
+
+    const { data: activeStaffRows, error: activeStaffErr } = await supabase
+      .from('hr_staff')
+      .select('salary, status')
+      .eq('school_id', schoolId)
+      .eq('is_deleted', false);
+    if (activeStaffErr) throw activeStaffErr;
+
+    const activeStaffRowsOnly = (activeStaffRows || []).filter(row => String(row.status || '').toLowerCase() === 'active');
+    const activeStaff = activeStaffRowsOnly.length;
+    const monthlyPayroll = activeStaffRowsOnly.reduce((sum, row) => sum + toNumber(row.salary), 0);
 
     // Get all paid payments for total collection (filter by term for balance calculation)
     const payQuery = supabase
@@ -142,6 +161,9 @@ router.get("/summary", async (req, res, next) => {
       girls,
       totalStudents,
       totalTeachers: totalTeachers || 0,
+      totalStaff: totalStaff || 0,
+      activeStaff,
+      monthlyPayroll,
       totalCollected,
       todayCollection,
       totalPending,

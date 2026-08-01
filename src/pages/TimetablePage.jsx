@@ -20,12 +20,38 @@ export default function TimetablePage({ auth, teachers, canEdit, toast }) {
   const [editing, setEditing]         = useState(null);
   const [csvPreview, setCsvPreview]   = useState([]);
   const [uploading, setUploading]     = useState(false);
+  const [launchingGenerator, setLaunchingGenerator] = useState(false);
+  const [generatorError, setGeneratorError] = useState("");
   const fileRef = useRef();
+  const launchedGeneratorRef = useRef(false);
 
   const [form, setForm] = useState({
     className: filterClass, dayOfWeek: "Monday", period: "",
     startTime: "08:00", endTime: "09:00", subject: SUBJECTS[0], teacherId: ""
   });
+
+  const launchGenerator = useCallback(async () => {
+    if (!auth?.token) return;
+    setLaunchingGenerator(true);
+    setGeneratorError("");
+
+    try {
+      const data = await apiFetch("/timetable/sso-url", {
+        method: "POST",
+        token: auth.token,
+      });
+
+      if (!data?.url) {
+        throw new Error("Timetable generator did not return a launch URL.");
+      }
+
+      window.location.assign(data.url);
+    } catch (e) {
+      setLaunchingGenerator(false);
+      setGeneratorError(e.message || "Could not open timetable generator.");
+      toast?.(e.message || "Could not open timetable generator.", "error");
+    }
+  }, [auth?.token, toast]);
 
   const load = useCallback(async () => {
     if (!auth?.token) return;
@@ -36,6 +62,15 @@ export default function TimetablePage({ auth, teachers, canEdit, toast }) {
   }, [auth, filterClass]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const role = String(auth?.role || "").toLowerCase();
+    const canUseGenerator = ["admin", "director", "superadmin"].includes(role);
+    if (!canUseGenerator || launchedGeneratorRef.current) return;
+
+    launchedGeneratorRef.current = true;
+    launchGenerator();
+  }, [auth?.role, launchGenerator]);
 
   const save = async () => {
     try {
@@ -127,6 +162,30 @@ export default function TimetablePage({ auth, teachers, canEdit, toast }) {
       subject: e.subject, teacherId: e.teacher_id||"" });
     setShowModal(true);
   };
+
+  if (["admin", "director", "superadmin"].includes(String(auth?.role || "").toLowerCase())) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+        <Card style={{ padding: "var(--space-5)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap" }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: "var(--text-xl)", color: "var(--color-text-primary)" }}>
+                Timetable Generator
+              </h2>
+              <p style={{ margin: "var(--space-2) 0 0", color: "var(--color-text-secondary)", maxWidth: "560px" }}>
+                {launchingGenerator
+                  ? "Opening the timetable generator..."
+                  : generatorError || "Use single sign-on to open the timetable generator."}
+              </p>
+            </div>
+            <Button onClick={launchGenerator} disabled={launchingGenerator}>
+              {launchingGenerator ? "Opening..." : "Open Generator"}
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
