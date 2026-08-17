@@ -11,7 +11,17 @@ function getDefaultApiBase() {
 
   const host = window.location.hostname;
   const isLocalHost = host === "localhost" || host === "127.0.0.1";
-  return isLocalHost ? DEFAULT_LOCAL_API_BASE : DEFAULT_PROD_API_BASE;
+  if (isLocalHost) return DEFAULT_LOCAL_API_BASE;
+
+  // Allow runtime override via localStorage for POC/local deployment
+  try {
+    const localOverride = localStorage.getItem("educore.apiBase");
+    if (localOverride) return localOverride;
+  } catch {
+    // ignore
+  }
+
+  return DEFAULT_PROD_API_BASE;
 }
 
 // OLD: export const API_BASE = "http://localhost:4001/api";

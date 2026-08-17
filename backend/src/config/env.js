@@ -39,10 +39,16 @@ export const env = {
   whatsappToken:        clean(process.env.WHATSAPP_TOKEN),
   whatsappPhoneNumberId: clean(process.env.WHATSAPP_PHONE_NUMBER_ID),
 
+  // Database mode: "cloud" (Supabase) or "local" (PostgreSQL)
+  databaseMode:           process.env.DATABASE_MODE || "cloud",
+
   // Supabase
   supabaseUrl:          clean(process.env.SUPABASE_URL),
   supabaseServiceKey:   clean(process.env.SUPABASE_SERVICE_KEY),
   supabaseAnonKey:      clean(process.env.SUPABASE_ANON_KEY),
+
+  // Local PostgreSQL (used when DATABASE_MODE=local)
+  pgDatabaseUrl:        clean(process.env.DATABASE_URL || process.env.PG_DATABASE_URL),
 
   // Cloudinary
   cloudinaryCloudName:  clean(process.env.CLOUDINARY_CLOUD_NAME),

@@ -34,12 +34,24 @@ export { database }; // Add this export
 //   queueLimit: 0
 // });
 
-// NEW: Simplified connection test - Supabase only
+// NEW: Simplified connection test - Supabase or local PostgreSQL
 export async function testDbConnection() {
+  const isLocalMode = env.databaseMode === "local";
+
+  if (isLocalMode) {
+    try {
+      await pgPool.query("SELECT 1");
+      return { success: true, type: "local" };
+    } catch (pgError) {
+      console.error('Local PostgreSQL connection failed:', pgError.message);
+      throw new Error(`Local database connection failed: ${pgError.message}`);
+    }
+  }
+
   try {
     const result = await testSupabaseConnection();
     if (result.success) {
-      return { success: true, type: 'supabase' };
+      return { success: true, type: "supabase" };
     }
     throw new Error(result.error);
   } catch (supabaseError) {
@@ -49,7 +61,7 @@ export async function testDbConnection() {
 }
 
 export async function applyDatabaseMigrations() {
-  const migrationPath = path.resolve(__dirname, '../../../database/migrations/011_add_mpesa_reconciliation.sql');
+  const migrationPath = path.resolve(__dirname, '../../../database/migrations/070_fix_missing_audit_columns.sql');
   if (!fs.existsSync(migrationPath)) {
     console.warn(`⚠️ Migration file not found: ${migrationPath}`);
     return;
@@ -84,6 +96,30 @@ export async function applyDatabaseMigrations() {
     // Custom Fixes for HR Payroll triggers and Expenditures approved_by column type (UUID -> BIGINT)
     console.log('🔧 Applying custom database fixes for HR payroll triggers & expenditures...');
     const customFixes = [
+      `CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+       RETURNS TRIGGER AS $$
+       DECLARE
+           _has_updated_at BOOL;
+           _has_version    BOOL;
+       BEGIN
+           _has_updated_at := EXISTS (
+               SELECT 1 FROM information_schema.columns
+               WHERE table_schema = TG_TABLE_SCHEMA
+                 AND table_name   = TG_TABLE_NAME
+                 AND column_name  = 'updated_at'
+           );
+           _has_version := EXISTS (
+               SELECT 1 FROM information_schema.columns
+               WHERE table_schema = TG_TABLE_SCHEMA
+                 AND table_name   = TG_TABLE_NAME
+                 AND column_name  = 'version'
+           );
+           IF _has_updated_at THEN NEW.updated_at = NOW(); END IF;
+           IF _has_version    THEN NEW.version = COALESCE(OLD.version, 0) + 1; END IF;
+           RETURN NEW;
+       END;
+       $$ LANGUAGE plpgsql;`,
+
       `CREATE OR REPLACE FUNCTION update_hr_updated_at_column()
        RETURNS TRIGGER AS $$
        BEGIN

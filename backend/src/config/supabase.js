@@ -4,25 +4,31 @@ import { env } from './env.js';
 const supabaseUrl = env.supabaseUrl;
 const supabaseServiceKey = env.supabaseServiceKey;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in environment variables');
-}
+// In local mode, Supabase credentials may be intentionally absent.
+// Export null instead of throwing so routes can fall back to local PostgreSQL.
+const isLocalMode = env.databaseMode === "local";
 
-export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false
-  },
-  db: {
-    schema: 'public'
-  },
-  global: {
-    headers: {
-      'x-tenant-source': 'educore-backend'
-    }
-  }
-});
+export const supabase = (supabaseUrl && supabaseServiceKey)
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+      },
+      db: {
+        schema: 'public'
+      },
+      global: {
+        headers: {
+          'x-tenant-source': 'educore-backend'
+        }
+      }
+    })
+  : null;
+
+if (!supabase && !isLocalMode) {
+  console.warn('[Supabase] CRITICAL: Missing SUPABASE_URL or SUPABASE_SERVICE_KEY and not in local mode');
+}
 
 export function withTenantFilter(query, schoolId) {
   return query.eq('school_id', schoolId);

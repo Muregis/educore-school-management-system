@@ -322,7 +322,7 @@ export default function App() {
       apiFetch("/attendance", { token }),
       apiFetch("/grades", { token }),
       apiFetch(`/payments${termParam}`, { token }),
-      apiFetch(`/payments/fee-structures${termParam}`, { token }),
+      apiFetch("/payments/fee-structures", { token }),
       apiFetch("/timetable", { token }),
     ]);
 

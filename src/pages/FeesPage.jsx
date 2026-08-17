@@ -116,7 +116,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [page, setPage]               = useState(1);
   const [paymentForm, setPaymentForm] = useState({ studentId: "", amount: "", feeType: "tuition", method: "cash", date: startDate || new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
   const [paymentClass, setPaymentClass] = useState("");
-  const [structForm, setStructForm]   = useState({ className: "Grade 7", term: term || "Term 1", tuition: "", activity: "", misc: "" });
+  const [structForm, setStructForm]   = useState({ className: "Grade 7", term: displayTerm, tuition: "", activity: "", misc: "" });
   const [bankDetails, setBankDetails] = useState(null);
   const [schoolWhatsApp, setSchoolWhatsApp] = useState("");
   const [schoolData, setSchoolData] = useState(null);
@@ -160,7 +160,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   }, [reloadPayments]);
 
   const normalisedPayments   = payments.map(p => p.payment_id ? normalisePayment(p) : p);
-  const normalisedStructures = feeStructures.map(f => f.fee_structure_id ? normaliseFeeStruct(f) : f);
+  const allStructures        = feeStructures.map(f => f.fee_structure_id ? normaliseFeeStruct(f) : f);
+  const normalisedStructures = allStructures.filter(f => (f.term || displayTerm) === displayTerm);
 
   const calculateLedgerBalance = (student, studentDiscounts = []) => {
     const sid = student?.student_id ?? student?.id;
@@ -427,14 +428,15 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         token: auth?.token,
         body: { 
           className: structForm.className, 
-          term: structForm.term || "Term 1", 
+          term: structForm.term || displayTerm, 
           tuition,
           activity,
           misc
         },
       });
-      // Reload fee structures for current school (no term filter needed)
-      const data = await apiFetch("/payments/fee-structures", { token: auth?.token });
+      // Reload fee structures for current school WITH term filter so display-term only shows
+      const reloadTermParam = `?term=${encodeURIComponent(structForm.term || displayTerm)}`;
+      const data = await apiFetch(`/payments/fee-structures${reloadTermParam}`, { token: auth?.token });
       setFeeStructures(data.map(normaliseFeeStruct));
       setShowStruct(false); 
       setEditStruct(null);
@@ -779,7 +781,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             {canViewTotals && tab === "structure" && <Button variant="ghost" onClick={printFeeStructureReport}>🖨️ Print Fee Structure</Button>}
             {canEdit && tab==="payments" && <Button onClick={() => setShowPayment(true)}>+ Record Payment</Button>}
             {canEdit && tab==="payments" && <Button variant="secondary" onClick={() => setShowRecordPaymentModal(true)}>📝 Manual Payment</Button>}
-            {canEdit && tab==="structure" && <Button onClick={() => { setEditStruct(null); setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""}); setShowStruct(true); }}>Set Fee Structure</Button>}
+            {canEdit && tab==="structure" && <Button onClick={() => { setEditStruct(null); setStructForm({className:"Grade 7",term:displayTerm,tuition:"",activity:"",misc:""}); setShowStruct(true); }}>Set Fee Structure</Button>}
             {canEdit && <Button variant="ghost" onClick={() => setShowDayEndSettings(true)}>⚙️ Day Settings</Button>}
             {canEdit && <Button variant="primary" onClick={closeDay}>🔒 Close Day</Button>}
           </div>
@@ -1024,7 +1026,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 money(f.activity), 
                 money(f.misc),
                 <strong key="total">{money(Number(f.tuition) + Number(f.activity) + Number(f.misc))}</strong>,
-                canEdit ? <Button key="ed" size="sm" variant="secondary" onClick={() => { setEditStruct(f); setStructForm({ className: f.className, term: f.term || "Term 1", tuition: String(f.tuition), activity: String(f.activity), misc: String(f.misc) }); setShowStruct(true); }}>Edit</Button> : "—"
+                canEdit ? <Button key="ed" size="sm" variant="secondary" onClick={() => { setEditStruct(f); setStructForm({ className: f.className, term: f.term || displayTerm, tuition: String(f.tuition), activity: String(f.activity), misc: String(f.misc) }); setShowStruct(true); }}>Edit</Button> : "—"
               ])}
             />
           </Card>

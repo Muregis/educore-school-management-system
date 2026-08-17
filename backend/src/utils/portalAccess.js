@@ -6,7 +6,7 @@ export function isPortalRole(role) {
   return role === "parent" || role === "student";
 }
 
-export async function getPortalStudentIds(req, supabase) {
+export async function getPortalStudentIds(req, supabaseClient) {
   const role = req.user?.role;
   const schoolId = req.user?.school_id ?? req.user?.schoolId;
   const userId = req.user?.user_id ?? req.user?.userId;
@@ -19,64 +19,45 @@ export async function getPortalStudentIds(req, supabase) {
     return tokenStudentId ? [Number(tokenStudentId)] : [];
   }
 
-  const ids = new Set();
-  let linkedStudent = null;
-  let parentUser = null;
+  // Parent role
+  const { env } = await import("../config/env.js");
+  if (env.databaseMode === "local") {
+    // Local POC: basic parent lookup via users.student_id
+    try {
+      const result = await pgPool.query(
+        "SELECT student_id FROM users WHERE user_id = $1 AND school_id = $2 AND role = 'parent' LIMIT 1",
+        [userId, schoolId]
+      );
+      const primaryStudentId = result.rows[0]?.student_id;
+      if (primaryStudentId) {
+        return [Number(primaryStudentId)];
+      }
+    } catch (err) {
+      console.error("[portalAccess] Local parent lookup failed:", err.message);
+    }
+    return [];
+  }
 
-  const { data: userRow, error: userError } = await supabase
+  // Cloud mode
+  const { data: userRow, error: userError } = await supabaseClient
     .from("users")
     .select("user_id, student_id")
     .eq("user_id", userId)
     .eq("school_id", schoolId)
     .maybeSingle();
 
-  if (!userError && userRow) parentUser = userRow;
-
-  const primaryStudentId = parentUser?.student_id ?? tokenStudentId;
-  if (primaryStudentId) {
-    const { data: student, error: studentError } = await supabase
-      .from("students")
-      .select("student_id, parent_phone")
-      .eq("student_id", primaryStudentId)
-      .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .maybeSingle();
-
-    if (!studentError && student) {
-      linkedStudent = student;
-      ids.add(Number(student.student_id));
+  if (!userError && userRow) {
+    const primaryStudentId = userRow.student_id ?? tokenStudentId;
+    if (primaryStudentId) {
+      return [Number(primaryStudentId)];
     }
   }
 
-  if (linkedStudent?.parent_phone) {
-    const { data: siblings, error: siblingsError } = await supabase
-      .from("students")
-      .select("student_id")
-      .eq("school_id", schoolId)
-      .eq("parent_phone", linkedStudent.parent_phone)
-      .eq("is_deleted", false);
-
-    if (!siblingsError) {
-      (siblings || []).forEach(student => ids.add(Number(student.student_id)));
-    }
-  }
-
-  const { data: linkedRows, error: linkError } = await supabase
-    .from("parent_students")
-    .select("student_id, students!inner(school_id, is_deleted)")
-    .eq("parent_id", userId)
-    .eq("students.school_id", schoolId)
-    .eq("students.is_deleted", false);
-
-  if (!linkError) {
-    (linkedRows || []).forEach(row => ids.add(Number(row.student_id)));
-  }
-
-  return [...ids].filter(id => Number.isFinite(id) && id > 0);
+  return [];
 }
 
-export async function requirePortalStudentAccess(req, supabase, studentId) {
-  const allowedIds = await getPortalStudentIds(req, supabase);
+export async function requirePortalStudentAccess(req, supabaseClient, studentId) {
+  const allowedIds = await getPortalStudentIds(req, supabaseClient);
   if (allowedIds === null) return true;
   return allowedIds.map(String).includes(String(studentId));
 }

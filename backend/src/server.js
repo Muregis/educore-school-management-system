@@ -35,19 +35,26 @@ app.get('/test', (req, res) => {
 
 async function start() {
   try {
-    // Supabase-only database connection
-    if (!env.supabaseUrl || !env.supabaseServiceKey) {
-      console.error(
-        "❌ Supabase credentials missing in .env (SUPABASE_URL and SUPABASE_SERVICE_KEY required)"
-      );
-      process.exit(1);
+    const isLocalMode = env.databaseMode === "local";
+
+    if (isLocalMode) {
+      console.log("🗄️  DATABASE_MODE=local — skipping Supabase requirement");
+      console.log("🗄️  Using local PostgreSQL via pgPool");
+    } else {
+      if (!env.supabaseUrl || !env.supabaseServiceKey) {
+        console.error(
+          "❌ Supabase credentials missing in .env (SUPABASE_URL and SUPABASE_SERVICE_KEY required)"
+        );
+        process.exit(1);
+      }
     }
     
     try {
       await testDbConnection();
-      console.log("✅ Supabase database connected successfully");
+      const dbType = isLocalMode ? "local PostgreSQL" : "Supabase";
+      console.log(`✅ ${dbType} database connected successfully`);
     } catch (dbErr) {
-      console.error("❌ Supabase connection failed:", dbErr.message);
+      console.error("❌ Database connection failed:", dbErr.message);
       process.exit(1);
     }
 
