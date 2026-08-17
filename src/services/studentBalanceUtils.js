@@ -22,8 +22,15 @@ export function getOpeningBalanceImpact(student) {
 export function getStudentBaseFee(student, feeStructures = []) {
   const className = getStudentClassName(student);
   const structure = feeStructures.find(f => (f?.className ?? f?.class_name) === className);
-  if (!structure) return 0;
+  if (!structure) {
+    return 0;
+  }
   return toNumber(structure.tuition) + toNumber(structure.activity) + toNumber(structure.misc);
+}
+
+export function hasFeeStructureForClass(student, feeStructures = []) {
+  const className = getStudentClassName(student);
+  return feeStructures.some(f => (f?.className ?? f?.class_name) === className);
 }
 
 export function getStudentTransportFee(student) {
@@ -73,10 +80,44 @@ export function calculateStudentBalanceLocal({
   feeStructures = [],
   payments = [],
   discounts = [],
-  schoolSettings = {}
+  schoolSettings = {},
+  requireFeeStructure = true
 }) {
   const studentId = getStudentId(student);
   const className = getStudentClassName(student);
+  const hasStructure = hasFeeStructureForClass(student, feeStructures);
+
+  // If requireFeeStructure is true (default for dashboard aggregates) and
+  // no fee structure is defined for this class, treat expected as 0 so we
+  // never surface phantom balances from lunch/transport/opening balances alone.
+  if (requireFeeStructure && !hasStructure) {
+    const paid = payments
+      .filter(p => String(p?.studentId ?? p?.student_id) === String(studentId) && (p?.status ?? "paid") === "paid")
+      .reduce((sum, p) => sum + toNumber(p.amount), 0);
+    return {
+      studentId,
+      className,
+      baseFee: 0,
+      transportFee: 0,
+      lunchFee: 0,
+      breakfastFee: 0,
+      openingBalance: 0,
+      grossAmount: 0,
+      expected: 0,
+      totalDiscount: 0,
+      discountPercent: 0,
+      discountType: null,
+      discountLabel: null,
+      hasDiscount: false,
+      paid,
+      rawBalance: -paid,
+      overpaymentAmount: paid > 0 ? paid : 0,
+      isOverpaid: paid > 0,
+      balance: 0,
+      hasFeeStructure: false
+    };
+  }
+
   const baseFee = getStudentBaseFee(student, feeStructures);
   const structure = feeStructures.find(f => (f?.className ?? f?.class_name) === className);
   const tuition = structure ? toNumber(structure.tuition) : 0;
@@ -123,6 +164,7 @@ export function calculateStudentBalanceLocal({
     rawBalance,
     overpaymentAmount,
     isOverpaid: overpaymentAmount > 0,
-    balance
+    balance,
+    hasFeeStructure: hasStructure
   };
 }

@@ -7,6 +7,7 @@ import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import EmptyState from "../components/ui/EmptyState";
 import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
+import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 export default function PortalDashboardPage({ 
   auth, 
@@ -15,12 +16,17 @@ export default function PortalDashboardPage({
   attendance, 
   results, 
   payments, 
-  feeStructures,
+  feeStructures: rawFeeStructures = [],
   toast,
   onViewGrades,
   onViewFees,
   onViewAttendance 
 }) {
+  const { term: currentTerm } = useCurrentTerm(auth);
+  const feeStructures = Array.isArray(rawFeeStructures)
+    ? rawFeeStructures.filter(f => (f?.term ?? f?.term_name ?? currentTerm) === currentTerm)
+    : [];
+
   const studentId = student?.student_id ?? student?.id;
   
   // Calculate stats

@@ -7,6 +7,7 @@ import Skeleton from "../components/ui/Skeleton";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
 import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
+import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 // Define money here locally just in case it was a global that gets lost in strict module scope
 const money = (val) => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(val || 0);
@@ -70,7 +71,12 @@ const ProgressRow = ({ label, value, max, color = "var(--color-primary)", displa
 // Fallback apiFetch if it was magically global, but better to import it
 import { apiFetch } from "../lib/api";
 
-export default function DashboardPage({ auth, school, students, teachers, attendance, payments, feeStructures, results, toast, showFinance = true }) {
+export default function DashboardPage({ auth, school, students, teachers, attendance, payments, feeStructures: rawFeeStructures = [], results, toast, showFinance = true }) {
+  const { term: currentTerm } = useCurrentTerm(auth);
+  const feeStructures = Array.isArray(rawFeeStructures)
+    ? rawFeeStructures.filter(f => (f?.term ?? f?.term_name ?? currentTerm) === currentTerm)
+    : [];
+
   const [books, setBooks] = useState([]);
   const [borrowRecords, setBorrowRecords] = useState([]);
   const [libraryLoading, setLibraryLoading] = useState(false);

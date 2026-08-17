@@ -10,6 +10,7 @@ import { parseStudentQrContent } from "../lib/qr";
 import { printHTML } from "../lib/print";
 import { Pager } from "../components/Helpers";
 import { csv, pager } from "../lib/utils";
+import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 // New UI Components
 import Button from "../components/ui/Button";
@@ -60,7 +61,12 @@ function normalise(s) {
   };
 }
 
-export default function StudentsPage({ auth, students, setStudents, canEdit, results, payments, feeStructures, toast }) {
+export default function StudentsPage({ auth, students, setStudents, canEdit, results, payments, feeStructures: rawFeeStructures = [], toast }) {
+  const { term: currentTerm } = useCurrentTerm(auth);
+  const feeStructures = Array.isArray(rawFeeStructures)
+    ? rawFeeStructures.filter(f => (f?.term ?? f?.term_name ?? currentTerm) === currentTerm)
+    : [];
+
   const [q, setQ] = useState("");
   const [cls, setCls] = useState("all");
   const [status, setStatus] = useState("all");
