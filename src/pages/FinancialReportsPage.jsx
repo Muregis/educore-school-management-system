@@ -3,6 +3,7 @@ import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { exportCsv } from "../utils/reportExport";
 import { printHTML } from "../lib/print";
+import { printFinancialReport } from "../utils/financialPrint";
 
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -66,7 +67,35 @@ function BalanceSheet({ auth }) {
     exportCsv(`balance-sheet-${asOfDate}.csv`, headers, rows);
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    await printFinancialReport({
+      authToken: auth?.token,
+      title: "Balance Sheet",
+      subtitle: `As of ${new Date(asOfDate).toLocaleDateString()}`,
+      meta: [
+        { label: "Report Date", value: new Date(asOfDate).toLocaleDateString() },
+        { label: "Status", value: isBalanced ? "Balanced" : "Not Balanced" },
+      ],
+      columns: [
+        { key: "account", label: "Account" },
+        { key: "code", label: "Code" },
+        { key: "type", label: "Type" },
+        { key: "balance", label: "Balance", align: "right" },
+      ],
+      rows: [
+        ...(data.assets || []).map(acc => ({ account: acc.account_name, code: acc.account_code, type: "Asset", balance: money(acc.balance) })),
+        ...(data.liabilities || []).map(acc => ({ account: acc.account_name, code: acc.account_code, type: "Liability", balance: money(acc.balance) })),
+        ...(data.equity || []).map(acc => ({ account: acc.account_name, code: acc.account_code, type: "Equity", balance: money(acc.balance) })),
+        { account: "Retained Earnings", code: "-", type: "Equity", balance: money(data.retained_earnings) },
+      ],
+      summary: [
+        { label: "Total Assets", value: money(totalAssets) },
+        { label: "Total Liabilities", value: money(totalLiabilities) },
+        { label: "Total Equity", value: money(totalEquity) },
+        { label: "Balance Check", value: isBalanced ? "Balanced" : "Not Balanced" },
+      ],
+    });
+    return;
     const html = `
       <div class="print-document">
         <div class="print-header">
@@ -228,7 +257,32 @@ function IncomeStatement({ auth }) {
     exportCsv(`income-statement-${startDate}-to-${endDate}.csv`, headers, rows);
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    await printFinancialReport({
+      authToken: auth?.token,
+      title: "Income Statement (Profit & Loss)",
+      subtitle: `${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`,
+      meta: [
+        { label: "Start Date", value: new Date(startDate).toLocaleDateString() },
+        { label: "End Date", value: new Date(endDate).toLocaleDateString() },
+      ],
+      columns: [
+        { key: "account", label: "Account" },
+        { key: "code", label: "Code" },
+        { key: "type", label: "Type" },
+        { key: "amount", label: "Amount", align: "right" },
+      ],
+      rows: [
+        ...(data.revenue || []).map(acc => ({ account: acc.account_name, code: acc.account_code, type: "Revenue", amount: money(acc.balance) })),
+        ...(data.expenses || []).map(acc => ({ account: acc.account_name, code: acc.account_code, type: "Expense", amount: money(acc.balance) })),
+      ],
+      summary: [
+        { label: "Total Revenue", value: money(totalRevenue) },
+        { label: "Total Expenses", value: money(totalExpenses) },
+        { label: "Net Income", value: money(netIncome) },
+      ],
+    });
+    return;
     const html = `
       <div class="print-document">
         <div class="print-header">
@@ -371,7 +425,36 @@ function TrialBalance({ auth }) {
     exportCsv(`trial-balance-${asOfDate}.csv`, headers, rows);
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    await printFinancialReport({
+      authToken: auth?.token,
+      title: "Trial Balance",
+      subtitle: `As of ${new Date(asOfDate).toLocaleDateString()}`,
+      meta: [
+        { label: "Report Date", value: new Date(asOfDate).toLocaleDateString() },
+        { label: "Status", value: isBalanced ? "Balanced" : "Not Balanced" },
+      ],
+      columns: [
+        { key: "account", label: "Account" },
+        { key: "code", label: "Code" },
+        { key: "type", label: "Type" },
+        { key: "debit", label: "Debit", align: "right" },
+        { key: "credit", label: "Credit", align: "right" },
+      ],
+      rows: (data.accounts || []).map(acc => ({
+        account: acc.account_name,
+        code: acc.account_code,
+        type: ACCOUNT_TYPES[acc.account_type]?.label || acc.account_type,
+        debit: money(acc.debit_balance || acc.debit || 0),
+        credit: money(acc.credit_balance || acc.credit || 0),
+      })),
+      summary: [
+        { label: "Total Debits", value: money(totalDebits) },
+        { label: "Total Credits", value: money(totalCredits) },
+        { label: "Balance Check", value: isBalanced ? "Balanced" : "Not Balanced" },
+      ],
+    });
+    return;
     const html = `
       <div class="print-document">
         <div class="print-header">
@@ -468,9 +551,35 @@ function ChartOfAccounts({ auth }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!data) return;
     const accounts = Array.isArray(data) ? data : data.data || [];
+    await printFinancialReport({
+      authToken: auth?.token,
+      title: "Chart of Accounts",
+      subtitle: `${accounts.length} accounts`,
+      meta: [
+        { label: "Type Filter", value: filterType ? ACCOUNT_TYPES[filterType]?.label || filterType : "All Types" },
+        { label: "Accounts", value: accounts.length },
+      ],
+      columns: [
+        { key: "code", label: "Code" },
+        { key: "name", label: "Account Name" },
+        { key: "type", label: "Type" },
+        { key: "status", label: "Status" },
+      ],
+      rows: accounts.map(acc => ({
+        code: acc.account_code || "-",
+        name: acc.account_name,
+        type: ACCOUNT_TYPES[acc.account_type]?.label || acc.account_type,
+        status: acc.is_active ? "Active" : "Inactive",
+      })),
+      summary: [
+        { label: "Active Accounts", value: accounts.filter(acc => acc.is_active).length },
+        { label: "Inactive Accounts", value: accounts.filter(acc => !acc.is_active).length },
+      ],
+    });
+    return;
     const rows = accounts.map(acc => `
       <tr>
         <td style="font-family: monospace">${acc.account_code || "—"}</td>
@@ -586,9 +695,46 @@ function JournalEntries({ auth }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!data) return;
     const entries = Array.isArray(data) ? data : data.data || [];
+    const rows = [];
+    entries.forEach(entry => {
+      (entry.journal_entry_lines || []).forEach(line => {
+        rows.push({
+          entry: entry.entry_number || `JE-${entry.id}`,
+          date: new Date(entry.entry_date).toLocaleDateString(),
+          description: entry.description || "-",
+          account: line.chart_of_accounts?.account_name || line.account_id,
+          debit: line.debit > 0 ? money(line.debit) : "-",
+          credit: line.credit > 0 ? money(line.credit) : "-",
+        });
+      });
+    });
+    await printFinancialReport({
+      authToken: auth?.token,
+      title: "Journal Entries",
+      subtitle: `${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`,
+      meta: [
+        { label: "Start Date", value: new Date(startDate).toLocaleDateString() },
+        { label: "End Date", value: new Date(endDate).toLocaleDateString() },
+        { label: "Entries", value: entries.length },
+      ],
+      columns: [
+        { key: "entry", label: "Entry" },
+        { key: "date", label: "Date" },
+        { key: "description", label: "Description" },
+        { key: "account", label: "Account" },
+        { key: "debit", label: "Debit", align: "right" },
+        { key: "credit", label: "Credit", align: "right" },
+      ],
+      rows,
+      summary: [
+        { label: "Journal Entries", value: entries.length },
+        { label: "Line Items", value: rows.length },
+      ],
+    });
+    return;
     const entryBlocks = entries.map(entry => {
       const lineRows = (entry.journal_entry_lines || []).map(line => `
         <tr>
@@ -757,9 +903,45 @@ function GeneralLedger({ auth }) {
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
   useEffect(() => { load(); }, [load]);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!data) return;
     const ledger = Array.isArray(data.ledger) ? data.ledger : [];
+    const rows = ledger.flatMap(accountLedger =>
+      (accountLedger.transactions || []).map(tx => ({
+        account: accountLedger.account?.account_name || "-",
+        date: new Date(tx.transaction_date || tx.date).toLocaleDateString(),
+        reference: tx.reference || tx.entry_number || "-",
+        description: tx.description || "-",
+        debit: tx.debit > 0 ? money(tx.debit) : "-",
+        credit: tx.credit > 0 ? money(tx.credit) : "-",
+        balance: money(tx.balance || tx.running_balance || 0),
+      }))
+    );
+    await printFinancialReport({
+      authToken: auth?.token,
+      title: "General Ledger",
+      subtitle: `${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`,
+      meta: [
+        { label: "Start Date", value: new Date(startDate).toLocaleDateString() },
+        { label: "End Date", value: new Date(endDate).toLocaleDateString() },
+        { label: "Account", value: selectedAccountId ? accounts.find(acc => String(acc.id) === String(selectedAccountId))?.account_name || "Selected" : "All Accounts" },
+      ],
+      columns: [
+        { key: "account", label: "Account" },
+        { key: "date", label: "Date" },
+        { key: "reference", label: "Reference" },
+        { key: "description", label: "Description" },
+        { key: "debit", label: "Debit", align: "right" },
+        { key: "credit", label: "Credit", align: "right" },
+        { key: "balance", label: "Balance", align: "right" },
+      ],
+      rows,
+      summary: [
+        { label: "Accounts", value: ledger.length },
+        { label: "Transactions", value: rows.length },
+      ],
+    });
+    return;
     const txRows = ledger.flatMap(accountLedger =>
       (accountLedger.transactions || []).map(tx => `
         <tr>

@@ -7,6 +7,7 @@ import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { getAuthHeaders } from "../lib/auth";
 import { printHTML } from "../lib/print";
+import { printFinancialReport } from "../utils/financialPrint";
 import discountService from "../services/discountService";
 import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
@@ -585,6 +586,99 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       })
     : balances;
 
+  const printBalanceReport = async () => {
+    const totalExpected = filteredBalances.reduce((sum, b) => sum + Number(b.expected || 0), 0);
+    const totalPaid = filteredBalances.reduce((sum, b) => sum + Number(b.paid || 0), 0);
+    const totalOutstanding = filteredBalances.reduce((sum, b) => sum + Math.max(0, Number(b.balance || 0)), 0);
+    const totalCredit = filteredBalances.reduce((sum, b) => sum + Number(b.overpaymentAmount || 0), 0);
+
+    await printFinancialReport({
+      authToken: auth?.token,
+      school: schoolData || school,
+      title: "Student Fee Balance Report",
+      subtitle: `${filterClass === "all" ? "All Classes" : filterClass} | ${filterDate === "today" ? `Business Day ${businessToday}` : "All Time"}`,
+      meta: [
+        { label: "Class Filter", value: filterClass === "all" ? "All classes" : filterClass },
+        { label: "Students", value: filteredBalances.length },
+        { label: "Term", value: displayTerm },
+        { label: "Academic Year", value: academicYear || "Current" },
+      ],
+      columns: [
+        { key: "student", label: "Student" },
+        { key: "className", label: "Class" },
+        { key: "baseFee", label: "Base Fee", align: "right" },
+        { key: "transportFee", label: "Transport", align: "right" },
+        { key: "lunchFee", label: "Lunch", align: "right" },
+        { key: "breakfastFee", label: "Breakfast", align: "right" },
+        { key: "openingBalance", label: "Opening", align: "right" },
+        ...(canViewTotals ? [{ key: "paid", label: "Paid", align: "right" }] : []),
+        { key: "discount", label: "Discount" },
+        { key: "balance", label: "Balance", align: "right" },
+        { key: "status", label: "Status" },
+      ],
+      rows: filteredBalances.map(b => ({
+        student: b.name,
+        className: b.className,
+        baseFee: money(b.baseFee),
+        transportFee: b.transportFee > 0 ? money(b.transportFee) : "-",
+        lunchFee: b.lunchFee > 0 ? money(b.lunchFee) : "-",
+        breakfastFee: b.breakfastFee > 0 ? money(b.breakfastFee) : "-",
+        openingBalance: b.openingBalance !== 0 ? `${money(Math.abs(b.openingBalance))} ${b.openingBalance > 0 ? "owing" : "credit"}` : "-",
+        paid: money(b.paid),
+        discount: b.hasDiscount ? `${b.discountPercent}% ${b.discountLabel}` : "-",
+        balance: b.isOverpaid ? `Credit ${money(b.overpaymentAmount)}` : money(b.balance),
+        status: b.expected === 0 ? "No Structure" : b.isOverpaid ? "Credit" : b.balance > 0 ? "Pending" : "Cleared",
+      })),
+      summary: [
+        { label: "Total Expected", value: money(totalExpected) },
+        { label: "Total Paid", value: money(totalPaid) },
+        { label: "Outstanding", value: money(totalOutstanding) },
+        { label: "Credit", value: money(totalCredit) },
+      ],
+    });
+  };
+
+  const printFeeStructureReport = async () => {
+    const structures = normalisedStructures.filter(f => filterClass === "all" || f.className === filterClass);
+    const grandTotal = structures.reduce((sum, f) => sum + Number(f.tuition || 0) + Number(f.activity || 0) + Number(f.misc || 0), 0);
+
+    await printFinancialReport({
+      authToken: auth?.token,
+      school: schoolData || school,
+      title: "Fee Structure Report",
+      subtitle: `${filterClass === "all" ? "All Classes" : filterClass} | ${displayTerm}`,
+      meta: [
+        { label: "Class Filter", value: filterClass === "all" ? "All classes" : filterClass },
+        { label: "Structures", value: structures.length },
+        { label: "Term", value: displayTerm },
+        { label: "Academic Year", value: academicYear || "Current" },
+      ],
+      columns: [
+        { key: "className", label: "Class" },
+        { key: "term", label: "Term" },
+        { key: "tuition", label: "Tuition", align: "right" },
+        { key: "activity", label: "Activity", align: "right" },
+        { key: "misc", label: "Misc", align: "right" },
+        { key: "total", label: "Total", align: "right" },
+      ],
+      rows: structures.map(f => {
+        const total = Number(f.tuition || 0) + Number(f.activity || 0) + Number(f.misc || 0);
+        return {
+          className: f.className,
+          term: f.term || "-",
+          tuition: money(f.tuition),
+          activity: money(f.activity),
+          misc: money(f.misc),
+          total: money(total),
+        };
+      }),
+      summary: [
+        { label: "Structures", value: structures.length },
+        { label: "Combined Total", value: money(grandTotal) },
+      ],
+    });
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Top Stats */}
@@ -724,6 +818,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
               `;
               printHTML(html, { title: statementTitle });
             }}>🖨️ Print Statement</Button>}
+            {canViewTotals && tab === "balances" && <Button variant="ghost" onClick={printBalanceReport}>🖨️ Print Balances</Button>}
+            {canViewTotals && tab === "structure" && <Button variant="ghost" onClick={printFeeStructureReport}>🖨️ Print Fee Structure</Button>}
             {canEdit && tab==="payments" && <Button onClick={() => setShowPayment(true)}>+ Record Payment</Button>}
             {canEdit && tab==="payments" && <Button variant="secondary" onClick={() => setShowRecordPaymentModal(true)}>📝 Manual Payment</Button>}
             {canEdit && tab==="structure" && <Button onClick={() => { setEditStruct(null); setStructForm({className:"Grade 7",term:"Term 1",tuition:"",activity:"",misc:""}); setShowStruct(true); }}>Set Fee Structure</Button>}
