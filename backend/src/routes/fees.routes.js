@@ -46,7 +46,8 @@ router.post("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { 
-      classId, 
+      classId,
+      className,
       term, 
       academicYear, 
       isActive = 1,
@@ -56,8 +57,18 @@ router.post("/", async (req, res, next) => {
       transport = 0
     } = req.body;
     
-    if (!classId || !term || !academicYear) {
-      return res.status(400).json({ message: "classId, term and academicYear required" });
+    // Support both classId and className for flexibility
+    let finalClassId = classId;
+    let finalClassName = className;
+    
+    // If className provided instead of classId, that's acceptable too
+    if (!term) {
+      return res.status(400).json({ message: "term is required" });
+    }
+    
+    // Note: academicYear now optional; can work with just className and term
+    if (!finalClassId && !finalClassName) {
+      return res.status(400).json({ message: "Either classId or className required" });
     }
     
     const totalFees = Number(tuition || 0) + Number(activity || 0) + Number(misc || 0) + Number(transport || 0);
@@ -66,24 +77,42 @@ router.post("/", async (req, res, next) => {
         message: "Total fees must be greater than 0" 
       });
     }
+
+    // Build insert object with available data
+    const insertData = {
+      school_id: schoolId,
+      term,
+      tuition: Number(tuition || 0),
+      activity: Number(activity || 0),
+      misc: Number(misc || 0),
+      transport: Number(transport || 0),
+      is_active: isActive
+    };
+
+    // Add classId if provided
+    if (finalClassId) {
+      insertData.class_id = finalClassId;
+    }
+
+    // Add className if provided (for simpler UI-based workflows)
+    if (finalClassName) {
+      insertData.class_name = finalClassName;
+    }
+
+    // Add academicYear if provided
+    if (academicYear) {
+      insertData.academic_year = academicYear;
+    }
+
     const { data: inserted, error } = await supabase
       .from('fee_structures')
-      .insert({
-        school_id: schoolId,
-        class_id: classId,
-        term,
-        academic_year: academicYear,
-        tuition: Number(tuition || 0),
-        activity: Number(activity || 0),
-        misc: Number(misc || 0),
-        transport: Number(transport || 0),
-        is_active: isActive
-      })
+      .insert(insertData)
       .select('fee_structure_id')
       .single();
+    
     if (error) {
       if (error.code === '23505') {
-        return res.status(409).json({ message: "Structure already exists for class/term/year" });
+        return res.status(409).json({ message: "Structure already exists for this class/term combination" });
       }
       throw error;
     }
