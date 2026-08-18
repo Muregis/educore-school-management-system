@@ -74,13 +74,12 @@ export default function CollegeProgramsPage({ auth, school, toast }) {
           <Table>
             <Table.Header>
               <Table.Row>
-                <Table.Row>
-                  <Table.Cell>Name</Table.Cell>
-                  <Table.Cell>Code</Table.Cell>
-                  <Table.Cell>Department</Table.Cell>
-                  <Table.Cell>Actions</Table.Cell>
-                </Table.Row>
-              </Table.Header>
+                <Table.Cell>Name</Table.Cell>
+                <Table.Cell>Code</Table.Cell>
+                <Table.Cell>Department</Table.Cell>
+                <Table.Cell>Actions</Table.Cell>
+              </Table.Row>
+            </Table.Header>
               {programs.map((prog) => (
                 <Table.Row key={prog.program_id}>
                   <Table.Cell>{prog.name}</Table.Cell>
@@ -93,7 +92,6 @@ export default function CollegeProgramsPage({ auth, school, toast }) {
                 </Table.Row>
               ))}
             </Table>
-          </Table>
         )}
       </Card.Body>
     </Card>

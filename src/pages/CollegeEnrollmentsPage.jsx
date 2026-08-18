@@ -114,15 +114,14 @@ export default function CollegeEnrollmentsPage({ auth, school, toast }) {
           <Table>
             <Table.Header>
               <Table.Row>
-                <Table.Row>
-                  <Table.Cell>Student</Table.Cell>
-                  <Table.Cell>Program</Table.Cell>
-                  <Table.Cell>Academic Year</Table.Cell>
-                  <Table.Cell>Enrollment Date</Table.Cell>
-                  <Table.Cell>Status</Table.Cell>
-                  <Table.Cell>Actions</Table.Cell>
-                </Table.Row>
-              </Table.Header>
+                <Table.Cell>Student</Table.Cell>
+                <Table.Cell>Program</Table.Cell>
+                <Table.Cell>Academic Year</Table.Cell>
+                <Table.Cell>Enrollment Date</Table.Cell>
+                <Table.Cell>Status</Table.Cell>
+                <Table.Cell>Actions</Table.Cell>
+              </Table.Row>
+            </Table.Header>
               {enrollments.map((enroll) => (
                 <Table.Row key={enroll.enrollment_id}>
                   <Table.Cell>
@@ -145,7 +144,6 @@ export default function CollegeEnrollmentsPage({ auth, school, toast }) {
                 </Table.Row>
               ))}
             </Table>
-          </Table>
         )}
       </Card.Body>
     </Card>

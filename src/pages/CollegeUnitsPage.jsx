@@ -86,14 +86,13 @@ export default function CollegeUnitsPage({ auth, school, toast }) {
           <Table>
             <Table.Header>
               <Table.Row>
-                <Table.Row>
-                  <Table.Cell>Title</Table.Cell>
-                  <Table.Cell>Code</Table.Cell>
-                  <Table.Cell>Program</Table.Cell>
-                  <Table.Cell>Department</Table.Cell>
-                  <Table.Cell>Actions</Table.Cell>
-                </Table.Row>
-              </Table.Header>
+                <Table.Cell>Title</Table.Cell>
+                <Table.Cell>Code</Table.Cell>
+                <Table.Cell>Program</Table.Cell>
+                <Table.Cell>Department</Table.Cell>
+                <Table.Cell>Actions</Table.Cell>
+              </Table.Row>
+            </Table.Header>
               {units.map((unit) => (
                 <Table.Row key={unit.unit_id}>
                   <Table.Cell>{unit.title}</Table.Cell>
@@ -107,7 +106,6 @@ export default function CollegeUnitsPage({ auth, school, toast }) {
                 </Table.Row>
               ))}
             </Table>
-          </Table>
         )}
       </Card.Body>
     </Card>
