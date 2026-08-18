@@ -2,7 +2,7 @@ import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { tenantContext } from "../middleware/tenantContext.js";
-import { tenantSecurityCheck } from "../middleware/tenantSecurityCheck.js";
+import { tenantSecurityCheck } from "../middleware/tenantContext.js";
 import { requireRoles, requireDirector } from "../middleware/roles.js";
 import { authorize } from "../middleware/permissions.js";
 
