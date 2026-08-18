@@ -45,6 +45,7 @@ import ChartOfAccountsPage from "./pages/ChartOfAccountsPage";
 import JournalEntriesPage from "./pages/JournalEntriesPage";
 import GeneralLedgerPage from "./pages/GeneralLedgerPage";
 import BalanceSheetPage from "./pages/BalanceSheetPage";
+import CollegeDepartmentsPage from "./pages/CollegeDepartmentsPage";
 import OfflineStatusBar from "./components/OfflineStatusBar"; // NEW: Offline/sync status indicator
 import ParentGuard from "./components/ParentGuard"; // NEW: Parent-student binding enforcement
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";

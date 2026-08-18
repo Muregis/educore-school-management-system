@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "./lib/auth";
 import { useNavigate } from "react-router-dom";
-import { Table, Badge, Button, Card } from "./components/ui";
-import { apiFetch } from "./lib/api";
-import { toast } from "./components/Helpers";
+import { Table, Badge, Button, Card } from "../components/ui";
+import { apiFetch } from "../lib/api";
 
-export default function CollegeEnrollmentsPage({ auth, school }) {
+export default function CollegeEnrollmentsPage({ auth, school, toast }) {
   const [enrollments, setEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [studentId, setStudentId] = useState("");

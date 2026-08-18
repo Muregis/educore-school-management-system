@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "./lib/auth";
 import { useNavigate } from "react-router-dom";
-import { Table, Badge, Button, Card } from "./components/ui";
-import { apiFetch } from "./lib/api";
-import { toast } from "./components/Helpers";
+import { Table, Badge, Button, Card } from "../components/ui";
+import { apiFetch } from "../lib/api";
 
-export default function CollegeDepartmentsPage({ auth, school }) {
+export default function CollegeDepartmentsPage({ auth, school, toast }) {
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
