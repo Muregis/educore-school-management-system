@@ -237,7 +237,7 @@ programRouter.get("/:id", async (req, res, next) => {
       `)
       .eq('program_id', req.params.id)
       .eq('school_id', schoolId)
-      .eq('is_deleted', false')
+      .eq('is_deleted', false)
       .single();
 
     if (error) throw error;
@@ -405,7 +405,7 @@ unitRouter.get("/:id", async (req, res, next) => {
       `)
       .eq('unit_id', req.params.id)
       .eq('school_id', schoolId)
-      .eq('is_deleted', false')
+      .eq('is_deleted', false)
       .single();
 
     if (error) throw error;
@@ -600,7 +600,7 @@ enrollmentRouter.get("/student/:studentId", async (req, res, next) => {
       `)
       .eq('school_id', schoolId)
       .eq('student_id', studentId)
-      .eq('is_deleted', false')
+      .eq('is_deleted', false)
       .order('enrollment_date', { ascending: false });
 
     if (error) throw error;
