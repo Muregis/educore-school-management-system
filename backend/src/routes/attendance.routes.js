@@ -145,11 +145,23 @@ router.get("/", async (req, res, next) => {
         params.push(...assignedClasses);
       }
 
+      let portalStudentIds = null;
+      if (role === "parent" || role === "student") {
+        portalStudentIds = await getPortalStudentIds(req, supabase);
+        if (!portalStudentIds.length) return res.json([]);
+        const placeholders = portalStudentIds.map((_, i) => `$${params.length + 1 + i}`).join(", ");
+        sql += ` AND a.student_id IN (${placeholders})`;
+        params.push(...portalStudentIds);
+      }
+
       if (classId) {
         sql += ` AND a.class_id = $${params.length + 1}`;
         params.push(classId);
       }
       if (studentId) {
+        if (portalStudentIds && !portalStudentIds.map(String).includes(String(studentId))) {
+          return res.status(403).json({ message: "Forbidden" });
+        }
         sql += ` AND a.student_id = $${params.length + 1}`;
         params.push(studentId);
       }
@@ -267,16 +279,26 @@ router.post("/bulk", async (req, res, next) => {
     }
 
     if (isLocalMode) {
-      const now = new Date().toISOString();
-      for (const r of records) {
-        await pgPool.query(
-          `INSERT INTO attendance (school_id, student_id, class_id, attendance_date, status, marked_by_user_id, is_deleted, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           ON CONFLICT (school_id, student_id, attendance_date)
-           DO UPDATE SET status = EXCLUDED.status, class_id = EXCLUDED.class_id,
-                         marked_by_user_id = EXCLUDED.marked_by_user_id, updated_at = NOW()`,
-          [schoolId, r.studentId, resolvedClassId, date, r.status || "present", userId, false, now]
-        );
+      const client = await pgPool.connect();
+      try {
+        await client.query("BEGIN");
+        const now = new Date().toISOString();
+        for (const r of records) {
+          await client.query(
+            `INSERT INTO attendance (school_id, student_id, class_id, attendance_date, status, marked_by_user_id, is_deleted, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             ON CONFLICT (school_id, student_id, attendance_date)
+             DO UPDATE SET status = EXCLUDED.status, class_id = EXCLUDED.class_id,
+                           marked_by_user_id = EXCLUDED.marked_by_user_id, updated_at = NOW()`,
+            [schoolId, r.studentId, resolvedClassId, date, r.status || "present", userId, false, now]
+          );
+        }
+        await client.query("COMMIT");
+      } catch (txErr) {
+        await client.query("ROLLBACK");
+        throw txErr;
+      } finally {
+        client.release();
       }
       return res.status(201).json({
         message: "Bulk attendance saved successfully",
