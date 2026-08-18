@@ -11,11 +11,6 @@ router.use(authRequired);
 router.use(tenantContext);
 router.use(tenantSecurityCheck);
 
-router.use("/api/college/departments", departmentRoutes);
-router.use("/api/college/programs", programRoutes);
-router.use("/api/college/units", unitRoutes);
-router.use("/api/college/enrollments", enrollmentRoutes);
-
 export default router;
 
 // ─── Departments ────────────────────────────────────────────────────────────
@@ -644,3 +639,8 @@ enrollmentRouter.delete("/:enrollmentId", requireRoles("admin", "director", "sup
     next(err);
   }
 });
+
+router.use("/api/college/departments", departmentRouter);
+router.use("/api/college/programs", programRouter);
+router.use("/api/college/units", unitRouter);
+router.use("/api/college/enrollments", enrollmentRouter);
