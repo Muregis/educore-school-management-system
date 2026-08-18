@@ -291,10 +291,22 @@ export default function App() {
     ? (validLinkedId ? payments.filter(p => Number(p.studentId ?? p.student_id) === validLinkedId) : []) 
     : payments;
 
-  const fullNav = useMemo(() => {
-    const existing = new Set(NAV.map(n => n.id));
-    return [...NAV, ...NAV_EXTRAS.filter(n => !existing.has(n.id))];
-  }, []);
+  const collegeNavIds = new Set(["departments","programs","units","enrollments","dashboard"]);
+
+const collegeNavItems = [
+  { id: "departments",    label: "Departments",    icon: "\u{1F5D1}" },
+  { id: "programs",       label: "Programs",       icon: "\u{1F4C2}" },
+  { id: "units",          label: "Units/Courses",  icon: "\u{1F4D6}" },
+  { id: "enrollments",    label: "Enrollments",    icon: "\u{1F4CD}" },
+];
+
+const fullNav = useMemo(() => {
+  const existing = new Set(NAV.map(n => n.id));
+  // Add college nav items when institution is college
+  const hasCollegeInstitution = school?.institution_type === 'college';
+  const collegeItems = hasCollegeInstitution ? collegeNavItems.filter(n => !existing.has(n.id)) : [];
+  return [...NAV, ...NAV_EXTRAS.filter(n => !existing.has(n.id)), ...collegeItems];
+}, []);
 
   const nav = useMemo(() => {
     if (!perms) return [];
@@ -480,6 +492,52 @@ export default function App() {
           : <DashboardPage auth={auth} school={school} students={myStudents} teachers={teachers} attendance={myAttendance} payments={myPayments} feeStructures={feeStructures} results={myResults} toast={toast} />
         ),
     students: <StudentsPage auth={auth} students={students} setStudents={setStudents} canEdit={canEdit} results={results} payments={payments} feeStructures={feeStructures} toast={toast} />,
+    staff: ["admin","hr","director","superadmin"].includes(auth.role) ? <StaffPage auth={auth} canEdit={canEdit} toast={toast} onTeachersChanged={setTeachers} /> : <Forbidden />,
+    teachers: ["director","superadmin"].includes(auth.role) ? <TeachersPage auth={auth} teachers={teachers} setTeachers={setTeachers} canEdit={canEdit} toast={toast} /> : <Forbidden />,
+    attendance: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
+    grades: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
+    subjects: ["admin","teacher","director","superadmin"].includes(auth.role) ? <SubjectsPage auth={auth} toast={toast} canEdit={canEdit} /> : <Forbidden />,
+    fees: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <FeesPage auth={auth} school={school} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} canViewTotals={canViewTotals} canDeletePayments={canDeletePayments} toast={toast} linkedStudentId={linkedStudentId} />,
+    expenditures: ["admin","finance","hr","director","superadmin"].includes(auth.role) ? <ExpendituresPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
+    "mpesa-reconcile": <MpesaReconciliationPage auth={auth} students={students} toast={toast} />,
+    "bulk-import": ["admin","director","superadmin"].includes(auth.role) ? <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} payments={payments} feeStructures={feeStructures} results={results} /> : <Forbidden />,
+    exams: <ExamsPage auth={auth} students={students} subjects={[]} toast={toast} />,
+    admissions: <AdmissionsPage auth={auth} canEdit={canEdit} toast={toast} />,
+    invoices: <InvoicesPage auth={auth} school={school} students={students} canEdit={canEdit} toast={toast} />,
+    reportcards: <ReportCardsPage auth={auth} school={school} students={myStudents} results={results} canEdit={canEdit} toast={toast} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
+    hr: ["admin","hr","director","superadmin"].includes(auth.role) ? <HRPage auth={auth} school={school} canEdit={canEdit} toast={toast} /> : <Forbidden />,
+    library: isPortal && isMobile && auth.role === "student" ? (() => { setPage("dashboard"); return null; })() : <LibraryPage auth={auth} students={myStudents} teachers={teachers} toast={toast} />,
+    discipline: <DisciplinePage auth={auth} students={myStudents} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
+    transport: <TransportPage auth={auth} canEdit={canEdit} toast={toast} students={students} />,
+    communication: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <CommunicationPage auth={auth} canEdit={canEdit} toast={toast} />,
+    timetable: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <TimetablePage auth={auth} teachers={teachers} canEdit={canEdit} toast={toast} />,
+    accounts: ["admin","director","superadmin"].includes(auth.role) ? <AccountsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
+    lessonplans: ["admin","teacher","director","superadmin"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
+    announcements: perms?.pages.includes("announcements") ? <AnnouncementsPage auth={auth} toast={toast} /> : <Forbidden />,
+    analytics: ["director","superadmin"].includes(auth.role) ? <AnalyticsPage auth={auth} students={students} teachers={teachers} payments={payments} results={results} attendance={attendance} feeStructures={feeStructures} toast={toast} /> : <Forbidden />,
+    reports: ["finance","director","superadmin"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
+    "financial-reports": ["finance","director","superadmin"].includes(auth.role) ? <FinancialReportsPage auth={auth} toast={toast} /> : <Forbidden />,
+    analysis: ["admin","teacher","director","superadmin"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,
+    "update-requests": ["admin","parent"].includes(auth.role) ? <UpdateRequestsPage auth={auth} students={students} pendingUpdates={pendingUpdates} setPendingUpdates={setPendingUpdates} toast={toast} /> : <Forbidden />,
+    "trial-balance": ["admin","finance","director","superadmin"].includes(auth.role) ? <TrialBalancePage auth={auth} toast={toast} /> : <Forbidden />,
+    "income-statement": ["admin","finance","director","superadmin"].includes(auth.role) ? <IncomeStatementPage auth={auth} toast={toast} /> : <Forbidden />,
+    "chart-of-accounts": ["admin","finance","director","superadmin"].includes(auth.role) ? <ChartOfAccountsPage auth={auth} toast={toast} /> : <Forbidden />,
+    "journal-entries": ["admin","finance","director","superadmin"].includes(auth.role) ? <JournalEntriesPage auth={auth} toast={toast} /> : <Forbidden />,
+    "general-ledger": ["admin","finance","director","superadmin"].includes(auth.role) ? <GeneralLedgerPage auth={auth} toast={toast} /> : <Forbidden />,
+    "balance-sheet": ["admin","finance","director","superadmin"].includes(auth.role) ? <BalanceSheetPage auth={auth} toast={toast} /> : <Forbidden />,
+    settings: ["director","superadmin"].includes(auth.role)
+      ? <AdminSettings
+          auth={auth}
+          onPermissionsSaved={() => loadRolePermissions(auth.token)}
+          onSchoolSaved={(savedSchool) => setSchool({ ...school, ...savedSchool })}
+        />
+      : <Forbidden />,
+
+    // College pages
+    departments: ["admin","director","superadmin"].includes(auth.role) ? <CollegeDepartmentsPage auth={auth} school={school} toast={toast} /> : <Forbidden />,
+    programs: ["admin","director","superadmin"].includes(auth.role) ? <CollegeProgramsPage auth={auth} school={school} toast={toast} /> : <Forbidden />,
+    units: ["admin","director","superadmin"].includes(auth.role) ? <CollegeUnitsPage auth={auth} school={school} toast={toast} /> : <Forbidden />,
+    enrollments: ["admin","director","superadmin"].includes(auth.role) ? <CollegeEnrollmentsPage auth={auth} school={school} toast={toast} /> : <Forbidden />,
     staff: ["admin","hr","director","superadmin"].includes(auth.role) ? <StaffPage auth={auth} canEdit={canEdit} toast={toast} onTeachersChanged={setTeachers} /> : <Forbidden />,
     teachers: ["director","superadmin"].includes(auth.role) ? <TeachersPage auth={auth} teachers={teachers} setTeachers={setTeachers} canEdit={canEdit} toast={toast} /> : <Forbidden />,
     attendance: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,

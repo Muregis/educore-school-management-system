@@ -176,6 +176,7 @@ router.get("/school", async (req, res, next) => {
       admin_title: data.admin_title || settings.get("admin_title") || "",
       school_type: data.school_type || settings.get("school_type") || "",
       type: data.school_type || settings.get("school_type") || "",  // alias for frontend compatibility
+      institution_type: data.institution_type || settings.get("institution_type") || "",
       curriculum: data.curriculum || settings.get("curriculum") || "",
       library_shortcode: data.library_shortcode || settings.get("library_shortcode") || "",
       // Lunch/breakfast settings
@@ -292,9 +293,10 @@ router.put("/school", requireRoles("admin", "director", "superadmin"), async (re
         established_year: settings.get("established_year") || "",
         admin_name: settings.get("admin_name") || "",
         admin_title: settings.get("admin_title") || "",
-        school_type: settings.get("school_type") || "",
-        curriculum: settings.get("curriculum") || "",
-        library_shortcode: settings.get("library_shortcode") || "",
+school_type: settings.get("school_type") || "",
+      curriculum: settings.get("curriculum") || "",
+      library_shortcode: settings.get("library_shortcode") || "",
+      institution_type: settings.get("institution_type") || "",
         whatsapp_business_number: data.whatsapp_business_number || "",
         // Lunch/breakfast settings
         lunch_daily_rate: settings.get("lunch_daily_rate") || 100,

@@ -15,6 +15,7 @@ import { requestLogger } from "./utils/logger.js";
 import healthRoutes        from "./routes/health.routes.js";
 import authRoutes          from "./routes/auth.routes.js";
 import studentsRoutes      from "./routes/students.routes.js";
+import collegeRoutes       from "./routes/college.routes.js";
 import teachersRoutes      from "./routes/teachers.routes.js";
 import teacherAssignmentsRoutes from "./routes/teacherassignments.routes.js";
 import attendanceRoutes    from "./routes/attendance.routes.js";
@@ -154,6 +155,7 @@ app.use("/api", (req, _res, next) => {
 
 // OLD: app.use("/api",               studentsRoutes);
 app.use("/api/students",      studentsRoutes);
+app.use("/api/college",         collegeRoutes);
 app.use("/api/teachers",      teachersRoutes);
 app.use("/api/attendance",    attendanceRoutes);
 app.use("/api/grades",        gradesRoutes);
