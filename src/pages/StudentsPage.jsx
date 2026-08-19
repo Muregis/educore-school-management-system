@@ -399,7 +399,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   onChange={e => setCls(e.target.value)}
   options={[
     { value: "all", label: "All classes" },
-    ...alumni.map(c => ({ value: c, label: c }))
+    ...availableClasses.map(c => ({ value: c, label: c }))
   ]}
           />
           <Select 

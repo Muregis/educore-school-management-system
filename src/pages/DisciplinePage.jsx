@@ -8,7 +8,6 @@ import Modal from "../components/Modal";
 import { Pager, Msg } from "../components/Helpers";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
-import { ALL_CLASSES } from "../lib/constants";
 
 const PAGE_SIZE = 10;
 const pager = (arr, p) => ({
@@ -33,6 +32,14 @@ export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId =
     status:         "open",
   });
   const [err, setErr] = useState("");
+  const [availableClasses, setAvailableClasses] = useState([]);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch("/classes", { token: auth.token })
+      .then(data => setAvailableClasses(data.map(c => c.class_name)))
+      .catch(() => {});
+  }, [auth]);
 
   const filteredStudents = f.studentClass === "all" || !f.studentClass
     ? students
@@ -122,7 +129,7 @@ export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId =
             <Field label="Class">
               <select style={inputStyle} value={f.studentClass} onChange={e => { setF({ ...f, studentClass: e.target.value, studentId: "" }); }}>
                 <option value="">All Classes</option>
-                {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
             <Field label="Student">

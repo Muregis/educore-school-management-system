@@ -55,7 +55,15 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
   const [exportClass, setExportClass] = useState("all");
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [exporting, setExporting] = useState(false);
-  
+  const [availableClasses, setAvailableClasses] = useState([]);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch("/classes", { token: auth.token })
+      .then(data => setAvailableClasses(data.map(c => c.class_name)))
+      .catch(() => {});
+  }, [auth]);
+
   // Optimize incoming data to prevent duplicates
   const optimizedStudents = useMemo(() => {
     if (!students || !Array.isArray(students)) return [];
@@ -726,7 +734,7 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
                   onChange={e => setExportClass(e.target.value)}
                 >
                   <option value="all">All Classes</option>
-                  {ALL_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
             )}

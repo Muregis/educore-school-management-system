@@ -7,7 +7,6 @@ import Modal from "../components/Modal";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { printHTML } from "../lib/print";
-import { ALL_CLASSES } from "../lib/constants";
 
 function money(n) { return `KES ${Number(n||0).toLocaleString()}`; }
 
@@ -20,6 +19,14 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
   const [singleForm, setSingleForm]   = useState({ studentId: "", term: "Term 2", academicYear: "2026", tuition: "", activity: "", misc: "", transport: "", dueDate: "" });
   const [singleFormClass, setSingleFormClass] = useState("");
   const [bulkForm, setBulkForm]       = useState({ className: "Grade 7", term: "Term 2", academicYear: "2026", dueDate: "" });
+  const [availableClasses, setAvailableClasses] = useState([]);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch("/classes", { token: auth.token })
+      .then(data => setAvailableClasses(data.map(c => c.class_name)))
+      .catch(() => {});
+  }, [auth]);
 
   const load = async () => {
     if (!auth?.token) return;
@@ -198,7 +205,7 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
             <Field label="Class" style={{ gridColumn: "1 / -1" }}>
               <select style={inputStyle} value={singleFormClass} onChange={e => { setSingleFormClass(e.target.value); setSingleForm({ ...singleForm, studentId: "" }); }}>
                 <option value="">-- Select class first --</option>
-                {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
+                {availableClasses.map(c => <option key={c}>{c}</option>)}
               </select>
             </Field>
             <Field label="Student" style={{ gridColumn: "1 / -1" }}>
@@ -228,7 +235,7 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
             Generates invoices for all students in a class using the existing fee structure.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Class"><select style={inputStyle} value={bulkForm.className} onChange={e => setBulkForm({ ...bulkForm, className: e.target.value })}>{ALL_CLASSES.map(c => <option key={c}>{c}</option>)}</select></Field>
+            <Field label="Class"><select style={inputStyle} value={bulkForm.className} onChange={e => setBulkForm({ ...bulkForm, className: e.target.value })}>{availableClasses.map(c => <option key={c}>{c}</option>)}</select></Field>
             <Field label="Term"><select style={inputStyle} value={bulkForm.term} onChange={e => setBulkForm({ ...bulkForm, term: e.target.value })}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></Field>
             <Field label="Academic Year"><input style={inputStyle} value={bulkForm.academicYear} onChange={e => setBulkForm({ ...bulkForm, academicYear: e.target.value })} /></Field>
             <Field label="Due Date"><input type="date" style={inputStyle} value={bulkForm.dueDate} onChange={e => setBulkForm({ ...bulkForm, dueDate: e.target.value })} /></Field>

@@ -125,6 +125,14 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [bankDepositLoading, setBankDepositLoading] = useState(false);
   const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [studentDiscounts, setStudentDiscounts] = useState({});
+  const [availableClasses, setAvailableClasses] = useState([]);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch("/classes", { token: auth.token })
+      .then(data => setAvailableClasses(data.map(c => c.class_name)))
+      .catch(() => {});
+  }, [auth]);
 
   const getBusinessToday = () => new Date().toISOString().split('T')[0];
   const businessToday = getBusinessToday();
@@ -685,7 +693,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
               onChange={e => setFilterClass(e.target.value)}
               options={[
                 { value: "all", label: "All classes" },
-                ...ALL_CLASSES.map(c => ({ value: c, label: c }))
+                ...availableClasses.map(c => ({ value: c, label: c }))
               ]}
             />
             <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flex: "1 1 320px", minWidth: "280px" }}>
@@ -920,7 +928,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
               {/* Class Summary Cards - Director/Superadmin only */}
               {["director", "superadmin"].includes(auth?.role) && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
-                  {ALL_CLASSES.map(cls => {
+                  {availableClasses.map(cls => {
                     const classBalances = balances.filter(b => b.className === cls);
                     const classStudents = classBalances.length;
                     const totalOutstanding = classBalances.reduce((sum, b) => sum + Math.max(0, b.balance), 0);
@@ -1141,7 +1149,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
               onChange={e => { setPaymentClass(e.target.value); setPaymentForm({ ...paymentForm, studentId: "" }); }}
               options={[
                 { value: "", label: "-- Select class first --" },
-                ...ALL_CLASSES.map(c => ({ value: c, label: c }))
+                ...availableClasses.map(c => ({ value: c, label: c }))
               ]}
             />
             <Select 
@@ -1324,7 +1332,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             label="Class"
             value={structForm.className} 
             onChange={e => setStructForm({ ...structForm, className: e.target.value })}
-            options={ALL_CLASSES.map(c => ({ value: c, label: c }))}
+            options={availableClasses.map(c => ({ value: c, label: c }))}
           />
           <Select 
             label="Term"

@@ -5,7 +5,6 @@ import Badge from "../components/Badge";
 import Modal from "../components/Modal";
 import Table from "../components/Table";
 import { C, inputStyle } from "../lib/theme";
-import { ALL_CLASSES } from "../lib/constants";
 import { apiFetch } from "../lib/api";
 
 const STATUS_TONE = { sent: "success", failed: "danger", queued: "warning" };
@@ -21,6 +20,14 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
   const [bulkForm, setBulkForm] = useState({ className: "all", message: "" });
   const [sending, setSending] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
+  const [availableClasses, setAvailableClasses] = useState([]);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch("/classes", { token: auth.token })
+      .then(data => setAvailableClasses(data.map(c => c.class_name)))
+      .catch(() => {});
+  }, [auth]);
 
   const isParent = auth?.role === "parent";
   const isStudent = auth?.role === "student";
@@ -180,7 +187,7 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
               style={{ ...inputStyle }}
             >
               <option value="">Select class first</option>
-              {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
+              {availableClasses.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
           <div style={{ marginTop: 10 }}>
@@ -236,7 +243,7 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
             <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Target Class</div>
             <select value={bulkForm.className} onChange={e => setBulkForm(f => ({ ...f, className: e.target.value }))} style={{ ...inputStyle }}>
               <option value="all">All Classes</option>
-              {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
+              {availableClasses.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
           <div>

@@ -2,7 +2,6 @@ import React, { useState, useMemo, useCallback, useEffect } from "react";
 import PropTypes from "prop-types";
 import { money, countBy } from "../lib/utils";
 import { apiFetch } from "../lib/api";
-import { ALL_CLASSES } from "../lib/constants";
 import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 
 import Card from "../components/ui/Card";
@@ -104,6 +103,14 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
   const [aiReport, setAiReport] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [expenditureSummary, setExpenditureSummary] = useState(null);
+  const [availableClasses, setAvailableClasses] = useState([]);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch("/classes", { token: auth.token })
+      .then(data => setAvailableClasses(data.map(c => c.class_name)))
+      .catch(() => {});
+  }, [auth]);
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -382,7 +389,7 @@ Provide a structured analysis with:
             <Card style={{ padding: "var(--space-4)" }}>
               <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Outstanding Balance by Class</h3>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "var(--space-3)" }}>
-                {ALL_CLASSES.map(cls => {
+                {availableClasses.map(cls => {
                   const classStudents = students.filter(s => (s.className || s.class_name) === cls);
                   if (classStudents.length === 0) return null;
                   

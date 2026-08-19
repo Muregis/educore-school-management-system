@@ -58,13 +58,18 @@ export function useCurrentTerm(auth, options = {}) {
         token: auth.token
       });
 
+      // Handle null/empty response
+      if (!response) {
+        throw new Error('Empty response from server');
+      }
+
       // Handle different response formats
       const termData = response.data || response;
 
-      if (!termData || !termData.term) {
+      if (!termData || !termData.term_name) {
         // Fallback: try to get terms list and find active one
         const termsResponse = await apiFetch('/academic/terms', { token: auth.token });
-        const terms = termsResponse.data || termsResponse || [];
+        const terms = (termsResponse?.data || termsResponse || []);
         
         const now = new Date();
         const activeTerm = terms.find(t => {

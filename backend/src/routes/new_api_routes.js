@@ -90,17 +90,20 @@ router.get("/academic/terms", authorize("academic.view"), async (req, res) => {
   try {
     const { schoolId } = req.user;
     const { data: terms, error } = await supabase
-      .from('academic_terms')
+      .from('terms')
       .select(`
         *,
         academic_years!inner(year_label)
       `)
       .eq('school_id', schoolId)
-      .neq('is_deleted', true)
-      .order('term_order');
+      .order('start_date', { ascending: false });
 
     if (error) throw error;
-    res.json(terms || []);
+    const normalized = (terms || []).map(t => ({
+      ...t,
+      academic_year: t.year_label || t.academic_year || t.academic_year_id,
+    }));
+    res.json(normalized);
   } catch (err) {
     console.error('Error fetching terms:', err);
     res.status(500).json({ message: "Failed to fetch terms" });
@@ -112,7 +115,14 @@ router.get("/academic/terms/current", async (req, res) => {
   try {
     const { schoolId } = req.user;
     const term = await TermService.getCurrentTerm(schoolId);
-    res.json(term);
+    if (!term) {
+      return res.status(404).json({ message: "No active term found" });
+    }
+    const normalizedTerm = {
+      ...term,
+      academic_year: term.year_label || term.academic_year || term.academic_year_id,
+    };
+    res.json(normalizedTerm);
   } catch (err) {
     console.error('Error fetching current term:', err);
     res.status(500).json({ message: "Failed to fetch current term" });
@@ -258,7 +268,7 @@ router.get("/finance/term-summary/:termId", authorize("reports.financial"), asyn
 
     // Get term details
     const { data: term } = await supabase
-      .from('academic_terms')
+      .from('terms')
       .select('*')
       .eq('term_id', termId)
       .eq('school_id', schoolId)
@@ -555,7 +565,7 @@ router.get("/migration/status", authorize("academic.view"), async (req, res) => 
       { count: ledgerEntries }
     ] = await Promise.all([
       supabase.from('academic_years').select('*', { count: 'exact', head: true }).eq('school_id', schoolId),
-      supabase.from('academic_terms').select('*', { count: 'exact', head: true }).eq('school_id', schoolId),
+      supabase.from('terms').select('*', { count: 'exact', head: true }).eq('school_id', schoolId),
       supabase.from('student_enrollments').select('*', { count: 'exact', head: true }),
       supabase.from('fee_balance_ledger').select('*', { count: 'exact', head: true }).eq('school_id', schoolId)
     ]);

@@ -48,7 +48,7 @@ export function requireTermAccess(action) {
       // Check if term is locked for certain actions
       if (action === 'modify') {
         const { data: term } = await req.supabase
-          .from('academic_terms')
+          .from('terms')
           .select('status')
           .eq('term_id', termId)
           .single();
@@ -449,7 +449,7 @@ async function validateTermOpening(termId) {
   try {
     // Check if previous term is closed
     const { data: term } = await supabase
-      .from('academic_terms')
+      .from('terms')
       .select('status, term_order, academic_year')
       .eq('term_id', termId)
       .single();
@@ -461,7 +461,7 @@ async function validateTermOpening(termId) {
     // Check if previous term exists and is closed
     if (term?.term_order > 1) {
       const { data: prevTerm } = await supabase
-        .from('academic_terms')
+        .from('terms')
         .select('status')
         .eq('academic_year', term.academic_year)
         .eq('term_order', term.term_order - 1)

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
-import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
+import { SUBJECTS } from "../lib/constants";
 
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -154,6 +154,15 @@ function PlanEditor({ auth, toast, editPlan, type: initType, onBack, onSaved }) 
   const [saving, setSaving]           = useState(false);
   const [uploading, setUploading]     = useState(false);
   const [rejectionNote, setRejNote]   = useState(editPlan?.admin_feedback || "");
+  const [availableClasses, setAvailableClasses] = useState([]);
+
+  // Load classes from API
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch("/classes", { token: auth.token })
+      .then(data => setAvailableClasses(data.map(c => c.class_name)))
+      .catch(() => {}); // fail silently - fallback to empty
+  }, [auth]);
 
   const handleSelectChange = (e, key) => {
     setForm(p => ({ ...p, [key]: e.target.value }));
@@ -286,7 +295,7 @@ function PlanEditor({ auth, toast, editPlan, type: initType, onBack, onSaved }) 
               label="Class *" 
               value={form.class_name} 
               onChange={e => handleSelectChange(e, "class_name")}
-              options={[{ value: "", label: "Select class…" }, ...ALL_CLASSES.map(c => ({ value: c, label: c }))]}
+              options={[{ value: "", label: "Select class…" }, ...availableClasses.map(c => ({ value: c, label: c }))]}
             />
           </div>
           <div>

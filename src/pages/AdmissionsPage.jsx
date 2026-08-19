@@ -18,9 +18,17 @@ export default function AdmissionsPage({ auth, canEdit, toast }) {
   const [filterStatus, setFilterStatus] = useState("all");
   const [form, setForm] = useState({
     fullName: "", dateOfBirth: "", gender: "male", parentName: "", parentPhone: "",
-    parentEmail: "", address: "", previousSchool: "", applyingClass: "Grade 7",
+    parentEmail: "", address: "", previousSchool: "", applyingClass: "", 
     academicYear: "2026", notes: "",
   });
+  const [availableClasses, setAvailableClasses] = useState([]);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch("/classes", { token: auth.token })
+      .then(data => setAvailableClasses(data.map(c => c.class_name)))
+      .catch(() => {});
+  }, [auth]);
 
   const load = async () => {
     if (!auth?.token) return;
@@ -243,7 +251,7 @@ setForm({
             </Field>
             <Field label="Applying For Class *">
               <select style={inputStyle} value={form.applyingClass} onChange={e => setForm({ ...form, applyingClass: e.target.value })} required>
-                {ALL_CLASSES.map(c => <option key={c}>{c}</option>)}
+                {availableClasses.map(c => <option key={c}>{c}</option>)}
               </select>
             </Field>
             <Field label="Academic Year *">

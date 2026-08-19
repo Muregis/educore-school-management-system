@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
+import { SUBJECTS } from "../lib/constants";
 
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -210,7 +211,7 @@ export default function TimetablePage({ auth, teachers, canEdit, toast }) {
             <Select 
               value={filterClass} 
               onChange={e => setFilterClass(e.target.value)}
-              options={ALL_CLASSES.map(c => ({ value: c, label: c }))}
+              options={availableClasses.map(c => ({ value: c, label: c }))}
             />
           </div>
           <div style={{ flex: 1 }} />

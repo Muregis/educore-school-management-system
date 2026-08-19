@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
-import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
+import { SUBJECTS } from "../lib/constants";
 import { pager } from "../components/Helpers";
 
 import Button from "../components/ui/Button";
@@ -58,9 +58,17 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const [showAssign, setShowAssign] = useState(false);
   const [assigningTeacher, setAssigningTeacher] = useState(null);
   const [assignmentForm, setAssignmentForm] = useState({ classId: "", subjectId: "", isClassTeacher: false });
+  const [availableClasses, setAvailableClasses] = useState([]);
   const canAssign = ["admin", "director", "superadmin"].includes(auth?.role);
   const isSyncingRef = useRef(false);
   const syncControllerRef = useRef(null);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch("/classes", { token: auth.token })
+      .then(data => setAvailableClasses(data.map(c => c.class_name)))
+      .catch(() => {});
+  }, [auth]);
 
   // Move these to the top to avoid temporal dead zone errors
   const assignmentUserForTeacher = teacher =>
@@ -558,7 +566,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
                 Classes <span style={{ textTransform: "none", opacity: 0.8, fontWeight: 400 }}>(select all that apply)</span>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
-                {ALL_CLASSES.map(c => {
+                {availableClasses.map(c => {
                   const sel = (f.classes||[]).includes(c);
                   return (
                     <div 

@@ -286,7 +286,7 @@ router.get("/attendance-rate", async (req, res, next) => {
 async function resolveCurrentTermName(schoolId) {
   try {
     const { data: current, error } = await supabase
-      .from('academic_terms')
+      .from('terms')
       .select('term_name')
       .eq('school_id', schoolId)
       .eq('status', 'active')
@@ -295,7 +295,7 @@ async function resolveCurrentTermName(schoolId) {
     if (!error && current?.term_name) return current.term_name;
 
     const { data: anyTerm } = await supabase
-      .from('academic_terms')
+      .from('terms')
       .select('term_name')
       .eq('school_id', schoolId)
       .limit(1)

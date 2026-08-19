@@ -98,7 +98,7 @@ export class AcademicYearRepository extends BaseRepository {
  */
 export class TermRepository extends BaseRepository {
   constructor() {
-    super('academic_terms');
+    super('terms');
   }
 
   /**
@@ -140,8 +140,8 @@ export class TermRepository extends BaseRepository {
     const { data, error } = await this.client
       .from(this.tableName)
       .select('*')
-      .eq('academic_year', academicYearId)
-      .order('start_date', { ascending: true });
+      .eq('academic_year_id', academicYearId)
+      .order('term_order', { ascending: true });
     
     if (error) throw error;
     return data || [];

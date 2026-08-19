@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import FeeBlock from "../components/FeeBlock";
 import PropTypes from "prop-types";
-import { ALL_CLASSES } from "../lib/constants";
 import { apiFetch } from "../lib/api";
 import { getGradeColor } from "../lib/grading";
 import { printHTML } from "../lib/print";
@@ -26,6 +25,14 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
   const [examType, setExamType]       = useState("all");
   const [form, setForm] = useState({ studentId: "", classTeacherComment: "", principalComment: "", conduct: "Good", daysPresent: "", daysAbsent: "", classPosition: "", outOf: "" });
   const [formClass, setFormClass] = useState("");
+  const [availableClasses, setAvailableClasses] = useState([]);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch("/classes", { token: auth.token })
+      .then(data => setAvailableClasses(data.map(c => c.class_name)))
+      .catch(() => {});
+  }, [auth]);
 
   const load = async () => {
     if (!auth?.token) return;
@@ -220,7 +227,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
             onChange={e => setFilterClass(e.target.value)}
             options={[
               { value: "all", label: "All classes" },
-              ...ALL_CLASSES.map(c => ({ value: c, label: c }))
+              ...availableClasses.map(c => ({ value: c, label: c }))
             ]}
           />
           <Select 
@@ -257,7 +264,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
               return acc;
             }, {});
             const classOrderIndex = (className) => {
-              const idx = ALL_CLASSES.indexOf(className);
+              const idx = availableClasses.indexOf(className);
               return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
             };
             const sortedClasses = Object.keys(grouped).sort((a, b) => classOrderIndex(a) - classOrderIndex(b) || a.localeCompare(b));
@@ -405,7 +412,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
               onChange={e => { setFormClass(e.target.value); setForm({ ...form, studentId: "" }); }}
               options={[
                 { value: "", label: "-- Select class first --" },
-                ...ALL_CLASSES.map(c => ({ value: c, label: c }))
+                ...availableClasses.map(c => ({ value: c, label: c }))
               ]}
             />
             <Select 

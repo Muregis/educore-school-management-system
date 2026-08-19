@@ -50,7 +50,7 @@ async function withIdempotencyGuard(key, ttlMs, fn) {
 export class TermService {
   static async createTerm(schoolId, termData) {
     try {
-      const { term_name, academic_year, start_date, end_date, status = "upcoming" } = termData;
+      const { term_name, academic_year_id, start_date, end_date, term_order, is_current = false } = termData;
 
       const startDate = new Date(start_date);
       const endDate = new Date(end_date);
@@ -58,31 +58,34 @@ export class TermService {
         throw new Error("End date must be after start date");
       }
 
-      const { data: existing } = await database.query("academic_terms", {
-        where: { term_name, academic_year, school_id: schoolId },
+      const { data: existing } = await database.query("terms", {
+        where: { term_name, school_id: schoolId, academic_year_id },
         limit: 1,
       });
 
       if (existing && existing.length > 0) {
-        throw new Error(`Term ${term_name} ${academic_year} already exists`);
+        throw new Error(`Term ${term_name} already exists for this academic year`);
       }
 
-      if (status === "active") {
+      if (is_current) {
         await database.update(
-          "academic_terms",
-          { is_current: false, status: "closed" },
-          { school_id: schoolId, is_current: true }
+          "terms",
+          { is_current: false },
+          { school_id: schoolId }
         );
       }
 
-      const { data: term } = await database.insert("academic_terms", {
+      const { data: term } = await database.insert("terms", {
         school_id: schoolId,
+        academic_year_id,
         term_name,
-        academic_year,
+        term_order: term_order || 1,
         start_date: startDate.toISOString().split("T")[0],
         end_date: endDate.toISOString().split("T")[0],
-        status,
-        is_current: status === "active",
+        status: "upcoming",
+        legacy_term_value: term_name,
+        is_current: Boolean(is_current),
+        is_deleted: false,
       });
 
       return term[0];
@@ -94,25 +97,35 @@ export class TermService {
 
   static async getCurrentTerm(schoolId) {
     try {
-      const { data: terms } = await database.query("academic_terms", {
-        where: { school_id: schoolId, is_current: true, status: "active" },
-        limit: 1,
-        order: { column: "term_id", ascending: false },
-      });
+      const { data: terms } = await supabase
+        .from('terms')
+        .select(`
+          *,
+          academic_years!inner(year_label)
+        `)
+        .eq('school_id', schoolId)
+        .eq('is_current', true)
+        .eq('is_deleted', false)
+        .single();
 
-      if (terms && terms.length > 0) {
-        return terms[0];
+      if (terms) {
+        return terms;
       }
 
-      const { data: currentByDate } = await database.query("academic_terms", {
-        where: { school_id: schoolId, status: "active" },
-        limit: 1,
-        order: { column: "end_date", ascending: false },
-      });
+      const { data: currentByDate } = await supabase
+        .from('terms')
+        .select(`
+          *,
+          academic_years!inner(year_label)
+        `)
+        .eq('school_id', schoolId)
+        .eq('is_deleted', false)
+        .order('end_date', { ascending: false })
+        .limit(1);
 
       return currentByDate?.[0] || null;
     } catch (error) {
-      console.error("Get current term error:", error);
+      console.error('Get current term error:', error);
       return null;
     }
   }
@@ -120,15 +133,15 @@ export class TermService {
   static async getTerms(schoolId, status = null) {
     try {
       const query = {
-        where: { school_id: schoolId },
-        order: { column: "academic_year", ascending: false },
+        where: { school_id: schoolId, is_deleted: false },
+        order: { column: "term_order", ascending: true },
       };
 
       if (status) {
         query.where.status = status;
       }
 
-      const { data: terms } = await database.query("academic_terms", query);
+      const { data: terms } = await database.query("terms", query);
       return terms || [];
     } catch (error) {
       console.error("Get terms error:", error);
@@ -141,22 +154,22 @@ export class TermService {
 
     try {
       await client.update(
-        "academic_terms",
-        { status: "closed", is_current: false },
-        { school_id: schoolId, is_current: true }
+        "terms",
+        { is_current: false },
+        { school_id: schoolId }
       );
 
       const { data: term } = await client.update(
-        "academic_terms",
+        "terms",
         { status: "active", is_current: true },
         { term_id: termId, school_id: schoolId }
       );
 
       await logAuditEvent({ user: { userId, schoolId } }, {
         action: "term.activate",
-        entity: "academic_term",
+        entity: "terms",
         entityId: termId,
-        description: `Activated term ${term.term_name} ${term.academic_year}`,
+        description: `Activated term ${term.term_name}`,
       });
 
       return term;
@@ -171,16 +184,16 @@ export class TermService {
 
     try {
       const { data: term } = await client.update(
-        "academic_terms",
-        { status: "closed" },
+        "terms",
+        { status: "closed", is_current: false, is_closed: true },
         { term_id: termId, school_id: schoolId }
       );
 
       await logAuditEvent({ user: { userId, schoolId } }, {
         action: "term.close",
-        entity: "academic_term",
+        entity: "terms",
         entityId: termId,
-        description: `Closed term ${term.term_name} ${term.academic_year}`,
+        description: `Closed term ${term.term_name}`,
       });
 
       return term;
@@ -197,7 +210,7 @@ export class TermService {
         return { canClose: false, reasons: ["Term not found"] };
       }
 
-      if (term.status === "closed") {
+      if (term.is_closed || term.status === "closed") {
         return { canClose: false, reasons: ["Term is already closed"] };
       }
 
@@ -235,8 +248,8 @@ export class TermService {
 
   static async getTerm(schoolId, termId) {
     try {
-      const { data: terms } = await database.query("academic_terms", {
-        where: { term_id: termId, school_id: schoolId },
+      const { data: terms } = await database.query("terms", {
+        where: { term_id: termId, school_id: schoolId, is_deleted: false },
         limit: 1,
       });
 
@@ -249,21 +262,28 @@ export class TermService {
 
   static async findNextTerm(schoolId, currentTermId) {
     try {
-      const allTerms = await this.getTerms(schoolId, "upcoming");
       const currentTerm = await this.getTerm(schoolId, currentTermId);
       if (!currentTerm) return null;
 
-      const sameYear = allTerms
-        .filter((t) => t.academic_year === currentTerm.academic_year && t.term_id !== currentTermId)
-        .sort((a, b) => (a.term_order || 0) - (b.term_order || 0));
+      const sameYear = await database.query("terms", {
+        where: { 
+          school_id: schoolId, 
+          academic_year_id: currentTerm.academic_year_id, 
+          is_deleted: false 
+        },
+        order: { column: "term_order", ascending: true },
+      });
 
-      if (sameYear.length > 0) return sameYear[0].term_id;
+      const next = (sameYear.data || []).find(t => t.term_id !== currentTermId && t.term_order > currentTerm.term_order);
+      if (next) return next.term_id;
 
-      const nextYear = allTerms
-        .filter((t) => t.academic_year > currentTerm.academic_year)
-        .sort((a, b) => a.academic_year - b.academic_year || (a.term_order || 0) - (b.term_order || 0));
+      const nextYear = await database.query("terms", {
+        where: { school_id: schoolId, is_deleted: false },
+        order: { column: "term_id", ascending: true },
+      });
 
-      return nextYear.length > 0 ? nextYear[0].term_id : null;
+      const later = (nextYear.data || []).find(t => t.term_id !== currentTermId);
+      return later?.term_id || null;
     } catch (error) {
       console.error("Find next term error:", error);
       return null;
@@ -281,10 +301,10 @@ export class TermService {
           throw new Error("Term not found");
         }
 
-        if (term.status === "closed") {
+        if (term.is_closed || term.status === "closed") {
           return {
             term: { ...term, status: "closed" },
-            summary: { termClosed: true, gradesArchived: 0, balancesCarriedForward: 0, studentsProcessed: 0, feeStructuresUpdated: 0, promoted: 0, alreadyClosed: true },
+            summary: { termClosed: true, gradesArchived: 0, balancesCarriedForward: 0, studentsProcessed: 0, feeStructuresUpdated: 0, alreadyClosed: true },
           };
         }
 
@@ -297,8 +317,8 @@ export class TermService {
         };
 
         await database.update(
-          "academic_terms",
-          { status: "closed", is_current: false, closed_at: new Date().toISOString(), closed_by: userId },
+          "terms",
+          { status: "closed", is_current: false, is_closed: true },
           { term_id: termId, school_id: schoolId }
         );
         summary.termClosed = true;
@@ -397,9 +417,9 @@ export class TermService {
 
         await logAuditEvent({ user: { userId, schoolId } }, {
           action: "term.transition",
-          entity: "academic_term",
+          entity: "terms",
           entityId: termId,
-          description: `Ended term ${term.term_name} ${term.academic_year} and prepared for transition`,
+          description: `Ended term ${term.term_name} and prepared for transition`,
           metadata: summary,
         });
 
