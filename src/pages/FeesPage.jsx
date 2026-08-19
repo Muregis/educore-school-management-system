@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import RecordPaymentModal from "../components/RecordPaymentModal";
 import PaymentReceipt from "../components/PaymentReceipt";
-import { ALL_CLASSES } from "../lib/constants";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { getAuthHeaders } from "../lib/auth";
@@ -116,7 +115,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [page, setPage]               = useState(1);
   const [paymentForm, setPaymentForm] = useState({ studentId: "", amount: "", feeType: "tuition", method: "cash", date: startDate || new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
   const [paymentClass, setPaymentClass] = useState("");
-  const [structForm, setStructForm]   = useState({ className: "Grade 7", term: displayTerm, tuition: "", activity: "", misc: "" });
+  const [structForm, setStructForm]   = useState({ className: "", term: displayTerm, tuition: "", activity: "", misc: "" });
   const [bankDetails, setBankDetails] = useState(null);
   const [schoolWhatsApp, setSchoolWhatsApp] = useState("");
   const [schoolData, setSchoolData] = useState(null);

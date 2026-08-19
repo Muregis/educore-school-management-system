@@ -6,51 +6,32 @@ import { requireRoles } from "../middleware/roles.js";
 const router = Router();
 router.use(authRequired);
 
-// Hardcoded promotion chain based on standard school progression
-const PROMOTION_CHAIN = {
-  "Playgroup": "PP1",
-  "PP1": "PP2", 
-  "PP2": "Grade 1",
-  "Grade 1": "Grade 2",
-  "Grade 2": "Grade 3",
-  "Grade 3": "Grade 4",
-  "Grade 4": "Grade 5",
-  "Grade 5": "Grade 6",
-  "Grade 6": "Grade 7",
-  "Grade 7": "Grade 8",
-  "Grade 8": "Grade 9",
-  "Grade 9": null // Grade 9 is the final class
-};
-
 /**
  * GET /api/classes/promotion-chain - Get promotion chain configuration
- * Returns hardcoded promotion chain using class names as IDs
+ * Returns classes from the database with their promotion targets
  */
 router.get("/promotion-chain", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     
-    // Get unique classes from students table
-    const { data: students, error: studentsError } = await supabase
-      .from("students")
-      .select("class_name")
+    const { data: classes, error } = await supabase
+      .from("classes")
+      .select("class_id, class_name, next_class_name, class_order, status")
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
-      .not("class_name", "is", null);
-    
-    if (studentsError) throw studentsError;
-    
-    // Get unique class names
-    const uniqueClasses = [...new Set((students || []).map(s => s.class_name))].filter(Boolean).sort();
-    
-    // Build promotion chain data using hardcoded progression
-    // Use class name as the ID for reliable lookup
-    const classData = uniqueClasses.map((className) => ({
-      class_id: className, // Use class name as ID instead of index
-      class_name: className,
-      next_class_name: PROMOTION_CHAIN[className] || null
+      .order("class_order", { ascending: true })
+      .order("class_name", { ascending: true });
+
+    if (error) throw error;
+
+    const classData = (classes || []).map((cls) => ({
+      class_id: cls.class_id,
+      class_name: cls.class_name,
+      next_class_name: cls.next_class_name || null,
+      class_order: cls.class_order || 0,
+      status: cls.status || "active",
     }));
-    
+
     res.json({ data: classData });
   } catch (err) {
     next(err);
@@ -59,60 +40,60 @@ router.get("/promotion-chain", requireRoles("admin", "director", "superadmin"), 
 
 /**
  * PUT /api/classes/:classId/promotion - Update promotion target for a class
- * This endpoint now validates against the hardcoded chain but allows customization
- * Uses class name as the ID for reliable lookup
+ * Persists next_class_name to the database
  */
 router.put("/:classId/promotion", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { classId } = req.params;
-    const { nextClassName } = req.body;
-    
-    console.log('[PROMOTION] Updating class:', classId, 'to:', nextClassName, 'for school:', schoolId);
-    
-    // classId is now the class name (e.g., "Grade 7")
-    const className = classId;
-    
-    // Verify this class exists in the school
-    const { data: students, error: studentsError } = await supabase
-      .from("students")
-      .select("class_name")
+    const { nextClassName, classOrder } = req.body;
+
+    const updateData = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (nextClassName === undefined || nextClassName === null || nextClassName === "") {
+      updateData.next_class_name = null;
+    } else {
+      updateData.next_class_name = String(nextClassName).trim();
+    }
+
+    if (classOrder !== undefined) {
+      updateData.class_order = Number(classOrder);
+    }
+
+    const { data, error } = await supabase
+      .from("classes")
+      .update(updateData)
       .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .eq("class_name", className)
-      .limit(1);
-    
-    if (studentsError) throw studentsError;
-    
-    if (!students || students.length === 0) {
-      console.error('[PROMOTION] Class not found:', className);
-      return res.status(404).json({ 
-        message: "Class not found", 
-        classId: className
-      });
+      .or(`class_id.eq.${classId},class_name.eq.${classId}`)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "42703") {
+        return res.status(400).json({
+          message: "Promotion columns not found. Please run the promotion columns migration.",
+          detail: error.message,
+        });
+      }
+      throw error;
     }
-    
-    console.log('[PROMOTION] Found class:', className);
-    
-    // Validate next class is in the promotion chain or is null
-    if (nextClassName && !Object.values(PROMOTION_CHAIN).includes(nextClassName) && nextClassName !== "") {
-      return res.status(400).json({ 
-        message: "Invalid promotion target. Must be a valid class in the school.",
-        validClasses: Object.keys(PROMOTION_CHAIN)
-      });
+
+    if (!data) {
+      return res.status(404).json({ message: "Class not found", classId });
     }
-    
-    // Return success (we're using hardcoded chain, so this is just for API compatibility)
-    res.json({ 
+
+    res.json({
       message: "Promotion target updated successfully",
       data: {
-        class_id: className,
-        class_name: className,
-        next_class_name: nextClassName || PROMOTION_CHAIN[className] || null
-      }
+        class_id: data.class_id,
+        class_name: data.class_name,
+        next_class_name: data.next_class_name,
+        class_order: data.class_order,
+      },
     });
   } catch (err) {
-    console.error('[PROMOTION] Unexpected error:', err);
     next(err);
   }
 });
@@ -123,16 +104,16 @@ router.put("/:classId/promotion", requireRoles("admin", "director", "superadmin"
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    
+
     const { data: classes, error } = await supabase
       .from("classes")
       .select("class_id, class_name, next_class_name")
       .eq("school_id", schoolId)
       .eq("is_deleted", false)
       .order("class_name");
-    
+
     if (error) throw error;
-    
+
     res.json({ data: classes || [] });
   } catch (err) {
     next(err);

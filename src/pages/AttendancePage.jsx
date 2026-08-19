@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import FeeBlock from "../components/FeeBlock";
 import PropTypes from "prop-types";
 import QRScanner from "../components/QRScanner";
-import { ALL_CLASSES } from "../lib/constants";
 import { apiFetch } from "../lib/api";
 import { parseStudentQrContent } from "../lib/qr";
 import { Pager, csv, pager } from "../components/Helpers";
@@ -52,7 +51,7 @@ export default function AttendancePage({
   onGoFees 
 }) {
   const { term, startDate, endDate } = useCurrentTerm(auth);
-  const [cls, setCls] = useState("Grade 7");
+  const [cls, setCls] = useState("");
   const [date, setDate] = useState(startDate || new Date().toISOString().slice(0, 10));
   const [filterClass, setFilterClass] = useState("all");
   const [filterDate, setFilterDate] = useState("");
@@ -61,6 +60,7 @@ export default function AttendancePage({
   const [editing, setEditing] = useState(null);
   const [bulk, setBulk] = useState([]);
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [availableClasses, setAvailableClasses] = useState([]); // Dynamically loaded
 
   // Update date when term dates change
   useEffect(() => {
@@ -68,6 +68,18 @@ export default function AttendancePage({
       setDate(startDate);
     }
   }, [startDate, filterDate]);
+
+  // Fetch classes from API based on school type
+  useEffect(() => {
+    if (!auth?.token) return;
+    // Get school_id from first student or use 100 as default
+    const schoolId = students?.[0]?.school_id ?? 100;
+    // Get school_type from students or default to 'lower_ed'
+    const schoolType = students?.[0]?.school_type ?? 'lower_ed';
+    apiFetch(`/classes?school_id=${schoolId}`, { token: auth.token })
+      .then(data => setAvailableClasses(data.map(c => c.class_name)))
+      .catch(e => console.warn("Failed to load classes", e));
+  }, [auth, students]);
 
   // Fetch attendance records on mount
   useEffect(() => {
@@ -262,7 +274,7 @@ export default function AttendancePage({
             onChange={e => setFilterClass(e.target.value)}
             options={[
               { value: "all", label: "All classes" },
-              ...ALL_CLASSES.map(c => ({ value: c, label: c }))
+              ...availableClasses.map(c => ({ value: c, label: c }))
             ]}
           />
           
@@ -358,7 +370,7 @@ export default function AttendancePage({
             label="Class"
             value={cls} 
             onChange={e => setCls(e.target.value)}
-            options={ALL_CLASSES.map(c => ({ value: c, label: c }))}
+            options={availableClasses.map(c => ({ value: c, label: c }))}
           />
           <Input 
             label="Date"

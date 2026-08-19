@@ -14,12 +14,10 @@ export class AcademicYearService {
    * Create new academic year
    */
   async createAcademicYear(data, context = {}) {
-    // Validate date range
     if (new Date(data.end_date) <= new Date(data.start_date)) {
       throw new Error('End date must be after start date');
     }
 
-    // Check for overlapping academic years
     const existing = await this.academicYearRepository.findAll({
       school_id: data.school_id,
       is_closed: false
@@ -36,9 +34,13 @@ export class AcademicYearService {
       throw new Error('Academic year overlaps with existing year');
     }
 
-    // If is_current is true, remove current flag from other years
-    if (data.is_current) {
+    const isCurrent = Boolean(data.is_current);
+
+    if (isCurrent) {
       await this.academicYearRepository.setCurrent(null, data.school_id);
+      const createData = { ...data, is_current: true };
+      delete createData.is_current;
+      return await this.academicYearRepository.create(createData, context);
     }
 
     return await this.academicYearRepository.create(data, context);
@@ -48,26 +50,27 @@ export class AcademicYearService {
    * Create new term
    */
   async createTerm(data, context = {}) {
-    // Validate date range
     if (new Date(data.end_date) <= new Date(data.start_date)) {
       throw new Error('End date must be after start date');
     }
 
-    // Verify academic year exists
     const academicYear = await this.academicYearRepository.findById(data.academic_year_id);
     if (!academicYear) {
       throw new Error('Academic year not found');
     }
 
-    // Ensure term dates are within academic year dates
     if (new Date(data.start_date) < new Date(academicYear.start_date) ||
         new Date(data.end_date) > new Date(academicYear.end_date)) {
       throw new Error('Term dates must be within academic year dates');
     }
 
-    // If is_current is true, remove current flag from other terms
-    if (data.is_current) {
+    const isCurrent = Boolean(data.is_current);
+
+    if (isCurrent) {
       await this.termRepository.setCurrent(null, data.school_id);
+      const createData = { ...data, is_current: true };
+      delete createData.is_current;
+      return await this.termRepository.create(createData, context);
     }
 
     return await this.termRepository.create(data, context);
@@ -98,10 +101,10 @@ export class AcademicYearService {
       throw new Error('Academic year not found');
     }
 
-    // Close all terms in this academic year
-    const terms = await this.termRepository.findByAcademicYear(id);
+    const yearLabel = academicYear.academic_year || academicYear.year_label;
+    const terms = await this.termRepository.findByAcademicYear(yearLabel);
     for (const term of terms) {
-      await this.termRepository.close(term.id);
+      await this.termRepository.close(term.term_id);
     }
 
     return await this.academicYearRepository.close(id);
@@ -140,8 +143,8 @@ export class AcademicYearService {
       throw new Error('Term does not belong to this school');
     }
 
-    if (term.is_closed) {
-      throw new Error('Cannot set a closed term as current');
+    if (term.status === 'closed' || term.status === 'locked') {
+      throw new Error('Cannot set a closed or locked term as current');
     }
 
     return await this.termRepository.setCurrent(id, schoolId);
@@ -169,7 +172,8 @@ export class AcademicYearService {
       throw new Error('Academic year not found');
     }
 
-    const terms = await this.termRepository.findByAcademicYear(id);
+    const yearLabel = academicYear.academic_year || academicYear.year_label;
+    const terms = await this.termRepository.findByAcademicYear(yearLabel);
 
     return {
       ...academicYear,
@@ -181,8 +185,6 @@ export class AcademicYearService {
    * Promote students to next academic year
    */
   async promoteStudents(academicYearId, context = {}) {
-    // This is a placeholder for the full promotion logic
-    // Will be implemented in Phase 4: Student Lifecycle
     throw new Error('Promotion logic will be implemented in Phase 4');
   }
 }

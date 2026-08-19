@@ -5,7 +5,7 @@ import { authRequired } from "../middleware/auth.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { requireRoles, requireDirector } from "../middleware/roles.js";
 import { authorize } from "../middleware/permissions.js";
-import { PromotionService } from "../services/backend_services.js";
+import { PromotionService } from "../services/PromotionService.js";
 import { studentDataRateLimit } from "../middleware/rateLimit.js";
 import multer from "multer";
 import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";

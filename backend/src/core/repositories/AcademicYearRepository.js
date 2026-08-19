@@ -2,11 +2,28 @@ import { BaseRepository } from '../BaseRepository.js';
 
 /**
  * Academic Year Repository
- * Manages academic year and term data access
+ * Manages academic year data access
  */
 export class AcademicYearRepository extends BaseRepository {
   constructor() {
     super('academic_years');
+  }
+
+  /**
+   * Find single record by ID
+   * Overrides BaseRepository to use academic_year_id as PK
+   */
+  async findById(id, options = {}) {
+    const { select = '*' } = options;
+    
+    const { data, error } = await this.client
+      .from(this.tableName)
+      .select(select)
+      .eq('academic_year_id', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 
   /**
@@ -28,17 +45,15 @@ export class AcademicYearRepository extends BaseRepository {
    * Set academic year as current
    */
   async setCurrent(id, schoolId) {
-    // Remove current flag from all academic years for this school
     await this.client
       .from(this.tableName)
       .update({ is_current: false })
       .eq('school_id', schoolId);
     
-    // Set new current academic year
     const { data, error } = await this.client
       .from(this.tableName)
       .update({ is_current: true })
-      .eq('id', id)
+      .eq('academic_year_id', id)
       .select()
       .single();
     
@@ -53,7 +68,7 @@ export class AcademicYearRepository extends BaseRepository {
     const { data, error } = await this.client
       .from(this.tableName)
       .update({ is_closed: true, is_current: false })
-      .eq('id', id)
+      .eq('academic_year_id', id)
       .select()
       .single();
     
@@ -68,7 +83,7 @@ export class AcademicYearRepository extends BaseRepository {
     const { data, error } = await this.client
       .from(this.tableName)
       .update({ is_closed: false })
-      .eq('id', id)
+      .eq('academic_year_id', id)
       .select()
       .single();
     
@@ -79,11 +94,28 @@ export class AcademicYearRepository extends BaseRepository {
 
 /**
  * Term Repository
- * Manages term data access
+ * Manages academic term data access
  */
 export class TermRepository extends BaseRepository {
   constructor() {
-    super('terms');
+    super('academic_terms');
+  }
+
+  /**
+   * Find single record by ID
+   * Overrides BaseRepository to use term_id as PK
+   */
+  async findById(id, options = {}) {
+    const { select = '*' } = options;
+    
+    const { data, error } = await this.client
+      .from(this.tableName)
+      .select(select)
+      .eq('term_id', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
   }
 
   /**
@@ -92,7 +124,7 @@ export class TermRepository extends BaseRepository {
   async findCurrent(schoolId) {
     const { data, error } = await this.client
       .from(this.tableName)
-      .select('*, academic_years(*)')
+      .select('*, academic_years!inner(year_label)')
       .eq('school_id', schoolId)
       .eq('is_current', true)
       .single();
@@ -108,7 +140,7 @@ export class TermRepository extends BaseRepository {
     const { data, error } = await this.client
       .from(this.tableName)
       .select('*')
-      .eq('academic_year_id', academicYearId)
+      .eq('academic_year', academicYearId)
       .order('start_date', { ascending: true });
     
     if (error) throw error;
@@ -119,17 +151,15 @@ export class TermRepository extends BaseRepository {
    * Set term as current
    */
   async setCurrent(id, schoolId) {
-    // Remove current flag from all terms for this school
     await this.client
       .from(this.tableName)
       .update({ is_current: false })
       .eq('school_id', schoolId);
     
-    // Set new current term
     const { data, error } = await this.client
       .from(this.tableName)
       .update({ is_current: true })
-      .eq('id', id)
+      .eq('term_id', id)
       .select()
       .single();
     
@@ -144,7 +174,7 @@ export class TermRepository extends BaseRepository {
     const { data, error } = await this.client
       .from(this.tableName)
       .update({ is_closed: true, is_current: false })
-      .eq('id', id)
+      .eq('term_id', id)
       .select()
       .single();
     

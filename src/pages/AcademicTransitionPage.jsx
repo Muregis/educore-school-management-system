@@ -43,15 +43,35 @@ export default function AcademicTransitionPage({ auth }) {
       // Load term financials if we have a current term
       if (termRes?.data?.term_name || termRes?.term_name) {
         const termName = termRes?.data?.term_name || termRes?.term_name;
+        const termId = termRes?.data?.term_id || termRes?.term_id;
         try {
-          const financialsRes = await apiFetch(`/reports/fee-defaulters?term=${encodeURIComponent(termName)}`, { token: auth?.token });
-          const defaulters = financialsRes || [];
-          const totalOutstanding = defaulters.reduce((sum, d) => sum + (d.balance || 0), 0);
-          const totalPaid = defaulters.reduce((sum, d) => sum + (d.paid_amount || 0), 0);
+          let totalOutstanding = 0;
+          let totalPaid = 0;
+          let defaulterCount = 0;
+
+          if (termId) {
+            try {
+              const summaryRes = await apiFetch(`/finance/term-summary/${termId}`, { token: auth?.token });
+              totalOutstanding = summaryRes?.summary?.totalOutstanding || summaryRes?.summary?.outstanding || 0;
+              totalPaid = summaryRes?.summary?.totalPaid || summaryRes?.summary?.collected || 0;
+              defaulterCount = summaryRes?.summary?.defaulterCount || summaryRes?.summary?.defaulters || 0;
+            } catch {
+              const financialsRes = await apiFetch(`/reports/fee-defaulters?term=${encodeURIComponent(termName)}`, { token: auth?.token });
+              const defaulters = financialsRes || [];
+              totalOutstanding = defaulters.reduce((sum, d) => sum + (d.balance || 0), 0);
+              defaulterCount = defaulters.length;
+            }
+          } else {
+            const financialsRes = await apiFetch(`/reports/fee-defaulters?term=${encodeURIComponent(termName)}`, { token: auth?.token });
+            const defaulters = financialsRes || [];
+            totalOutstanding = defaulters.reduce((sum, d) => sum + (d.balance || 0), 0);
+            defaulterCount = defaulters.length;
+          }
+
           setTermFinancials({
             totalOutstanding,
             totalPaid,
-            defaulterCount: defaulters.length,
+            defaulterCount,
             termName
           });
         } catch (err) {

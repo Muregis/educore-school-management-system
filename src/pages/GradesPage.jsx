@@ -6,7 +6,7 @@ import Field from "../components/Field";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
 import Table from "../components/Table";
-import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
+import { SUBJECTS } from "../lib/constants";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch, API_BASE } from "../lib/api";
 import { getAuthHeaders } from "../lib/auth";

@@ -6,15 +6,9 @@ import Btn from "../components/Btn";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { Msg } from "../components/Helpers";
-import { ALL_CLASSES } from "../lib/constants";
 import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
-import { 
-  deduplicateStudents, 
-  deduplicatePayments, 
-  deduplicateGrades,
-  optimizeDataForDisplay,
-  DataCache 
-} from "../utils/dataDeduplication";
+import { deduplicateStudents, deduplicatePayments, deduplicateGrades, 
+         optimizeDataForDisplay, DataCache} from "../utils/dataDeduplication";
 
 // Create data cache outside component to avoid issues with React hooks
 const dataCache = new DataCache(10 * 60 * 1000); // 10 minutes cache
@@ -152,10 +146,8 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
     }).length;
   }, [exportFilter, optimizedStudents, optimizedPayments, feeStructures, exportDefaulterAmount]);
 
-  // CSV Template
-  const csvTemplate = `first_name,last_name,gender,class_name,admission_number,parent_name,parent_phone,date_of_birth,nemis_number,status
-John,Doe,male,Grade 1,ADM001,Jane Doe,0712345678,2015-03-15,NEM123456,active
-Jane,Smith,female,Grade 2,ADM002,John Smith,0723456789,2014-07-22,NEM789012,active`;
+  // CSV Template - dynamically generated from classes table
+  const csvTemplate = `first_name,last_name,gender,class_name,admission_number,parent_name,parent_phone,date_of_birth,nemis_number,status`;
 
   // Handle file upload
   const handleFileUpload = (e) => {

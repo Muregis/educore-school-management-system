@@ -194,9 +194,7 @@ export default function AnalysisTabNew({ auth }) {
     const dataset = buildDataset();
     console.log("[AI] dataset length:", dataset.length, "first 200:", dataset.slice(0,200));
 
-    const prompt = `You are an academic performance analyst for a Kenyan primary/secondary school.
-
-Analyze the following exam results dataset and generate a structured performance report.
+    const prompt = `You are an academic performance analyst for an educational institution. Analyze the following exam results dataset and generate a structured performance report.
 
 Dataset:
 ${dataset}

@@ -1,5 +1,16 @@
-export const ALL_CLASSES = ["Playgroup","PP1","PP2","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"];
 export const SUBJECTS   = ["Mathematics","English","Kiswahili","Computer Science","Biology","Physics","Chemistry","History","Geography","CRE"];
+
+export const fetchClasses = async (schoolId, schoolType) => {
+  if (!schoolId) return [];
+  const filter = schoolType === 'lower_ed'
+    ? 'class_name NOT LIKE %/%'
+    : 'class_name LIKE %/%';
+  const res = await apiFetch(`/classes?school_id=${schoolId}&filter=${filter}`);
+  return res.map(c => c.class_name);
+};
+export const getClassList = async (schoolId, schoolType) => {
+  return fetchClasses(schoolId, schoolType);
+};
 
 export const DEFAULTS = {
   school: { name:"", term:"", year:"", email:"", phone:"", address:"", county:"", whatsapp_business_number:"", logo:"" },

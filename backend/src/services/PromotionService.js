@@ -1,307 +1,368 @@
 import { database } from "../config/db.js";
+import { supabase } from "../config/supabaseClient.js";
 import { logAuditEvent } from "../helpers/audit.logger.js";
 import GradeCalculationService from "./GradeCalculationService.js";
 
-/**
- * Promotion Service
- * Handles student promotion workflows
- */
+const PROMOTION_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
+
+function generatePromotionIdempotencyKey(schoolId, fromClass, toClass, studentIds, dryRun) {
+  const ids = Array.isArray(studentIds) ? studentIds.slice().sort().join(",") : "all";
+  return `promotion:${schoolId}:${fromClass}:${toClass}:${ids}:${dryRun}`;
+}
+
+async function withPromotionIdempotencyGuard(schoolId, fromClass, toClass, studentIds, dryRun, fn) {
+  const key = generatePromotionIdempotencyKey(schoolId, fromClass, toClass, studentIds, dryRun);
+  try {
+    const { data: existing, error: fetchError } = await supabase
+      .from("idempotency_keys")
+      .select("response_payload, created_at")
+      .eq("key", key)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error("Promotion idempotency guard fetch failed:", fetchError.message);
+    } else if (existing) {
+      const age = Date.now() - new Date(existing.created_at).getTime();
+      if (age < PROMOTION_IDEMPOTENCY_TTL_MS && existing.response_payload) {
+        return existing.response_payload;
+      }
+    }
+  } catch (guardError) {
+    console.error("Promotion idempotency guard read failed:", guardError);
+  }
+
+  const result = await fn();
+
+  try {
+    await supabase.from("idempotency_keys").upsert(
+      {
+        key,
+        response_payload: result,
+        created_at: new Date().toISOString(),
+      },
+      { onConflict: "key" }
+    );
+  } catch (guardError) {
+    console.error("Promotion idempotency guard write failed:", guardError);
+  }
+
+  return result;
+}
+
 export class PromotionService {
-  /**
-   * Promote students from one class to another
-   */
   static async promoteStudents(schoolId, fromClass, toClass, academicYear, options = {}) {
     const { dryRun = false, autoApprove = false, userId = null, minPercentage = null } = options;
-    
-    try {
-      // Get all active students in the source class
-      const { data: students } = await database.query('students', {
-        where: {
-          school_id: schoolId,
-          class_name: fromClass,
-          status: 'active',
-          is_deleted: false
+
+    return withPromotionIdempotencyGuard(schoolId, fromClass, toClass, null, dryRun, async () => {
+      try {
+        const { data: students } = await database.query("students", {
+          where: {
+            school_id: schoolId,
+            class_name: fromClass,
+            status: "active",
+            is_deleted: false,
+          },
+        });
+
+        if (!students || students.length === 0) {
+          return {
+            success: true,
+            promoted: 0,
+            skipped: 0,
+            errors: [],
+            message: "No students found to promote",
+          };
         }
-      });
-      
-      if (!students || students.length === 0) {
-        return {
-          success: true,
-          promoted: 0,
-          skipped: 0,
-          errors: [],
-          message: 'No students found to promote'
-        };
-      }
-      
-      const promoted = [];
-      const skipped = [];
-      const errors = [];
-      
-      for (const student of students) {
-        try {
-          // Check if student meets promotion criteria
-          const canPromote = await this.checkPromotionCriteria(schoolId, student.student_id, fromClass, toClass, minPercentage);
-          
-          if (!canPromote.canPromote) {
-            skipped.push({
+
+        const promoted = [];
+        const skipped = [];
+        const errors = [];
+
+        for (const student of students) {
+          try {
+            const canPromote = await this.checkPromotionCriteria(schoolId, student.student_id, fromClass, toClass, minPercentage, academicYear);
+
+            if (!canPromote.canPromote) {
+              skipped.push({
+                studentId: student.student_id,
+                name: `${student.first_name} ${student.last_name}`.trim(),
+                reason: canPromote.reason,
+              });
+              continue;
+            }
+
+            if (!dryRun) {
+              await database.update(
+                "students",
+                {
+                  class_name: toClass,
+                  previous_class: fromClass,
+                  promotion_year: academicYear,
+                  updated_at: new Date().toISOString(),
+                },
+                { student_id: student.student_id, school_id: schoolId }
+              );
+
+              await this.createEnrollmentHistory(schoolId, student.student_id, null, fromClass, toClass, academicYear, "promoted");
+
+              promoted.push({
+                studentId: student.student_id,
+                name: `${student.first_name} ${student.last_name}`.trim(),
+                fromClass,
+                toClass,
+              });
+            } else {
+              promoted.push({
+                studentId: student.student_id,
+                name: `${student.first_name} ${student.last_name}`.trim(),
+                fromClass,
+                toClass,
+                wouldPromote: true,
+              });
+            }
+          } catch (error) {
+            errors.push({
               studentId: student.student_id,
-              name: `${student.first_name} ${student.last_name}`,
-              reason: canPromote.reason
-            });
-            continue;
-          }
-          
-          if (!dryRun) {
-            // Update student class
-            await database.update('students', {
-              class_name: toClass,
-              previous_class: fromClass,
-              promotion_year: academicYear,
-              updated_at: new Date().toISOString()
-            }, {
-              student_id: student.student_id,
-              school_id: schoolId
-            });
-            
-            // Create enrollment history record
-            await this.createEnrollmentHistory(schoolId, student.student_id, null, fromClass, toClass, academicYear, 'promoted');
-            
-            promoted.push({
-              studentId: student.student_id,
-              name: `${student.first_name} ${student.last_name}`,
-              fromClass,
-              toClass
-            });
-          } else {
-            promoted.push({
-              studentId: student.student_id,
-              name: `${student.first_name} ${student.last_name}`,
-              fromClass,
-              toClass,
-              wouldPromote: true
+              error: error.message,
             });
           }
-        } catch (error) {
-          errors.push({
-            studentId: student.student_id,
-            error: error.message
+        }
+
+        if (!dryRun && userId) {
+          await logAuditEvent({ user: { userId, schoolId } }, {
+            action: "students.promote",
+            entity: "promotion_batch",
+            description: `Promoted ${promoted.length} students from ${fromClass} to ${toClass}. Skipped: ${skipped.length}. Errors: ${errors.length}`,
+            metadata: { fromClass, toClass, promoted: promoted.length, skipped: skipped.length, errors: errors.length },
           });
         }
+
+        return {
+          success: errors.length === 0,
+          promoted: promoted.length,
+          skipped: skipped.length,
+          errors,
+          promotedStudents: promoted,
+          skippedStudents: skipped,
+          dryRun,
+          message: this.generatePromotionMessage(promoted.length, skipped.length, errors.length, dryRun),
+        };
+      } catch (error) {
+        console.error("Promote students error:", error);
+        throw error;
       }
-      
-      // Log promotion activity
-      if (!dryRun && userId) {
-        await logAuditEvent({ user: { userId, schoolId } }, {
-          action: 'students.promote',
-          entity: 'promotion_batch',
-          description: `Promoted ${promoted.length} students from ${fromClass} to ${toClass}. Skipped: ${skipped.length}. Errors: ${errors.length}`,
-          metadata: { fromClass, toClass, promoted: promoted.length, skipped: skipped.length, errors: errors.length }
-        });
+    });
+  }
+
+  static async promoteStudent(studentId, toClass, userId, reason = "Individual promotion") {
+    try {
+      const { data: student } = await database.query("students", {
+        where: { student_id: studentId, is_deleted: false },
+        limit: 1,
+      });
+
+      if (!student || student.length === 0) {
+        throw new Error("Student not found");
       }
-      
+
+      const studentRecord = student[0];
+      const fromClass = studentRecord.class_name;
+
+      if (!fromClass) {
+        throw new Error("Student does not have a current class assigned");
+      }
+
+      await database.update(
+        "students",
+        {
+          class_name: toClass,
+          previous_class: fromClass,
+          promotion_year: new Date().getFullYear().toString(),
+          updated_at: new Date().toISOString(),
+        },
+        { student_id: studentId }
+      );
+
+      await this.createEnrollmentHistory(studentRecord.school_id, studentId, null, fromClass, toClass, new Date().getFullYear().toString(), "promoted");
+
+      await logAuditEvent({ user: { userId, schoolId: studentRecord.school_id } }, {
+        action: "students.promote.individual",
+        entity: "students",
+        entityId: studentId,
+        description: `${reason}: ${fromClass} → ${toClass}`,
+      });
+
       return {
-        success: errors.length === 0,
-        promoted: promoted.length,
-        skipped: skipped.length,
-        errors,
-        promotedStudents: promoted,
-        skippedStudents: skipped,
-        dryRun,
-        message: this.generatePromotionMessage(promoted.length, skipped.length, errors.length, dryRun)
+        success: true,
+        studentId,
+        fromClass,
+        toClass,
+        message: `Student promoted from ${fromClass} to ${toClass}`,
       };
     } catch (error) {
-      console.error('Promote students error:', error);
+      console.error("Promote single student error:", error);
       throw error;
     }
   }
-  
-  /**
-   * Check if a student can be promoted
-   */
-  static async checkPromotionCriteria(schoolId, studentId, fromClass, toClass, minPercentage = null) {
+
+  static async checkPromotionCriteria(schoolId, studentId, fromClass, toClass, minPercentage = null, academicYear = null) {
     try {
-      // Check if student exists and is active
-      const { data: student } = await database.query('students', {
-        where: {
-          student_id: studentId,
-          school_id: schoolId,
-          is_deleted: false
-        },
-        limit: 1
+      const { data: student } = await database.query("students", {
+        where: { student_id: studentId, school_id: schoolId, is_deleted: false },
+        limit: 1,
       });
-      
+
       if (!student || student.length === 0) {
-        return { canPromote: false, reason: 'Student not found' };
+        return { canPromote: false, reason: "Student not found" };
       }
-      
-      if (student[0].status !== 'active') {
-        return { canPromote: false, reason: 'Student is not active' };
+
+      const studentRecord = student[0];
+
+      if (studentRecord.status !== "active") {
+        return { canPromote: false, reason: "Student is not active" };
       }
-      
-      // Check if student is in the correct class
-      if (student[0].class_name !== fromClass) {
-        return { canPromote: false, reason: `Student is in ${student[0].class_name}, not ${fromClass}` };
+
+      if (studentRecord.class_name !== fromClass) {
+        return { canPromote: false, reason: `Student is in ${studentRecord.class_name}, not ${fromClass}` };
       }
-      
-      // If minimum percentage is required, check student's performance
-      if (minPercentage !== null) {
-        const meanResult = await GradeCalculationService.calculateMeanGrade(
-          schoolId, studentId, 'Term 3', new Date().getFullYear()
-        );
-        
+
+      if (minPercentage !== null && academicYear) {
+        const currentTerm = await (await import("./TermService.js")).TermService.getCurrentTerm(schoolId);
+        const termName = currentTerm?.term_name || "Term 3";
+
+        const meanResult = await GradeCalculationService.calculateMeanGrade(schoolId, studentId, termName, new Date().getFullYear());
+
         if (meanResult.meanPoints < minPercentage) {
-          return { 
-            canPromote: false, 
-            reason: `Mean grade ${meanResult.meanPoints}% is below minimum required ${minPercentage}%` 
+          return {
+            canPromote: false,
+            reason: `Mean grade ${meanResult.meanPoints}% is below minimum required ${minPercentage}%`,
           };
         }
       }
-      
-      // Check for unpaid balances
-      const { data: unpaidPayments } = await database.query('payments', {
+
+      const { data: unpaidPayments } = await database.query("payments", {
         where: {
           student_id: studentId,
           school_id: schoolId,
-          status: { 'in': "('pending','failed')" },
-          is_deleted: false
+          status: { in: "('pending','failed')" },
+          is_deleted: false,
         },
-        limit: 1
+        limit: 1,
       });
-      
+
       if (unpaidPayments && unpaidPayments.length > 0) {
-        return { canPromote: false, reason: 'Student has unpaid fee balances' };
+        return { canPromote: false, reason: "Student has unpaid fee balances" };
       }
-      
-      return { canPromote: true, reason: 'Eligible for promotion' };
+
+      return { canPromote: true, reason: "Eligible for promotion" };
     } catch (error) {
-      console.error('Check promotion criteria error:', error);
-      return { canPromote: false, reason: 'Error checking criteria' };
+      console.error("Check promotion criteria error:", error);
+      return { canPromote: false, reason: "Error checking criteria" };
     }
   }
-  
-  /**
-   * Get next class in progression
-   */
+
   static async getNextClass(currentClass, schoolId = null) {
     try {
-      // Try to get progression from database if schoolId provided
       if (schoolId) {
-        const { data: config } = await database.query('school_settings', {
+        const { data: config } = await database.query("school_settings", {
           where: {
             school_id: schoolId,
-            setting_key: 'class_progression'
+            setting_key: "class_progression",
           },
-          limit: 1
+          limit: 1,
         });
-        
+
         if (config && config.length > 0) {
-          const progression = JSON.parse(config[0].setting_value || '{}');
+          const progression = JSON.parse(config[0].setting_value || "{}");
           return progression[currentClass] || null;
         }
       }
-      
-      // Default CBC progression as fallback
+
       const defaultProgression = {
-        'Playgroup': 'PP1',
-        'PP1': 'PP2',
-        'PP2': 'Grade 1',
-        'Grade 1': 'Grade 2',
-        'Grade 2': 'Grade 3',
-        'Grade 3': 'Grade 4',
-        'Grade 4': 'Grade 5',
-        'Grade 5': 'Grade 6',
-        'Grade 6': 'Grade 7',
-        'Grade 7': 'Grade 8',
-        'Grade 8': 'Grade 9',
-        'Grade 9': 'Form 1'
+        Playgroup: "PP1",
+        PP1: "PP2",
+        PP2: "Grade 1",
+        "Grade 1": "Grade 2",
+        "Grade 2": "Grade 3",
+        "Grade 3": "Grade 4",
+        "Grade 4": "Grade 5",
+        "Grade 5": "Grade 6",
+        "Grade 6": "Grade 7",
+        "Grade 7": "Grade 8",
+        "Grade 8": "Grade 9",
+        "Grade 9": "Form 1",
       };
-      
+
       return defaultProgression[currentClass] || null;
     } catch (error) {
-      console.error('Get next class error:', error);
+      console.error("Get next class error:", error);
       return null;
     }
   }
-  
-  /**
-   * Create enrollment history record
-   */
+
   static async createEnrollmentHistory(schoolId, studentId, fromClassId, fromClassName, toClassName, academicYear, action) {
     try {
-      // Note: In this implementation, we track history in the students table
-      // via previous_class and promotion_year fields
-      // A full history table could be added if needed
-      
       await logAuditEvent({ user: { schoolId } }, {
         action: `student.${action}`,
-        entity: 'enrollment_history',
+        entity: "enrollment_history",
         entityId: studentId,
-        description: `${action}: ${fromClassName} → ${toClassName} (${academicYear})`
+        description: `${action}: ${fromClassName} → ${toClassName} (${academicYear})`,
       });
     } catch (error) {
-      console.error('Create enrollment history error:', error);
+      console.error("Create enrollment history error:", error);
     }
   }
-  
-  /**
-   * Get promotion rules for school
-   */
+
   static async getPromotionRules(schoolId) {
     try {
-      // Try to get promotion rules from database
-      const { data: config } = await database.query('school_settings', {
+      const { data: config } = await database.query("school_settings", {
         where: {
           school_id: schoolId,
-          setting_key: 'promotion_rules'
+          setting_key: "promotion_rules",
         },
-        limit: 1
+        limit: 1,
       });
-      
+
       if (config && config.length > 0) {
-        return JSON.parse(config[0].setting_value || '{}');
+        return JSON.parse(config[0].setting_value || "{}");
       }
-      
-      // Default CBC promotion rules as fallback
+
       return {
         progression: {
-          'Playgroup': 'PP1',
-          'PP1': 'PP2',
-          'PP2': 'Grade 1',
-          'Grade 1': 'Grade 2',
-          'Grade 2': 'Grade 3',
-          'Grade 3': 'Grade 4',
-          'Grade 4': 'Grade 5',
-          'Grade 5': 'Grade 6',
-          'Grade 6': 'Grade 7',
-          'Grade 7': 'Grade 8',
-          'Grade 8': 'Grade 9',
-          'Grade 9': 'Form 1'
+          Playgroup: "PP1",
+          PP1: "PP2",
+          PP2: "Grade 1",
+          "Grade 1": "Grade 2",
+          "Grade 2": "Grade 3",
+          "Grade 3": "Grade 4",
+          "Grade 4": "Grade 5",
+          "Grade 5": "Grade 6",
+          "Grade 6": "Grade 7",
+          "Grade 7": "Grade 8",
+          "Grade 8": "Grade 9",
+          "Grade 9": "Form 1",
         },
         requirements: {
           minimumPercentage: 50,
           clearFees: true,
-          goodStanding: true
-        }
+          goodStanding: true,
+        },
       };
     } catch (error) {
-      console.error('Get promotion rules error:', error);
+      console.error("Get promotion rules error:", error);
       return null;
     }
   }
-  
-  /**
-   * Generate promotion summary message
-   */
+
   generatePromotionMessage(promoted, skipped, errors, dryRun) {
     if (dryRun) {
       return `Dry run: ${promoted} student(s) would be promoted, ${skipped} would be skipped`;
     }
-    
+
     let message = `${promoted} student(s) promoted successfully`;
     if (skipped > 0) message += `, ${skipped} skipped`;
     if (errors > 0) message += `, ${errors} errors`;
-    
+
     return message;
   }
 }

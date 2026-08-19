@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import PropTypes from "prop-types";
-import { ALL_CLASSES, SUBJECTS } from "../lib/constants";
 import { apiFetch } from "../lib/api";
 
 import Button from "../components/ui/Button";
@@ -14,11 +13,26 @@ const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday"];
 
 export default function TimetablePage({ auth, teachers, canEdit, toast }) {
   const [entries, setEntries]         = useState([]);
-  const [filterClass, setFilterClass] = useState(ALL_CLASSES[6]);
+  const [filterClass, setFilterClass] = useState("");
   const [showModal, setShowModal]     = useState(false);
   const [showUpload, setShowUpload]   = useState(false);
   const [editing, setEditing]         = useState(null);
   const [csvPreview, setCsvPreview]   = useState([]);
+  const [availableClasses, setAvailableClasses] = useState([]);
+
+  useEffect(() => {
+    const loadClasses = async () => {
+      if (!auth?.token) return;
+      const schoolId = teachers?.[0]?.school_id ?? 100;
+      try {
+        const res = await apiFetch(`/classes?school_id=${schoolId}`, { token: auth.token });
+        setAvailableClasses(res.map(c => c.class_name));
+      } catch (err) {
+        console.warn("Failed to load classes", err);
+      }
+    };
+    loadClasses();
+  }, [auth, teachers]);
   const [uploading, setUploading]     = useState(false);
   const [launchingGenerator, setLaunchingGenerator] = useState(false);
   const [generatorError, setGeneratorError] = useState("");

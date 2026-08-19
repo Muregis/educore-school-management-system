@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import PropTypes from "prop-types";
 import StudentIDCard from "../components/StudentIDCard";
 import QRScanner from "../components/QRScanner";
-import { ALL_CLASSES } from "../lib/constants";
+import { SUBJECTS } from "../lib/constants";
 import { money } from "../lib/utils";
 import { API_BASE, apiFetch } from "../lib/api";
 import { getAuthHeaders } from "../lib/auth";
@@ -79,11 +79,26 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [availableClasses, setAvailableClasses] = useState([]);
   const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", transport_direction: "none", transport_base_fee: "", lunch_enabled: false, lunch_daily_rate: "", lunch_days: "", lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: "", breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
 
   const handleChange = useCallback((field, value) => {
     setF(prev => ({ ...prev, [field]: value }));
   }, []);
+
+  useEffect(() => {
+    const loadClasses = async () => {
+      if (!auth?.token) return;
+      const schoolId = students?.[0]?.school_id ?? 100;
+      try {
+        const res = await apiFetch(`/classes?school_id=${schoolId}`, { token: auth.token });
+        setAvailableClasses(res.map(c => c.class_name));
+      } catch (err) {
+        console.warn("Failed to load classes", err);
+      }
+    };
+    loadClasses();
+  }, [auth, students]);
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -379,13 +394,13 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       <Card style={{ padding: "var(--space-3)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--space-3)", alignItems: "end" }}>
           <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search students..." />
-          <Select 
-            value={cls} 
-            onChange={e => setCls(e.target.value)}
-            options={[
-              { value: "all", label: "All classes" },
-              ...ALL_CLASSES.map(c => ({ value: c, label: c }))
-            ]}
+<Select 
+  value={cls} 
+  onChange={e => setCls(e.target.value)}
+  options={[
+    { value: "all", label: "All classes" },
+    ...alumni.map(c => ({ value: c, label: c }))
+  ]}
           />
           <Select 
             value={status} 
@@ -468,7 +483,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <Input label="Last Name" value={f.lastName} onChange={e => handleChange('lastName', e.target.value)} />
           <Input label="Admission" value={f.admission || ""} onChange={e => handleChange('admission', e.target.value)} />
           
-          <Select label="Class" value={f.className} onChange={e => handleChange('className', e.target.value)} options={ALL_CLASSES.map(c => ({ value: c, label: c }))} />
+          <Select label="Class" value={f.className} onChange={e => handleChange('className', e.target.value)} options={availableClasses.map(c => ({ value: c, label: c }))} />
           <Select label="Gender" value={f.gender} onChange={e => handleChange('gender', e.target.value)} options={[{value:"female", label:"Female"}, {value:"male", label:"Male"}]} />
           <Select label="Status" value={f.status} onChange={e => handleChange('status', e.target.value)} options={[{value:"active", label:"Active"}, {value:"inactive", label:"Inactive"}]} />
           

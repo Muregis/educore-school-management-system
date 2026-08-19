@@ -7,7 +7,6 @@ import Modal from "../components/Modal";
 
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
-import { ALL_CLASSES } from "../lib/constants";
 
 const STATUS_TONE = { pending: "warning", reviewed: "info", accepted: "success", rejected: "danger" };
 
@@ -105,11 +104,11 @@ export default function AdmissionsPage({ auth, canEdit, toast }) {
       await apiFetch("/admissions", { method: "POST", body: cleanForm, token: auth.token });
       await load();
       setShowModal(false);
-      setForm({ 
-        fullName: "", dateOfBirth: "", gender: "male", parentName: "", parentPhone: "", 
-        parentEmail: "", address: "", previousSchool: "", applyingClass: "Grade 7", 
-        academicYear: "2026", notes: "" 
-      });
+setForm({ 
+         fullName: "", dateOfBirth: "", gender: "male", parentName: "", parentPhone: "", 
+         parentEmail: "", address: "", previousSchool: "", applyingClass: "", 
+         academicYear: "2026", notes: "" 
+       });
       toast("Application submitted successfully", "success");
     } catch (e) { 
       console.error("Admission submission error:", e);

@@ -139,155 +139,7 @@ export class AcademicYearService {
 // TERM SERVICE
 // =====================================================
 
-export class TermService {
-  /**
-   * Get current term for a school
-   */
-  static async getCurrentTerm(schoolId) {
-    try {
-      const { data, error } = await supabase
-        .from('terms')
-        .select(`
-          *,
-          academic_years!inner(year_label)
-        `)
-        .eq('school_id', schoolId)
-        .eq('is_current', true)
-        .single();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      return data;
-    } catch (error) {
-      console.error('Error getting current term:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Get current term with fallback to legacy system
-   */
-  static async getCurrentTermWithFallback(schoolId) {
-    // Try new system first
-    let term = await this.getCurrentTerm(schoolId);
-    if (term) return term;
-
-    // Fallback to legacy system
-    try {
-      const { data } = await supabase
-        .from('school_settings')
-        .select('setting_value')
-        .eq('school_id', schoolId)
-        .eq('setting_key', 'current_term')
-        .single();
-
-      return {
-        term_name: data?.setting_value,
-        is_legacy: true
-      };
-    } catch (error) {
-      console.error('Error getting legacy term:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Initialize terms from legacy data
-   */
-  static async initializeFromLegacy(schoolId) {
-    try {
-      // Get distinct terms from invoices and payments
-      const { data: legacyTerms } = await supabase
-        .from('invoices')
-        .select('term')
-        .eq('school_id', schoolId)
-        .neq('is_deleted', true)
-        .neq('term', null)
-        .neq('term', '');
-
-      const { data: paymentTerms } = await supabase
-        .from('payments')
-        .select('term')
-        .eq('school_id', schoolId)
-        .neq('is_deleted', true)
-        .neq('term', null)
-        .neq('term', '');
-
-      const allTerms = [
-        ...(legacyTerms || []).map(i => i.term),
-        ...(paymentTerms || []).map(p => p.term)
-      ];
-
-      const uniqueTerms = [...new Set(allTerms)];
-
-      if (!uniqueTerms.length) return;
-
-      // Get current term from settings
-      const { data: currentSetting } = await supabase
-        .from('school_settings')
-        .select('setting_value')
-        .eq('school_id', schoolId)
-        .eq('setting_key', 'current_term')
-        .single();
-
-      // Get current academic year
-      const currentYear = await AcademicYearService.getCurrentYear(schoolId);
-      if (!currentYear) return;
-
-      // Create term records
-      const termRecords = uniqueTerms.map((term, index) => ({
-        school_id: schoolId,
-        academic_year_id: currentYear.academic_year_id,
-        term_name: term,
-        term_order: index + 1,
-        start_date: new Date(), // Placeholder - should be calculated
-        end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days from now
-        status: 'active',
-        legacy_term_value: term,
-        is_current: currentSetting?.setting_value === term,
-        created_at: new Date(),
-        updated_at: new Date()
-      }));
-
-      const { error } = await supabase
-        .from('terms')
-        .upsert(termRecords, { onConflict: 'school_id,term_name' });
-
-      if (error) throw error;
-
-      return termRecords;
-    } catch (error) {
-      console.error('Error initializing terms:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Check if term can be closed
-   */
-  static async canCloseTerm(termId) {
-    try {
-      // Check if all invoices are generated
-      const { data: invoices } = await supabase
-        .from('invoices')
-        .select('status')
-        .eq('term_id', termId) // This would need to be mapped
-        .neq('is_deleted', true);
-
-      const allInvoicesPaid = invoices?.every(inv => inv.status === 'paid') ?? false;
-
-      // Check if grades are finalized (this would need grade tables)
-      // const gradesFinalized = await this.checkGradesFinalized(termId);
-
-      return {
-        canClose: allInvoicesPaid,
-        reasons: allInvoicesPaid ? [] : ['Outstanding invoices exist']
-      };
-    } catch (error) {
-      console.error('Error checking term closure eligibility:', error);
-      return { canClose: false, reasons: ['Error checking eligibility'] };
-    }
-  }
-}
+export { TermService } from './TermService.js';
 
 // =====================================================
 // TERM TRANSITION SERVICE
@@ -299,28 +151,24 @@ export class TermTransitionService {
    */
   static async closeTerm(schoolId, termId, userId) {
     try {
-      // 1. Validate term can be closed
-      const eligibility = await TermService.canCloseTerm(termId);
+      const eligibility = await TermService.canCloseTerm(schoolId, termId);
       if (!eligibility.canClose) {
         throw new Error(`Cannot close term: ${eligibility.reasons.join(', ')}`);
       }
 
-      // 2. Lock the term
       await supabase
-        .from('terms')
+        .from('academic_terms')
         .update({
-          status: 'completed',
+          status: 'closed',
           updated_at: new Date()
         })
-        .eq('term_id', termId);
+        .eq('term_id', termId)
+        .eq('school_id', schoolId);
 
-      // 3. Calculate and create carry-forward entries
       await this.createCarryForwards(schoolId, termId, userId);
 
-      // 4. Promote students to next class
       await this.promoteStudents(schoolId, termId, userId);
 
-      // 5. Record transition
       await supabase
         .from('term_transitions')
         .insert({
@@ -345,16 +193,16 @@ export class TermTransitionService {
   /**
    * Promote students to next class based on promotion rules
    */
-  static async promoteStudents(schoolId, termId, userId) {
-    try {
-      // Get current term
-      const { data: currentTerm } = await supabase
-        .from('terms')
-        .select('term_id, term_name, academic_year_id')
-        .eq('term_id', termId)
-        .single();
+   static async promoteStudents(schoolId, termId, userId) {
+     try {
+       const { data: currentTerm } = await supabase
+         .from('academic_terms')
+         .select('term_id, term_name, academic_year')
+         .eq('term_id', termId)
+         .eq('school_id', schoolId)
+         .single();
 
-      if (!currentTerm) throw new Error('Term not found');
+       if (!currentTerm) throw new Error('Term not found');
 
       // Get active classes for this school
       const { data: classes } = await supabase
@@ -380,6 +228,14 @@ export class TermTransitionService {
         .eq('is_deleted', false)
         .eq('status', 'active');
 
+      // Look up academic_year_id from academic_years using the term's academic_year string
+      const { data: academicYear } = await supabase
+        .from('academic_years')
+        .select('academic_year_id')
+        .eq('academic_year', currentTerm.academic_year)
+        .eq('school_id', schoolId)
+        .maybeSingle();
+
       const promoted = [];
       const classMap = new Map((classes || []).map(c => [c.class_name, c]));
       const ruleMap = new Map((rules || []).map(r => [r.from_class_name, r]));
@@ -389,7 +245,6 @@ export class TermTransitionService {
         const nextClassName = currentClass?.next_class_name;
 
         if (!nextClassName) {
-          // No next class - student graduates or stays (handled elsewhere)
           continue;
         }
 
@@ -399,12 +254,10 @@ export class TermTransitionService {
           continue;
         }
 
-        // Check promotion rule
         const rule = ruleMap.get(student.class_name);
         const shouldAutoPromote = rule?.auto_promote ?? true;
 
         if (shouldAutoPromote) {
-          // Update student to next class
           const { error: updateError } = await supabase
             .from('students')
             .update({
@@ -419,12 +272,11 @@ export class TermTransitionService {
             continue;
           }
 
-          // Record promotion decision
           await supabase
             .from('promotion_decisions')
             .insert({
               student_id: student.student_id,
-              academic_year_id: currentTerm.academic_year_id,
+              academic_year_id: academicYear?.academic_year_id,
               from_class_id: student.class_id,
               to_class_id: nextClass.class_id,
               decision: 'promoted',
@@ -469,7 +321,7 @@ export class TermTransitionService {
 
       // Get next term
       const { data: nextTerm } = await supabase
-        .from('terms')
+        .from('academic_terms')
         .select('term_id')
         .eq('school_id', schoolId)
         .eq('status', 'upcoming')
@@ -530,19 +382,18 @@ export class TermTransitionService {
    */
   static async openTerm(schoolId, termId, userId) {
     try {
-      // Update term status
       await supabase
-        .from('terms')
+        .from('academic_terms')
         .update({
           status: 'active',
           is_current: true,
           updated_at: new Date()
         })
-        .eq('term_id', termId);
+        .eq('term_id', termId)
+        .eq('school_id', schoolId);
 
-      // Set previous term as not current
       await supabase
-        .from('terms')
+        .from('academic_terms')
         .update({
           is_current: false,
           updated_at: new Date()
@@ -550,7 +401,6 @@ export class TermTransitionService {
         .eq('school_id', schoolId)
         .neq('term_id', termId);
 
-      // Record transition
       await supabase
         .from('term_transitions')
         .insert({
@@ -582,11 +432,13 @@ export class TermTransitionService {
       if (!year) throw new Error('Academic year not found');
       if (year.is_closed) throw new Error('Academic year is already closed');
 
+      const yearLabel = year.academic_year || year.year_label;
+
       const { data: terms } = await supabase
-        .from('terms')
+        .from('academic_terms')
         .select('*')
-        .eq('academic_year_id', academicYearId)
         .eq('school_id', schoolId)
+        .eq('academic_year', yearLabel)
         .neq('status', 'closed');
 
       const summary = {
@@ -599,9 +451,10 @@ export class TermTransitionService {
 
       for (const term of terms || []) {
         await supabase
-          .from('terms')
+          .from('academic_terms')
           .update({ status: 'closed', is_current: false, updated_at: new Date() })
-          .eq('term_id', term.term_id);
+          .eq('term_id', term.term_id)
+          .eq('school_id', schoolId);
 
         summary.termsClosed++;
       }
@@ -697,7 +550,6 @@ export class TermTransitionService {
         for (const student of allStudents || []) {
           const balanceInfo = calculateStudentFeeBalance({ student, feeStructures: feeStructures || [], payments: payments || [] });
 
-          // Update student's opening_balance for the next year
           if (balanceInfo.balance > 0) {
             await supabase.from('students').update({
               opening_balance: balanceInfo.balance,
@@ -741,23 +593,26 @@ export class TermTransitionService {
             .eq('academic_year_id', nextYear.academic_year_id);
 
           await supabase
-            .from('terms')
+            .from('academic_terms')
             .update({ is_current: false })
-            .eq('academic_year_id', nextYear.academic_year_id);
+            .eq('academic_year', nextYear.academic_year)
+            .eq('school_id', schoolId);
 
           const { data: firstTerm } = await supabase
-            .from('terms')
+            .from('academic_terms')
             .select('term_id')
-            .eq('academic_year_id', nextYear.academic_year_id)
+            .eq('academic_year', nextYear.academic_year)
+            .eq('school_id', schoolId)
             .order('term_order')
             .limit(1)
             .single();
 
           if (firstTerm) {
             await supabase
-              .from('terms')
+              .from('academic_terms')
               .update({ is_current: true, status: 'upcoming' })
-              .eq('term_id', firstTerm.term_id);
+              .eq('term_id', firstTerm.term_id)
+              .eq('school_id', schoolId);
           }
 
           summary.nextYearCreated = true;
@@ -818,9 +673,9 @@ export class TermTransitionService {
       if (error) throw error;
 
       const { data: currentTerms } = await supabase
-        .from('terms')
+        .from('academic_terms')
         .select('term_name, term_order, start_date, end_date')
-        .eq('academic_year_id', currentYear.academic_year_id)
+        .eq('academic_year', currentYear.academic_year || currentYear.year_label)
         .eq('school_id', schoolId)
         .order('term_order');
 
@@ -833,7 +688,7 @@ export class TermTransitionService {
 
           return {
             school_id: schoolId,
-            academic_year_id: nextYear.academic_year_id,
+            academic_year: nextYear.academic_year,
             term_name: term.term_name,
             term_order: index + 1,
             start_date: termStart.toISOString().split('T')[0],
@@ -845,7 +700,7 @@ export class TermTransitionService {
           };
         });
 
-        await supabase.from('terms').insert(termRecords);
+        await supabase.from('academic_terms').insert(termRecords);
       }
 
       return nextYear;
@@ -883,7 +738,7 @@ export class StudentEnrollmentService {
       const [classesResult, yearsResult, termsResult] = await Promise.all([
         classIds.length ? supabase.from('classes').select('class_id, class_name').in('class_id', classIds) : { data: [] },
         yearIds.length ? supabase.from('academic_years').select('academic_year_id, year_label').in('academic_year_id', yearIds) : { data: [] },
-        termIds.length ? supabase.from('terms').select('term_id, term_name').in('term_id', termIds) : { data: [] }
+        termIds.length ? supabase.from('academic_terms').select('term_id, term_name').in('term_id', termIds) : { data: [] }
       ]);
 
       if (classesResult.error) throw classesResult.error;
@@ -1171,7 +1026,7 @@ export class FeeBalanceService {
       const createdByIds = [...new Set(data.map(r => r.created_by).filter(Boolean))];
 
       const [termsResult, yearsResult, usersResult] = await Promise.all([
-        termIds.length ? supabase.from('terms').select('term_id, term_name').in('term_id', termIds) : { data: [] },
+        termIds.length ? supabase.from('academic_terms').select('term_id, term_name').in('term_id', termIds) : { data: [] },
         yearIds.length ? supabase.from('academic_years').select('academic_year_id, year_label').in('academic_year_id', yearIds) : { data: [] },
         createdByIds.length ? supabase.from('users').select('user_id, full_name').in('user_id', createdByIds) : { data: [] }
       ]);
@@ -1526,7 +1381,7 @@ export class PermissionService {
         resourceSchoolId = data?.school_id;
       } else if (permission.includes('academic.') || permission.includes('term.')) {
         const { data } = await supabase
-          .from('terms')
+          .from('academic_terms')
           .select('school_id')
           .eq('term_id', resourceId)
           .single();

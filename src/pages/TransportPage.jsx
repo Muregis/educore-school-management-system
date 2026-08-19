@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
-import { ALL_CLASSES } from "../lib/constants";
 
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -13,6 +12,21 @@ import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
 
 export default function TransportPage({ auth, canEdit, toast, students }) {
+  const [availableClasses, setAvailableClasses] = useState([]);
+
+  useEffect(() => {
+    const loadClasses = async () => {
+      if (!auth?.token) return;
+      const schoolId = students?.[0]?.school_id ?? 100;
+      try {
+        const res = await apiFetch(`/classes?school_id=${schoolId}`, { token: auth.token });
+        setAvailableClasses(res.map(c => c.class_name));
+      } catch (err) {
+        console.warn("Failed to load classes", err);
+      }
+    };
+    loadClasses();
+  }, [auth, students]);
   const [tab, setTab]           = useState("routes");
   const [routes, setRoutes]     = useState([]);
   const [assignments, setAssignments] = useState([]);
@@ -234,10 +248,10 @@ export default function TransportPage({ auth, canEdit, toast, students }) {
                 label="Class Filter"
                 value={af.studentClass} 
                 onChange={e => setAf({ ...af, studentClass: e.target.value, studentId: "" })}
-                options={[
-                  { value: "", label: "All Classes" },
-                  ...ALL_CLASSES.map(c => ({ value: c, label: c }))
-                ]}
+options={[
+                    { value: "", label: "All Classes" },
+                    ...availableClasses.map(c => ({ value: c, label: c }))
+                  ]}
               />
               
               <Select 

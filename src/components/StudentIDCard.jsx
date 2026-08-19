@@ -43,7 +43,7 @@ export default function StudentIDCard({ student, school, onClose }) {
             ${school.name}
           </div>
           <div class="student-name">${student.firstName || student.first_name} ${student.lastName || student.last_name}</div>
-          <div class="student-class">${student.className || student.class_name || "Grade 1"}</div>
+          <div class="student-class">${student.className || student.class_name || "Unassigned"}</div>
           <div class="admission-no">${student.admission || student.admission_number}</div>
         </div>
         <div class="qr-area">
@@ -239,7 +239,7 @@ export default function StudentIDCard({ student, school, onClose }) {
     // Class
     ctx.font = "12px Arial";
     ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.fillText(student.className || student.class_name || "Grade 1", 70, 62);
+    ctx.fillText(student.className || student.class_name || "Unassigned", 70, 62);
 
     // Admission number
     ctx.fillStyle = "rgba(255,255,255,0.2)";
@@ -355,9 +355,9 @@ export default function StudentIDCard({ student, school, onClose }) {
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 2 }}>
               {student.firstName || student.first_name} {student.lastName || student.last_name}
             </div>
-            <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>
-              {student.className || student.class_name || "Grade 1"}
-            </div>
+<div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>
+               {student.className || student.class_name || "Unassigned"}
+             </div>
             <div style={{
               fontSize: 13,
               fontWeight: 600,

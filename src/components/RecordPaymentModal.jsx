@@ -34,11 +34,24 @@ export default function RecordPaymentModal({
   });
   const [selectedClass, setSelectedClass] = useState("");
   const [filteredStudents, setFilteredStudents] = useState([]);
-
-  // Get unique classes from students
-  const classes = [...new Set(students.map(s => s.class_name || s.className).filter(Boolean))].sort();
+  const [classes, setClasses] = useState([]);
 
   const prevIsOpenRef = useRef(false);
+
+  // Load classes from API when component mounts or school changes
+  useEffect(() => {
+    if (auth?.token && school?.school_id) {
+      const loadClasses = async () => {
+        try {
+          const data = await apiFetch(`/classes?school_id=${school.school_id}`, { token: auth.token });
+          setClasses(data.map(c => c.class_name));
+        } catch (err) {
+          console.warn("Failed to load classes:", err);
+        }
+      };
+      loadClasses();
+    }
+  }, [auth?.token, school?.school_id]);
 
   useEffect(() => {
     if (isOpen && !prevIsOpenRef.current) {

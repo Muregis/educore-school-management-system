@@ -21,10 +21,10 @@ import { apiFetch } from "../lib/api";
 export function TermManagementPage({ auth }) {
   const [currentTerm, setCurrentTerm] = useState(null);
   const [upcomingTerms, setUpcomingTerms] = useState([]);
-  const [termStats, setTermStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closingTerm, setClosingTerm] = useState(false);
+  const [actionMessage, setActionMessage] = useState(null);
 
   useEffect(() => {
     loadTermData();
@@ -38,7 +38,7 @@ export function TermManagementPage({ auth }) {
         apiFetch('/academic/terms', { token: auth?.token })
       ]);
 
-      setCurrentTerm(termRes.data);
+      setCurrentTerm(termRes.data || termRes);
       setUpcomingTerms(termsRes.data?.filter(t => t.status === 'upcoming') || []);
     } catch (error) {
       console.error('Error loading term data:', error);
@@ -51,19 +51,38 @@ export function TermManagementPage({ auth }) {
     if (!currentTerm) return;
 
     setClosingTerm(true);
+    setActionMessage(null);
     try {
-      await apiFetch(`/academic/terms/${currentTerm.term_id}/close`, {
-        method: 'PUT'
+      const res = await apiFetch(`/academic/terms/${currentTerm.term_id}/close`, {
+        method: 'PUT',
+        token: auth?.token
       });
 
       setShowCloseModal(false);
       loadTermData();
-      // Show success message
+      setActionMessage({ type: 'success', text: res?.message || 'Term closed successfully' });
     } catch (error) {
-      console.error('Error closing term:', error);
-      // Show error message
+      setActionMessage({ type: 'error', text: error.message || 'Failed to close term' });
     } finally {
       setClosingTerm(false);
+    }
+  };
+
+  const handleOpenNextTerm = async () => {
+    if (!upcomingTerms.length) return;
+
+    const nextTerm = upcomingTerms[0];
+    setActionMessage(null);
+    try {
+      const res = await apiFetch(`/academic/terms/${nextTerm.term_id}/open`, {
+        method: 'PUT',
+        token: auth?.token
+      });
+
+      loadTermData();
+      setActionMessage({ type: 'success', text: res?.message || 'Next term opened successfully' });
+    } catch (error) {
+      setActionMessage({ type: 'error', text: error.message || 'Failed to open next term' });
     }
   };
 
@@ -84,27 +103,22 @@ export function TermManagementPage({ auth }) {
 
       <div className="term-stats-grid">
         <StatCard
-          title="Active Students"
-          value={termStats.activeStudents || 0}
-          icon="👥"
+          title="Current Term"
+          value={currentTerm?.term_name || 'Not set'}
+          icon="📅"
         />
         <StatCard
-          title="Outstanding Balance"
-          value={`$${money(termStats.unpaidBalance || 0)}`}
-          icon="💰"
-          status={termStats.unpaidBalance > 0 ? 'warning' : 'success'}
-        />
-        <StatCard
-          title="Pending Promotions"
-          value={termStats.pendingPromotions || 0}
-          icon="📈"
-        />
-        <StatCard
-          title="Completed Invoices"
-          value={`${termStats.completedInvoices || 0}%`}
-          icon="📋"
+          title="Upcoming Terms"
+          value={upcomingTerms.length}
+          icon="📆"
         />
       </div>
+
+      {actionMessage && (
+        <div className={`action-message action-${actionMessage.type}`}>
+          {actionMessage.type === 'success' ? '✅' : '❌'} {actionMessage.text}
+        </div>
+      )}
 
       <div className="term-actions">
         {currentTerm?.status === 'active' && (
@@ -176,12 +190,6 @@ function TermClosureChecklist({ term, onClose, show, onHide, loading }) {
       console.error('Error loading checklist:', error);
     }
   }, [term?.term_id]);
-
-  useEffect(() => {
-    if (show && term) {
-      loadChecklist();
-    }
-  }, [show, term, loadChecklist]);
 
   useEffect(() => {
     if (show && term) {
@@ -744,9 +752,9 @@ export function ClassPromotionChain({ auth }) {
     try {
       setLoading(true);
       const res = await apiFetch('/classes/promotion-chain', { 
-        token: sessionStorage.getItem("token") 
+        token: auth?.token 
       });
-      setClasses(res.data || res || []);
+      setClasses(res?.data || res || []);
     } catch (err) {
       console.error('Error loading classes:', err);
     } finally {
@@ -759,7 +767,7 @@ export function ClassPromotionChain({ auth }) {
     try {
       await apiFetch(`/classes/${classId}/promotion`, {
         method: 'PUT',
-        token: sessionStorage.getItem("token"),
+        token: auth?.token,
         body: { nextClassName }
       });
       loadClasses();
