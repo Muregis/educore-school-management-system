@@ -92,8 +92,9 @@ export const validateSession = async (req, res, next) => {
       return next();
     }
 
+    // If no sessionId header, allow request to proceed (session is optional enhancement)
     if (!sessionId) {
-      return res.status(401).json({ message: "Session required" });
+      return next();
     }
 
     if (sessionsBackend === "memory") {
