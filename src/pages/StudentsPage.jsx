@@ -61,7 +61,7 @@ function normalise(s) {
   };
 }
 
-export default function StudentsPage({ auth, students, setStudents, canEdit, results, payments, feeStructures: rawFeeStructures = [], toast }) {
+export default function StudentsPage({ auth, students, setStudents, canEdit, results, payments, feeStructures: rawFeeStructures = [], toast, school }) {
   const { term: currentTerm } = useCurrentTerm(auth);
   const feeStructures = Array.isArray(rawFeeStructures)
     ? rawFeeStructures.filter(f => (f?.term ?? f?.term_name ?? currentTerm) === currentTerm)

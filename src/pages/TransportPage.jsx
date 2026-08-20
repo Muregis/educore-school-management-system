@@ -11,7 +11,7 @@ import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
 
-export default function TransportPage({ auth, canEdit, toast, students }) {
+export default function TransportPage({ auth, canEdit, toast, students, school }) {
   const [availableClasses, setAvailableClasses] = useState([]);
 
   useEffect(() => {

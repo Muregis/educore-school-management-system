@@ -48,7 +48,8 @@ export default function AttendancePage({
   canEdit, 
   toast, 
   feeBlocked = false, 
-  onGoFees 
+  onGoFees,
+  school
 }) {
   const { term, startDate, endDate } = useCurrentTerm(auth);
   const [cls, setCls] = useState("");
