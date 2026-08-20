@@ -329,24 +329,6 @@ router.post("/promotion/rules", authorize("promotion.approve"), async (req, res)
     res.status(500).json({ message: "Failed to create promotion rule" });
   }
 });
-
-// Standard CBC promotion progression used as a default chain
-const PROMOTION_CHAIN = {
-  "Playgroup": "PP1",
-  "PP1": "PP2",
-  "PP2": "Grade 1",
-  "Grade 1": "Grade 2",
-  "Grade 2": "Grade 3",
-  "Grade 3": "Grade 4",
-  "Grade 4": "Grade 5",
-  "Grade 5": "Grade 6",
-  "Grade 6": "Grade 7",
-  "Grade 7": "Grade 8",
-  "Grade 8": "Grade 9",
-  "Grade 9": null
-};
-
-// GET /api/classes/promotion-chain - Get all classes with their promotion chain
 router.get("/classes/promotion-chain", authorize("academic.view"), async (req, res) => {
   try {
     const { schoolId } = req.user;
@@ -376,7 +358,7 @@ router.get("/classes/promotion-chain", authorize("academic.view"), async (req, r
     const classes = (rows || []).map(c => ({
       class_id: c.class_id || c.id || c.class_name,
       class_name: c.class_name,
-      next_class_name: c.next_class_name || PROMOTION_CHAIN[c.class_name] || null,
+      next_class_name: c.next_class_name || null,
       class_order: c.sort_order ?? c.class_order ?? 0,
       status: c.status || 'active'
     })).sort((a, b) => (a.class_order || 0) - (b.class_order || 0) || a.class_name.localeCompare(b.class_name));
@@ -467,10 +449,9 @@ router.put("/classes/:id/promotion", requireRoles("admin", "director", "superadm
 
  // Build update payload with only columns that exist
  const updateData = { updated_at: new Date().toISOString() };
- if (nextClassName === undefined || nextClassName === null || nextClassName === "") {
-   const name = existing.class_name || classId;
-   updateData.next_class_name = PROMOTION_CHAIN[name] || null;
- } else {
+if (nextClassName === undefined || nextClassName === null || nextClassName === "") {
+    updateData.next_class_name = null;
+  } else {
    updateData.next_class_name = nextClassName;
  }
  if (classOrder !== undefined) updateData.class_order = classOrder;
