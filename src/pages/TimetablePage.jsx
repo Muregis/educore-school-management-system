@@ -12,7 +12,7 @@ import EmptyState from "../components/ui/EmptyState";
 
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday"];
 
-export default function TimetablePage({ auth, teachers, canEdit, toast }) {
+export default function TimetablePage({ auth, teachers, canEdit, toast, school }) {
   const [entries, setEntries]         = useState([]);
   const [filterClass, setFilterClass] = useState("");
   const [showModal, setShowModal]     = useState(false);
@@ -24,7 +24,7 @@ export default function TimetablePage({ auth, teachers, canEdit, toast }) {
   useEffect(() => {
     const loadClasses = async () => {
       if (!auth?.token) return;
-      const schoolId = teachers?.[0]?.school_id ?? 100;
+      const schoolId = school?.school_id ?? auth?.schoolId;
       try {
         const res = await apiFetch(`/classes?school_id=${schoolId}`, { token: auth.token });
         setAvailableClasses(res.map(c => c.class_name));
@@ -33,7 +33,7 @@ export default function TimetablePage({ auth, teachers, canEdit, toast }) {
       }
     };
     loadClasses();
-  }, [auth, teachers]);
+  }, [auth, school]);
   const [uploading, setUploading]     = useState(false);
   const [launchingGenerator, setLaunchingGenerator] = useState(false);
   const [generatorError, setGeneratorError] = useState("");

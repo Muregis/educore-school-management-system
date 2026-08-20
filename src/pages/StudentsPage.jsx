@@ -89,7 +89,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   useEffect(() => {
     const loadClasses = async () => {
       if (!auth?.token) return;
-      const schoolId = students?.[0]?.school_id ?? 100;
+      const schoolId = school?.school_id ?? auth?.schoolId;
       try {
         const res = await apiFetch(`/classes?school_id=${schoolId}`, { token: auth.token });
         setAvailableClasses(res.map(c => c.class_name));
@@ -98,7 +98,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       }
     };
     loadClasses();
-  }, [auth, students]);
+  }, [auth, school]);
 
   useEffect(() => {
     if (!auth?.token) return;
