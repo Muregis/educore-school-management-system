@@ -160,8 +160,11 @@ function PlanEditor({ auth, toast, editPlan, type: initType, onBack, onSaved }) 
   useEffect(() => {
     if (!auth?.token) return;
     apiFetch("/classes", { token: auth.token })
-      .then(data => setAvailableClasses(data.map(c => c.class_name)))
-      .catch(() => {}); // fail silently - fallback to empty
+      .then(data => {
+        const classes = Array.isArray(data) ? data : (data?.data ?? []);
+        setAvailableClasses(classes.map(c => c.class_name));
+      })
+      .catch(() => { setAvailableClasses([]); }); // fail silently - fallback to empty
   }, [auth]);
 
   const handleSelectChange = (e, key) => {

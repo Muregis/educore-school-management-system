@@ -60,8 +60,11 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
   useEffect(() => {
     if (!auth?.token) return;
     apiFetch("/classes", { token: auth.token })
-      .then(data => setAvailableClasses(data.map(c => c.class_name)))
-      .catch(() => {});
+      .then(data => {
+        const classes = Array.isArray(data) ? data : (data?.data ?? []);
+        setAvailableClasses(classes.map(c => c.class_name));
+      })
+      .catch(() => { setAvailableClasses([]); });
   }, [auth]);
 
   // Optimize incoming data to prevent duplicates

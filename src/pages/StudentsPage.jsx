@@ -90,11 +90,15 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     const loadClasses = async () => {
       if (!auth?.token) return;
       const schoolId = school?.school_id ?? auth?.schoolId;
+      if (!schoolId) return;
       try {
         const res = await apiFetch(`/classes?school_id=${schoolId}`, { token: auth.token });
-        setAvailableClasses(res.map(c => c.class_name));
+        // Handle various response formats
+        const classes = Array.isArray(res) ? res : (res?.data ?? []);
+        setAvailableClasses(classes.map(c => c.class_name));
       } catch (err) {
         console.warn("Failed to load classes", err);
+        setAvailableClasses([]);
       }
     };
     loadClasses();

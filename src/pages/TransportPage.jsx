@@ -18,11 +18,18 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
     const loadClasses = async () => {
       if (!auth?.token) return;
       const schoolId = school?.school_id ?? auth?.schoolId;
+      if (!schoolId) return;
       try {
         const res = await apiFetch(`/classes?school_id=${schoolId}`, { token: auth.token });
-        setAvailableClasses(res.map(c => c.class_name));
+        const classes = Array.isArray(res) ? res : (res?.data ?? []);
+        setAvailableClasses(classes.map(c => c.class_name));
       } catch (err) {
         console.warn("Failed to load classes", err);
+        setAvailableClasses([]);
+      }
+    };
+    loadClasses();
+  }, [auth, school]);
       }
     };
     loadClasses();

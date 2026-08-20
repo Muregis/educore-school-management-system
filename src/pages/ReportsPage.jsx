@@ -945,16 +945,18 @@ export default function ReportsPage({ auth }) {
       let ignore = false;
       apiFetch('/classes', { token })
         .then(res => {
-          if (!ignore) setClassOptions(res.data || res || []);
+          if (!ignore) {
+            const classes = Array.isArray(res) ? res : (res?.data ?? []);
+            setClassOptions(classes);
+          }
         })
         .catch((e) => {
           if (e?.code !== "EABORT") {
             console.error("Classes load error:", e);
+            setClassOptions([]);
           }
         });
-      return () => {
-        ignore = true;
-      };
+      return () => { ignore = true; };
     }
     return undefined;
   }, [auth?.token]);

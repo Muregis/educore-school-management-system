@@ -91,8 +91,11 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
     const token = auth?.token || sessionStorage.getItem("token");
     if (token) {
       apiFetch('/classes', { token })
-        .then(res => setClassOptions(res.data || res || []))
-        .catch(() => {});
+        .then(res => {
+          const classes = Array.isArray(res) ? res : (res?.data ?? []);
+          setClassOptions(classes);
+        })
+        .catch(() => { setClassOptions([]); });
       // Fetch exam types
       apiFetch('/exam-types', { token })
         .then(res => {

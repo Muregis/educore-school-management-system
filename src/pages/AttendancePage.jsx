@@ -73,11 +73,14 @@ export default function AttendancePage({
   // Fetch classes from API based on school type
   useEffect(() => {
     if (!auth?.token) return;
-    // Use school prop, fallback to auth.schoolId
     const schoolId = school?.school_id ?? auth?.schoolId;
+    if (!schoolId) return;
     apiFetch(`/classes?school_id=${schoolId}`, { token: auth.token })
-      .then(data => setAvailableClasses(data.map(c => c.class_name)))
-      .catch(e => console.warn("Failed to load classes", e));
+      .then(data => {
+        const classes = Array.isArray(data) ? data : (data?.data ?? []);
+        setAvailableClasses(classes.map(c => c.class_name));
+      })
+      .catch(e => { console.warn("Failed to load classes", e); setAvailableClasses([]); });
   }, [auth, school]);
 
   // Fetch attendance records on mount
