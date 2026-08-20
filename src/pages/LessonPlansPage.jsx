@@ -298,7 +298,7 @@ function PlanEditor({ auth, toast, editPlan, type: initType, onBack, onSaved }) 
               label="Class *" 
               value={form.class_name} 
               onChange={e => handleSelectChange(e, "class_name")}
-              options={[{ value: "", label: "Select class…" }, ...availableClasses.map(c => ({ value: c, label: c }))]}
+              options={[{ value: "", label: "Select class…" }, ...(availableClasses ?? []).map(c => ({ value: c, label: c }))]}
             />
           </div>
           <div>

@@ -89,10 +89,8 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   useEffect(() => {
     const loadClasses = async () => {
       if (!auth?.token) return;
-      const schoolId = school?.school_id ?? auth?.schoolId;
-      if (!schoolId) return;
       try {
-        const res = await apiFetch(`/classes?school_id=${schoolId}`, { token: auth.token });
+        const res = await apiFetch(`/classes`, { token: auth.token });
         // Handle various response formats
         const classes = Array.isArray(res) ? res : (res?.data ?? []);
         setAvailableClasses(classes.map(c => c.class_name));
@@ -102,7 +100,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       }
     };
     loadClasses();
-  }, [auth, school]);
+  }, [auth]);
 
   useEffect(() => {
     if (!auth?.token) return;
@@ -403,7 +401,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   onChange={e => setCls(e.target.value)}
   options={[
     { value: "all", label: "All classes" },
-    ...availableClasses.map(c => ({ value: c, label: c }))
+    ...(availableClasses ?? []).map(c => ({ value: c, label: c }))
   ]}
           />
           <Select 
@@ -487,7 +485,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <Input label="Last Name" value={f.lastName} onChange={e => handleChange('lastName', e.target.value)} />
           <Input label="Admission" value={f.admission || ""} onChange={e => handleChange('admission', e.target.value)} />
           
-          <Select label="Class" value={f.className} onChange={e => handleChange('className', e.target.value)} options={availableClasses.map(c => ({ value: c, label: c }))} />
+          <Select label="Class" value={f.className} onChange={e => handleChange('className', e.target.value)} options={(availableClasses ?? []).map(c => ({ value: c, label: c }))} />
           <Select label="Gender" value={f.gender} onChange={e => handleChange('gender', e.target.value)} options={[{value:"female", label:"Female"}, {value:"male", label:"Male"}]} />
           <Select label="Status" value={f.status} onChange={e => handleChange('status', e.target.value)} options={[{value:"active", label:"Active"}, {value:"inactive", label:"Inactive"}]} />
           

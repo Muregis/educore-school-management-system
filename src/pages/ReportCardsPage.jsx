@@ -230,7 +230,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
             onChange={e => setFilterClass(e.target.value)}
             options={[
               { value: "all", label: "All classes" },
-              ...availableClasses.map(c => ({ value: c, label: c }))
+              ...(availableClasses ?? []).map(c => ({ value: c, label: c }))
             ]}
           />
           <Select 
@@ -415,7 +415,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
               onChange={e => { setFormClass(e.target.value); setForm({ ...form, studentId: "" }); }}
               options={[
                 { value: "", label: "-- Select class first --" },
-                ...availableClasses.map(c => ({ value: c, label: c }))
+                ...(availableClasses ?? []).map(c => ({ value: c, label: c }))
               ]}
             />
             <Select 

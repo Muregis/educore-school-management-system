@@ -40,10 +40,10 @@ export default function RecordPaymentModal({
 
   // Load classes from API when component mounts or school changes
   useEffect(() => {
-    if (auth?.token && school?.school_id) {
+    if (auth?.token) {
       const loadClasses = async () => {
         try {
-          const data = await apiFetch(`/classes?school_id=${school.school_id}`, { token: auth.token });
+          const data = await apiFetch(`/classes`, { token: auth.token });
           const classes = Array.isArray(data) ? data : (data?.data ?? []);
           setClasses(classes.map(c => c.class_name));
         } catch (err) {
@@ -53,7 +53,7 @@ export default function RecordPaymentModal({
       };
       loadClasses();
     }
-  }, [auth?.token, school?.school_id]);
+  }, [auth?.token]);
 
   useEffect(() => {
     if (isOpen && !prevIsOpenRef.current) {

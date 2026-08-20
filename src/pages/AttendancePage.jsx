@@ -73,15 +73,13 @@ export default function AttendancePage({
   // Fetch classes from API based on school type
   useEffect(() => {
     if (!auth?.token) return;
-    const schoolId = school?.school_id ?? auth?.schoolId;
-    if (!schoolId) return;
-    apiFetch(`/classes?school_id=${schoolId}`, { token: auth.token })
+    apiFetch(`/classes`, { token: auth.token })
       .then(data => {
         const classes = Array.isArray(data) ? data : (data?.data ?? []);
         setAvailableClasses(classes.map(c => c.class_name));
       })
       .catch(e => { console.warn("Failed to load classes", e); setAvailableClasses([]); });
-  }, [auth, school]);
+  }, [auth]);
 
   // Fetch attendance records on mount
   useEffect(() => {
@@ -276,7 +274,7 @@ export default function AttendancePage({
             onChange={e => setFilterClass(e.target.value)}
             options={[
               { value: "all", label: "All classes" },
-              ...availableClasses.map(c => ({ value: c, label: c }))
+              ...(availableClasses ?? []).map(c => ({ value: c, label: c }))
             ]}
           />
           
@@ -372,7 +370,7 @@ export default function AttendancePage({
             label="Class"
             value={cls} 
             onChange={e => setCls(e.target.value)}
-            options={availableClasses.map(c => ({ value: c, label: c }))}
+            options={(availableClasses ?? []).map(c => ({ value: c, label: c }))}
           />
           <Input 
             label="Date"

@@ -737,7 +737,7 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
                   onChange={e => setExportClass(e.target.value)}
                 >
                   <option value="all">All Classes</option>
-                  {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                  {(availableClasses ?? []).map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
             )}

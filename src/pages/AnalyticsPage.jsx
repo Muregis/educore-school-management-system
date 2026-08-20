@@ -392,7 +392,7 @@ Provide a structured analysis with:
             <Card style={{ padding: "var(--space-4)" }}>
               <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Outstanding Balance by Class</h3>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "var(--space-3)" }}>
-                {availableClasses.map(cls => {
+                {(availableClasses ?? []).map(cls => {
                   const classStudents = students.filter(s => (s.className || s.class_name) === cls);
                   if (classStudents.length === 0) return null;
                   

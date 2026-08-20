@@ -24,10 +24,8 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
   useEffect(() => {
     const loadClasses = async () => {
       if (!auth?.token) return;
-      const schoolId = school?.school_id ?? auth?.schoolId;
-      if (!schoolId) return;
       try {
-        const res = await apiFetch(`/classes?school_id=${schoolId}`, { token: auth.token });
+        const res = await apiFetch(`/classes`, { token: auth.token });
         const classes = Array.isArray(res) ? res : (res?.data ?? []);
         setAvailableClasses(classes.map(c => c.class_name));
       } catch (err) {
@@ -36,7 +34,7 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
       }
     };
     loadClasses();
-  }, [auth, school]);
+  }, [auth]);
   const [uploading, setUploading]     = useState(false);
   const [launchingGenerator, setLaunchingGenerator] = useState(false);
   const [generatorError, setGeneratorError] = useState("");
@@ -214,7 +212,7 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
             <Select 
               value={filterClass} 
               onChange={e => setFilterClass(e.target.value)}
-              options={availableClasses.map(c => ({ value: c, label: c }))}
+              options={(availableClasses ?? []).map(c => ({ value: c, label: c }))}
             />
           </div>
           <div style={{ flex: 1 }} />

@@ -17,10 +17,8 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
   useEffect(() => {
     const loadClasses = async () => {
       if (!auth?.token) return;
-      const schoolId = school?.school_id ?? auth?.schoolId;
-      if (!schoolId) return;
       try {
-        const res = await apiFetch(`/classes?school_id=${schoolId}`, { token: auth.token });
+        const res = await apiFetch(`/classes`, { token: auth.token });
         const classes = Array.isArray(res) ? res : (res?.data ?? []);
         setAvailableClasses(classes.map(c => c.class_name));
       } catch (err) {
@@ -29,7 +27,7 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
       }
     };
     loadClasses();
-  }, [auth, school]);
+  }, [auth]);
       }
     };
     loadClasses();
@@ -257,7 +255,7 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
                 onChange={e => setAf({ ...af, studentClass: e.target.value, studentId: "" })}
 options={[
                     { value: "", label: "All Classes" },
-                    ...availableClasses.map(c => ({ value: c, label: c }))
+                    ...(availableClasses ?? []).map(c => ({ value: c, label: c }))
                   ]}
               />
               

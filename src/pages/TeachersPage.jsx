@@ -569,7 +569,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
                 Classes <span style={{ textTransform: "none", opacity: 0.8, fontWeight: 400 }}>(select all that apply)</span>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
-                {availableClasses.map(c => {
+                {(availableClasses ?? []).map(c => {
                   const sel = (f.classes||[]).includes(c);
                   return (
                     <div 

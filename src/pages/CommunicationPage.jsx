@@ -190,7 +190,7 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
               style={{ ...inputStyle }}
             >
               <option value="">Select class first</option>
-              {availableClasses.map(c => <option key={c}>{c}</option>)}
+              {(availableClasses ?? []).map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
           <div style={{ marginTop: 10 }}>
@@ -246,7 +246,7 @@ export default function CommunicationPage({ auth, canEdit, toast }) {
             <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Target Class</div>
             <select value={bulkForm.className} onChange={e => setBulkForm(f => ({ ...f, className: e.target.value }))} style={{ ...inputStyle }}>
               <option value="all">All Classes</option>
-              {availableClasses.map(c => <option key={c}>{c}</option>)}
+              {(availableClasses ?? []).map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
           <div>

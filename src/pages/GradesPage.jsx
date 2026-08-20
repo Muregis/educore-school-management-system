@@ -137,7 +137,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
    const findStudentById = id => students.find(x => `${x.student_id ?? x.id ?? ""}` === `${id}`);
 
 const classesForDropdown = useMemo(() => {
-      const fromApi = classOptions.map(c => (c.class_name ?? c.className ?? "").toString().trim()).filter(Boolean);
+      const fromApi = (classOptions ?? []).map(c => (c.class_name ?? c.className ?? "").toString().trim()).filter(Boolean);
       const fromStudents = students.map(getStudentClass).filter(Boolean);
       const merged = Array.from(new Set([...fromApi, ...fromStudents]));
       return merged.length ? merged.sort() : [];

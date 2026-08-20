@@ -132,7 +132,7 @@ export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId =
             <Field label="Class">
               <select style={inputStyle} value={f.studentClass} onChange={e => { setF({ ...f, studentClass: e.target.value, studentId: "" }); }}>
                 <option value="">All Classes</option>
-                {availableClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                {(availableClasses ?? []).map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
             <Field label="Student">

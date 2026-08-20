@@ -254,7 +254,7 @@ setForm({
             </Field>
             <Field label="Applying For Class *">
               <select style={inputStyle} value={form.applyingClass} onChange={e => setForm({ ...form, applyingClass: e.target.value })} required>
-                {availableClasses.map(c => <option key={c}>{c}</option>)}
+                {(availableClasses ?? []).map(c => <option key={c}>{c}</option>)}
               </select>
             </Field>
             <Field label="Academic Year *">

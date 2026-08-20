@@ -208,7 +208,7 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
             <Field label="Class" style={{ gridColumn: "1 / -1" }}>
               <select style={inputStyle} value={singleFormClass} onChange={e => { setSingleFormClass(e.target.value); setSingleForm({ ...singleForm, studentId: "" }); }}>
                 <option value="">-- Select class first --</option>
-                {availableClasses.map(c => <option key={c}>{c}</option>)}
+{(availableClasses ?? []).map(c => <option key={c}>{c}</option>)}
               </select>
             </Field>
             <Field label="Student" style={{ gridColumn: "1 / -1" }}>
@@ -238,7 +238,7 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
             Generates invoices for all students in a class using the existing fee structure.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <Field label="Class"><select style={inputStyle} value={bulkForm.className} onChange={e => setBulkForm({ ...bulkForm, className: e.target.value })}>{availableClasses.map(c => <option key={c}>{c}</option>)}</select></Field>
+            <Field label="Class"><select style={inputStyle} value={bulkForm.className} onChange={e => setBulkForm({ ...bulkForm, className: e.target.value })}>{(availableClasses ?? []).map(c => <option key={c}>{c}</option>)}</select></Field>
             <Field label="Term"><select style={inputStyle} value={bulkForm.term} onChange={e => setBulkForm({ ...bulkForm, term: e.target.value })}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></Field>
             <Field label="Academic Year"><input style={inputStyle} value={bulkForm.academicYear} onChange={e => setBulkForm({ ...bulkForm, academicYear: e.target.value })} /></Field>
             <Field label="Due Date"><input type="date" style={inputStyle} value={bulkForm.dueDate} onChange={e => setBulkForm({ ...bulkForm, dueDate: e.target.value })} /></Field>

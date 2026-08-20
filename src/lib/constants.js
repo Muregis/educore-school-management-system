@@ -1,15 +1,11 @@
 export const SUBJECTS   = ["Mathematics","English","Kiswahili","Computer Science","Biology","Physics","Chemistry","History","Geography","CRE"];
 
-export const fetchClasses = async (schoolId, schoolType) => {
-  if (!schoolId) return [];
-  const filter = schoolType === 'lower_ed'
-    ? 'class_name NOT LIKE %/%'
-    : 'class_name LIKE %/%';
-  const res = await apiFetch(`/classes?school_id=${schoolId}&filter=${filter}`);
-  return res.map(c => c.class_name);
+// Deprecated - classes are now fetched via /classes endpoint using token's school_id
+export const fetchClasses = async () => {
+  return [];
 };
-export const getClassList = async (schoolId, schoolType) => {
-  return fetchClasses(schoolId, schoolType);
+export const getClassList = async () => {
+  return [];
 };
 
 export const DEFAULTS = {
