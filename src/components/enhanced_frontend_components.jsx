@@ -163,15 +163,14 @@ function TermClosureChecklist({ term, onClose, show, onHide, loading }) {
 
   const loadChecklist = useCallback(async () => {
     try {
-      const res = await apiFetch(`/academic/terms/${term.term_id}/can-close`);
-      const eligibility = res.data;
+      const eligibility = await apiFetch(`/academic/terms/${term.term_id}/can-close`);
 
       setChecklist([
         {
           id: 'invoices',
           title: 'All Invoices Generated',
-          status: eligibility.canClose,
-          message: eligibility.reasons?.find(r => r.includes('invoice')) || 'All invoices are properly generated'
+          status: eligibility?.canClose,
+          message: eligibility?.reasons?.find(r => r.includes('invoice')) || 'All invoices are properly generated'
         },
         {
           id: 'payments',

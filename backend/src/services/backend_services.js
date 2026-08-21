@@ -6,6 +6,7 @@
 import { supabase } from '../config/supabaseClient.js';
 import { logAuditEvent } from '../helpers/audit.logger.js';
 import { calculateStudentFeeBalance } from './feeBalanceCalculator.js';
+import { TermService } from './TermService.js';
 
 // =====================================================
 // ACADEMIC YEAR SERVICE
