@@ -26,7 +26,10 @@ const ROLE_PERMISSIONS = {
   ],
   admin: [
     'dashboard', 'students', 'attendance', 'communication', 'announcements',
-    'academic.view', 'academic.manage', 'promotion.view', 'promotion.approve'
+    'academic.view', 'academic.manage', 'term.close', 'term.open',
+    'promotion.view', 'promotion.approve',
+    'reports.view', 'reports.financial', 'reports.academic',
+    'finance.approve_adjustments', 'ledger.view'
   ],
   teacher: [
     'dashboard', 'attendance', 'grades', 'reportcards', 'discipline', 'timetable',
