@@ -434,14 +434,14 @@ router.put("/classes/:id/promotion", requireRoles("admin", "director", "superadm
 
     console.log(`[PROMOTION] PUT /classes/${classId}/promotion schoolId=${schoolId} nextClassName=${nextClassName}`);
 
-    // Resolve the class by class_id, id, OR class name
+    // Resolve the class by class_id OR class_name
     let existing = null;
     let findErr = null;
 
     // Try class_id first
     const byClassId = await supabase
       .from('classes')
-      .select('class_id, id, class_name')
+      .select('class_id, class_name')
       .eq('school_id', schoolId)
       .eq('class_id', classId)
       .maybeSingle();
@@ -449,28 +449,16 @@ router.put("/classes/:id/promotion", requireRoles("admin", "director", "superadm
     if (byClassId.data) {
       existing = byClassId.data;
     } else {
-      // Try numeric id
-      const byId = await supabase
+      // Try class_name
+      const byName = await supabase
         .from('classes')
-        .select('class_id, id, class_name')
+        .select('class_id, class_name')
         .eq('school_id', schoolId)
-        .eq('id', classId)
+        .eq('class_name', classId)
         .maybeSingle();
 
-      if (byId.data) {
-        existing = byId.data;
-      } else {
-        // Try class_name
-        const byName = await supabase
-          .from('classes')
-          .select('class_id, id, class_name')
-          .eq('school_id', schoolId)
-          .eq('class_name', classId)
-          .maybeSingle();
-
-        existing = byName.data;
-        findErr = byName.error;
-      }
+      existing = byName.data;
+      findErr = byName.error;
     }
 
     if (findErr || !existing) {
@@ -483,10 +471,7 @@ router.put("/classes/:id/promotion", requireRoles("admin", "director", "superadm
       });
     }
 
-    const pk = existing.class_id || existing.id;
-    const pkColumn = existing.class_id ? 'class_id' : 'id';
-
-    // Build update payload
+    const pk = existing.class_id;
     const updateData = { updated_at: new Date().toISOString() };
     if (nextClassName === undefined || nextClassName === null || nextClassName === "") {
       updateData.next_class_name = null;
@@ -499,12 +484,11 @@ router.put("/classes/:id/promotion", requireRoles("admin", "director", "superadm
       .from('classes')
       .update(updateData)
       .eq('school_id', schoolId)
-      .eq(pkColumn, pk)
+      .eq('class_id', pk)
       .select()
       .single();
 
     if (error) {
-      // If column doesn't exist, return what we tried to save
       if (error.message?.includes('does not exist') || error.code === '42703') {
         return res.json({ class_id: classId, next_class_name: nextClassName, class_order: classOrder, warning: 'Columns not in table, update skipped' });
       }
