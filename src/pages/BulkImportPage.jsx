@@ -61,8 +61,9 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
     if (!auth?.token) return;
     apiFetch("/classes", { token: auth.token })
       .then(data => {
-        const classes = Array.isArray(data) ? data : (data?.data ?? []);
-        setAvailableClasses(classes.map(c => c.class_name));
+        const payload = data?.data ?? data ?? [];
+        const classes = Array.isArray(payload) ? payload : [];
+        setAvailableClasses(classes.map(c => c.class_name).filter(Boolean));
       })
       .catch(() => { setAvailableClasses([]); });
   }, [auth]);

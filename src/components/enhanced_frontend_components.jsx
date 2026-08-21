@@ -754,7 +754,9 @@ export function ClassPromotionChain({ auth }) {
       const res = await apiFetch('/classes/promotion-chain', { 
         token: auth?.token 
       });
-      setClasses(res?.data || res || []);
+      const payload = res?.data ?? res ?? [];
+      const classes = Array.isArray(payload) ? payload : [];
+      setClasses(classes);
     } catch (err) {
       console.error('Error loading classes:', err);
     } finally {

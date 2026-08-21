@@ -44,8 +44,9 @@ export default function RecordPaymentModal({
       const loadClasses = async () => {
         try {
           const data = await apiFetch(`/classes`, { token: auth.token });
-          const classes = Array.isArray(data) ? data : (data?.data ?? []);
-          setClasses(classes.map(c => c.class_name));
+          const payload = data?.data ?? data ?? [];
+          const classes = Array.isArray(payload) ? payload : [];
+          setClasses(classes.map(c => c.class_name).filter(Boolean));
         } catch (err) {
           console.warn("Failed to load classes:", err);
           setClasses([]);
