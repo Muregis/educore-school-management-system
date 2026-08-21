@@ -14,7 +14,9 @@ const ROLE_PERMISSIONS = {
     'communication', 'messaging', 'timetable', 'reports', 'analytics', 'accounts', 'hr',
     'library', 'lessonplans', 'pendingplans', 'settings', 'announcements', 'bulk-import',
     'exams', 'medical', 'update-requests', 'academic.view', 'academic.manage',
-    'promotion.view', 'promotion.approve', 'branch-management', 'admin-permissions'
+    'term.close', 'term.open',
+    'promotion.view', 'promotion.approve', 'branch-management', 'admin-permissions',
+    'reports.view', 'reports.financial', 'reports.academic'
   ],
   superadmin: [
     'dashboard', 'upgrade', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees', 'expenditures',
