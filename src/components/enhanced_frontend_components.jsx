@@ -767,14 +767,23 @@ export function ClassPromotionChain({ auth }) {
   const updateNextClass = async (classId, nextClassName) => {
     setSaving(classId);
     try {
-      await apiFetch(`/classes/${classId}/promotion`, {
+      const res = await apiFetch(`/classes/${classId}/promotion`, {
         method: 'PUT',
         token: auth?.token,
         body: { nextClassName }
       });
+      
+      if (res?.warning) {
+        console.warn('Promotion update warning:', res.warning);
+      }
+      
       loadClasses();
     } catch (err) {
       console.error('Error updating:', err);
+      const msg = err?.message || 'Failed to update promotion';
+      if (msg.includes('Class not found')) {
+        alert(`Class "${classId}" was not found for your school. This may happen if the class list changed. Please refresh and try again.`);
+      }
     } finally {
       setSaving(null);
     }

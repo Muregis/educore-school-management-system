@@ -427,55 +427,95 @@ router.get("/classes", authorize("academic.view"), async (req, res) => {
 
 // PUT /api/classes/:id/promotion - Set next class for promotion
 router.put("/classes/:id/promotion", requireRoles("admin", "director", "superadmin"), async (req, res) => {
- try {
- const { schoolId } = req.user;
- const classId = req.params.id;
- const { nextClassName, classOrder } = req.body;
+  try {
+    const { schoolId } = req.user;
+    const classId = req.params.id;
+    const { nextClassName, classOrder } = req.body;
 
-  // Resolve the class by class_id, numeric id, OR class name
-  const { data: existing, error: findErr } = await supabase
-  .from('classes')
-  .select('class_id, id, class_name')
-  .eq('school_id', schoolId)
-  .or(`class_id.eq."${classId}",id.eq."${classId}",class_name.eq."${classId}"`)
-  .maybeSingle();
+    console.log(`[PROMOTION] PUT /classes/${classId}/promotion schoolId=${schoolId} nextClassName=${nextClassName}`);
 
- if (findErr || !existing) {
- return res.status(404).json({ message: "Class not found", classId });
- }
+    // Resolve the class by class_id, id, OR class name
+    let existing = null;
+    let findErr = null;
 
- const pk = existing.class_id || existing.id;
- const pkColumn = existing.class_id ? 'class_id' : 'id';
+    // Try class_id first
+    const byClassId = await supabase
+      .from('classes')
+      .select('class_id, id, class_name')
+      .eq('school_id', schoolId)
+      .eq('class_id', classId)
+      .maybeSingle();
 
- // Build update payload with only columns that exist
- const updateData = { updated_at: new Date().toISOString() };
-if (nextClassName === undefined || nextClassName === null || nextClassName === "") {
-    updateData.next_class_name = null;
-  } else {
-   updateData.next_class_name = nextClassName;
- }
- if (classOrder !== undefined) updateData.class_order = classOrder;
+    if (byClassId.data) {
+      existing = byClassId.data;
+    } else {
+      // Try numeric id
+      const byId = await supabase
+        .from('classes')
+        .select('class_id, id, class_name')
+        .eq('school_id', schoolId)
+        .eq('id', classId)
+        .maybeSingle();
 
- const { data, error } = await supabase
- .from('classes')
- .update(updateData)
- .eq('school_id', schoolId)
- .eq(pkColumn, pk)
- .select()
- .single();
+      if (byId.data) {
+        existing = byId.data;
+      } else {
+        // Try class_name
+        const byName = await supabase
+          .from('classes')
+          .select('class_id, id, class_name')
+          .eq('school_id', schoolId)
+          .eq('class_name', classId)
+          .maybeSingle();
 
- if (error) {
- // If column doesn't exist, return what we tried to save
- if (error.message?.includes('does not exist') || error.code === '42703') {
- return res.json({ class_id: classId, next_class_name: nextClassName, class_order: classOrder, warning: 'Columns not in table, update skipped' });
- }
- throw error;
- }
- res.json(data);
- } catch (err) {
- console.error('Error updating class promotion:', err);
- res.status(500).json({ message: "Failed to update class promotion", detail: err.message });
- }
+        existing = byName.data;
+        findErr = byName.error;
+      }
+    }
+
+    if (findErr || !existing) {
+      console.log(`[PROMOTION] Class not found: classId=${classId} schoolId=${schoolId} error=${findErr?.message}`);
+      return res.status(404).json({ 
+        message: "Class not found", 
+        classId, 
+        schoolId,
+        hint: "Ensure the class exists for your school and try refreshing the page."
+      });
+    }
+
+    const pk = existing.class_id || existing.id;
+    const pkColumn = existing.class_id ? 'class_id' : 'id';
+
+    // Build update payload
+    const updateData = { updated_at: new Date().toISOString() };
+    if (nextClassName === undefined || nextClassName === null || nextClassName === "") {
+      updateData.next_class_name = null;
+    } else {
+      updateData.next_class_name = String(nextClassName).trim();
+    }
+    if (classOrder !== undefined) updateData.class_order = Number(classOrder);
+
+    const { data, error } = await supabase
+      .from('classes')
+      .update(updateData)
+      .eq('school_id', schoolId)
+      .eq(pkColumn, pk)
+      .select()
+      .single();
+
+    if (error) {
+      // If column doesn't exist, return what we tried to save
+      if (error.message?.includes('does not exist') || error.code === '42703') {
+        return res.json({ class_id: classId, next_class_name: nextClassName, class_order: classOrder, warning: 'Columns not in table, update skipped' });
+      }
+      throw error;
+    }
+
+    res.json(data);
+  } catch (err) {
+    console.error('Error updating class promotion:', err);
+    res.status(500).json({ message: "Failed to update class promotion", detail: err.message });
+  }
 });
 
 // =====================================================
