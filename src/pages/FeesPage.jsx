@@ -161,14 +161,15 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   };
 
   const reloadPayments = useCallback(async () => {
-    if (!auth?.token) return;
-    const data = await apiFetch(`/payments${term ? `?term=${encodeURIComponent(term)}` : ''}`, { token: auth.token });
+    if (!auth?.token || !term) return;
+    const data = await apiFetch(`/payments?term=${encodeURIComponent(term)}`, { token: auth.token });
     setPayments((data || []).map(normalisePayment));
   }, [auth, setPayments, term]);
 
   useEffect(() => {
+    if (!term) return;
     reloadPayments();
-  }, [reloadPayments]);
+  }, [reloadPayments, term]);
 
   const normalisedPayments   = payments.map(p => p.payment_id ? normalisePayment(p) : p);
   const allStructures        = feeStructures.map(f => f.fee_structure_id ? normaliseFeeStruct(f) : f);
