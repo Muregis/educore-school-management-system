@@ -216,7 +216,7 @@ export default function AcademicTransitionPage({ auth }) {
             {activeTerm?.term_name || 'Not set'}
           </div>
           <div style={{ marginTop: 8 }}>
-            <Badge status={activeTerm?.status === 'active' ? 'success' : activeTerm?.status === 'closed' ? 'danger' : 'default'}>
+            <Badge status={activeTerm?.status === 'active' ? 'success' : (activeTerm?.status === 'closed' || activeTerm?.status === 'completed') ? 'danger' : 'default'}>
               {activeTerm?.status || 'Unknown'}
             </Badge>
           </div>
@@ -261,10 +261,10 @@ export default function AcademicTransitionPage({ auth }) {
           <div style={{ marginTop: 'auto' }}>
             <Btn
               onClick={() => setShowTermModal(true)}
-              disabled={!activeTerm || activeTerm.status === 'closed' || closingTerm}
+              disabled={!activeTerm || (activeTerm.status === 'closed' || activeTerm.status === 'completed') || closingTerm}
               style={{ width: '100%' }}
             >
-              {closingTerm ? 'Closing Term...' : activeTerm?.status === 'closed' ? 'Term Already Closed' : 'Close Current Term'}
+              {closingTerm ? 'Closing Term...' : (activeTerm?.status === 'closed' || activeTerm?.status === 'completed') ? 'Term Already Closed' : 'Close Current Term'}
             </Btn>
           </div>
         </Card>

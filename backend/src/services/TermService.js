@@ -1,7 +1,7 @@
 import { database } from "../config/db.js";
 import { supabase } from "../config/supabaseClient.js";
 import { logAuditEvent } from "../helpers/audit.logger.js";
-import { calculateStudentFeeBalance } from "./feeBalanceCalculator.js";
+import { calculateStudentFeeBalance, calculateStudentEndingBalance } from "./feeBalanceCalculator.js";
 
 const TERM_TRANSITION_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -185,7 +185,7 @@ export class TermService {
     try {
       const { data: term } = await client.update(
         "terms",
-        { status: "closed", is_current: false, is_closed: true },
+          { status: "completed", is_current: false, is_closed: true },
         { term_id: termId, school_id: schoolId }
       );
 
@@ -210,7 +210,7 @@ export class TermService {
         return { canClose: false, reasons: ["Term not found"] };
       }
 
-      if (term.is_closed || term.status === "closed") {
+      if (term.is_closed || term.status === "closed" || term.status === "completed") {
         return { canClose: false, reasons: ["Term is already closed"] };
       }
 
@@ -301,9 +301,9 @@ export class TermService {
           throw new Error("Term not found");
         }
 
-        if (term.is_closed || term.status === "closed") {
+        if (term.is_closed || term.status === "closed" || term.status === "completed") {
           return {
-            term: { ...term, status: "closed" },
+            term: { ...term, status: "completed" },
             summary: { termClosed: true, gradesArchived: 0, balancesCarriedForward: 0, studentsProcessed: 0, feeStructuresUpdated: 0, alreadyClosed: true },
           };
         }
@@ -318,7 +318,7 @@ export class TermService {
 
         await database.update(
           "terms",
-          { status: "closed", is_current: false, is_closed: true },
+          { status: "completed", is_current: false, is_closed: true },
           { term_id: termId, school_id: schoolId }
         );
         summary.termClosed = true;
@@ -354,7 +354,9 @@ export class TermService {
           if (students && students.length > 0) {
             let balanceCount = 0;
             for (const student of students) {
-              const balanceInfo = calculateStudentFeeBalance({
+              // Use calculateStudentEndingBalance to get the balance for THIS TERM only
+              // without including the existing opening_balance (which is from previous term)
+              const balanceInfo = calculateStudentEndingBalance({
                 student,
                 feeStructures: feeStructures || [],
                 payments: payments || [],

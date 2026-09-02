@@ -44,8 +44,8 @@ export function getStudentLunchFee(student, schoolSettings = {}) {
   const enabled = Boolean(student?.lunch_enabled ?? student?.lunchEnabled);
   if (!enabled) return 0;
   return ledgerBalanceService.calculateLunchFee(
-    toNumber(student?.lunch_daily_rate ?? student?.lunchDailyRate ?? schoolSettings.lunch_daily_rate ?? 100),
-    toNumber(student?.lunch_days ?? student?.lunchDays ?? schoolSettings.lunch_days ?? 66),
+    toNumber(student?.lunch_daily_rate ?? student?.lunchDailyRate ?? schoolSettings.lunch_daily_rate ?? 0),
+    toNumber(student?.lunch_days ?? student?.lunchDays ?? schoolSettings.lunch_days ?? 0),
     student?.lunch_billing_type ?? student?.lunchBillingType ?? "daily"
   );
 }
@@ -54,8 +54,8 @@ export function getStudentBreakfastFee(student, schoolSettings = {}) {
   const enabled = Boolean(student?.breakfast_enabled ?? student?.breakfastEnabled);
   if (!enabled) return 0;
   return ledgerBalanceService.calculateBreakfastFee(
-    toNumber(student?.breakfast_daily_rate ?? student?.breakfastDailyRate ?? schoolSettings.breakfast_daily_rate ?? 100),
-    toNumber(student?.breakfast_days ?? student?.breakfastDays ?? schoolSettings.breakfast_days ?? 66),
+    toNumber(student?.breakfast_daily_rate ?? student?.breakfastDailyRate ?? schoolSettings.breakfast_daily_rate ?? 0),
+    toNumber(student?.breakfast_days ?? student?.breakfastDays ?? schoolSettings.breakfast_days ?? 0),
     student?.breakfast_billing_type ?? student?.breakfastBillingType ?? "daily"
   );
 }

@@ -180,10 +180,10 @@ router.get("/school", async (req, res, next) => {
       curriculum: data.curriculum || settings.get("curriculum") || "",
       library_shortcode: data.library_shortcode || settings.get("library_shortcode") || "",
       // Lunch/breakfast settings
-      lunch_daily_rate: settings.get("lunch_daily_rate") || 100,
-      lunch_days: settings.get("lunch_days") || 66,
-      breakfast_daily_rate: settings.get("breakfast_daily_rate") || 100,
-      breakfast_days: settings.get("breakfast_days") || 66,
+      lunch_daily_rate: settings.get("lunch_daily_rate") || 0,
+      lunch_days: settings.get("lunch_days") || 0,
+      breakfast_daily_rate: settings.get("breakfast_daily_rate") || 0,
+      breakfast_days: settings.get("breakfast_days") || 0,
     });
   } catch (err) {
     next(err);
@@ -299,10 +299,10 @@ school_type: settings.get("school_type") || "",
       institution_type: settings.get("institution_type") || "",
         whatsapp_business_number: data.whatsapp_business_number || "",
         // Lunch/breakfast settings
-        lunch_daily_rate: settings.get("lunch_daily_rate") || 100,
-        lunch_days: settings.get("lunch_days") || 66,
-        breakfast_daily_rate: settings.get("breakfast_daily_rate") || 100,
-        breakfast_days: settings.get("breakfast_days") || 66,
+        lunch_daily_rate: settings.get("lunch_daily_rate") || 0,
+        lunch_days: settings.get("lunch_days") || 0,
+        breakfast_daily_rate: settings.get("breakfast_daily_rate") || 0,
+        breakfast_days: settings.get("breakfast_days") || 0,
       },
     });
   } catch (err) { next(err); }

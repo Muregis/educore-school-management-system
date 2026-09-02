@@ -278,15 +278,49 @@ router.get("/finance/term-summary/:termId", authorize("reports.financial"), asyn
       return res.status(404).json({ message: "Term not found" });
     }
 
-    // Get financial summary
-    const { data: summary, error } = await supabase
-      .rpc('get_term_financial_summary', { term_id: termId });
+    // Get payments for this term
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('amount, status')
+      .eq('school_id', schoolId)
+      .eq('term', term.term_name)
+      .eq('is_deleted', false);
 
-    if (error) throw error;
+    // Get invoices for this term
+    const { data: invoices } = await supabase
+      .from('invoices')
+      .select('total_amount, balance, status')
+      .eq('school_id', schoolId)
+      .eq('term', term.term_name)
+      .eq('is_deleted', false);
+
+    const totalPaid = (payments || [])
+      .filter(p => p.status === 'paid' || p.status === 'completed' || p.status === 'success')
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    const totalOutstanding = (invoices || [])
+      .filter(i => i.status !== 'paid' && i.status !== 'completed')
+      .reduce((sum, i) => sum + (Number(i.balance) || 0), 0);
+
+    const totalInvoiced = (invoices || [])
+      .reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
+
+    const defaulterCount = new Set(
+      (invoices || [])
+        .filter(i => i.status !== 'paid' && i.status !== 'completed')
+        .map(i => i.student_id)
+    ).size;
 
     res.json({
       term,
-      summary: summary || {}
+      summary: {
+        totalPaid,
+        totalOutstanding,
+        totalInvoiced,
+        defaulterCount,
+        paymentCount: (payments || []).length,
+        invoiceCount: (invoices || []).length,
+      }
     });
   } catch (err) {
     console.error('Error fetching term financial summary:', err);

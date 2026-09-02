@@ -160,7 +160,7 @@ export class TermTransitionService {
       await supabase
         .from('terms')
         .update({
-          status: 'closed',
+          status: 'completed',
           is_current: false,
           is_closed: true,
           updated_at: new Date()
@@ -449,7 +449,7 @@ export class TermTransitionService {
       for (const term of terms || []) {
         await supabase
           .from('terms')
-          .update({ status: 'closed', is_current: false, updated_at: new Date() })
+          .update({ status: 'completed', is_current: false, updated_at: new Date() })
           .eq('term_id', term.term_id)
           .eq('school_id', schoolId);
 
