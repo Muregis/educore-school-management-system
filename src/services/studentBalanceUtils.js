@@ -88,12 +88,40 @@ export function calculateStudentBalanceLocal({
   const hasStructure = hasFeeStructureForClass(student, feeStructures);
 
   // If requireFeeStructure is true (default for dashboard aggregates) and
-  // no fee structure is defined for this class, treat expected as 0 so we
-  // never surface phantom balances from lunch/transport/opening balances alone.
+  // no fee structure is defined for this class, still surface real opening
+  // balances. Only suppress phantom balances when there is no opening balance
+  // either.
   if (requireFeeStructure && !hasStructure) {
+    const openingBalance = getOpeningBalanceImpact(student);
     const paid = payments
       .filter(p => String(p?.studentId ?? p?.student_id) === String(studentId) && (p?.status ?? "paid") === "paid")
       .reduce((sum, p) => sum + toNumber(p.amount), 0);
+    if (openingBalance === 0) {
+      return {
+        studentId,
+        className,
+        baseFee: 0,
+        transportFee: 0,
+        lunchFee: 0,
+        breakfastFee: 0,
+        openingBalance: 0,
+        grossAmount: 0,
+        expected: 0,
+        totalDiscount: 0,
+        discountPercent: 0,
+        discountType: null,
+        discountLabel: null,
+        hasDiscount: false,
+        paid,
+        rawBalance: -paid,
+        overpaymentAmount: paid > 0 ? paid : 0,
+        isOverpaid: paid > 0,
+        balance: 0,
+        hasFeeStructure: false
+      };
+    }
+    const rawBalance = openingBalance - paid;
+    const overpaymentAmount = rawBalance < 0 ? Math.abs(rawBalance) : 0;
     return {
       studentId,
       className,
@@ -101,19 +129,19 @@ export function calculateStudentBalanceLocal({
       transportFee: 0,
       lunchFee: 0,
       breakfastFee: 0,
-      openingBalance: 0,
-      grossAmount: 0,
-      expected: 0,
+      openingBalance,
+      grossAmount: openingBalance,
+      expected: openingBalance,
       totalDiscount: 0,
       discountPercent: 0,
       discountType: null,
       discountLabel: null,
       hasDiscount: false,
       paid,
-      rawBalance: -paid,
-      overpaymentAmount: paid > 0 ? paid : 0,
-      isOverpaid: paid > 0,
-      balance: 0,
+      rawBalance,
+      overpaymentAmount,
+      isOverpaid: overpaymentAmount > 0,
+      balance: Math.max(0, rawBalance),
       hasFeeStructure: false
     };
   }
