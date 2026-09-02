@@ -209,80 +209,6 @@ export function calculateFeeWithDiscount({
 
 const PAID_STATUSES = ["paid", "completed", "success"];
 
-// ── Ending balance calculation (for term transitions) ─────────────────────────────
-// This calculates the balance for the current term WITHOUT including the existing
-// opening_balance, since that represents carry-forward from a previous term and should
-// not be included when calculating what to carry forward to the NEXT term.
-export function calculateStudentEndingBalance({
-  student,
-  feeStructures = [],
-  payments = [],
-  discounts = [],
-  schoolSettings = {},
-} = {}) {
-  const studentId = student?.student_id ?? student?.id ?? student?.studentId ?? null;
-  const className = student?.className ?? student?.class_name ?? "";
-
-  const baseFee = getStudentBaseFee(student, feeStructures);
-  const structure = feeStructures.find(
-    (f) => (f?.className ?? f?.class_name) === className
-  );
-  const tuition = structure ? toNumber(structure.tuition) : 0;
-
-  const transportFee = getStudentTransportFee(student);
-  const lunchFee = getStudentLunchFee(student, schoolSettings);
-  const breakfastFee = getStudentBreakfastFee(student, schoolSettings);
-  // NOTE: We do NOT include opening_balance here - this is the key difference
-  // from calculateStudentFeeBalance. We want to know what the student owes/has
-  // credit for THIS TERM only, not including previous term carry-forwards.
-  const openingBalance = 0;
-
-  const activeDiscounts = discounts?.length ? discounts : getFallbackDiscounts(student);
-
-  const discountCalc = calculateFeeWithDiscount({
-    baseFee,
-    tuition,
-    transportFee,
-    lunchFee,
-    breakfastFee,
-    openingBalance,
-    discounts: activeDiscounts,
-  });
-
-  const paid = (payments || [])
-    .filter(
-      (p) =>
-        String(p?.student_id ?? p?.studentId) === String(studentId) &&
-        PAID_STATUSES.includes((p?.status ?? "paid").toLowerCase())
-    )
-    .reduce((sum, p) => sum + toNumber(p.amount), 0);
-
-  const rawBalance = round2(discountCalc.netAmount - paid);
-  const overpaymentAmount = rawBalance < 0 ? Math.abs(rawBalance) : 0;
-  const balance = Math.max(0, rawBalance);
-
-  return {
-    studentId,
-    className,
-    baseFee,
-    transportFee,
-    lunchFee,
-    breakfastFee,
-    openingBalance: 0, // Explicitly 0 for ending balance calculation
-    grossAmount: discountCalc.grossAmount,
-    expected: discountCalc.netAmount,
-    totalDiscount: discountCalc.discountAmount,
-    discountPercent: discountCalc.discountPercent,
-    discountType: discountCalc.discountType,
-    hasDiscount: discountCalc.hasDiscount,
-    paid,
-    rawBalance,
-    overpaymentAmount,
-    isOverpaid: overpaymentAmount > 0,
-    balance,
-  };
-}
-
 // ── Canonical per-student balance calculation ───────────────────────────────────
 /**
  * @param {Object} params
@@ -362,7 +288,6 @@ export function calculateStudentFeeBalance({
 
 export default {
   calculateStudentFeeBalance,
-  calculateStudentEndingBalance,
   getOpeningBalanceImpact,
   getStudentBaseFee,
   getBestDiscount,

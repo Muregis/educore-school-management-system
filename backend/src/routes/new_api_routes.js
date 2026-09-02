@@ -91,17 +91,14 @@ router.get("/academic/terms", authorize("academic.view"), async (req, res) => {
     const { schoolId } = req.user;
     const { data: terms, error } = await supabase
       .from('terms')
-      .select(`
-        *,
-        academic_years!inner(year_label)
-      `)
+      .select('*')
       .eq('school_id', schoolId)
       .order('start_date', { ascending: false });
 
     if (error) throw error;
     const normalized = (terms || []).map(t => ({
       ...t,
-      academic_year: t.year_label || t.academic_year || t.academic_year_id,
+      academic_year: t.academic_year_id || t.academic_year,
     }));
     res.json(normalized);
   } catch (err) {
@@ -120,7 +117,7 @@ router.get("/academic/terms/current", async (req, res) => {
     }
     const normalizedTerm = {
       ...term,
-      academic_year: term.year_label || term.academic_year || term.academic_year_id,
+      academic_year: term.academic_year_id || term.academic_year,
     };
     res.json(normalizedTerm);
   } catch (err) {

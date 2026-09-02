@@ -1,7 +1,7 @@
 import { database } from "../config/db.js";
 import { supabase } from "../config/supabaseClient.js";
 import { logAuditEvent } from "../helpers/audit.logger.js";
-import { calculateStudentFeeBalance, calculateStudentEndingBalance } from "./feeBalanceCalculator.js";
+import { calculateStudentFeeBalance } from "./feeBalanceCalculator.js";
 
 const TERM_TRANSITION_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -99,10 +99,7 @@ export class TermService {
     try {
       const { data: terms } = await supabase
         .from('terms')
-        .select(`
-          *,
-          academic_years!inner(year_label)
-        `)
+        .select('*')
         .eq('school_id', schoolId)
         .eq('is_current', true)
         .eq('is_deleted', false)
@@ -114,10 +111,7 @@ export class TermService {
 
       const { data: currentByDate } = await supabase
         .from('terms')
-        .select(`
-          *,
-          academic_years!inner(year_label)
-        `)
+        .select('*')
         .eq('school_id', schoolId)
         .eq('is_deleted', false)
         .order('end_date', { ascending: false })
@@ -354,9 +348,7 @@ export class TermService {
           if (students && students.length > 0) {
             let balanceCount = 0;
             for (const student of students) {
-              // Use calculateStudentEndingBalance to get the balance for THIS TERM only
-              // without including the existing opening_balance (which is from previous term)
-              const balanceInfo = calculateStudentEndingBalance({
+              const balanceInfo = calculateStudentFeeBalance({
                 student,
                 feeStructures: feeStructures || [],
                 payments: payments || [],
