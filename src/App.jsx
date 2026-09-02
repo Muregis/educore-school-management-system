@@ -702,7 +702,7 @@ const fullNav = useMemo(() => {
             </>
           )}
 
-          <main style={{ marginLeft: isMobile ? 0 : sideW, flex:1, transition:"margin-left 0.2s ease", minWidth:0 }}>
+          <main style={{ marginLeft: isMobile ? 0 : sideW, flex:1, transition:"margin-left 0.2s ease", minWidth:0, display:"flex", flexDirection:"column" }}>
         <Topbar
           auth={auth}
           school={school}
@@ -719,6 +719,7 @@ const fullNav = useMemo(() => {
           onLogout={handleLogout}
           activeSchoolId={activeSchoolId}
           onSchoolSwitch={handleSchoolSwitch}
+          showSearch={page !== "dashboard"}
         />
 
         <div className="ec-page-content" style={{ padding: isMobile ? "var(--space-4)" : "var(--space-5)" }}>
@@ -759,7 +760,7 @@ const fullNav = useMemo(() => {
             </button>
           ))}
           <button className="ec-bottom-nav-item touch-target" onClick={() => setDrawerOpen(true)}>
-            <span className="icon">⋯</span>
+            <span className="icon">☰</span>
             <span>More</span>
           </button>
         </nav>
