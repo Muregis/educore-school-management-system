@@ -17,6 +17,7 @@ import {
   PromotionService,
   PermissionService
 } from "../services/backend_services.js";
+import { calculateStudentFeeBalance, getOpeningBalanceImpact } from "../services/feeBalanceCalculator.js";
 
 const router = express.Router();
 router.use(authRequired);
@@ -263,7 +264,6 @@ router.get("/finance/term-summary/:termId", authorize("reports.financial"), asyn
     const { schoolId } = req.user;
     const termId = req.params.termId;
 
-    // Get term details
     const { data: term } = await supabase
       .from('terms')
       .select('*')
@@ -275,48 +275,47 @@ router.get("/finance/term-summary/:termId", authorize("reports.financial"), asyn
       return res.status(404).json({ message: "Term not found" });
     }
 
-    // Get payments for this term
-    const { data: payments } = await supabase
-      .from('payments')
-      .select('amount, status')
-      .eq('school_id', schoolId)
-      .eq('term', term.term_name)
-      .eq('is_deleted', false);
+    const termName = term.term_name;
 
-    // Get invoices for this term
-    const { data: invoices } = await supabase
-      .from('invoices')
-      .select('total_amount, balance, status')
-      .eq('school_id', schoolId)
-      .eq('term', term.term_name)
-      .eq('is_deleted', false);
+    const [{ data: students }, { data: feeStructures }, { data: payments }] = await Promise.all([
+      supabase.from('students').select('student_id, first_name, last_name, admission_number, class_name, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, discount_type, discount_value, discount_is_percentage').eq('school_id', schoolId).eq('is_deleted', false).eq('status', 'active'),
+      supabase.from('fee_structures').select('class_name, tuition, activity, misc').eq('school_id', schoolId).eq('is_deleted', false).eq('term', termName),
+      supabase.from('payments').select('student_id, amount, status').eq('school_id', schoolId).eq('term', termName).eq('is_deleted', false).in('status', ['paid', 'completed', 'success']),
+    ]);
 
-    const totalPaid = (payments || [])
-      .filter(p => p.status === 'paid' || p.status === 'completed' || p.status === 'success')
-      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const activeStudents = students || [];
+    const termFeeStructures = feeStructures || [];
+    const termPayments = payments || [];
 
-    const totalOutstanding = (invoices || [])
-      .filter(i => i.status !== 'paid' && i.status !== 'completed')
-      .reduce((sum, i) => sum + (Number(i.balance) || 0), 0);
+    let totalPaid = 0;
+    let totalOutstanding = 0;
+    let totalInvoiced = 0;
+    const defaulterSet = new Set();
 
-    const totalInvoiced = (invoices || [])
-      .reduce((sum, i) => sum + (Number(i.total_amount) || 0), 0);
+    for (const student of activeStudents) {
+      const balanceInfo = calculateStudentFeeBalance({
+        student,
+        feeStructures: termFeeStructures,
+        payments: termPayments,
+      });
 
-    const defaulterCount = new Set(
-      (invoices || [])
-        .filter(i => i.status !== 'paid' && i.status !== 'completed')
-        .map(i => i.student_id)
-    ).size;
+      totalPaid += balanceInfo.paid;
+      totalOutstanding += balanceInfo.balance;
+      totalInvoiced += balanceInfo.expected;
+      if (balanceInfo.balance > 0) {
+        defaulterSet.add(student.student_id);
+      }
+    }
 
     res.json({
       term,
       summary: {
-        totalPaid,
-        totalOutstanding,
-        totalInvoiced,
-        defaulterCount,
-        paymentCount: (payments || []).length,
-        invoiceCount: (invoices || []).length,
+        totalPaid: Math.round(totalPaid * 100) / 100,
+        totalOutstanding: Math.round(totalOutstanding * 100) / 100,
+        totalInvoiced: Math.round(totalInvoiced * 100) / 100,
+        defaulterCount: defaulterSet.size,
+        paymentCount: termPayments.length,
+        invoiceCount: activeStudents.length,
       }
     });
   } catch (err) {
