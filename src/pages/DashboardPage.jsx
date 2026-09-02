@@ -294,13 +294,13 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     return pd.toISOString().slice(0, 10) === todayStr;
   });
   const todayCollection = todayPayments.reduce((s, p) => s + Number(p.amount), 0);
-  
-  const totalPaid = studentBalances.reduce((sum, item) => sum + item.paid, 0);
 
   const studentBalances = students.map(student => ({
     student,
     ...calculateStudentBalanceLocal({ student, feeStructures, payments })
   }));
+
+  const totalPaid = studentBalances.reduce((sum, item) => sum + item.paid, 0);
 
   const outstanding = studentBalances.reduce((sum, item) => sum + item.balance, 0);
 

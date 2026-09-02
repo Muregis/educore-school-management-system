@@ -5,7 +5,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
-  { ignores: ['dist', 'backend/**'] },
+  { ignores: ['dist', 'backend/**', 'scripts/**', 'dev-dist/**', 'backups/**'] },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
@@ -33,6 +33,17 @@ export default [
         'warn',
         { allowConstantExport: true },
       ],
+      // Catches temporal-dead-zone style bugs: identifiers used before they
+      // are declared in the same scope. Lightweight no-undef on usage of
+      // undeclared identifiers (lets `const`/`let`/`class` references that
+      // haven't been declared yet trigger because their declaration site is
+      // *later* in the source, which most linters miss).
+      'no-use-before-define': ['error', {
+        functions: false,    // function declarations are hoisted-initialized
+        classes: true,       // class declarations trigger TDZ
+        variables: true,     // let/const trigger TDZ
+        allowNamedExports: false,
+      }],
     },
   },
 ]
