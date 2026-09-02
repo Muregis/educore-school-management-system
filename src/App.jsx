@@ -56,7 +56,7 @@ import SidebarModern from "./components/SidebarModern";
 import BranchSelector from "./components/BranchSelector";
 import Topbar from "./components/Topbar";
 import { API_BASE, apiFetch } from "./lib/api";
-import { TermManagementPage } from "./components/enhanced_frontend_components";
+import TermManagementPage from "./pages/TermManagementPage";
 import AcademicTransitionPage from "./pages/AcademicTransitionPage";
 import { clearSession, getSession, logout, saveSession } from "./lib/auth";
 

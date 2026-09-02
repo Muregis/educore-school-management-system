@@ -56,16 +56,30 @@ export default function AcademicTransitionPage({ auth }) {
               totalPaid = summaryRes?.summary?.totalPaid || summaryRes?.summary?.collected || 0;
               defaulterCount = summaryRes?.summary?.defaulterCount || summaryRes?.summary?.defaulters || 0;
             } catch {
-              const financialsRes = await apiFetch(`/reports/fee-defaulters?term=${encodeURIComponent(termName)}`, { token: auth?.token });
-              const defaulters = financialsRes || [];
-              totalOutstanding = defaulters.reduce((sum, d) => sum + (d.balance || 0), 0);
+              const [defaultersRes, paymentsRes] = await Promise.all([
+                apiFetch(`/reports/fee-defaulters?term=${encodeURIComponent(termName)}`, { token: auth?.token }).catch(() => []),
+                apiFetch(`/payments?term=${encodeURIComponent(termName)}`, { token: auth?.token }).catch(() => []),
+              ]);
+              const defaulters = Array.isArray(defaultersRes) ? defaultersRes : (defaultersRes?.data || []);
+              const payments = Array.isArray(paymentsRes) ? paymentsRes : (paymentsRes?.data || []);
+              totalOutstanding = defaulters.reduce((sum, d) => sum + (Number(d.balance) || 0), 0);
               defaulterCount = defaulters.length;
+              totalPaid = payments
+                .filter(p => p.status === 'paid' || p.status === 'completed' || p.status === 'success')
+                .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
             }
           } else {
-            const financialsRes = await apiFetch(`/reports/fee-defaulters?term=${encodeURIComponent(termName)}`, { token: auth?.token });
-            const defaulters = financialsRes || [];
-            totalOutstanding = defaulters.reduce((sum, d) => sum + (d.balance || 0), 0);
+            const [defaultersRes, paymentsRes] = await Promise.all([
+              apiFetch(`/reports/fee-defaulters?term=${encodeURIComponent(termName)}`, { token: auth?.token }).catch(() => []),
+              apiFetch(`/payments?term=${encodeURIComponent(termName)}`, { token: auth?.token }).catch(() => []),
+            ]);
+            const defaulters = Array.isArray(defaultersRes) ? defaultersRes : (defaultersRes?.data || []);
+            const payments = Array.isArray(paymentsRes) ? paymentsRes : (paymentsRes?.data || []);
+            totalOutstanding = defaulters.reduce((sum, d) => sum + (Number(d.balance) || 0), 0);
             defaulterCount = defaulters.length;
+            totalPaid = payments
+              .filter(p => p.status === 'paid' || p.status === 'completed' || p.status === 'success')
+              .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
           }
 
           setTermFinancials({
