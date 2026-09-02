@@ -288,15 +288,14 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   
   const todayPayments = payments.filter(p => {
     const paymentDate = p.date || p.payment_date;
-    if (!paymentDate || p.status !== "paid") return false;
-    // Handle various date formats by parsing and comparing dates
+    if (!paymentDate || !["paid","completed","success"].includes((p.status||"").toLowerCase())) return false;
     const pd = new Date(paymentDate);
     if (isNaN(pd.getTime())) return false;
     return pd.toISOString().slice(0, 10) === todayStr;
   });
   const todayCollection = todayPayments.reduce((s, p) => s + Number(p.amount), 0);
   
-  const totalPaid = payments.filter(p => p.status === "paid").reduce((s, p) => s + Number(p.amount), 0);
+  const totalPaid = studentBalances.reduce((sum, item) => sum + item.paid, 0);
 
   const studentBalances = students.map(student => ({
     student,
@@ -583,7 +582,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     }, {});
 
     const recentPayments = payments
-      .filter(p => p.status === "paid")
+      .filter(p => ["paid","completed","success"].includes((p.status||"").toLowerCase()))
       .sort((a, b) => new Date(b.date || b.payment_date) - new Date(a.date || a.payment_date))
       .slice(0, 5);
 

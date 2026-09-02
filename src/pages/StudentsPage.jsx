@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 import StudentIDCard from "../components/StudentIDCard";
 import QRScanner from "../components/QRScanner";
 import { SUBJECTS } from "../lib/constants";
-import { money } from "../lib/utils";
+import { money, isPaidStatus } from "../lib/utils";
 import { API_BASE, apiFetch } from "../lib/api";
 import { getAuthHeaders } from "../lib/auth";
 import { parseStudentQrContent } from "../lib/qr";
@@ -668,7 +668,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: 700 }}>Paid Amount</div>
                 <div style={{ color: "var(--color-success)", fontWeight: 700, fontSize: "18px", marginTop: "4px" }}>
-                  {money(payments.filter(p => (p.studentId ?? p.student_id) === (profile.student_id ?? profile.id) && p.status === "paid").reduce((s, p) => s + Number(p.amount), 0))}
+                  {money(payments.filter(p => (p.studentId ?? p.student_id) === (profile.student_id ?? profile.id) && isPaidStatus(p.status)).reduce((s, p) => s + Number(p.amount), 0))}
                 </div>
               </div>
             </div>

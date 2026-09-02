@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import RecordPaymentModal from "../components/RecordPaymentModal";
 import PaymentReceipt from "../components/PaymentReceipt";
-import { money } from "../lib/utils";
+import { money, isPaidStatus } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { getAuthHeaders } from "../lib/auth";
 import { printHTML } from "../lib/print";
@@ -563,7 +563,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     if (lastDayClosed && new Date(paymentDate) <= new Date(lastDayClosed)) {
       return false;
     }
-    return p.status === "paid" && paymentDate && paymentDate.startsWith(businessToday);
+    return isPaidStatus(p.status) && paymentDate && paymentDate.startsWith(businessToday);
   });
   const todayCollection = todayPayments.reduce((s, p) => s + Number(p.amount), 0);
 

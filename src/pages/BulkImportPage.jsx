@@ -389,7 +389,7 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
     
     const rows = filteredStudents.map(s => {
       const studentId = s.student_id ?? s.id;
-      const studentPayments = allPayments.filter(p => (p.studentId ?? p.student_id) === studentId && p.status === "paid");
+      const studentPayments = allPayments.filter(p => (p.studentId ?? p.student_id) === studentId && ["paid","completed","success"].includes((p.status||"").toLowerCase()));
       
       // Fee calculations
       let paidAmount, balance;

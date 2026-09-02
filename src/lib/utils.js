@@ -5,6 +5,8 @@ export const countBy = (arr, key) => arr.reduce((acc, item) => {
   acc[k] = (acc[k] || 0) + 1;
   return acc;
 }, {});
+export const PAID_STATUSES = ["paid", "completed", "success"];
+export const isPaidStatus = (status) => PAID_STATUSES.includes((status || "").toLowerCase());
 
 export const PAGE_SIZE = 8;
 
