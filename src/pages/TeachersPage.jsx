@@ -123,7 +123,6 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   useEffect(() => {
     return () => {
       if (syncControllerRef.current) {
-        console.log("[SYNC] Component unmounting, aborting sync");
         syncControllerRef.current.abort();
         syncControllerRef.current = null;
       }
@@ -223,7 +222,6 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   const syncToHR = async () => {
     if (!window.confirm("Sync all teachers to HR staff table and create user accounts?\n\nThis will:\n- Create HR records for teachers without them\n- Create user login accounts for teachers\n- Link teachers to their user accounts\n\nDefault password will be the part before @ in their email.\n\nThis will process teachers in small batches to avoid timeouts.")) return;
 
-    console.log("[SYNC] Starting sync, token present:", !!auth?.token);
     toast("Starting sync... This will process teachers in batches.", "info");
 
     isSyncingRef.current = true;
@@ -240,7 +238,6 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
         signal: syncController.signal
       });
 
-      console.log("[SYNC] Job started with ID:", jobId);
       toast("Sync job started. Processing teachers...", "info");
 
       // Poll for job status
@@ -260,8 +257,6 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
           retries: 1,
           signal: syncController.signal
         });
-
-        console.log("[SYNC] Job status:", status);
 
         if (status.status === 'completed') {
           const { syncedToHR, userAccountsCreated, userAccountsLinked, total, errors } = status.result;

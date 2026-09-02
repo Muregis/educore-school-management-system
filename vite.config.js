@@ -2,25 +2,33 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// https://vite.dev/config/
 export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      manifest: false, // Use custom manifest in public folder
+      manifest: false,
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}']
       },
       devOptions: {
-        // Avoid stale cached bundles and noisy Workbox logs during local development.
         enabled: command === 'build'
       }
     })
   ],
   build: {
+    sourcemap: false,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
-      // external: ['qrcode']
+      external: ['fsevents'],
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          supabase: ['@supabase/supabase-js'],
+          sentry: ['@sentry/react'],
+          pwa: ['vite-plugin-pwa']
+        }
+      }
     }
   }
 }))

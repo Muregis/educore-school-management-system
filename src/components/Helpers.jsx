@@ -1,4 +1,5 @@
 import PropTypes from "prop-types";
+import { useEffect } from "react";
 import { C } from "../lib/theme";
 import Btn from "./Btn";
 
@@ -96,29 +97,47 @@ export const Forbidden = () => (
       justifyContent:"center", fontSize:32,
     }}>🔒</div>
     <div style={{ textAlign:"center" }}>
-      <div style={{ fontWeight:800, fontSize:20, color:C.rose, marginBottom:6 }}>Access Denied</div>
-      <div style={{ color:C.textSub, fontSize:14 }}>You don't have permission to view this page.</div>
+      <h1 style={{ fontWeight:800, fontSize:20, color:C.rose, marginBottom:6, margin:0 }}>Access Denied</h1>
+      <p style={{ color:C.textSub, fontSize:14, marginTop:8 }}>You don't have permission to view this page.</p>
     </div>
   </div>
 );
 
 // ── NotFound ──────────────────────────────────────────────────────────────────
-export const NotFound = () => (
-  <div style={{
-    display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
-    minHeight:320, gap:16,
-  }}>
+export const NotFound = () => {
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.type = "application/ld+json";
+    script.id = "ec-notfound-jsonld";
+    script.textContent = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Page Not Found",
+      "description": "The requested page does not exist on EduCore."
+    });
+    const existing = document.getElementById("ec-notfound-jsonld");
+    if (existing) existing.remove();
+    document.head.appendChild(script);
+    return () => { const s = document.getElementById("ec-notfound-jsonld"); if (s) s.remove(); };
+  }, []);
+  return (
     <div style={{
-      width:72, height:72, borderRadius:20, background:C.amberDim,
-      border:`1px solid ${C.amber}44`, display:"flex", alignItems:"center",
-      justifyContent:"center", fontSize:32,
-    }}>🔍</div>
-    <div style={{ textAlign:"center" }}>
-      <div style={{ fontWeight:800, fontSize:20, color:C.amber, marginBottom:6 }}>Page Not Found</div>
-      <div style={{ color:C.textSub, fontSize:14 }}>This page doesn't exist.</div>
+      display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+      minHeight:320, gap:16,
+    }}>
+      <div style={{
+        width:72, height:72, borderRadius:20, background:C.amberDim,
+        border:`1px solid ${C.amber}44`, display:"flex", alignItems:"center",
+        justifyContent:"center", fontSize:32,
+      }}>🔍</div>
+      <div style={{ textAlign:"center" }}>
+        <h1 style={{ fontWeight:800, fontSize:20, color:C.amber, marginBottom:6, margin:0 }}>Page Not Found</h1>
+        <p style={{ color:C.textSub, fontSize:14, marginTop:8 }}>The page you are looking for does not exist.</p>
+        <a href="/" style={{ color: C.accent, textDecoration: "none", fontSize: 14, fontWeight: 600, marginTop: 8, display: "inline-block" }} onClick={(e) => { e.preventDefault(); window.location.hash = "#/dashboard"; }}>Return to dashboard</a>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ── pager helper (fn) ─────────────────────────────────────────────────────────
 const PAGE_SIZE = 20;

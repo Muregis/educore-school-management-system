@@ -84,29 +84,17 @@ export function useBranches(token, onSwitch) {
     // Prevent repeated attempts to switch to the same branch
     const currentActiveSchool = localStorage.getItem("educore.activeSchool");
     if (currentActiveSchool === String(branchId)) {
-      console.log("Already on the target branch, skipping switch");
       return { newSchoolId: branchId, newSchool: null };
     }
 
     try {
-      console.log("Attempting to switch to branch:", branchId);
-      
-      // First call the backend to validate the switch
       const response = await apiFetch(`/branches/switch/${branchId}`, {
         method: "PUT",
         token,
       });
 
-      console.log("Backend switch response:", response);
-
-      // Update local storage
       localStorage.setItem("educore.activeSchool", String(branchId));
-      console.log("Updated localStorage educore.activeSchool to:", branchId);
-
-      // Update session storage
       const auth = JSON.parse(sessionStorage.getItem("educore.auth") || "{}");
-      console.log("Current auth before update:", auth);
-      
       auth.schoolId = branchId;
       auth.school_id = branchId;
       const session = getSession();
@@ -115,18 +103,12 @@ export function useBranches(token, onSwitch) {
         sessionId: session?.sessionId || auth.sessionId,
         user: auth,
       });
-      console.log("Updated sessionStorage with new schoolId:", branchId);
 
-      // Find the selected school data
       const selectedSchool = [...allSchools, currentBranch, parentSchool, ...branches]
         .filter(Boolean)
         .find((school) => Number(school.school_id) === Number(branchId)) || response.newSchool;
 
-      console.log("Selected school data:", selectedSchool);
-
-      // Call the parent switch handler
       if (onSwitchRef.current) {
-        console.log("Calling onSwitch callback");
         await onSwitchRef.current(branchId, selectedSchool);
       } else {
         console.warn("No onSwitch callback provided");

@@ -226,7 +226,6 @@ function AnalysisTab({ auth }) {
   };
 
   const generateAIReport = async () => {
-    console.log("[AI] data:", data, "token:", auth?.token ? "present" : "MISSING");
     if (!data || data.streamAverages.length === 0) {
       setAiError("No data loaded yet. Please wait for the visual report to load first.");
       return;
@@ -234,7 +233,6 @@ function AnalysisTab({ auth }) {
     setAiLoading(true);
     setAiReport(""); setAiError("");
     const dataset = buildDataset();
-    console.log("[AI] dataset length:", dataset.length, "first 200:", dataset.slice(0,200));
 
     const prompt = `You are an academic performance analyst for a Kenyan primary/secondary school.
 

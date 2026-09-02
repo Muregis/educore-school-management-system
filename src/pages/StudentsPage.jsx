@@ -146,20 +146,6 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   };
 
   const save = async () => {
-    console.log('=== SAVE STARTED ===');
-    console.log('editId:', editId);
-    console.log('FORM STATE f:', JSON.stringify(f, null, 2));
-    console.log('Fee fields specifically:');
-    console.log('- opening_balance:', f.opening_balance, typeof f.opening_balance);
-    console.log('- transport_direction:', f.transport_direction, typeof f.transport_direction);
-    console.log('- transport_base_fee:', f.transport_base_fee, typeof f.transport_base_fee);
-    console.log('- lunch_enabled:', f.lunch_enabled, typeof f.lunch_enabled);
-    console.log('- lunch_daily_rate:', f.lunch_daily_rate, typeof f.lunch_daily_rate);
-    console.log('- breakfast_enabled:', f.breakfast_enabled, typeof f.breakfast_enabled);
-    console.log('- breakfast_daily_rate:', f.breakfast_daily_rate, typeof f.breakfast_daily_rate);
-    console.log('- discount_type:', f.discount_type, typeof f.discount_type);
-    console.log('- discount_value:', f.discount_value, typeof f.discount_value);
-    console.log('=== END DEBUG ===');
     setErr("");
     if (!f.firstName.trim() || !f.lastName.trim()) return setErr("First and last name are required.");
     
@@ -233,26 +219,15 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           discount_is_percentage: f.discount_is_percentage !== false,
         };
         
-        console.log('=== PATCH /fees CALL ===');
-        console.log('URL:', `/students/${editId}/fees`);
-        console.log('Payload:', JSON.stringify(patchPayload, null, 2));
-        console.log('Token exists:', !!auth?.token);
-        
         try {
-          console.log('Making PATCH call to:', `/students/${editId}/fees`);
           const patchResponse = await apiFetch(`/students/${editId}/fees`, {
             method: "PATCH",
             body: patchPayload,
             token: auth?.token,
           });
-          console.log('PATCH /fees SUCCESS:', patchResponse);
           toast('Student fee settings updated successfully', 'success');
         } catch (feeErr) {
-          console.error('=== PATCH /fees FAILED ===');
-          console.error('Error:', feeErr);
-          console.error('Error message:', feeErr.message);
-          console.error('Error status:', feeErr.status);
-          console.error('Full error object:', JSON.stringify(feeErr, null, 2));
+          console.error('Fee settings failed:', feeErr);
           
           // Show detailed error to user
           const errorMsg = `Fee settings failed: ${feeErr.message || 'Unknown error'} (Status: ${feeErr.status || 'N/A'})`;
@@ -441,24 +416,16 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
                 <Button size="sm" variant="ghost" onClick={() => setProfile(s)}>Profile</Button>
                 <Button size="sm" variant="ghost" onClick={() => setIdCardStudent(s)}>🪪 ID</Button>
                 {canEdit && auth.role !== "finance" && <Button size="sm" variant="secondary" onClick={() => { 
-                  console.log('=== EDIT BUTTON CLICKED ===');
-                  console.log('Student data from list:', JSON.stringify(s, null, 2));
                   setEditId(s.id); 
-                  
-                  // Fetch fresh student data to ensure all fee fields are present
                   apiFetch(`/students/${s.id}`, { token: auth.token })
                     .then(fresh => {
-                      console.log('Fresh student data from API:', JSON.stringify(fresh, null, 2));
                       const normalisedData = normalise(fresh);
-                      console.log('Normalised data for form:', JSON.stringify(normalisedData, null, 2));
                       setF(normalisedData);
                       setShow(true);
                     })
                     .catch(err => {
                       console.error('Failed to fetch fresh student data, using list data:', err);
-                      console.log('Fallback to list data (before normalise):', JSON.stringify(s, null, 2));
                       const normalisedListData = normalise(s);
-                      console.log('Normalised list data for form:', JSON.stringify(normalisedListData, null, 2));
                       setF(normalisedListData); 
                       setShow(true);
                     });
@@ -651,7 +618,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", marginBottom: "var(--space-2)" }}>
               {profile.photoUrl ? (
-                <img src={profile.photoUrl} alt="" style={{ width: 80, height: 80, borderRadius: "var(--radius-md)", objectFit: "cover", boxShadow: "var(--shadow-card)" }} />
+                <img src={profile.photoUrl} alt="Student profile photo" style={{ width: 80, height: 80, borderRadius: "var(--radius-md)", objectFit: "cover", boxShadow: "var(--shadow-card)" }} />
               ) : (
                 <div style={{ width: 80, height: 80, borderRadius: "var(--radius-md)", background: "var(--color-primary-muted)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary)", fontSize: "24px", fontWeight: "bold" }}>
                   {profile.firstName[0]}{profile.lastName[0]}

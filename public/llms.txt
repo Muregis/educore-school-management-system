@@ -1,0 +1,21 @@
+# EduCore
+
+EduCore is a comprehensive school management system for administrators, teachers, students, and parents.
+
+## Features
+- Student management and enrollment
+- Grade tracking and report cards
+- Fee management and M-Pesa reconciliation
+- Attendance tracking
+- Timetable and exam management
+- HR and staff management
+- Library and discipline management
+- Financial reporting and analytics
+
+## Contact
+- Email: i.am.muregi@gmail.com
+- Phone: +254 797846126
+
+## URLs
+- Home: https://educore.app/
+- Verification: https://educore.app/verify

@@ -171,7 +171,10 @@ export default function App() {
     return session?.user ? { ...session.user, token: session.token, sessionId: session.sessionId } : null;
   });
 
-  const [page, setPage]                   = useState("dashboard");
+  const [page, _setPage]                   = useState(() => {
+    const hash = window.location.hash.replace(/^#\/?/, "");
+    return NAV.find(n => n.id === hash) ? hash : "dashboard";
+  });
   const [showBell, setShowBell]           = useState(false);
   const [toasts, setToasts]               = useState([]);
   const [activeChildId, setActiveChildId] = useState(null);
@@ -186,6 +189,22 @@ export default function App() {
     }
   });
   const isMobile = useIsMobile();
+
+  const setPage = useCallback((targetPage) => {
+    _setPage(targetPage);
+    window.location.hash = `#/${targetPage}`;
+  }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      const hash = window.location.hash.replace(/^#\/?/, "");
+      if (NAV.find(n => n.id === hash)) {
+        _setPage(hash);
+      }
+    };
+    window.addEventListener("hashchange", handler);
+    return () => window.removeEventListener("hashchange", handler);
+  }, []);
 
   useEffect(() => {
     const id = "ec-responsive";
@@ -203,6 +222,91 @@ export default function App() {
   }, [school?.primary_color]);
 
   useEffect(() => { setDrawerOpen(false); }, [page]);
+
+  const PAGE_META = {
+    dashboard:         { title: "Dashboard",         desc: "Overview of school operations, student performance, and financial summaries." },
+    students:          { title: "Students",           desc: "Manage student records, profiles, and enrollment details." },
+    staff:             { title: "Staff",              desc: "Manage school staff, HR records, and employment details." },
+    teachers:          { title: "Teachers",           desc: "Manage teaching staff, assignments, and performance." },
+    attendance:        { title: "Attendance",         desc: "Track daily student attendance and generate attendance reports." },
+    grades:            { title: "Grades",             desc: "View and manage student grades, report cards, and academic performance." },
+    subjects:          { title: "Subjects",           desc: "Manage school subjects, curriculum, and class allocations." },
+    fees:              { title: "Fees",               desc: "Manage fee structures, payments, invoices, and financial records." },
+    expenditures:      { title: "Expenditures",       desc: "Track school expenditures, budgets, and financial outflows." },
+    "mpesa-reconcile": { title: "M-Pesa Reconcile",   desc: "Reconcile M-Pesa payments with student fee records." },
+    "bulk-import":     { title: "Import / Export",    desc: "Bulk import and export student, fee, and academic data." },
+    exams:             { title: "Exams",              desc: "Manage examinations, schedules, and results processing." },
+    admissions:        { title: "Admissions",         desc: "Manage student admissions, applications, and enrollment." },
+    invoices:          { title: "Invoices",           desc: "Generate and manage invoices for fees and services." },
+    reportcards:       { title: "Report Cards",       desc: "Generate and print student report cards and academic summaries." },
+    hr:                { title: "Human Resources",    desc: "Manage HR operations, staff records, and payroll." },
+    library:           { title: "Library",            desc: "Manage library resources, book inventory, and borrowing records." },
+    discipline:        { title: "Discipline",         desc: "Track student discipline records and incident management." },
+    transport:         { title: "Transport",          desc: "Manage school transport routes, vehicles, and schedules." },
+    communication:     { title: "Communication",      desc: "Send announcements, notifications, and school communications." },
+    timetable:         { title: "Timetable",          desc: "Manage class schedules, timetables, and session planning." },
+    accounts:          { title: "Accounts",           desc: "Manage user accounts, roles, and access permissions." },
+    lessonplans:       { title: "Lesson Plans",       desc: "Create, manage, and review teacher lesson plans." },
+    announcements:     { title: "Announcements",      desc: "View school announcements, news, and updates." },
+    analytics:         { title: "Analytics",          desc: "View school analytics, insights, and performance trends." },
+    reports:           { title: "Reports",            desc: "Generate comprehensive school reports and data exports." },
+    "financial-reports": { title: "Financial Reports", desc: "Generate financial statements and accounting reports." },
+    analysis:          { title: "Analysis",           desc: "Analyze academic performance, trends, and statistical data." },
+    "update-requests": { title: "Update Requests",    desc: "Manage requests to update student and school information." },
+    "trial-balance":   { title: "Trial Balance",      desc: "View trial balance reports and accounting summaries." },
+    "income-statement": { title: "Income Statement",  desc: "View income statements and revenue reports." },
+    "chart-of-accounts": { title: "Chart of Accounts", desc: "Manage the chart of accounts and accounting structure." },
+    "journal-entries": { title: "Journal Entries",    desc: "Manage journal entries and accounting transactions." },
+    "general-ledger":  { title: "General Ledger",     desc: "View general ledger accounts and transaction history." },
+    "balance-sheet":   { title: "Balance Sheet",      desc: "View balance sheet reports and financial position." },
+    settings:          { title: "Settings",           desc: "Configure school settings, permissions, and preferences." },
+    departments:       { title: "Departments",        desc: "Manage college departments and organizational structure." },
+    programs:          { title: "Programs",           desc: "Manage academic programs, courses, and curricula." },
+    units:             { title: "Units",              desc: "Manage academic units, modules, and course content." },
+    enrollments:       { title: "Enrollments",        desc: "Manage student enrollments and registration records." },
+    "term-management": { title: "Term Management",    desc: "Manage academic terms, sessions, and school calendar." },
+    "academic-transition": { title: "Academic Transition", desc: "Manage academic transitions, promotions, and class changes." },
+  };
+
+  useEffect(() => {
+    const meta = PAGE_META[page] || { title: "EduCore", desc: "Comprehensive school management system." };
+    const schoolName = school?.name?.trim();
+    document.title = schoolName ? `${meta.title} | ${schoolName}` : `${meta.title} | EduCore`;
+
+    let descTag = document.querySelector('meta[name="description"]');
+    if (!descTag) {
+      descTag = document.createElement("meta");
+      descTag.setAttribute("name", "description");
+      document.head.appendChild(descTag);
+    }
+    descTag.setAttribute("content", meta.desc);
+
+    let canonicalTag = document.querySelector('link[rel="canonical"]');
+    if (!canonicalTag) {
+      canonicalTag = document.createElement("link");
+      canonicalTag.setAttribute("rel", "canonical");
+      document.head.appendChild(canonicalTag);
+    }
+    canonicalTag.setAttribute("href", `https://educore.app/${page}`);
+
+    let breadcrumbScript = document.getElementById("ec-breadcrumb-jsonld");
+    if (!breadcrumbScript) {
+      breadcrumbScript = document.createElement("script");
+      breadcrumbScript.id = "ec-breadcrumb-jsonld";
+      breadcrumbScript.type = "application/ld+json";
+      document.head.appendChild(breadcrumbScript);
+    }
+    const currentNav = nav.find(n => n.id === page);
+    const breadcrumbData = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://educore.app/dashboard" },
+        ...(currentNav ? [{ "@type": "ListItem", "position": 2, "name": currentNav.label, "item": `https://educore.app/${page}` }] : [])
+      ]
+    };
+    breadcrumbScript.textContent = JSON.stringify(breadcrumbData);
+  }, [page, school?.name]);
 
   const toast = useCallback((text, type = "success", category = "general") => {
     const id = genId();
@@ -537,51 +641,10 @@ const fullNav = useMemo(() => {
         />
       : <Forbidden />,
 
-    // College pages
     departments: ["admin","director","superadmin"].includes(auth.role) ? <CollegeDepartmentsPage auth={auth} school={school} toast={toast} /> : <Forbidden />,
     programs: ["admin","director","superadmin"].includes(auth.role) ? <CollegeProgramsPage auth={auth} school={school} toast={toast} /> : <Forbidden />,
     units: ["admin","director","superadmin"].includes(auth.role) ? <CollegeUnitsPage auth={auth} school={school} toast={toast} /> : <Forbidden />,
     enrollments: ["admin","director","superadmin"].includes(auth.role) ? <CollegeEnrollmentsPage auth={auth} school={school} toast={toast} /> : <Forbidden />,
-    staff: ["admin","hr","director","superadmin"].includes(auth.role) ? <StaffPage auth={auth} canEdit={canEdit} toast={toast} onTeachersChanged={setTeachers} /> : <Forbidden />,
-    teachers: ["director","superadmin"].includes(auth.role) ? <TeachersPage auth={auth} teachers={teachers} setTeachers={setTeachers} canEdit={canEdit} toast={toast} /> : <Forbidden />,
-    attendance: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <AttendancePage auth={auth} students={myStudents} attendance={myAttendance} setAttendance={setAttendance} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
-    grades: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <GradesPage auth={auth} students={myStudents} results={myResults} setResults={setResults} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
-    subjects: ["admin","teacher","director","superadmin"].includes(auth.role) ? <SubjectsPage auth={auth} toast={toast} canEdit={canEdit} /> : <Forbidden />,
-    fees: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <FeesPage auth={auth} school={school} students={myStudents} feeStructures={feeStructures} setFeeStructures={setFeeStructures} payments={myPayments} setPayments={setPayments} canEdit={canEdit} canViewTotals={canViewTotals} canDeletePayments={canDeletePayments} toast={toast} linkedStudentId={linkedStudentId} />,
-    expenditures: ["admin","finance","hr","director","superadmin"].includes(auth.role) ? <ExpendituresPage auth={auth} canEdit={canEdit} toast={toast} /> : <Forbidden />,
-    "mpesa-reconcile": <MpesaReconciliationPage auth={auth} students={students} toast={toast} />,
-    "bulk-import": ["admin","director","superadmin"].includes(auth.role) ? <BulkImportPage auth={auth} students={students} setStudents={setStudents} toast={toast} payments={payments} feeStructures={feeStructures} results={results} /> : <Forbidden />,
-    exams: <ExamsPage auth={auth} students={students} subjects={[]} toast={toast} />,
-    admissions: <AdmissionsPage auth={auth} school={school} canEdit={canEdit} toast={toast} />,
-    invoices: <InvoicesPage auth={auth} school={school} students={students} canEdit={canEdit} toast={toast} />,
-    reportcards: <ReportCardsPage auth={auth} school={school} students={myStudents} results={results} canEdit={canEdit} toast={toast} feeBlocked={isParent && (auth?.feeBlocked ?? false)} onGoFees={() => setPage("fees")} />,
-    hr: ["admin","hr","director","superadmin"].includes(auth.role) ? <HRPage auth={auth} school={school} canEdit={canEdit} toast={toast} /> : <Forbidden />,
-    library: isPortal && isMobile && auth.role === "student" ? (() => { setPage("dashboard"); return null; })() : <LibraryPage auth={auth} students={myStudents} teachers={teachers} toast={toast} />,
-    discipline: <DisciplinePage auth={auth} students={myStudents} canEdit={canEdit} toast={toast} linkedStudentId={linkedStudentId} />,
-    transport: <TransportPage auth={auth} canEdit={canEdit} toast={toast} students={students} />,
-    communication: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <CommunicationPage auth={auth} canEdit={canEdit} toast={toast} />,
-    timetable: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <TimetablePage auth={auth} school={school} teachers={teachers} canEdit={canEdit} toast={toast} />,
-    accounts: ["admin","director","superadmin"].includes(auth.role) ? <AccountsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
-    lessonplans: ["admin","teacher","director","superadmin"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
-    announcements: perms?.pages.includes("announcements") ? <AnnouncementsPage auth={auth} toast={toast} /> : <Forbidden />,
-    analytics: ["director","superadmin"].includes(auth.role) ? <AnalyticsPage auth={auth} students={students} teachers={teachers} payments={payments} results={results} attendance={attendance} feeStructures={feeStructures} toast={toast} /> : <Forbidden />,
-    reports: ["finance","director","superadmin"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
-    "financial-reports": ["finance","director","superadmin"].includes(auth.role) ? <FinancialReportsPage auth={auth} toast={toast} /> : <Forbidden />,
-    analysis: ["admin","teacher","director","superadmin"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,
-    "update-requests": ["admin","parent"].includes(auth.role) ? <UpdateRequestsPage auth={auth} students={students} pendingUpdates={pendingUpdates} setPendingUpdates={setPendingUpdates} toast={toast} /> : <Forbidden />,
-    "trial-balance": ["admin","finance","director","superadmin"].includes(auth.role) ? <TrialBalancePage auth={auth} toast={toast} /> : <Forbidden />,
-    "income-statement": ["admin","finance","director","superadmin"].includes(auth.role) ? <IncomeStatementPage auth={auth} toast={toast} /> : <Forbidden />,
-    "chart-of-accounts": ["admin","finance","director","superadmin"].includes(auth.role) ? <ChartOfAccountsPage auth={auth} toast={toast} /> : <Forbidden />,
-    "journal-entries": ["admin","finance","director","superadmin"].includes(auth.role) ? <JournalEntriesPage auth={auth} toast={toast} /> : <Forbidden />,
-    "general-ledger": ["admin","finance","director","superadmin"].includes(auth.role) ? <GeneralLedgerPage auth={auth} toast={toast} /> : <Forbidden />,
-    "balance-sheet": ["admin","finance","director","superadmin"].includes(auth.role) ? <BalanceSheetPage auth={auth} toast={toast} /> : <Forbidden />,
-    settings: ["director","superadmin"].includes(auth.role)
-      ? <AdminSettings
-          auth={auth}
-          onPermissionsSaved={() => loadRolePermissions(auth.token)}
-          onSchoolSaved={(savedSchool) => setSchool({ ...school, ...savedSchool })}
-        />
-      : <Forbidden />,
   };
 
   const currentNav = nav.find(n => n.id === page);
@@ -665,7 +728,7 @@ const fullNav = useMemo(() => {
       {isMobile && (
         <nav className="ec-bottom-nav">
           {bottomNavItems.map(n => (
-            <button key={n.id} className={`ec-bottom-nav-item ${page === n.id ? "active" : ""} touch-target`} onClick={() => setPage(n.id)}>
+            <button key={n.id} className={`ec-bottom-nav-item ${page === n.id ? "active" : ""} touch-target`} onClick={() => navigateTo(n.id)}>
               <span className="icon">{n.icon}</span>
               <span>{n.label.length > 8 ? n.label.slice(0,7)+"…" : n.label}</span>
             </button>
@@ -676,7 +739,31 @@ const fullNav = useMemo(() => {
           </button>
         </nav>
       )}
-        </>
+
+      <footer style={{
+        padding: "var(--space-4) var(--space-5)",
+        borderTop: "1px solid var(--color-border)",
+        background: "var(--color-bg-surface)",
+        color: "var(--color-text-muted)",
+        fontSize: 12,
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "var(--space-4)",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }}>
+        <div>
+          <a href="#/dashboard" onClick={(e) => { e.preventDefault(); navigateTo("dashboard"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Home</a>
+          <a href="#/students" onClick={(e) => { e.preventDefault(); navigateTo("students"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Students</a>
+          <a href="#/fees" onClick={(e) => { e.preventDefault(); navigateTo("fees"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Fees</a>
+          <a href="#/grades" onClick={(e) => { e.preventDefault(); navigateTo("grades"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Grades</a>
+          <a href="#/attendance" onClick={(e) => { e.preventDefault(); navigateTo("attendance"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>Attendance</a>
+        </div>
+        <div style={{ marginTop: isMobile ? 8 : 0 }}>
+          <span>© {new Date().getFullYear()} EduCore. All rights reserved.</span>
+        </div>
+      </footer>
+         </>
       )}
 
       <Toasts items={toasts} remove={id => setToasts(prev => prev.filter(t => t.id !== id))} />

@@ -730,7 +730,6 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
       }
     } catch (err) {
       // School data not found, keep defaults
-      console.log('[DEBUG] Load school data failed:', err);
     }
   };
 

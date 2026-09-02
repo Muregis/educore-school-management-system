@@ -36,10 +36,10 @@ export default function StudentIDCard({ student, school, onClose }) {
     const html = `
       <div class="id-card id-card-front">
         <div class="id-type">STUDENT</div>
-        <div class="photo-area">${student.photoUrl ? `<img src="${student.photoUrl}" alt="Photo" />` : 'Photo'}</div>
+        <div class="photo-area">${student.photoUrl ? `<img src="${student.photoUrl}" alt="Student photo" />` : 'Photo'}</div>
         <div class="info-area">
           <div class="school-name">
-            ${school.logo_url ? `<img src="${school.logo_url}" style="width:16px;height:16px;border-radius:2px;margin-right:4px;vertical-align:middle" />` : ''}
+            ${school.logo_url ? `<img src="${school.logo_url}" alt="${school.name} logo" style="width:16px;height:16px;border-radius:2px;margin-right:4px;vertical-align:middle" />` : ''}
             ${school.name}
           </div>
           <div class="student-name">${student.firstName || student.first_name} ${student.lastName || student.last_name}</div>
@@ -387,7 +387,7 @@ export default function StudentIDCard({ student, school, onClose }) {
             {loading ? (
               <span style={{ fontSize: 10, color: "#666" }}>...</span>
             ) : qrDataUrl ? (
-              <img src={qrDataUrl} alt="QR" style={{ width: "100%", height: "100%" }} />
+              <img src={qrDataUrl} alt="Student QR code" style={{ width: "100%", height: "100%" }} />
             ) : (
               <span style={{ fontSize: 10, color: "#999" }}>QR</span>
             )}

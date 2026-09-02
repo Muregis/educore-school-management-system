@@ -171,7 +171,6 @@ export default function UpdateRequestsPage({ auth, students, pendingUpdates, set
       // Add notification for admins
       if (isAdmin) {
         // This would typically be handled by the backend
-        console.log("Notification: New update request requires approval");
       }
     } catch (err) {
       setErr(err.message || "Failed to submit request");
