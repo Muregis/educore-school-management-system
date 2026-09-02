@@ -11,34 +11,37 @@ import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 // Define money here locally just in case it was a global that gets lost in strict module scope
 const money = (val) => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(val || 0);
-const StatCard = ({ label, value, color, loading = false, icon = "●" }) => (
-  <Card
-    hoverable
-    style={{
-      minHeight: 118,
-      position: "relative",
-      overflow: "hidden",
-      background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 92%, transparent) 0%, var(--color-bg-card) 100%)",
-      border: "1px solid var(--color-border)",
-      boxShadow: "var(--shadow-sm)",
-      transition: "transform 180ms ease, box-shadow 180ms ease"
-    }}
-  >
-    <div style={{ position: "absolute", inset: 0, background: `linear-gradient(135deg, color-mix(in srgb, ${color} 12%, transparent) 0%, transparent 70%)`, pointerEvents: "none" }} />
-    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: color, opacity: 0.85 }} />
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-3)" }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ color: "var(--color-text-muted)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 800 }}>{label}</div>
-        <div style={{ color: "var(--color-text-primary)", fontWeight: 800, fontSize: "24px", marginTop: "var(--space-2)", fontFamily: "var(--font-heading)" }}>
-          {loading ? <Skeleton width="60px" height="32px" /> : value}
+const StatCard = ({ label, value, color, loading = false, icon = "●" }) => {
+  const displayValue = loading ? <Skeleton width="60px" height="32px" /> : value;
+  return (
+    <Card
+      hoverable
+      style={{
+        minHeight: 118,
+        position: "relative",
+        overflow: "hidden",
+        background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 92%, transparent) 0%, var(--color-bg-card) 100%)",
+        border: "1px solid var(--color-border)",
+        boxShadow: "var(--shadow-sm)",
+        transition: "transform 180ms ease, box-shadow 180ms ease"
+      }}
+    >
+      <div style={{ position: "absolute", inset: 0, background: `linear-gradient(135deg, color-mix(in srgb, ${color} 12%, transparent) 0%, transparent 70%)`, pointerEvents: "none" }} />
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: color, opacity: 0.85 }} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-3)" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: "var(--color-text-muted)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 800 }}>{label}</div>
+          <div style={{ color: "var(--color-text-primary)", fontWeight: 800, fontSize: "clamp(16px, 2.2vw, 24px)", marginTop: "var(--space-2)", fontFamily: "var(--font-heading)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", wordBreak: "break-all" }}>
+            {displayValue}
+          </div>
+        </div>
+        <div style={{ width: 44, height: 44, borderRadius: "var(--radius-md)", display: "grid", placeItems: "center", background: `color-mix(in srgb, ${color} 16%, var(--color-bg-base))`, color, fontSize: 20, flexShrink: 0 }}>
+          {icon}
         </div>
       </div>
-      <div style={{ width: 44, height: 44, borderRadius: "var(--radius-md)", display: "grid", placeItems: "center", background: `color-mix(in srgb, ${color} 16%, var(--color-bg-base))`, color, fontSize: 20, flexShrink: 0 }}>
-        {icon}
-      </div>
-    </div>
-  </Card>
-);
+    </Card>
+  );
+};
 
 const ChartCard = ({ title, subtitle, children, loading = false }) => (
   <Card style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 96%, transparent) 0%, var(--color-bg-card) 100%)", boxShadow: "var(--shadow-sm)" }}>
@@ -708,7 +711,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
                 opacity: 0.8
               }} />
               <div style={{ color: "var(--color-text-muted)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700 }}>{label}</div>
-              <div style={{ color: "var(--color-text-primary)", fontWeight: 800, fontSize: "28px", marginTop: "var(--space-2)" }}>{value}</div>
+              <div style={{ color: "var(--color-text-primary)", fontWeight: 800, fontSize: "clamp(16px, 2.5vw, 28px)", marginTop: "var(--space-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", wordBreak: "break-all" }}>{value}</div>
             </Card>
           ))}
         </div>
@@ -810,7 +813,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
                 opacity: 0.8
               }} />
               <div style={{ color: "var(--color-text-muted)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700 }}>{label}</div>
-              <div style={{ color: "var(--color-text-primary)", fontWeight: 800, fontSize: "28px", marginTop: "var(--space-2)" }}>{value}</div>
+              <div style={{ color: "var(--color-text-primary)", fontWeight: 800, fontSize: "clamp(16px, 2.5vw, 28px)", marginTop: "var(--space-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", wordBreak: "break-all" }}>{value}</div>
             </Card>
           ))}
         </div>

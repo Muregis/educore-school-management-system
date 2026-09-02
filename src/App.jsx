@@ -724,6 +724,30 @@ const fullNav = useMemo(() => {
         <div className="ec-page-content" style={{ padding: isMobile ? "var(--space-4)" : "var(--space-5)" }}>
           {!pageExists ? <NotFound /> : !allowed ? <Forbidden /> : (pages[page] || <NotFound />)}
         </div>
+
+        <footer style={{
+          padding: "var(--space-4) var(--space-5)",
+          borderTop: "1px solid var(--color-border)",
+          background: "var(--color-bg-surface)",
+          color: "var(--color-text-muted)",
+          fontSize: 12,
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "var(--space-4)",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}>
+          <div>
+            <a href="#/dashboard" onClick={(e) => { e.preventDefault(); navigateTo("dashboard"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Home</a>
+            <a href="#/students" onClick={(e) => { e.preventDefault(); navigateTo("students"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Students</a>
+            <a href="#/fees" onClick={(e) => { e.preventDefault(); navigateTo("fees"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Fees</a>
+            <a href="#/grades" onClick={(e) => { e.preventDefault(); navigateTo("grades"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Grades</a>
+            <a href="#/attendance" onClick={(e) => { e.preventDefault(); navigateTo("attendance"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>Attendance</a>
+          </div>
+          <div style={{ marginTop: isMobile ? 8 : 0 }}>
+            <span>© {new Date().getFullYear()} EduCore. All rights reserved.</span>
+          </div>
+        </footer>
       </main>
 
       {isMobile && (
@@ -740,30 +764,6 @@ const fullNav = useMemo(() => {
           </button>
         </nav>
       )}
-
-      <footer style={{
-        padding: "var(--space-4) var(--space-5)",
-        borderTop: "1px solid var(--color-border)",
-        background: "var(--color-bg-surface)",
-        color: "var(--color-text-muted)",
-        fontSize: 12,
-        display: "flex",
-        flexWrap: "wrap",
-        gap: "var(--space-4)",
-        justifyContent: "space-between",
-        alignItems: "center"
-      }}>
-        <div>
-          <a href="#/dashboard" onClick={(e) => { e.preventDefault(); navigateTo("dashboard"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Home</a>
-          <a href="#/students" onClick={(e) => { e.preventDefault(); navigateTo("students"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Students</a>
-          <a href="#/fees" onClick={(e) => { e.preventDefault(); navigateTo("fees"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Fees</a>
-          <a href="#/grades" onClick={(e) => { e.preventDefault(); navigateTo("grades"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Grades</a>
-          <a href="#/attendance" onClick={(e) => { e.preventDefault(); navigateTo("attendance"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>Attendance</a>
-        </div>
-        <div style={{ marginTop: isMobile ? 8 : 0 }}>
-          <span>© {new Date().getFullYear()} EduCore. All rights reserved.</span>
-        </div>
-      </footer>
          </>
       )}
 
