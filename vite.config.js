@@ -20,13 +20,9 @@ export default defineConfig(({ command }) => ({
     sourcemap: false,
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
-      external: ['fsevents'],
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom'],
-          supabase: ['@supabase/supabase-js'],
-          sentry: ['@sentry/react'],
-          pwa: ['vite-plugin-pwa']
+          vendor: ['react', 'react-dom']
         }
       }
     }
