@@ -70,6 +70,7 @@ function lookupSubjectMark(existing, subject) {
 export default function GradesPage({ auth, students, results, setResults, canEdit, toast, feeBlocked = false, onGoFees}) {
   // Use current term from API instead of hardcoded "Term 2"
   const { term: currentTerm } = useCurrentTerm(auth);
+  const termQuery = currentTerm ? `?term=${encodeURIComponent(currentTerm)}` : '';
   const [term, setTerm] = useState(""); // Will be set from currentTerm
   const [examType, setExamType] = useState("all");
   const [examTypes, setExamTypes] = useState([]);
@@ -224,11 +225,12 @@ const classesForDropdown = useMemo(() => {
   useEffect(() => {
     if (!auth?.token) return;
     const ac = new AbortController();
-    apiFetch("/grades", { token: auth.token, signal: ac.signal })
+    const termQuery = currentTerm ? `?term=${encodeURIComponent(currentTerm)}` : '';
+    apiFetch(`/grades${termQuery}`, { token: auth.token, signal: ac.signal })
       .then(data => setResults(data))
       .catch(e => { if (e?.code !== "EABORT") toast("Failed to fetch results", "error"); });
     return () => ac.abort();
-  }, [auth, setResults, toast]);
+  }, [auth, setResults, toast, currentTerm]);
 
   const filtered = results.filter(r =>
     (term === "all" || r.term === term) &&
@@ -287,7 +289,7 @@ const classesForDropdown = useMemo(() => {
         },
         token: auth?.token,
       });
-      const data = await apiFetch("/grades", { token: auth?.token });
+      const data = await apiFetch(`/grades${termQuery}`, { token: auth?.token });
       setResults(data);
       setBulkMarks(subjects.reduce((a, sub) => ({ ...a, [sub]: "" }), {}));
       setShowBulk(false);
@@ -317,7 +319,7 @@ const classesForDropdown = useMemo(() => {
         },
         token: auth?.token,
       });
-      const data = await apiFetch("/grades", { token: auth?.token });
+      const data = await apiFetch(`/grades${termQuery}`, { token: auth?.token });
       setResults(data);
       setEditing(null);
       toast("Result updated", "success");
@@ -485,7 +487,7 @@ const classesForDropdown = useMemo(() => {
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.message || "Recalculation failed");
                 toast(`Recalculated grades for ${data.updated} results`, "success");
-                const fresh = await apiFetch("/grades", { token });
+                const fresh = await apiFetch(`/grades${termQuery}`, { token });
                 setResults(fresh);
               } catch (err) {
                 toast(err.message || "Recalculation failed", "error");
@@ -555,7 +557,7 @@ const classesForDropdown = useMemo(() => {
                     }
                     
                     // Refresh results
-                    const fresh = await apiFetch("/grades", { token });
+                    const fresh = await apiFetch(`/grades${termQuery}`, { token });
                     setResults(fresh);
                   } catch (err) {
                     console.error("Import error:", err);

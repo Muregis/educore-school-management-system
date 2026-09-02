@@ -29,15 +29,21 @@ export default function PortalDashboardPage({
 
   const studentId = student?.student_id ?? student?.id;
   
-  // Calculate stats
+  const termAttendance = currentTerm
+    ? attendance.filter(a => (a.term || a.term_name) === currentTerm)
+    : attendance;
+  const termResults = currentTerm
+    ? results.filter(r => (r.term || r.term_name) === currentTerm)
+    : results;
+  
   const studentAttendance = useMemo(() => 
-    attendance.filter(a => (a.studentId ?? a.student_id) === studentId),
-    [attendance, studentId]
+    termAttendance.filter(a => (a.studentId ?? a.student_id) === studentId),
+    [termAttendance, studentId]
   );
   
   const studentResults = useMemo(() => 
-    results.filter(r => (r.studentId ?? r.student_id) === studentId),
-    [results, studentId]
+    termResults.filter(r => (r.studentId ?? r.student_id) === studentId),
+    [termResults, studentId]
   );
   
   const studentPayments = useMemo(() => 

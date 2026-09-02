@@ -429,18 +429,19 @@ const fullNav = useMemo(() => {
     setTimetable(DEFAULTS.timetable); setPendingUpdates(DEFAULTS.pendingUpdates);
   }, [setSchool, setUsers, setStudents, setTeachers, setAttendance, setResults, setFeeStructures, setPayments, setNotifications, setTimetable, setPendingUpdates]);
 
-  const { term: currentTerm } = useCurrentTerm(auth);
+  const { term: currentTerm, startDate, endDate } = useCurrentTerm(auth);
 
   const hydrateTenantData = useCallback(async (loggedInAuth) => {
     if (!loggedInAuth?.token) return;
     const token = loggedInAuth.token;
     const termParam = currentTerm ? `?term=${encodeURIComponent(currentTerm)}` : '';
+    const attendanceParams = currentTerm && startDate && endDate ? `?from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}` : '';
     const [schoolRes, studentsRes, teachersRes, attendanceRes, gradesRes, paymentsRes, feeRes, timetableRes] = await Promise.allSettled([
       apiFetch("/settings/school", { token }),
       apiFetch("/students", { token }),
       apiFetch("/teachers", { token }),
-      apiFetch("/attendance", { token }),
-      apiFetch("/grades", { token }),
+      apiFetch(`/attendance${attendanceParams}`, { token }),
+      apiFetch(`/grades${termParam}`, { token }),
       apiFetch(`/payments${termParam}`, { token }),
       apiFetch("/payments/fee-structures", { token }),
       apiFetch("/timetable", { token }),

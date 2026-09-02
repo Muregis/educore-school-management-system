@@ -16,8 +16,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '../lib/api';
 
-// Cache duration - 5 minutes
-const CACHE_DURATION = 5 * 60 * 1000;
+// Cache duration - 30 seconds (terms don't change often, but when they do we want to pick it up quickly)
+const CACHE_DURATION = 30 * 1000;
 let cachedTerm = null;
 let cachedAt = null;
 

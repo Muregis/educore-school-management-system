@@ -52,6 +52,7 @@ export default function AttendancePage({
   school
 }) {
   const { term, startDate, endDate } = useCurrentTerm(auth);
+  const termQuery = (startDate && endDate) ? `?from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}` : '';
   const [cls, setCls] = useState("");
   const [date, setDate] = useState(startDate || new Date().toISOString().slice(0, 10));
   const [filterClass, setFilterClass] = useState("all");
@@ -86,7 +87,8 @@ export default function AttendancePage({
   useEffect(() => {
     if (!auth?.token) return;
     const ac = new AbortController();
-    apiFetch("/attendance", { token: auth.token, signal: ac.signal })
+    const termQuery = (startDate && endDate) ? `?from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}` : '';
+    apiFetch(`/attendance${termQuery}`, { token: auth.token, signal: ac.signal })
       .then(data => setAttendance(data.map(normalise)))
       .catch(e => { 
         if (e?.code !== "EABORT") console.warn("Failed to load attendance", e); 
@@ -144,7 +146,7 @@ export default function AttendancePage({
         token: auth?.token,
       });
       
-      const data = await apiFetch("/attendance", { token: auth?.token });
+      const data = await apiFetch(`/attendance${termQuery}`, { token: auth?.token });
       setAttendance(data.map(normalise));
       setShowBulk(false);
       toast(`Attendance saved for ${cls}`, "success");
@@ -164,7 +166,7 @@ export default function AttendancePage({
         token: auth?.token,
       });
       
-      const data = await apiFetch("/attendance", { token: auth?.token });
+      const data = await apiFetch(`/attendance${termQuery}`, { token: auth?.token });
       setAttendance(data.map(normalise));
       setEditing(null);
       toast("Attendance updated", "success");
@@ -228,7 +230,7 @@ export default function AttendancePage({
       });
 
       // Refresh attendance data
-      const data_response = await apiFetch("/attendance", { token: auth?.token });
+      const data_response = await apiFetch(`/attendance${termQuery}`, { token: auth?.token });
       setAttendance(data_response.map(normalise));
 
       const studentName = student.firstName || student.first_name;

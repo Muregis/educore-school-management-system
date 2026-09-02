@@ -72,7 +72,7 @@ const ProgressRow = ({ label, value, max, color = "var(--color-primary)", displa
 import { apiFetch } from "../lib/api";
 
 export default function DashboardPage({ auth, school, students, teachers, attendance, payments, feeStructures: rawFeeStructures = [], results, toast, showFinance = true }) {
-  const { term: currentTerm } = useCurrentTerm(auth);
+  const { term: currentTerm, startDate, endDate } = useCurrentTerm(auth);
   const feeStructures = Array.isArray(rawFeeStructures)
     ? rawFeeStructures.filter(f => (f?.term ?? f?.term_name ?? currentTerm) === currentTerm)
     : [];
@@ -84,6 +84,15 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   const [lessonPlansLoading, setLessonPlansLoading] = useState(false);
   const [lessonPlansError, setLessonPlansError] = useState("");
   const [teacherClasses, setTeacherClasses] = useState([]);
+
+  const termResults = currentTerm ? results.filter(r => (r.term || r.term_name) === currentTerm) : results;
+  const termAttendance = (startDate && endDate)
+    ? attendance.filter(a => {
+        const d = a.date || a.attendance_date;
+        if (!d) return false;
+        return d >= startDate && d <= endDate;
+      })
+    : attendance;
 
   // Load library data for librarian
   useEffect(() => {
@@ -297,17 +306,19 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   const outstanding = studentBalances.reduce((sum, item) => sum + item.balance, 0);
 
   const gradeCount = {
-    EE: results.filter(r => r.grade === "EE").length,
-    ME: results.filter(r => r.grade === "ME").length,
-    AE: results.filter(r => r.grade === "AE").length,
-    BE: results.filter(r => r.grade === "BE").length,
+    EE: termResults.filter(r => r.grade === "EE").length,
+    ME: termResults.filter(r => r.grade === "ME").length,
+    AE: termResults.filter(r => r.grade === "AE").length,
+    BE: termResults.filter(r => r.grade === "BE").length,
   };
 
   const attendanceByDate = Object.entries(
-    attendance.reduce((acc, row) => {
-      if (!acc[row.date]) acc[row.date] = { present: 0, total: 0 };
-      acc[row.date].total += 1;
-      if (row.status === "present") acc[row.date].present += 1;
+    termAttendance.reduce((acc, row) => {
+      const d = row.date || row.attendance_date;
+      if (!d) return acc;
+      if (!acc[d]) acc[d] = { present: 0, total: 0 };
+      acc[d].total += 1;
+      if (row.status === "present") acc[d].present += 1;
       return acc;
     }, {})
   ).slice(-7);
