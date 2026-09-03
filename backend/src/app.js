@@ -63,6 +63,7 @@ import academicTermsRoutes      from "./routes/academic-terms.routes.js";  // NE
 import promotionAdvancedRoutes  from "./routes/promotion-advanced.routes.js";  // NEW: Advanced promotion
 import notificationQueueRoutes  from "./routes/notification-queue.routes.js";  // NEW: Notification queue
 import discountsRoutes         from "./routes/discounts.routes.js";  // NEW: Fee discounts system
+import billingRoutes           from "./routes/billing.routes.js";    // NEW: Billing automation
 import expendituresRoutes     from "./routes/expenditures.routes.js";
 import examTypesRoutes         from "./routes/exam-types.routes.js";  // NEW: Exam types management
 import compiledResultsRoutes   from "./routes/compiled-results.routes.js";  // NEW: Compiled results endpoint
@@ -212,6 +213,7 @@ app.use("/api/backup", backupRoutes);
 app.use("/api/promotion",         promotionAdvancedRoutes);   // NEW: Advanced promotion
 app.use("/api/notifications",     notificationQueueRoutes);   // NEW: Notification queue
 app.use("/api/discounts",         discountsRoutes);           // NEW: Fee discounts system
+app.use("/api/billing",           billingRoutes);             // NEW: Billing automation
 app.use("/api/expenditures",      expendituresRoutes);
 app.use("/api/exam-types",        examTypesRoutes);           // NEW: Exam types management
 app.use("/api/grades/compiled",   compiledResultsRoutes);     // NEW: Compiled results endpoint

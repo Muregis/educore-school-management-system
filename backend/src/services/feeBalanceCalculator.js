@@ -55,24 +55,52 @@ export function getStudentBaseFee(student, feeStructures = []) {
   return toNumber(structure.tuition) + toNumber(structure.activity) + toNumber(structure.misc);
 }
 
+// ── Agreed-amount overrides ────────────────────────────────────────────────────
+// The students table stores three per-row columns — transport_fee, lunch_fee,
+// breakfast_fee — that represent the already-computed contribution for that
+// component (e.g. an agreed KES 4,500 for transport, regardless of rate or
+// direction). When set to a positive value they replace the rate-based
+// calculation entirely.  A value of 0 or missing means "no agreement, fall
+// through to the rate calculation".
+
+function agreedAmount(student, key) {
+  const v = student?.[key];
+  if (v === undefined || v === null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function calculateTransportFee(baseFee, direction = "two_way") {
   const base = toNumber(baseFee);
   if (!direction || direction === "none") return 0;
   // The stored transport base fee is the full (two-way) amount.
-  return base;
+  if (direction === "one_way") return round2(base / 2);
+  return round2(base);
 }
 
-export function calculateLunchFee(dailyRate, days = 66, billingType = "daily") {
-  if (billingType === "termly") return round2(toNumber(dailyRate));
-  return round2(toNumber(dailyRate) * toNumber(days));
+export function calculateLunchFee(rate, days = 0, billingType = "termly") {
+  const r = toNumber(rate);
+  if (billingType === "daily") {
+    const d = toNumber(days);
+    if (d <= 0) return 0;
+    return round2(r * d);
+  }
+  return round2(r);
 }
 
-export function calculateBreakfastFee(dailyRate, days = 66, billingType = "daily") {
-  if (billingType === "termly") return round2(toNumber(dailyRate));
-  return round2(toNumber(dailyRate) * toNumber(days));
+export function calculateBreakfastFee(rate, days = 0, billingType = "termly") {
+  const r = toNumber(rate);
+  if (billingType === "daily") {
+    const d = toNumber(days);
+    if (d <= 0) return 0;
+    return round2(r * d);
+  }
+  return round2(r);
 }
 
 export function getStudentTransportFee(student) {
+  const agreed = agreedAmount(student, "transport_fee");
+  if (agreed !== null && agreed > 0) return agreed;
   return calculateTransportFee(
     student?.transport_base_fee ?? student?.transportBaseFee,
     student?.transport_direction ?? student?.transportDirection ?? "none"
@@ -80,6 +108,8 @@ export function getStudentTransportFee(student) {
 }
 
 export function getStudentLunchFee(student, schoolSettings = {}) {
+  const agreed = agreedAmount(student, "lunch_fee");
+  if (agreed !== null && agreed > 0) return agreed;
   if (!Boolean(student?.lunch_enabled ?? student?.lunchEnabled)) return 0;
   return calculateLunchFee(
     student?.lunch_daily_rate ?? student?.lunchDailyRate ?? schoolSettings.lunch_daily_rate ?? 0,
@@ -89,6 +119,8 @@ export function getStudentLunchFee(student, schoolSettings = {}) {
 }
 
 export function getStudentBreakfastFee(student, schoolSettings = {}) {
+  const agreed = agreedAmount(student, "breakfast_fee");
+  if (agreed !== null && agreed > 0) return agreed;
   if (!Boolean(student?.breakfast_enabled ?? student?.breakfastEnabled)) return 0;
   return calculateBreakfastFee(
     student?.breakfast_daily_rate ?? student?.breakfastDailyRate ?? schoolSettings.breakfast_daily_rate ?? 0,

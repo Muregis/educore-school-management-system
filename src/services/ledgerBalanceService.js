@@ -313,7 +313,11 @@ export function calculateTransportFee(baseFee, direction = 'two_way') {
     return 0;
   }
 
-  // Use full amount as inserted (no percentage reduction)
+  // one-way = half the two-way fee; two-way = full base
+  if (direction === 'one_way') {
+    return Math.round((base / 2) * 100) / 100;
+  }
+
   return base;
 }
 
@@ -325,26 +329,41 @@ export function calculateTransportFee(baseFee, direction = 'two_way') {
  * @param {string} billingType - 'daily' or 'termly'
  * @returns {number} Calculated fee
  */
-export function calculateLunchFee(dailyRate, days = 66, billingType = 'daily') {
-  if (billingType === 'termly') {
-    return Math.round((parseFloat(dailyRate) || 0) * 100) / 100;
+/**
+ * Lunch fee calculation.
+ *
+ * Two billing models are supported:
+ *  - 'termly' (default for Kenyan schools): the rate is a flat per-term fee,
+ *    `days` is ignored. This is the most common arrangement — a school
+ *    charges "KES 4,000 per term for lunch".
+ *  - 'daily': the rate is per-day and multiplied by `days`. `days` MUST be
+ *    supplied explicitly via the student record or school settings; no implicit
+ *    default is applied so a missing value is treated as zero (caller-side
+ *    warning surfaces the gap).
+ *
+ * @param {number} rate  Per-term (when billingType='termly') or per-day (when 'daily') rate.
+ * @param {number} days  Number of school days (only used when billingType='daily').
+ * @param {string} billingType  'termly' (default) | 'daily'.
+ */
+export function calculateLunchFee(rate, days = 0, billingType = 'termly') {
+  const r = parseFloat(rate) || 0;
+  if (billingType === 'daily') {
+    if (!days || days <= 0) return 0;
+    return Math.round(r * days * 100) / 100;
   }
-  return Math.round((parseFloat(dailyRate) || 0) * days * 100) / 100;
+  return Math.round(r * 100) / 100;
 }
 
 /**
- * Breakfast fee calculation
- * 
- * @param {number} dailyRate - Daily breakfast rate
- * @param {number} days - Number of days (default: term days)
- * @param {string} billingType - 'daily' or 'termly'
- * @returns {number} Calculated fee
+ * Breakfast fee calculation. Same semantics as {@link calculateLunchFee}.
  */
-export function calculateBreakfastFee(dailyRate, days = 66, billingType = 'daily') {
-  if (billingType === 'termly') {
-    return Math.round((parseFloat(dailyRate) || 0) * 100) / 100;
+export function calculateBreakfastFee(rate, days = 0, billingType = 'termly') {
+  const r = parseFloat(rate) || 0;
+  if (billingType === 'daily') {
+    if (!days || days <= 0) return 0;
+    return Math.round(r * days * 100) / 100;
   }
-  return Math.round((parseFloat(dailyRate) || 0) * days * 100) / 100;
+  return Math.round(r * 100) / 100;
 }
 
 /**

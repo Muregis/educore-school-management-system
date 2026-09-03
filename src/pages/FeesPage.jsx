@@ -185,7 +185,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       feeStructures: normalisedStructures,
       payments: normalisedPayments,
       discounts: studentDiscounts,
-      schoolSettings: schoolData || {}
+      schoolSettings: schoolData || school || {}
     });
 
     const balance = balanceInfo.balance;
@@ -214,8 +214,11 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       isOverpaid,
       openingBalance: balanceInfo.openingBalance,
       transportFee: balanceInfo.transportFee,
+      transportAgreed: Number(student?.transport_fee) > 0,
       lunchFee: balanceInfo.lunchFee,
+      lunchAgreed: Number(student?.lunch_fee) > 0,
       breakfastFee: balanceInfo.breakfastFee,
+      breakfastAgreed: Number(student?.breakfast_fee) > 0,
       baseFee: balanceInfo.baseFee,
       admissionNumber: student?.admission ?? student?.admission_number ?? "",
       email: student?.email ?? student?.parentEmail ?? "",
@@ -608,9 +611,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         student: b.name,
         className: b.className,
         baseFee: money(b.baseFee),
-        transportFee: b.transportFee > 0 ? money(b.transportFee) : "-",
-        lunchFee: b.lunchFee > 0 ? money(b.lunchFee) : "-",
-        breakfastFee: b.breakfastFee > 0 ? money(b.breakfastFee) : "-",
+        transportFee: b.transportFee > 0 ? `${money(b.transportFee)}${b.transportAgreed ? ' *' : ''}` : "-",
+        lunchFee: b.lunchFee > 0 ? `${money(b.lunchFee)}${b.lunchAgreed ? ' *' : ''}` : "-",
+        breakfastFee: b.breakfastFee > 0 ? `${money(b.breakfastFee)}${b.breakfastAgreed ? ' *' : ''}` : "-",
         openingBalance: b.openingBalance !== 0 ? `${money(Math.abs(b.openingBalance))} ${b.openingBalance > 0 ? "owing" : "credit"}` : "-",
         paid: money(b.paid),
         discount: b.hasDiscount ? `${b.discountPercent}% ${b.discountLabel}` : "-",
@@ -968,14 +971,14 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                     b.className,
                     <span key="base" style={{ fontSize: "13px" }}>{money(b.baseFee)}</span>,
                     <span key="transport" style={{ fontSize: "13px", color: b.transportFee > 0 ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>
-                      {b.transportFee > 0 ? money(b.transportFee) : "—"}
+                      {b.transportFee > 0 ? `${money(b.transportFee)}${b.transportAgreed ? ' *' : ''}` : "—"}
                       {b.transportDirection !== 'none' && <small style={{ display: 'block', fontSize: "10px", color: "var(--color-text-muted)" }}>{b.transportDirection.replace('_',' ')}</small>}
                     </span>,
                     <span key="lunch" style={{ fontSize: "13px", color: b.lunchFee > 0 ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>
-                      {b.lunchFee > 0 ? money(b.lunchFee) : "—"}
+                      {b.lunchFee > 0 ? `${money(b.lunchFee)}${b.lunchAgreed ? ' *' : ''}` : "—"}
                     </span>,
                     <span key="breakfast" style={{ fontSize: "13px", color: b.breakfastFee > 0 ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>
-                      {b.breakfastFee > 0 ? money(b.breakfastFee) : "—"}
+                      {b.breakfastFee > 0 ? `${money(b.breakfastFee)}${b.breakfastAgreed ? ' *' : ''}` : "—"}
                     </span>,
                     <span key="opening" style={{ fontSize: "13px", color: b.openingBalance > 0 ? 'var(--color-warning)' : b.openingBalance < 0 ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
                       {b.openingBalance !== 0 ? money(Math.abs(b.openingBalance)) : "—"}

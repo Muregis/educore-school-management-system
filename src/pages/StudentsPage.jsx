@@ -80,7 +80,25 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [availableClasses, setAvailableClasses] = useState([]);
-  const [f, setF] = useState({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", transport_direction: "none", transport_base_fee: "", lunch_enabled: false, lunch_daily_rate: "", lunch_days: "", lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: "", breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
+  const emptyFeeForm = () => ({
+  opening_balance: "", opening_balance_type: "owing",
+  transport_fee: "",                  // agreed flat transport amount (overrides rate calc)
+  transport_direction: "none", transport_base_fee: "",
+  lunch_fee: "",                      // agreed flat lunch amount (overrides rate calc)
+  lunch_enabled: false, lunch_daily_rate: "", lunch_days: "", lunch_billing_type: "termly",
+  breakfast_fee: "",                  // agreed flat breakfast amount (overrides rate calc)
+  breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: "", breakfast_billing_type: "termly",
+  discount_type: "", discount_value: "", discount_is_percentage: true,
+});
+
+  const [f, setF] = useState({
+    firstName: "", lastName: "", className: "Grade 7", gender: "female",
+    parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "",
+    allergies: "", medicalConditions: "",
+    emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "",
+    photoUrl: "", status: "active", admission: "",
+    ...emptyFeeForm(),
+  });
 
   const handleChange = useCallback((field, value) => {
     setF(prev => ({ ...prev, [field]: value }));
@@ -141,7 +159,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
   const openAdd = () => {
     setEditId(null); setErr("");
-    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", opening_balance: "", opening_balance_type: "owing", transport_direction: "none", transport_base_fee: "", lunch_enabled: false, lunch_daily_rate: "", lunch_days: "", lunch_billing_type: "daily", breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: "", breakfast_billing_type: "daily", discount_type: "", discount_value: "", discount_is_percentage: true });
+    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", ...emptyFeeForm() });
     setShow(true);
   };
 
@@ -204,12 +222,15 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         const patchPayload = {
           opening_balance: parseFloat(f.opening_balance) || 0,
           opening_balance_type: f.opening_balance_type || "owing",
+          transport_fee: f.transport_fee === "" ? 0 : parseFloat(f.transport_fee) || 0,
           transport_direction: f.transport_direction || "none",
           transport_base_fee: parseFloat(f.transport_base_fee) || 0,
+          lunch_fee: f.lunch_fee === "" ? 0 : parseFloat(f.lunch_fee) || 0,
           lunch_enabled: Boolean(f.lunch_enabled),
           lunch_daily_rate: parseFloat(f.lunch_daily_rate) || 0,
           lunch_days: f.lunch_days ? parseInt(f.lunch_days) : null,
           lunch_billing_type: f.lunch_billing_type || "daily",
+          breakfast_fee: f.breakfast_fee === "" ? 0 : parseFloat(f.breakfast_fee) || 0,
           breakfast_enabled: Boolean(f.breakfast_enabled),
           breakfast_daily_rate: parseFloat(f.breakfast_daily_rate) || 0,
           breakfast_days: f.breakfast_days ? parseInt(f.breakfast_days) : null,
@@ -493,14 +514,18 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           {/* Transport */}
           <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
             <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Transport Settings</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
               <Select value={f.transport_direction || "none"} onChange={e => handleChange('transport_direction', e.target.value)} options={[
                 { value: "none", label: "No Transport" },
-                { value: "one_way", label: "One Way (60% fee)" },
+                { value: "one_way", label: "One Way (50% fee)" },
                 { value: "two_way", label: "Two Way (100% fee)" }
               ]} />
               <Input type="number" value={f.transport_base_fee || ""} onChange={e => handleChange('transport_base_fee', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder="Base transport fee (KES)" disabled={f.transport_direction === "none"} />
+              <Input type="number" value={f.transport_fee || ""} onChange={e => handleChange('transport_fee', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder="Agreed transport (KES) — overrides rate" />
             </div>
+            <small style={{ color: "var(--color-text-muted)", fontSize: "11px", display: "block", marginTop: "var(--space-2)" }}>
+              If <strong>Agreed transport</strong> is set, it replaces the rate × direction calculation and the parent is charged exactly this amount.
+            </small>
           </div>
 
           {/* Lunch */}
@@ -510,15 +535,18 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
               <input type="checkbox" checked={f.lunch_enabled || false} onChange={e => handleChange('lunch_enabled', e.target.checked)} style={{ width: "16px", height: "16px", cursor: "pointer" }} />
               <span>Enrolled in lunch program</span>
             </label>
-            {f.lunch_enabled && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
-                <Select value={f.lunch_billing_type || 'daily'} onChange={e => handleChange('lunch_billing_type', e.target.value)} options={[{value:"daily", label:"Daily Rate"}, {value:"termly", label:"Termly Rate"}]} />
-                <Input type="number" value={f.lunch_daily_rate || ""} onChange={e => handleChange('lunch_daily_rate', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder={f.lunch_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
-                {f.lunch_billing_type !== 'termly' && (
-                  <Input type="number" value={f.lunch_days || ""} onChange={e => handleChange('lunch_days', e.target.value)} placeholder="School days (optional)" />
-                )}
-              </div>
-            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "var(--space-3)" }}>
+              <Select value={f.lunch_billing_type || 'termly'} onChange={e => handleChange('lunch_billing_type', e.target.value)} options={[{value:"termly", label:"Termly (flat)"}, {value:"daily", label:"Daily × Days"}]} />
+              <Input type="number" value={f.lunch_daily_rate || ""} onChange={e => handleChange('lunch_daily_rate', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder={f.lunch_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
+              {f.lunch_billing_type === 'daily' && (
+                <Input type="number" value={f.lunch_days || ""} onChange={e => handleChange('lunch_days', e.target.value)} placeholder="School days" />
+              )}
+              {f.lunch_billing_type === 'termly' && <div />}
+              <Input type="number" value={f.lunch_fee || ""} onChange={e => handleChange('lunch_fee', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder="Agreed lunch (KES) — overrides rate" />
+            </div>
+            <small style={{ color: "var(--color-text-muted)", fontSize: "11px", display: "block", marginTop: "var(--space-2)" }}>
+              If <strong>Agreed lunch</strong> is set, it replaces the rate × days calculation.
+            </small>
           </div>
 
           {/* Breakfast */}
@@ -528,15 +556,18 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
               <input type="checkbox" checked={f.breakfast_enabled || false} onChange={e => handleChange('breakfast_enabled', e.target.checked)} style={{ width: "16px", height: "16px", cursor: "pointer" }} />
               <span>Enrolled in breakfast program</span>
             </label>
-            {f.breakfast_enabled && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
-                <Select value={f.breakfast_billing_type || 'daily'} onChange={e => handleChange('breakfast_billing_type', e.target.value)} options={[{value:"daily", label:"Daily Rate"}, {value:"termly", label:"Termly Rate"}]} />
-                <Input type="number" value={f.breakfast_daily_rate || ""} onChange={e => handleChange('breakfast_daily_rate', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder={f.breakfast_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
-                {f.breakfast_billing_type !== 'termly' && (
-                  <Input type="number" value={f.breakfast_days || ""} onChange={e => handleChange('breakfast_days', e.target.value)} placeholder="School days (optional)" />
-                )}
-              </div>
-            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "var(--space-3)" }}>
+              <Select value={f.breakfast_billing_type || 'termly'} onChange={e => handleChange('breakfast_billing_type', e.target.value)} options={[{value:"termly", label:"Termly (flat)"}, {value:"daily", label:"Daily × Days"}]} />
+              <Input type="number" value={f.breakfast_daily_rate || ""} onChange={e => handleChange('breakfast_daily_rate', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder={f.breakfast_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
+              {f.breakfast_billing_type === 'daily' && (
+                <Input type="number" value={f.breakfast_days || ""} onChange={e => handleChange('breakfast_days', e.target.value)} placeholder="School days" />
+              )}
+              {f.breakfast_billing_type === 'termly' && <div />}
+              <Input type="number" value={f.breakfast_fee || ""} onChange={e => handleChange('breakfast_fee', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder="Agreed breakfast (KES) — overrides rate" />
+            </div>
+            <small style={{ color: "var(--color-text-muted)", fontSize: "11px", display: "block", marginTop: "var(--space-2)" }}>
+              If <strong>Agreed breakfast</strong> is set, it replaces the rate × days calculation.
+            </small>
           </div>
 
           {/* Fee Discount */}
