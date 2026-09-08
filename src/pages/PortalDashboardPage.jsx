@@ -47,8 +47,10 @@ export default function PortalDashboardPage({
   );
   
   const studentPayments = useMemo(() => 
-    payments.filter(p => (p.studentId ?? p.student_id) === studentId),
-    [payments, studentId]
+    currentTerm
+      ? payments.filter(p => (p.studentId ?? p.student_id) === studentId && (p.term || p.term_name) === currentTerm)
+      : payments.filter(p => (p.studentId ?? p.student_id) === studentId),
+    [payments, studentId, currentTerm]
   );
   
   const presentCount = studentAttendance.filter(a => a.status === "present").length;

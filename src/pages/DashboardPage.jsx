@@ -286,13 +286,14 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   });
   const present = todayAttendance.filter(a => a.status === "present").length;
   
-  const todayPayments = payments.filter(p => {
-    const paymentDate = p.date || p.payment_date;
-    if (!paymentDate || !["paid","completed","success"].includes((p.status||"").toLowerCase())) return false;
-    const pd = new Date(paymentDate);
-    if (isNaN(pd.getTime())) return false;
-    return pd.toISOString().slice(0, 10) === todayStr;
-  });
+const todayPayments = payments.filter(p => {
+     const paymentDate = p.date || p.payment_date;
+     if (!paymentDate || !["paid","completed","success"].includes((p.status||"").toLowerCase())) return false;
+     const pd = new Date(paymentDate);
+     if (isNaN(pd.getTime())) return false;
+     if (currentTerm && (p.term || p.term_name) && (p.term || p.term_name) !== currentTerm) return false;
+     return pd.toISOString().slice(0, 10) === todayStr;
+   });
   const todayCollection = todayPayments.reduce((s, p) => s + Number(p.amount), 0);
 
   const studentBalances = students.map(student => ({
@@ -565,10 +566,11 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   if (auth?.role === "finance") {
     const thisMonth = new Date().getMonth();
     const thisYear = new Date().getFullYear();
-    const monthlyPayments = payments.filter(p => {
-      const paymentDate = new Date(p.date || p.payment_date);
-      return paymentDate.getMonth() === thisMonth && paymentDate.getFullYear() === thisYear;
-    });
+const monthlyPayments = payments.filter(p => {
+       const paymentDate = new Date(p.date || p.payment_date);
+       if (currentTerm && (p.term || p.term_name) && (p.term || p.term_name) !== currentTerm) return false;
+       return paymentDate.getMonth() === thisMonth && paymentDate.getFullYear() === thisYear;
+     });
     
     const collectedThisMonth = monthlyPayments.reduce((s, p) => s + Number(p.amount), 0);
     
