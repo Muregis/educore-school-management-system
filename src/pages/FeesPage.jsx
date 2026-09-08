@@ -242,8 +242,16 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       );
     });
 
-  const filteredPayments = normalisedPayments.filter(p => 
+  const isTodayPayment = (p) => {
+    const paymentDate = p.date || p.payment_date || "";
+    if (!paymentDate) return false;
+    if (lastDayClosed && new Date(paymentDate) <= new Date(lastDayClosed)) return false;
+    return paymentDate.startsWith(businessToday);
+  };
+
+  const filteredPayments = normalisedPayments.filter(p =>
     (filterClass === "all" || p.className === filterClass) &&
+    (filterDate === "all" || (filterDate === "today" && isTodayPayment(p))) &&
     (!recordSearch || (
       (p.studentName || "").toLowerCase().includes(recordSearch.toLowerCase()) ||
       String(p.studentId).includes(recordSearch) ||
@@ -561,13 +569,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     setBankDepositLoading(false);
   };
 
-  const todayPayments = normalisedPayments.filter(p => {
-    const paymentDate = p.date || p.payment_date;
-    if (lastDayClosed && new Date(paymentDate) <= new Date(lastDayClosed)) {
-      return false;
-    }
-    return isPaidStatus(p.status) && paymentDate && paymentDate.startsWith(businessToday);
-  });
+  const todayPayments = normalisedPayments.filter(p => isPaidStatus(p.status) && isTodayPayment(p));
   const todayCollection = todayPayments.reduce((s, p) => s + Number(p.amount), 0);
 
   const filteredBalances = filterDate === "today"
