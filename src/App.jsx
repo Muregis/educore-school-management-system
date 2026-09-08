@@ -434,7 +434,22 @@ const fullNav = useMemo(() => {
   const hydrateTenantData = useCallback(async (loggedInAuth) => {
     if (!loggedInAuth?.token) return;
     const token = loggedInAuth.token;
-    const termParam = currentTerm ? `?term=${encodeURIComponent(currentTerm)}` : '';
+    // Resolve the authoritative current term from the server BEFORE filtering
+    // payments/grades/fee-structures. If the client's term is still null (e.g.
+    // useCurrentTerm hasn't resolved yet), an empty `?term=` would make the
+    // backend return ALL terms mixed together — which is exactly what made
+    // different devices disagree on collected fees.
+    let term = currentTerm;
+    if (!term) {
+      try {
+        const termRes = await apiFetch('/academic/terms/current', { token });
+        const termData = termRes?.data || termRes;
+        if (termData?.term_name) term = termData.term_name;
+      } catch (err) {
+        console.error('[hydrate] Failed to resolve current term:', err.message || err);
+      }
+    }
+    const termParam = term ? `?term=${encodeURIComponent(term)}` : '';
     const attendanceParams = currentTerm && startDate && endDate ? `?from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}` : '';
     const [schoolRes, studentsRes, teachersRes, attendanceRes, gradesRes, paymentsRes, feeRes, timetableRes] = await Promise.allSettled([
       apiFetch("/settings/school", { token }),
@@ -475,6 +490,28 @@ const fullNav = useMemo(() => {
       console.error("[tenant_hydrate] Failed to refresh tenant data:", err.message);
     });
   }, [auth?.token, auth?.schoolId, activeSchoolId, hydrateTenantData, fetchOnMount]);
+
+  // Keep payments (and the derived collection/progress shown on the dashboard and Fees page)
+  // in sync across devices. Payments are the most frequently mutated data, so poll them
+  // instead of relying on a manual reload — otherwise a payment recorded on one device
+  // (e.g. the director's desktop) never appears on another (e.g. the phone) until a full
+  // page refresh.
+  const reloadPayments = useCallback(async () => {
+    if (!auth?.token || !currentTerm) return;
+    try {
+      const data = await apiFetch(`/payments?term=${encodeURIComponent(currentTerm)}`, { token: auth.token });
+      setPayments(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("[payments_poll] Failed to refresh payments:", err.message || err);
+    }
+  }, [auth?.token, currentTerm, setPayments]);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    reloadPayments();
+    const interval = setInterval(reloadPayments, 30000);
+    return () => clearInterval(interval);
+  }, [reloadPayments, auth?.token]);
 
   const handleSchoolSwitch = useCallback(async (schoolId, selectedSchool) => {
     const nextSchoolId = Number(schoolId);

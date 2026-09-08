@@ -67,16 +67,22 @@ export function useCurrentTerm(auth, options = {}) {
       const termData = response.data || response;
 
       if (!termData || !termData.term_name) {
-        // Fallback: try to get terms list and find active one
+        // Fallback: try to get terms list and find active one.
+        // Prefer the term the school has marked current (authoritative, matches the
+        // backend's TermService.getCurrentTerm) so every device resolves the SAME
+        // term — otherwise a date-based guess can diverge (e.g. Term 3 in Sep-Dec)
+        // and different devices end up filtering payments by different terms.
         const termsResponse = await apiFetch('/academic/terms', { token: auth.token });
         const terms = (termsResponse?.data || termsResponse || []);
-        
+
+        const currentByFlag = terms.find(t => t.is_current || t.isCurrent);
         const now = new Date();
-        const activeTerm = terms.find(t => {
+        const currentByDate = terms.find(t => {
           const start = new Date(t.start_date || t.startDate);
           const end = new Date(t.end_date || t.endDate);
           return now >= start && now <= end;
-        }) || terms[0]; // Fallback to first term
+        });
+        const activeTerm = currentByFlag || currentByDate || terms[0]; // Fallback to first term
 
         if (activeTerm) {
           const result = {
