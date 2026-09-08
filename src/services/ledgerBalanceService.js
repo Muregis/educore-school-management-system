@@ -202,6 +202,7 @@ export async function recordPayment({
   paymentMethod,
   paymentId,
   reference,
+  term,
   token
 }) {
   return addLedgerEntry({
@@ -211,6 +212,7 @@ export async function recordPayment({
     description: `Payment via ${paymentMethod}`,
     reference: reference || `PAY_${paymentId}`,
     metadata: { payment_method: paymentMethod, payment_id: paymentId },
+    term,
     token
   });
 }
@@ -269,6 +271,7 @@ async function addLedgerEntry({
   description,
   reference = null,
   metadata = {},
+  term,
   token
 }) {
   const payload = {
@@ -280,6 +283,10 @@ async function addLedgerEntry({
     metadata,
     transaction_date: new Date().toISOString()
   };
+
+  if (term) {
+    payload.term = term;
+  }
 
   try {
     const result = await apiFetch('/ledger/entries', {

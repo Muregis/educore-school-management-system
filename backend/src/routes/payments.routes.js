@@ -11,6 +11,20 @@ import { LedgerService } from "../services/ledger.service.js";
 import { getPortalStudentIds } from "../utils/portalAccess.js";
 import multer from "multer";
 
+// Helper: fetch the current term for a school
+async function getCurrentTermName(schoolId) {
+  const { data: term, error } = await supabase
+    .from('terms')
+    .select('term_name')
+    .eq('school_id', schoolId)
+    .eq('is_current', true)
+    .maybeSingle();
+  if (error || !term) {
+    return 'Term 2'; // fallback only if no current term exists
+  }
+  return term.term_name;
+}
+
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -158,11 +172,17 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
       referenceNumber = null,
       paymentDate,
       status       = "paid",
-      term         = "Term 2",
+      term,
       paidBy       = null,
       parentPhone,
       proofUrl
     } = req.body;
+
+    // Resolve term: use client-supplied value, else fetch current term from DB
+    let resolvedTerm = term;
+    if (!resolvedTerm) {
+      resolvedTerm = await getCurrentTermName(schoolId);
+    }
 
     if (!studentId || !amount || !paymentDate)
       return res.status(400).json({ message: "studentId, amount and paymentDate are required" });
@@ -194,7 +214,7 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
         reference_number: referenceNumber,
         payment_date: paymentDate,
         status,
-        term,
+        term: resolvedTerm,
         paid_by: paidBy,
         proof_url: proofUrl || null
       })
@@ -231,11 +251,11 @@ router.post("/", requireRoles("admin", "finance", "teacher"), async (req, res, n
         if (student && userRow?.email) {
           sendEmail({
             to: userRow.email,
-            subject: `Payment Received — ${term}`,
+            subject: `Payment Received — ${resolvedTerm}`,
             html: templates.paymentReceived({
               parentName:  student.parent_name || "Parent/Guardian",
               studentName: `${student.first_name} ${student.last_name}`,
-              amount, term, balance: 0,
+              amount, term: resolvedTerm, balance: 0,
             }),
             schoolId,
           }).catch(() => {});
@@ -504,6 +524,12 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
       return res.status(404).json({ message: 'Student not found in this school' });
     }
 
+    // Resolve term: use client-supplied value, else fetch current term from DB
+    let resolvedTerm = term;
+    if (!resolvedTerm) {
+      resolvedTerm = await getCurrentTermName(schoolId);
+    }
+
     const receiptNumber = normalizedPaymentMethod === 'cash'
       ? (referenceNumber ? `CASH-${referenceNumber}` : `CASH-${Date.now()}`)
       : ['bank_transfer', 'bank'].includes(normalizedPaymentMethod)
@@ -525,7 +551,7 @@ router.post("/record-manual", authRequired, requireRoles('admin', 'finance', 'di
         proof_url: proofUrl || null,
         payment_date: paymentDate || new Date().toISOString().split('T')[0],
         status: 'paid',
-        term: term || 'Term 2',
+        term: resolvedTerm,
         received_by_user_id: userId,
         notes: notes || null,
         created_at: new Date().toISOString()
