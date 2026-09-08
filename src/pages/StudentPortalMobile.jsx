@@ -178,7 +178,7 @@ export default function StudentPortalMobile({
         {(() => {
           const today = new Date().toLocaleLowerCase('en-US', { weekday: 'long' });
           const todaySubjects = timetable.filter(t =>
-            t.day?.toLowerCase() === today &&
+            t.day_of_week?.toLowerCase() === today &&
             t.className === student?.className
           );
 
@@ -201,7 +201,7 @@ export default function StudentPortalMobile({
                     </div>
                   </div>
                   <div style={{ fontSize: '14px', color: '#3B82F6', fontWeight: '600' }}>
-                    {subject.startTime} - {subject.endTime}
+                    {subject.start_time} - {subject.end_time}
                   </div>
                 </div>
               ))}
@@ -357,9 +357,9 @@ export default function StudentPortalMobile({
     const timetableByDay = daysOfWeek.map(day => ({
       day,
       subjects: timetable.filter(t =>
-        t.day?.toLowerCase() === day.toLowerCase() &&
+        t.day_of_week?.toLowerCase() === day.toLowerCase() &&
         t.className === student?.className
-      ).sort((a, b) => a.startTime.localeCompare(b.startTime))
+      ).sort((a, b) => a.start_time.localeCompare(b.start_time))
     }));
 
     return (
@@ -376,7 +376,7 @@ export default function StudentPortalMobile({
                   <div key={subject.id ?? subject.timetable_id} className="timetable-subject">
                     <div className="timetable-name">{subject.subject}</div>
                     <div className="timetable-time">
-                      {subject.startTime} - {subject.endTime}
+                      {subject.start_time} - {subject.end_time}
                     </div>
                   </div>
                 ))
