@@ -323,7 +323,7 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
             opening_balance: s.opening_balance,
             transport_fee: s.transport_fee,
             lunch_fee: s.lunch_fee,
-            breakfast_fee: s.breakfast_fee,
+            breakfast_termly_fee: s.breakfast_termly_fee,
             dob: s.date_of_birth,
             nemisNumber: s.nemis_number,
             bloodGroup: s.blood_group,

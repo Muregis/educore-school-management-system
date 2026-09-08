@@ -218,7 +218,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       lunchFee: balanceInfo.lunchFee,
       lunchAgreed: Number(student?.lunch_fee) > 0,
       breakfastFee: balanceInfo.breakfastFee,
-      breakfastAgreed: Number(student?.breakfast_fee) > 0,
+      breakfastAgreed: Number(student?.breakfast_termly_fee) > 0,
       baseFee: balanceInfo.baseFee,
       admissionNumber: student?.admission ?? student?.admission_number ?? "",
       email: student?.email ?? student?.parentEmail ?? "",

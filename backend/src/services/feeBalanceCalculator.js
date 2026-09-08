@@ -57,7 +57,7 @@ export function getStudentBaseFee(student, feeStructures = []) {
 
 // ── Agreed-amount overrides ────────────────────────────────────────────────────
 // The students table stores three per-row columns — transport_fee, lunch_fee,
-// breakfast_fee — that represent the already-computed contribution for that
+// breakfast_termly_fee — that represent the already-computed contribution for that
 // component (e.g. an agreed KES 4,500 for transport, regardless of rate or
 // direction). When set to a positive value they replace the rate-based
 // calculation entirely.  A value of 0 or missing means "no agreement, fall
@@ -119,7 +119,7 @@ export function getStudentLunchFee(student, schoolSettings = {}) {
 }
 
 export function getStudentBreakfastFee(student, schoolSettings = {}) {
-  const agreed = agreedAmount(student, "breakfast_fee");
+  const agreed = agreedAmount(student, "breakfast_termly_fee");
   if (agreed !== null && agreed > 0) return agreed;
   if (!Boolean(student?.breakfast_enabled ?? student?.breakfastEnabled)) return 0;
   return calculateBreakfastFee(

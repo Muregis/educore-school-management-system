@@ -34,7 +34,7 @@ export function hasFeeStructureForClass(student, feeStructures = []) {
 }
 
 // ── Agreed-amount overrides ────────────────────────────────────────────────────
-// A student's per-row `transport_fee` / `lunch_fee` / `breakfast_fee` columns
+// A student's per-row `transport_fee` / `lunch_fee` / `breakfast_termly_fee` columns
 // (set via PATCH /students/:id/fees) represent the *already-computed*
 // contribution for that component — they supersede any rate-based calculation
 // so a parent/guardian agreement of "transport = KES 4,500 flat" is honored
@@ -109,7 +109,7 @@ export function getStudentLunchFee(student, schoolSettings = {}) {
 
 export function getStudentBreakfastFee(student, schoolSettings = {}) {
   // 1. Agreed override
-  const agreed = getAgreedAmount(student, "breakfast_fee");
+  const agreed = getAgreedAmount(student, "breakfast_termly_fee");
   if (agreed !== null && agreed > 0) {
     return agreed;
   }

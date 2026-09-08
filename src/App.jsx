@@ -508,9 +508,14 @@ const fullNav = useMemo(() => {
 
   useEffect(() => {
     if (!auth?.token) return;
-    reloadPayments();
-    const interval = setInterval(reloadPayments, 30000);
-    return () => clearInterval(interval);
+    const poll = () => {
+      if (document.visibilityState === "visible") reloadPayments();
+    };
+    poll();
+    const interval = setInterval(poll, 30000);
+    const handleVisibility = () => { if (document.visibilityState === "visible") reloadPayments(); };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => { clearInterval(interval); document.removeEventListener("visibilitychange", handleVisibility); };
   }, [reloadPayments, auth?.token]);
 
   const handleSchoolSwitch = useCallback(async (schoolId, selectedSchool) => {

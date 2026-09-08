@@ -86,7 +86,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   transport_direction: "none", transport_base_fee: "",
   lunch_fee: "",                      // agreed flat lunch amount (overrides rate calc)
   lunch_enabled: false, lunch_daily_rate: "", lunch_days: "", lunch_billing_type: "termly",
-  breakfast_fee: "",                  // agreed flat breakfast amount (overrides rate calc)
+  breakfast_termly_fee: "",                  // agreed flat breakfast amount (overrides rate calc)
   breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: "", breakfast_billing_type: "termly",
   discount_type: "", discount_value: "", discount_is_percentage: true,
 });
@@ -230,7 +230,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           lunch_daily_rate: parseFloat(f.lunch_daily_rate) || 0,
           lunch_days: f.lunch_days ? parseInt(f.lunch_days) : null,
           lunch_billing_type: f.lunch_billing_type || "daily",
-          breakfast_fee: f.breakfast_fee === "" ? 0 : parseFloat(f.breakfast_fee) || 0,
+          breakfast_termly_fee: f.breakfast_termly_fee === "" ? 0 : parseFloat(f.breakfast_termly_fee) || 0,
           breakfast_enabled: Boolean(f.breakfast_enabled),
           breakfast_daily_rate: parseFloat(f.breakfast_daily_rate) || 0,
           breakfast_days: f.breakfast_days ? parseInt(f.breakfast_days) : null,
@@ -563,7 +563,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
                 <Input type="number" value={f.breakfast_days || ""} onChange={e => handleChange('breakfast_days', e.target.value)} placeholder="School days" />
               )}
               {f.breakfast_billing_type === 'termly' && <div />}
-              <Input type="number" value={f.breakfast_fee || ""} onChange={e => handleChange('breakfast_fee', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder="Agreed breakfast (KES) — overrides rate" />
+              <Input type="number" value={f.breakfast_termly_fee || ""} onChange={e => handleChange('breakfast_termly_fee', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder="Agreed breakfast (KES) — overrides rate" />
             </div>
             <small style={{ color: "var(--color-text-muted)", fontSize: "11px", display: "block", marginTop: "var(--space-2)" }}>
               If <strong>Agreed breakfast</strong> is set, it replaces the rate × days calculation.
