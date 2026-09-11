@@ -55,10 +55,13 @@ import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import SidebarModern from "./components/SidebarModern";
 import BranchSelector from "./components/BranchSelector";
 import Topbar from "./components/Topbar";
+import PageLoader from "./components/ui/PageLoader";
+import EmptyState from "./components/ui/EmptyState";
 import { API_BASE, apiFetch } from "./lib/api";
 import TermManagementPage from "./pages/TermManagementPage";
 import AcademicTransitionPage from "./pages/AcademicTransitionPage";
 import { clearSession, getSession, logout, saveSession } from "./lib/auth";
+import { clearCurrentTermCache } from "./hooks/useCurrentTerm";
 
 // Mobile portal imports
 import ParentPortalMobile from "./pages/ParentPortalMobile";
@@ -153,23 +156,26 @@ export default function App() {
   const isQRVerification = !!verifyMatch;
   const studentId = verifyMatch ? verifyMatch[1] : null;
 
-  const [school, setSchool]               = useLocalState("educore.school",        DEFAULTS.school);
-  const [users, setUsers]                 = useLocalState("educore.users",          DEFAULTS.users);
-  const [students, setStudents]           = useLocalState("educore.students",       DEFAULTS.students);
-  const [teachers, setTeachers]           = useLocalState("educore.teachers",       DEFAULTS.teachers);
-  const [attendance, setAttendance]       = useLocalState("educore.attendance",     DEFAULTS.attendance);
-  const [results, setResults]             = useLocalState("educore.results",        DEFAULTS.results);
-  const [feeStructures, setFeeStructures] = useLocalState("educore.feeStructures",  DEFAULTS.feeStructures);
-  const [payments, setPayments]           = useLocalState("educore.payments",       DEFAULTS.payments);
-  const [notifications, setNotifications] = useLocalState("educore.notifications",  DEFAULTS.notifications);
-  const [timetable, setTimetable]         = useLocalState("educore.timetable",      DEFAULTS.timetable);
-  const [pendingUpdates, setPendingUpdates] = useLocalState("educore.pendingUpdates", DEFAULTS.pendingUpdates);
-  const [fetchOnMount] = useState(() => Date.now());
-
   const [auth, setAuth] = useState(() => {
     const session = getSession();
     return session?.user ? { ...session.user, token: session.token, sessionId: session.sessionId } : null;
   });
+  const hasAuthenticatedSession = Boolean(auth?.token);
+
+  const [school, setSchool]               = useLocalState("educore.school",        hasAuthenticatedSession ? { ...DEFAULTS.school } : DEFAULTS.school);
+  const [users, setUsers]                 = useLocalState("educore.users",          hasAuthenticatedSession ? [] : DEFAULTS.users);
+  const [students, setStudents]           = useLocalState("educore.students",       hasAuthenticatedSession ? [] : DEFAULTS.students);
+  const [teachers, setTeachers]           = useLocalState("educore.teachers",       hasAuthenticatedSession ? [] : DEFAULTS.teachers);
+  const [attendance, setAttendance]       = useLocalState("educore.attendance",     hasAuthenticatedSession ? [] : DEFAULTS.attendance);
+  const [results, setResults]             = useLocalState("educore.results",        hasAuthenticatedSession ? [] : DEFAULTS.results);
+  const [feeStructures, setFeeStructures] = useLocalState("educore.feeStructures",  hasAuthenticatedSession ? [] : DEFAULTS.feeStructures);
+  const [payments, setPayments]           = useLocalState("educore.payments",       hasAuthenticatedSession ? [] : DEFAULTS.payments);
+  const [notifications, setNotifications] = useLocalState("educore.notifications",  hasAuthenticatedSession ? [] : DEFAULTS.notifications);
+  const [timetable, setTimetable]         = useLocalState("educore.timetable",      hasAuthenticatedSession ? [] : DEFAULTS.timetable);
+  const [pendingUpdates, setPendingUpdates] = useLocalState("educore.pendingUpdates", hasAuthenticatedSession ? [] : DEFAULTS.pendingUpdates);
+  const [tenantDataLoading, setTenantDataLoading] = useState(hasAuthenticatedSession);
+  const [tenantDataError, setTenantDataError] = useState(null);
+  const tenantRequestRef = useRef(0);
 
   const [page, _setPage]                   = useState(() => {
     const hash = window.location.hash.replace(/^#\/?/, "");
@@ -429,38 +435,51 @@ const fullNav = useMemo(() => {
     setTimetable(DEFAULTS.timetable); setPendingUpdates(DEFAULTS.pendingUpdates);
   }, [setSchool, setUsers, setStudents, setTeachers, setAttendance, setResults, setFeeStructures, setPayments, setNotifications, setTimetable, setPendingUpdates]);
 
-  const { term: currentTerm, startDate, endDate } = useCurrentTerm(auth);
+  const {
+    term: currentTerm,
+    startDate,
+    endDate,
+    isLoading: currentTermLoading,
+    error: currentTermError,
+  } = useCurrentTerm(auth);
 
-  const hydrateTenantData = useCallback(async (loggedInAuth) => {
-    if (!loggedInAuth?.token) return;
+  const beginTenantRefresh = useCallback(() => {
+    tenantRequestRef.current += 1;
+    setDataRefreshRequest((value) => value + 1);
+    setTenantDataLoading(true);
+    setTenantDataError(null);
+    resetClientData();
+  }, [resetClientData]);
+
+  const hydrateTenantData = useCallback(async (loggedInAuth, term, termStartDate, termEndDate) => {
+    if (!loggedInAuth?.token || !term) return;
+
+    const requestId = ++tenantRequestRef.current;
     const token = loggedInAuth.token;
-    // Resolve the authoritative current term from the server BEFORE filtering
-    // payments/grades/fee-structures. If the client's term is still null (e.g.
-    // useCurrentTerm hasn't resolved yet), an empty `?term=` would make the
-    // backend return ALL terms mixed together — which is exactly what made
-    // different devices disagree on collected fees.
-    let term = currentTerm;
-    if (!term) {
-      try {
-        const termRes = await apiFetch('/academic/terms/current', { token });
-        const termData = termRes?.data || termRes;
-        if (termData?.term_name) term = termData.term_name;
-      } catch (err) {
-        console.error('[hydrate] Failed to resolve current term:', err.message || err);
-      }
-    }
-    const termParam = term ? `?term=${encodeURIComponent(term)}` : '';
-    const attendanceParams = currentTerm && startDate && endDate ? `?from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}` : '';
+    const termParam = `?term=${encodeURIComponent(term)}`;
+    const attendanceParams = termStartDate && termEndDate
+      ? `?from=${encodeURIComponent(termStartDate)}&to=${encodeURIComponent(termEndDate)}`
+      : "";
+
+    setTenantDataLoading(true);
+    setTenantDataError(null);
+    resetClientData();
+
     const [schoolRes, studentsRes, teachersRes, attendanceRes, gradesRes, paymentsRes, feeRes, timetableRes] = await Promise.allSettled([
-      apiFetch("/settings/school", { token }),
-      apiFetch("/students", { token }),
-      apiFetch("/teachers", { token }),
-      apiFetch(`/attendance${attendanceParams}`, { token }),
-      apiFetch(`/grades${termParam}`, { token }),
-      apiFetch(`/payments${termParam}`, { token }),
-      apiFetch("/payments/fee-structures", { token }),
-      apiFetch("/timetable", { token }),
+      apiFetch("/settings/school", { token, timeoutMs: 12000, retries: 0 }),
+      apiFetch("/students", { token, timeoutMs: 12000, retries: 0 }),
+      apiFetch("/teachers", { token, timeoutMs: 12000, retries: 0 }),
+      apiFetch(`/attendance${attendanceParams}`, { token, timeoutMs: 12000, retries: 0 }),
+      apiFetch(`/grades${termParam}`, { token, timeoutMs: 12000, retries: 0 }),
+      apiFetch(`/payments${termParam}`, { token, timeoutMs: 12000, retries: 0 }),
+      apiFetch("/payments/fee-structures", { token, timeoutMs: 12000, retries: 0 }),
+      apiFetch("/timetable", { token, timeoutMs: 12000, retries: 0 }),
     ]);
+
+    if (requestId !== tenantRequestRef.current) return;
+
+    const criticalResults = [schoolRes, studentsRes, teachersRes, attendanceRes, gradesRes, paymentsRes, feeRes];
+    const criticalFailed = criticalResults.some(result => result.status !== "fulfilled" || !result.value);
 
     if (schoolRes.status === "fulfilled" && schoolRes.value) {
       setSchool({ ...DEFAULTS.school, ...schoolRes.value });
@@ -475,7 +494,9 @@ const fullNav = useMemo(() => {
     setPayments(paymentsRes.status === "fulfilled" ? (paymentsRes.value || []) : []);
     setFeeStructures(feeRes.status === "fulfilled" ? (feeRes.value || []) : []);
     setTimetable(timetableRes.status === "fulfilled" ? (timetableRes.value || []) : []);
-  }, [setSchool, setStudents, setTeachers, setAttendance, setResults, setPayments, setFeeStructures, setTimetable, currentTerm]);
+    setTenantDataLoading(false);
+    setTenantDataError(criticalFailed ? "Some dashboard data could not be loaded. Please try again." : null);
+  }, [resetClientData, setSchool, setStudents, setTeachers, setAttendance, setResults, setPayments, setFeeStructures, setTimetable]);
 
   useEffect(() => {
     const ping = () => fetch(`${API_BASE}/health`).catch(() => {});
@@ -485,11 +506,40 @@ const fullNav = useMemo(() => {
   }, []);
 
   useEffect(() => {
-    if (!auth?.token) return;
-    hydrateTenantData(auth).catch((err) => {
-      console.error("[tenant_hydrate] Failed to refresh tenant data:", err.message);
-    });
-  }, [auth?.token, auth?.schoolId, activeSchoolId, hydrateTenantData, fetchOnMount]);
+    if (!auth?.token) {
+      tenantRequestRef.current += 1;
+      setTenantDataLoading(false);
+      setTenantDataError(null);
+      return undefined;
+    }
+
+    if (currentTermLoading) {
+      setTenantDataLoading(true);
+      return undefined;
+    }
+
+    if (currentTermError || !currentTerm) {
+      tenantRequestRef.current += 1;
+      setTenantDataLoading(false);
+      setTenantDataError(currentTermError || "Current term is unavailable.");
+      resetClientData();
+      return undefined;
+    }
+
+    hydrateTenantData(auth, currentTerm, startDate, endDate);
+    return undefined;
+  }, [
+    auth,
+    activeSchoolId,
+    currentTerm,
+    currentTermLoading,
+    currentTermError,
+    startDate,
+    endDate,
+    hydrateTenantData,
+    resetClientData,
+    dataRefreshRequest,
+  ]);
 
   // Keep payments (and the derived collection/progress shown on the dashboard and Fees page)
   // in sync across devices. Payments are the most frequently mutated data, so poll them
@@ -523,7 +573,7 @@ const fullNav = useMemo(() => {
     if (!nextSchoolId || !auth?.token) return;
 
     localStorage.setItem("educore.activeSchool", String(nextSchoolId));
-    setActiveSchoolId(String(nextSchoolId));
+    clearCurrentTermCache();
 
     const nextAuth = {
       ...auth,
@@ -536,14 +586,17 @@ const fullNav = useMemo(() => {
     if (selectedSchool) {
       setSchool(prev => ({ ...prev, ...selectedSchool, school_id: nextSchoolId }));
     }
-
-    await hydrateTenantData(nextAuth);
+    beginTenantRefresh();
     toast(`Switched to ${selectedSchool?.name || "selected school"}`, "success");
-  }, [auth, hydrateTenantData, setSchool, toast]);
+  }, [auth, beginTenantRefresh, setSchool, toast]);
 
   const handleLogout = useCallback(() => {
     logout();
     clearTenantLocalState();
+    clearCurrentTermCache();
+    tenantRequestRef.current += 1;
+    setTenantDataLoading(false);
+    setTenantDataError(null);
     resetClientData();
     setAuth(null);
     setActiveChildId(null);
@@ -552,6 +605,7 @@ const fullNav = useMemo(() => {
 
   const handleLogin = useCallback(async (u) => {
     clearTenantLocalState();
+    clearCurrentTermCache();
     resetClientData();
 
     saveSession({ token: u.token, sessionId: u.sessionId, user: u });
@@ -559,14 +613,9 @@ const fullNav = useMemo(() => {
     setAuth(u);
     setActiveChildId(null);
     setPage("dashboard");
+    beginTenantRefresh();
     toast(`Welcome, ${u.name}`, "success");
-
-    try {
-      await hydrateTenantData(u);
-    } catch (err) {
-      console.error("[tenant_hydrate] Failed to load fresh tenant data:", err.message);
-    }
-  }, [hydrateTenantData, resetClientData, toast]);
+  }, [beginTenantRefresh, resetClientData, toast]);
 
   useEffect(() => {
     if (!auth) return undefined;
