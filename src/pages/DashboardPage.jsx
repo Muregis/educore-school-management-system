@@ -430,24 +430,18 @@ const todayPayments = payments.filter(p => {
             <EmptyState icon="📝" title="All Caught Up" description="Submit lesson plans" />
           )}
         </ChartCard>
+      </div>
+    );
   }
 
-// Teacher dashboard  
-  let normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
-  let myClasses;
-  let myStudents;
-  let myStudentIds;
-  let myAttendance;
-  let myResults;
-  let attendanceByDate;
-
-  if (auth?.role === "teacher") {
-    myClasses = teacherClasses?.map(normalizeClassName) || [];
-    myStudents = students.filter(s => myClasses.includes(normalizeClassName(s.className ?? s.class_name)));
-    myStudentIds = new Set(myStudents.map(s => String(s.student_id ?? s.id ?? s.studentId ?? "")));
-    myAttendance = attendance.filter(a => myStudentIds.has(String(a.studentId ?? a.student_id ?? "")));
-    myResults = results.filter(r => myStudentIds.has(String(r.studentId ?? r.student_id ?? "")));
-    attendanceByDate = Object.entries(
+if (auth?.role === "teacher") {
+    let normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
+    let myClasses = teacherClasses?.map(normalizeClassName) || [];
+    let myStudents = students.filter(s => myClasses.includes(normalizeClassName(s.className ?? s.class_name)));
+    let myStudentIds = new Set(myStudents.map(s => String(s.student_id ?? s.id ?? s.studentId ?? "")));
+    let myAttendance = attendance.filter(a => myStudentIds.has(String(a.studentId ?? a.student_id ?? "")));
+    let myResults = results.filter(r => myStudentIds.has(String(r.studentId ?? r.student_id ?? "")));
+    let attendanceByDate = Object.entries(
       myAttendance.reduce((acc, row) => {
         if (!acc[row.date]) acc[row.date] = { present: 0, total: 0 };
         acc[row.date].total += 1;
