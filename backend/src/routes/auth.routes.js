@@ -1,6 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { authRequired } from "../middleware/auth.js";
+import { supabase } from "../config/supabaseClient.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { requireRoles, requireDirector } from "../middleware/roles.js";
 import { authorize } from "../middleware/permissions.js";
