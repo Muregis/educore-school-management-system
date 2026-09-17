@@ -8,7 +8,6 @@ const KEEP_LAST = 7;
 const SENSITIVE_COLUMNS = new Set([
   "password",
   "password_hash",
-  "password_history",
   "two_factor_secret",
   "two_factor_backup_codes",
   "reset_token",

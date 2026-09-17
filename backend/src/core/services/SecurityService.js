@@ -94,19 +94,10 @@ export class SecurityService {
       throw new Error(validation.errors.join(', '));
     }
 
-    const history = Array.isArray(user.password_history) ? user.password_history : [];
-    const reused = await Promise.all(
-      [user.password_hash, ...history].filter(Boolean).map(hash => bcrypt.compare(newPassword, hash))
-    );
-    if (reused.some(Boolean)) {
-      throw new Error('Cannot reuse a recent password');
-    }
-
     const newHash = await bcrypt.hash(newPassword, 12);
     await this.usersRepository.update(userId, {
       password_hash: newHash,
-      password_changed_at: new Date().toISOString(),
-      password_history: [...history, user.password_hash].filter(Boolean).slice(-Math.max(policy.preventReuse, 1))
+      password_changed_at: new Date().toISOString()
     }, context);
 
     await this.logSecurityEvent(userId, user.school_id, 'password_changed', 'Password changed successfully');

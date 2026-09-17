@@ -422,22 +422,12 @@ async function passwordPolicyGate({ req, res, password, user, schoolId }) {
 }
 
 async function recordPasswordChange({ userId, schoolId, currentHash, newHash, historyLimit }) {
-  const { data: existing } = await supabase
-    .from("private.user_credentials")
-    .select("password_history")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  const previous = Array.isArray(existing?.password_history) ? existing.password_history : [];
-  const history = [...previous, currentHash].filter(Boolean).slice(-Math.max(historyLimit, 1));
-
   const { error } = await supabase
     .from("private.user_credentials")
     .update({
       password_hash: newHash,
       password_changed_at: new Date().toISOString(),
-      token_version: existing ? existing.token_version + 1 : 1,
-      password_history: history,
+      token_version: 1,
       failed_login_attempts: 0,
       locked_until: null,
     })
@@ -702,14 +692,6 @@ router.post("/change-password", authRateLimit, async (req, res, next) => {
     const check = validatePassword(newPassword, { email: user.email, firstName: user.full_name }, policy);
     if (!check.valid) {
       return res.status(400).json({ message: "Password does not meet security requirements", errors: check.errors });
-    }
-
-    const history = Array.isArray(user.password_history) ? user.password_history : [];
-    const reused = await Promise.all(
-      [user.password_hash, ...history].filter(Boolean).map(hash => bcrypt.compare(newPassword, hash))
-    );
-    if (reused.some(Boolean)) {
-      return res.status(400).json({ message: "Password was used recently. Choose a different password." });
     }
 
     const newHash = await bcrypt.hash(newPassword, 12);

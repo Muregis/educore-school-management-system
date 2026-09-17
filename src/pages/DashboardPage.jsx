@@ -433,19 +433,14 @@ const todayPayments = payments.filter(p => {
   }
 
 // Teacher dashboard  
-if (auth?.role === "teacher") {
-    var normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
-    var myClasses = Array.isArray(teacherClasses) ? teacherClasses.map(normalizeClassName) : [];
-    var myStudents = students.filter(s => myClasses.includes(normalizeClassName(s.className ?? s.class_name)));
-    var myStudentIds = new Set(myStudents.map(s => String(s.student_id ?? s.id ?? s.studentId ?? "")));
-    var myAttendance = attendance.filter(a => myStudentIds.has(String(a.studentId ?? a.student_id ?? "")));
-    var myResults = results.filter(r => myStudentIds.has(String(r.studentId ?? r.student_id ?? """)));
-    attendanceByDate = Object.entries(
+  if (auth?.role === "teacher") {
+    const normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
+    const myClasses = Array.isArray(teacherClasses) ? teacherClasses.map(normalizeClassName) : [];
+    const myStudents = students.filter(s => myClasses.includes(normalizeClassName(s.className ?? s.class_name)));
     const myStudentIds = new Set(myStudents.map(s => String(s.student_id ?? s.id ?? s.studentId ?? "")));
     const myAttendance = attendance.filter(a => myStudentIds.has(String(a.studentId ?? a.student_id ?? "")));
     const myResults = results.filter(r => myStudentIds.has(String(r.studentId ?? r.student_id ?? "")));
-     
-    const attendanceByDate = Object.entries(
+    attendanceByDate = Object.entries(
       myAttendance.reduce((acc, row) => {
         if (!acc[row.date]) acc[row.date] = { present: 0, total: 0 };
         acc[row.date].total += 1;
