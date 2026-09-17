@@ -2,7 +2,9 @@ import { Router } from "express";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { adminActionRateLimit, passwordResetRateLimit } from "../middleware/rateLimit.js";
-import { runBackup, listBackups, downloadBackup, deleteBackup } from "../services/backup.service.js";
+import { runBackup, listBackups, downloadBackup, deleteBackup, BACKUP_FILENAME_RE } from "../services/backup.service.js";
+import { logActivity } from "../helpers/activity.logger.js";
+import { rejectWeakPassword } from "../helpers/password-policy.helper.js";
 import { AdminService } from "../services/admin.service.js";
 import { supabase } from "../config/supabaseClient.js";
 import { logTenantContext, logTenantQuery } from "../helpers/tenant-debug.logger.js";
@@ -11,10 +13,34 @@ const router  = Router();
 
 router.use(authRequired);
 router.use(requireRoles("admin", "director", "superadmin"));
+// Backups are tenant artifacts: the school always comes from the session and a
+// filename is only addressable by the school that owns it.
+function tenantSchoolId(req) {
+  const id = Number(req.user?.school_id ?? req.user?.schoolId);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function backupContext(req, res) {
+  const schoolId = tenantSchoolId(req);
+  if (!schoolId) {
+    res.status(400).json({ message: "No active school context" });
+    return null;
+  }
+  const { filename } = req.params;
+  if (filename !== undefined &&
+      (!BACKUP_FILENAME_RE.test(filename) || !filename.startsWith(`backup_school${schoolId}_`))) {
+    res.status(404).json({ message: "Backup not found" });
+    return null;
+  }
+  return { schoolId, filename };
+}
+
 // ── GET /api/admin/backups ────────────────────────────────────────────────────
 router.get("/backups", async (req, res, next) => {
   try {
-    const backups = (await listBackups()).map(b => ({
+    const ctx = backupContext(req, res);
+    if (!ctx) return;
+    const backups = (await listBackups(ctx.schoolId)).map(b => ({
       filename:  b.filename,
       sizeKb:    Math.round(b.size / 1024),
       createdAt: b.createdAt,
@@ -26,8 +52,16 @@ router.get("/backups", async (req, res, next) => {
 // ── POST /api/admin/backups ───────────────────────────────────────────────────
 router.post("/backups", async (req, res, next) => {
   try {
-    const result = await runBackup();
-    if (!result.success) return res.status(500).json({ message: result.error });
+    const ctx = backupContext(req, res);
+    if (!ctx) return;
+    const result = await runBackup(ctx.schoolId);
+    if (!result.success) return res.status(500).json({ message: "Backup failed" });
+    logActivity(req, {
+      action: "admin.backup.create",
+      entity: "backup",
+      entityId: result.filename,
+      description: `Backup created for school ${ctx.schoolId}`,
+    });
     res.status(201).json({
       message:  "Backup created successfully",
       filename: result.filename,
@@ -39,14 +73,18 @@ router.post("/backups", async (req, res, next) => {
 // ── GET /api/admin/backups/:filename/download ─────────────────────────────────
 router.get("/backups/:filename/download", async (req, res, next) => {
   try {
-    const { filename } = req.params;
-    if (!/^backup_[\d\-T]+\.sql$/.test(filename)) {
-      return res.status(400).json({ message: "Invalid filename" });
-    }
-    const blob = await downloadBackup(filename);
+    const ctx = backupContext(req, res);
+    if (!ctx) return;
+    const blob = await downloadBackup(ctx.schoolId, ctx.filename);
     const buffer = Buffer.from(await blob.arrayBuffer());
+    logActivity(req, {
+      action: "admin.backup.download",
+      entity: "backup",
+      entityId: ctx.filename,
+      description: `Backup downloaded for school ${ctx.schoolId}`,
+    });
     res.setHeader("Content-Type", "application/sql");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${ctx.filename}"`);
     res.send(buffer);
   } catch (err) {
     if (err.message.includes("not found") || err.message.includes("404")) {
@@ -59,12 +97,16 @@ router.get("/backups/:filename/download", async (req, res, next) => {
 // ── DELETE /api/admin/backups/:filename ───────────────────────────────────────
 router.delete("/backups/:filename", async (req, res, next) => {
   try {
-    const { filename } = req.params;
-    if (!/^backup_[\d\-T]+\.sql$/.test(filename)) {
-      return res.status(400).json({ message: "Invalid filename" });
-    }
-    await deleteBackup(filename);
-    res.json({ deleted: true, filename });
+    const ctx = backupContext(req, res);
+    if (!ctx) return;
+    await deleteBackup(ctx.schoolId, ctx.filename);
+    logActivity(req, {
+      action: "admin.backup.delete",
+      entity: "backup",
+      entityId: ctx.filename,
+      description: `Backup deleted for school ${ctx.schoolId}`,
+    });
+    res.json({ deleted: true, filename: ctx.filename });
   } catch (err) {
     if (err.message.includes("not found") || err.message.includes("404")) {
       return res.status(404).json({ message: "Backup not found" });
@@ -87,10 +129,8 @@ router.post("/reset-password",
         });
       }
 
-      if (newPassword.length < 6) {
-        return res.status(400).json({ 
-          message: "Password must be at least 6 characters long" 
-        });
+      if (await rejectWeakPassword(res, newPassword, { schoolId: req.user?.school_id ?? req.user?.schoolId })) {
+        return;
       }
 
       const result = await AdminService.resetPassword(req.user, userId, newPassword, req);

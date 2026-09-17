@@ -119,6 +119,11 @@ export default function LoginView({ onLogin }) {
   const [twoFactorToken, setTwoFactorToken] = useState("");
   const [tempToken, setTempToken] = useState("");
   const [tempSessionId, setTempSessionId] = useState("");
+  const [passwordChangeToken, setPasswordChangeToken] = useState("");
+  const [passwordChangeReasons, setPasswordChangeReasons] = useState([]);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [notice, setNotice] = useState("");
   const lastResolvedIdentifierRef = useRef("");
   const lastResolveRoleRef = useRef("");
 
@@ -267,7 +272,41 @@ export default function LoginView({ onLogin }) {
       setEmail("");
       setPassword("");
     } catch (err) {
-      setError(err.message || "Login failed");
+      if (err?.status === 403 && err.body?.passwordChangeRequired) {
+        setPasswordChangeToken(err.body.changeToken);
+        setPasswordChangeReasons(err.body.errors || []);
+        setError(err.body.message || "Please set a new password to continue.");
+      } else {
+        setError(err.message || "Login failed");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitPasswordChange(event) {
+    event.preventDefault();
+    setError("");
+    if (newPassword !== confirmPassword) {
+      setError("New passwords do not match");
+      return;
+    }
+    setLoading(true);
+    try {
+      await apiFetch("/auth/change-password", {
+        method: "POST",
+        token: passwordChangeToken,
+        body: { currentPassword: password, newPassword },
+      });
+      setPasswordChangeToken("");
+      setPasswordChangeReasons([]);
+      setNewPassword("");
+      setConfirmPassword("");
+      setPassword("");
+      setNotice("Password updated. Please sign in with your new password.");
+    } catch (err) {
+      const details = err.body?.errors?.join(", ");
+      setError(details || err.message || "Could not update password");
     } finally {
       setLoading(false);
     }
@@ -442,7 +481,31 @@ export default function LoginView({ onLogin }) {
 
              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                
-               {twoFactorRequired ? (
+               {notice ? (
+                 <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(34,197,94,0.12)", color: "#86efac", fontSize: 13 }}>
+                   {notice}
+                 </div>
+               ) : null}
+
+               {passwordChangeToken ? (
+                 <form onSubmit={submitPasswordChange} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
+                   <div style={{ textAlign: "center" }}>
+                     <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Password Update Required</div>
+                     <div style={{ fontSize: 13, marginTop: 4, color: "#cbd5f5" }}>
+                       {passwordChangeReasons.length ? passwordChangeReasons.join(". ") : "Your password does not meet the school's security policy."}
+                     </div>
+                   </div>
+                   <label style={labelStyle}>
+                     <span style={labelTextStyle}>New password</span>
+                     <input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} type="password" autoComplete="new-password" style={fieldStyle} />
+                   </label>
+                   <label style={labelStyle}>
+                     <span style={labelTextStyle}>Confirm new password</span>
+                     <input value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} type="password" autoComplete="new-password" style={fieldStyle} />
+                   </label>
+                   <SubmitButton loading={loading} text="Update Password" />
+                 </form>
+               ) : twoFactorRequired ? (
                  <form onSubmit={submitTwoFactor} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
                    <div style={{ textAlign: "center", marginBottom: "8px" }}>
                      <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Two-Factor Authentication</div>

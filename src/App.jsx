@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULTS, NAV, ROLE, NAV_EXTRAS } from "./lib/constants";
 import { C, applyBrandColorTokens } from "./lib/theme";
 import { genId } from "./lib/utils";

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
+import { rejectWeakPassword } from "../helpers/password-policy.helper.js";
 
 const router = Router();
 router.use(authRequired);
@@ -87,8 +88,7 @@ router.post("/staff", requireRoles("admin", "director", "superadmin"), async (re
       return res.status(400).json({ message: "name, email, password and role are required" });
     if (!["admin","teacher","finance"].includes(role))
       return res.status(400).json({ message: "role must be admin, teacher or finance" });
-    if (password.length < 6)
-      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    if (await rejectWeakPassword(res, password, { schoolId, email, name })) return;
 
     // Check if admin already exists when trying to create another admin
     if (role === "admin") {
@@ -141,8 +141,7 @@ router.patch("/staff/:id", async (req, res, next) => {
     const { name, email, phone, role, status, password } = req.body;
 
     if (password) {
-      if (password.length < 6)
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      if (await rejectWeakPassword(res, password, { schoolId, email, name })) return;
       const hash = await bcrypt.hash(password, 10);
       const { error: updateError } = await supabase
         .from('users')
@@ -300,8 +299,7 @@ router.post("/portal", requireRoles("admin", "director", "superadmin"), async (r
       return res.status(400).json({ message: "studentId, role and password are required" });
     if (!["parent","student"].includes(role))
       return res.status(400).json({ message: "Role must be parent or student" });
-    if (password.length < 6)
-      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    if (await rejectWeakPassword(res, password, { schoolId, name })) return;
 
     const { data: student, error: studentError } = await supabase
       .from('students')
@@ -356,8 +354,7 @@ router.patch("/portal/:id", async (req, res, next) => {
     const { status, password } = req.body;
 
     if (password) {
-      if (password.length < 6)
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      if (await rejectWeakPassword(res, password, { schoolId })) return;
       const hash = await bcrypt.hash(password, 10);
       const { error: updateError } = await supabase
         .from('users')

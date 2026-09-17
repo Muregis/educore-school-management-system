@@ -32,11 +32,7 @@ export function authRequired(req, res, next) {
   }
 
   const header = req.headers.authorization || "";
-  let token = header.startsWith("Bearer ") ? header.slice(7) : null;
-
-  if (!token && req.query.token) {
-    token = req.query.token;
-  }
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
 
   if (!token) {
     logAuthEvent("WARN", "MISSING_TOKEN", {

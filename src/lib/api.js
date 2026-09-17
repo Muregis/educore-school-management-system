@@ -29,6 +29,34 @@ export const API_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
   getDefaultApiBase();
 
+// Downloads a protected file with the session token in the Authorization
+// header, so no credential ever appears in a URL, Referer or browser history.
+export async function apiDownload(path, { token = null, filename = null, method = "GET" } = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: getAuthHeaders(token),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    let err;
+    try { err = JSON.parse(text); } catch { err = { message: text }; }
+    const e = new Error(err.message || res.statusText);
+    e.status = res.status;
+    throw e;
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename || path.split("/").pop().split("?")[0];
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function apiFetch(
   path,
   { method = "GET", body = null, token = null, timeoutMs = 45000, signal = null, retries = 1 } = {}
@@ -77,6 +105,7 @@ export async function apiFetch(
         }
         const e = new Error(err.message || res.statusText);
         e.status = res.status;
+        e.body = err;
         throw e;
       }
 
