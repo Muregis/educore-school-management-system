@@ -66,6 +66,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   const [lessonPlansError, setLessonPlansError] = useState("");
   const [teacherClasses, setTeacherClasses] = useState([]);
 
+  const normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
   const termResults = currentTerm ? results.filter(r => (r.term || r.term_name) === currentTerm) : results;
   const termAttendance = (startDate && endDate)
     ? attendance.filter(a => {
@@ -425,17 +426,21 @@ const todayPayments = payments.filter(p => {
             <Skeleton height="200px" />
           ) : lessonPlansError ? (
             <div style={{ color: "var(--color-danger)", fontSize: "13px", padding: "var(--space-3)", background: "var(--color-danger-muted)", borderRadius: "var(--radius-md)" }}>{lessonPlansError}</div>
-          ) : lessonPlans.length === 0 ? (
+          ) : lessonPlans.length > 0 ? null : (
             <EmptyState icon="📝" title="All Caught Up" description="Submit lesson plans" />
           )}
         </ChartCard>
   }
 
 // Teacher dashboard  
-  if (auth?.role === "teacher") {
-    const normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
-    const myClasses = Array.isArray(teacherClasses) ? teacherClasses.map(normalizeClassName) : [];
-    const myStudents = students.filter(s => myClasses.includes(normalizeClassName(s.className ?? s.class_name)));
+if (auth?.role === "teacher") {
+    var normalizeClassName = value => value?.toString().trim().toLowerCase() ?? "";
+    var myClasses = Array.isArray(teacherClasses) ? teacherClasses.map(normalizeClassName) : [];
+    var myStudents = students.filter(s => myClasses.includes(normalizeClassName(s.className ?? s.class_name)));
+    var myStudentIds = new Set(myStudents.map(s => String(s.student_id ?? s.id ?? s.studentId ?? "")));
+    var myAttendance = attendance.filter(a => myStudentIds.has(String(a.studentId ?? a.student_id ?? "")));
+    var myResults = results.filter(r => myStudentIds.has(String(r.studentId ?? r.student_id ?? """)));
+    attendanceByDate = Object.entries(
     const myStudentIds = new Set(myStudents.map(s => String(s.student_id ?? s.id ?? s.studentId ?? "")));
     const myAttendance = attendance.filter(a => myStudentIds.has(String(a.studentId ?? a.student_id ?? "")));
     const myResults = results.filter(r => myStudentIds.has(String(r.studentId ?? r.student_id ?? "")));
