@@ -10,19 +10,6 @@ import multer from "multer";
 import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
 import { getPortalStudentIds, requirePortalStudentAccess } from "../utils/portalAccess.js";
 import { changePasswordGate } from "../middleware/auth.js";
-import router from "./auth.routes.js";
-
-// Configure multer for photo uploads
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 2 * 1024 * 1024,
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-    cb(null, allowedTypes.includes(file.mimetype));
-  }
-});
 
 const router = Router();
 router.use(authRequired);
