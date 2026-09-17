@@ -12,7 +12,62 @@ import { getPortalStudentIds, requirePortalStudentAccess } from "../utils/portal
 import { changePasswordGate } from "../middleware/auth.js";
 
 const router = Router();
-router.use(authRequired);
+
+// ─── Public pre-login routes (called before user is authenticated) ────────
+router.get("/resolve-school", async (req, res, next) => {
+  try {
+    const { hostname, role } = req.query;
+    if (!hostname) {
+      return res.status(400).json({ message: "hostname query param required" });
+    }
+    // Resolve school by hostname - simplified lookup
+    const { data: school, error } = await supabase
+      .from("public.schools")
+      .select("school_id, name, slug, plan")
+      .eq("slug", hostname)
+      .single();
+
+    if (error || !school) {
+      return res.status(404).json({ message: "School not found" });
+    }
+
+    res.json({
+      schoolId: school.school_id,
+      schoolName: school.name,
+      schoolSlug: school.slug,
+      plan: school.plan || "starter",
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/lookup-school", async (req, res, next) => {
+  try {
+    const { schoolId } = req.query;
+    if (!schoolId) {
+      return res.status(400).json({ message: "schoolId query param required" });
+    }
+    const { data: school, error } = await supabase
+      .from("public.schools")
+      .select("school_id, name, slug, plan")
+      .eq("school_id", schoolId)
+      .single();
+
+    if (error || !school) {
+      return res.status(404).json({ message: "School not found" });
+    }
+
+    res.json({
+      schoolId: school.school_id,
+      schoolName: school.name,
+      schoolSlug: school.slug,
+      plan: school.plan || "starter",
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─── POST /api/auth/login ───────────────────────────────────────────────
 router.post("/login", changePasswordGate, async (req, res, next) => {
