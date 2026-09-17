@@ -308,7 +308,7 @@ async function logSecurityEvent(schoolId, userId, eventType, req, details = {}) 
 async function checkAccountLockout(schoolId, email) {
   try {
     const { data: user } = await supabase
-      .from("users")
+      .from("private.user_credentials")
       .select("user_id, failed_login_attempts, locked_until, email")
       .eq("school_id", schoolId)
       .ilike("email", email)
@@ -323,7 +323,7 @@ async function checkAccountLockout(schoolId, email) {
 
     if (user.locked_until && new Date(user.locked_until) <= new Date()) {
       await supabase
-        .from("users")
+        .from("private.user_credentials")
         .update({ failed_login_attempts: 0, locked_until: null })
         .eq("user_id", user.user_id);
     }
@@ -338,7 +338,7 @@ async function checkAccountLockout(schoolId, email) {
 async function incrementFailedLogin(schoolId, email, req) {
   try {
     const { data: user } = await supabase
-      .from("users")
+      .from("private.user_credentials")
       .select("user_id, failed_login_attempts, email")
       .eq("school_id", schoolId)
       .ilike("email", email)
@@ -366,7 +366,7 @@ async function incrementFailedLogin(schoolId, email, req) {
     }
 
     await supabase
-      .from("users")
+      .from("private.user_credentials")
       .update(updates)
       .eq("user_id", user.user_id);
   } catch (err) {
@@ -377,9 +377,8 @@ async function incrementFailedLogin(schoolId, email, req) {
 async function resetFailedLogin(schoolId, userId) {
   try {
     await supabase
-      .from("users")
+      .from("private.user_credentials")
       .update({ failed_login_attempts: 0, locked_until: null })
-      .eq("school_id", schoolId)
       .eq("user_id", userId);
   } catch (err) {
     console.error("[security] Failed to reset failed login:", err);
@@ -424,7 +423,7 @@ async function passwordPolicyGate({ req, res, password, user, schoolId }) {
 
 async function recordPasswordChange({ userId, schoolId, currentHash, newHash, historyLimit }) {
   const { data: existing } = await supabase
-    .from("users")
+    .from("private.user_credentials")
     .select("password_history")
     .eq("user_id", userId)
     .maybeSingle();
@@ -433,16 +432,16 @@ async function recordPasswordChange({ userId, schoolId, currentHash, newHash, hi
   const history = [...previous, currentHash].filter(Boolean).slice(-Math.max(historyLimit, 1));
 
   const { error } = await supabase
-    .from("users")
+    .from("private.user_credentials")
     .update({
       password_hash: newHash,
       password_changed_at: new Date().toISOString(),
+      token_version: existing ? existing.token_version + 1 : 1,
       password_history: history,
       failed_login_attempts: 0,
       locked_until: null,
     })
-    .eq("user_id", userId)
-    .eq("school_id", schoolId);
+    .eq("user_id", userId);
 
   if (error) throw error;
 }
@@ -673,15 +672,19 @@ router.post("/change-password", authRateLimit, async (req, res, next) => {
     }
 
     const { data: user, error } = await supabase
-      .from("users")
-      .select("user_id, school_id, email, full_name, password_hash, password_history, status")
+      .from("private.user_credentials")
+      .select("password_hash, token_version, failed_login_attempts, locked_until, user_id, school_id")
       .eq("user_id", claims.user_id)
       .eq("school_id", claims.school_id)
-      .eq("is_deleted", false)
-      .maybeSingle();
+      .single();
     if (error) throw error;
     if (!user || user.status !== "active") {
       return res.status(401).json({ message: "Authentication required" });
+    }
+
+    // Check lockout
+    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      return res.status(423).json({ message: "Account temporarily locked. Please try again later." });
     }
 
     const currentMatches = user.password_hash
@@ -718,6 +721,12 @@ router.post("/change-password", authRateLimit, async (req, res, next) => {
       historyLimit: policy.preventReuse,
     });
     await logSecurityEvent(user.school_id, user.user_id, "password_changed", req, { email: user.email });
+
+    // Increment token version for session invalidation
+    await supabase
+      .from("private.user_credentials")
+      .update({ token_version: user.token_version + 1 })
+      .eq("user_id", user.user_id);
 
     return res.json({ message: "Password updated. Please sign in with your new password." });
   } catch (err) {
