@@ -1,5 +1,6 @@
 import PropTypes from "prop-types";
 import { useState, useEffect } from "react";
+import { useCurrentTerm } from "../hooks/useCurrentTerm";
 import { Msg } from "../components"; 
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
