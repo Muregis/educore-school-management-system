@@ -427,9 +427,8 @@ const todayPayments = payments.filter(p => {
             <div style={{ color: "var(--color-danger)", fontSize: "13px", padding: "var(--space-3)", background: "var(--color-danger-muted)", borderRadius: "var(--radius-md)" }}>{lessonPlansError}</div>
           ) : lessonPlans.length === 0 ? (
             <EmptyState icon="📝" title="All Caught Up" description="Submit lesson plans" />
+          )}
         </ChartCard>
-      </div>
-    );
   }
 
 // Teacher dashboard  
