@@ -186,6 +186,7 @@ export default function App() {
   const [activeChildId, setActiveChildId] = useState(null);
   const [sideCollapsed, setSideCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen]       = useState(false);
+  const [dataRefreshRequest, setDataRefreshRequest] = useState(0);
   const [rolePermissions, setRolePermissions] = useState(null);
   const [activeSchoolId, setActiveSchoolId] = useState(() => {
     try {
