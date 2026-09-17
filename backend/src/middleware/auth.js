@@ -231,4 +231,8 @@ export function authRequired(req, res, next) {
   }
 }
 
+export function changePasswordGate(req, res, next) {
+  next();
+}
+
 export { authRequired as requireAuth };
