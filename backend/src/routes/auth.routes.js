@@ -14,6 +14,8 @@ import { logTenantContext, logTenantQuery } from "../helpers/tenant-debug.logger
 import { requireRoles, requireDirector } from "../middleware/roles.js";
 import { pgPool } from "../config/pg.js";
 import { generateTwoFactorSecret, generateBackupCodes, verifyTwoFactorToken } from "../middleware/twoFactor.js";
+import { validatePassword } from "../middleware/passwordPolicy.js";
+import { getSchoolPasswordPolicy } from "../helpers/password-policy.helper.js";
 
 const router = Router();
 
@@ -384,12 +386,65 @@ async function resetFailedLogin(schoolId, userId) {
   }
 }
 
-// Helper to verify superadmin password (stored in env or hardcoded for now)
+// Superadmin credentials live only in the environment; no built-in default exists.
 async function verifySuperadminPassword(password) {
-  // For now, use a hash of a default superadmin password
-  // In production, this should be in environment variables
-  const SUPERADMIN_PASSWORD_HASH = "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi"; // "superadmin123"
-  return await bcrypt.compare(password, SUPERADMIN_PASSWORD_HASH);
+  if (!env.superadminPasswordHash) {
+    console.error("[auth] SUPERADMIN_PASSWORD_HASH is not configured; superadmin login is disabled");
+    return false;
+  }
+  return await bcrypt.compare(password, env.superadminPasswordHash);
+}
+
+const PASSWORD_CHANGE_PURPOSE = "password_change";
+
+async function passwordPolicyGate({ req, res, password, user, schoolId }) {
+  const policy = await getSchoolPasswordPolicy(schoolId);
+  const check = validatePassword(password, { email: user.email, firstName: user.full_name }, policy);
+  if (check.valid) return false;
+
+  const changeToken = jwt.sign(
+    { user_id: user.user_id, school_id: schoolId, role: user.role, purpose: PASSWORD_CHANGE_PURPOSE },
+    env.jwtSecret,
+    { expiresIn: "15m" }
+  );
+  await logSecurityEvent(schoolId, user.user_id, "password_change_required", req, {
+    email: user.email,
+    reason: "Stored password does not satisfy the password policy",
+    severity: "warning",
+  });
+  res.status(403).json({
+    passwordChangeRequired: true,
+    changeToken,
+    policy,
+    errors: check.errors,
+    message: "Your password no longer meets the security policy. Please set a new password to continue.",
+  });
+  return true;
+}
+
+async function recordPasswordChange({ userId, schoolId, currentHash, newHash, historyLimit }) {
+  const { data: existing } = await supabase
+    .from("users")
+    .select("password_history")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const previous = Array.isArray(existing?.password_history) ? existing.password_history : [];
+  const history = [...previous, currentHash].filter(Boolean).slice(-Math.max(historyLimit, 1));
+
+  const { error } = await supabase
+    .from("users")
+    .update({
+      password_hash: newHash,
+      password_changed_at: new Date().toISOString(),
+      password_history: history,
+      failed_login_attempts: 0,
+      locked_until: null,
+    })
+    .eq("user_id", userId)
+    .eq("school_id", schoolId);
+
+  if (error) throw error;
 }
 
 router.post("/login", authRateLimit, async (req, res, next) => {
@@ -515,6 +570,11 @@ router.post("/login", authRateLimit, async (req, res, next) => {
       });
     }
 
+    // Reject sessions for credentials that violate the active password policy.
+    if (await passwordPolicyGate({ req, res, password, user, schoolId: normalizedSchoolId })) {
+      return;
+    }
+
     const role = user.role;
     const name = user.full_name;
     const userPayload = { user_id: user.user_id, school_id: normalizedSchoolId, role, name, email: user.email };
@@ -584,6 +644,83 @@ router.post("/login", authRateLimit, async (req, res, next) => {
     });
   } catch (err) {
     console.error("Login error:", err);
+    next(err);
+  }
+});
+
+router.post("/change-password", authRateLimit, async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    const header = req.headers.authorization || "";
+    const bearer = header.startsWith("Bearer ") ? header.slice(7) : null;
+
+    if (!bearer) return res.status(401).json({ message: "Authentication required" });
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current and new passwords are required" });
+    }
+
+    let claims;
+    try {
+      claims = jwt.verify(bearer, env.jwtSecret);
+    } catch {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    if (claims.two_factor_pending) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    if (claims.user_id === "superadmin") {
+      return res.status(400).json({ message: "Superadmin credentials are managed outside the application" });
+    }
+
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("user_id, school_id, email, full_name, password_hash, password_history, status")
+      .eq("user_id", claims.user_id)
+      .eq("school_id", claims.school_id)
+      .eq("is_deleted", false)
+      .maybeSingle();
+    if (error) throw error;
+    if (!user || user.status !== "active") {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    const currentMatches = user.password_hash
+      ? await bcrypt.compare(currentPassword, user.password_hash)
+      : false;
+    if (!currentMatches) {
+      await logSecurityEvent(user.school_id, user.user_id, "password_change_failed", req, {
+        reason: "Current password mismatch",
+        severity: "warning",
+      });
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    const policy = await getSchoolPasswordPolicy(user.school_id);
+    const check = validatePassword(newPassword, { email: user.email, firstName: user.full_name }, policy);
+    if (!check.valid) {
+      return res.status(400).json({ message: "Password does not meet security requirements", errors: check.errors });
+    }
+
+    const history = Array.isArray(user.password_history) ? user.password_history : [];
+    const reused = await Promise.all(
+      [user.password_hash, ...history].filter(Boolean).map(hash => bcrypt.compare(newPassword, hash))
+    );
+    if (reused.some(Boolean)) {
+      return res.status(400).json({ message: "Password was used recently. Choose a different password." });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 12);
+    await recordPasswordChange({
+      userId: user.user_id,
+      schoolId: user.school_id,
+      currentHash: user.password_hash,
+      newHash,
+      historyLimit: policy.preventReuse,
+    });
+    await logSecurityEvent(user.school_id, user.user_id, "password_changed", req, { email: user.email });
+
+    return res.json({ message: "Password updated. Please sign in with your new password." });
+  } catch (err) {
     next(err);
   }
 });
@@ -835,14 +972,12 @@ router.post("/portal-login", authRateLimit, async (req, res, next) => {
       });
     }
 
+    const hasRealPassword = Boolean(user.password_hash) && !isPlaceholderHash(user.password_hash);
     let passwordMatches = false;
-    if (user.password_hash && !isPlaceholderHash(user.password_hash)) {
+    if (hasRealPassword) {
       passwordMatches = await bcrypt.compare(password, user.password_hash || "");
-    }
-    if (!passwordMatches && password === defaultPasswordForRole(role)) {
-      passwordMatches = true;
-    }
-    if (!passwordMatches && password === trimmedAdmissionNumber) {
+    } else if (password === trimmedAdmissionNumber) {
+      // First-time portal bootstrap only: accounts without a real password hash.
       passwordMatches = true;
     }
     if (!passwordMatches) {

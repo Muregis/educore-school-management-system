@@ -29,3 +29,6 @@ dist-ssr
 .env.production
 .env.staging
 backend/.env
+
+# Database backups (may contain tenant data and credentials)
+backups/*.sql

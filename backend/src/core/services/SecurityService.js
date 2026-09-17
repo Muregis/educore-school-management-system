@@ -1,6 +1,8 @@
+import bcrypt from 'bcryptjs';
 import { BaseRepository } from '../BaseRepository.js';
 import { generateTwoFactorSecret, generateBackupCodes, verifyTwoFactorToken } from '../../middleware/twoFactor.js';
 import { validatePassword } from '../../middleware/passwordPolicy.js';
+import { getSchoolPasswordPolicy } from '../../helpers/password-policy.helper.js';
 
 /**
  * Security Service
@@ -78,27 +80,33 @@ export class SecurityService {
       throw new Error('User not found');
     }
 
-    // Verify current password (implementation depends on password hashing)
-    // For now, skip verification
-    
-    // Validate new password
-    const validation = validatePassword(newPassword, user);
+    const currentMatches = user.password_hash
+      ? await bcrypt.compare(currentPassword, user.password_hash)
+      : false;
+    if (!currentMatches) {
+      await this.logSecurityEvent(userId, user.school_id, 'password_change_failed', 'Current password mismatch', 'warning');
+      throw new Error('Current password is incorrect');
+    }
+
+    const policy = await getSchoolPasswordPolicy(user.school_id);
+    const validation = validatePassword(newPassword, { email: user.email, firstName: user.full_name }, policy);
     if (!validation.valid) {
       throw new Error(validation.errors.join(', '));
     }
 
-    // Check password history
-    if (user.password_history) {
-      const history = JSON.parse(user.password_history);
-      if (history.includes(newPassword)) {
-        throw new Error('Cannot reuse a recent password');
-      }
+    const history = Array.isArray(user.password_history) ? user.password_history : [];
+    const reused = await Promise.all(
+      [user.password_hash, ...history].filter(Boolean).map(hash => bcrypt.compare(newPassword, hash))
+    );
+    if (reused.some(Boolean)) {
+      throw new Error('Cannot reuse a recent password');
     }
 
-    // Update password
+    const newHash = await bcrypt.hash(newPassword, 12);
     await this.usersRepository.update(userId, {
+      password_hash: newHash,
       password_changed_at: new Date().toISOString(),
-      password_history: JSON.stringify([...(user.password_history ? JSON.parse(user.password_history) : []).slice(-4), newPassword])
+      password_history: [...history, user.password_hash].filter(Boolean).slice(-Math.max(policy.preventReuse, 1))
     }, context);
 
     await this.logSecurityEvent(userId, user.school_id, 'password_changed', 'Password changed successfully');

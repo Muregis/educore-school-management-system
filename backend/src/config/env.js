@@ -65,6 +65,7 @@ export const env = {
 
   // Superadmin
   superadminEmail: clean(process.env.SUPERADMIN_EMAIL) || "muregivictor@gmail.com",
+  superadminPasswordHash: clean(process.env.SUPERADMIN_PASSWORD_HASH),
 };
 
 // Validate production environment variables

@@ -7,7 +7,7 @@ import Modal from "../components/Modal";
 import Table from "../components/Table";
 import { Pager, Msg } from "../components/Helpers";
 import { C, inputStyle } from "../lib/theme";
-import { apiFetch } from "../lib/api";
+import { apiFetch, apiDownload } from "../lib/api";
 import { printHTML } from "../lib/print";
 
 const DEPARTMENTS    = ["Administration","Academic","Finance","Support Staff","Security","Catering","Transport","Library","HR"];
@@ -228,10 +228,12 @@ export default function HRPage({ auth, canEdit, toast, school }) {
 
   const exportPayroll = async () => {
     try {
-      const url = `${import.meta.env.VITE_API_URL || "/api"}/hr/payslips/export?month=${payMonth}&year=${payYear}&token=${auth.token}`;
-      window.open(url, "_blank");
       toast("Exporting payroll...", "info");
-    } catch(e) { toast("Export failed", "error"); }
+      await apiDownload(`/hr/payslips/export?month=${payMonth}&year=${payYear}`, {
+        token: auth.token,
+        filename: `payslips-${payYear}-${payMonth}.csv`,
+      });
+    } catch(e) { toast(e.message || "Export failed", "error"); }
   };
 
   const handleTransfer = async () => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { apiFetch, API_BASE } from "../lib/api";
+import { apiFetch, apiDownload, API_BASE } from "../lib/api";
 import { getAuthHeaders } from "../lib/auth";
 import { NAV, NAV_EXTRAS, ROLE } from "../lib/constants";
 import PropTypes from "prop-types";
@@ -285,6 +285,12 @@ const BackupsTab = ({ auth }) => {
     setRunning(false);
   };
 
+  const downloadBackup = async (filename) => {
+    try {
+      await apiDownload(`/admin/backups/${filename}/download`, { token: auth?.token, filename });
+    } catch(e) { alert(e.message); }
+  };
+
   const deleteBackup = async (filename) => {
     if (!confirm(`Delete ${filename}?`)) return;
     try {
@@ -326,10 +332,10 @@ const BackupsTab = ({ auth }) => {
                       {b.sizeKb} KB · {new Date(b.createdAt).toLocaleString()}
                     </div>
                   </div>
-                  <a href={`${import.meta.env.VITE_API_URL}/admin/backups/${b.filename}/download?token=${auth?.token}`}
-                    style={{ fontSize:12, color:"#60a5fa", textDecoration:"none", fontWeight:600 }}>
-                    ⬇ Download
-                  </a>
+                  <button onClick={() => downloadBackup(b.filename)} style={{
+                    background:"none", border:"none", padding:0, cursor:"pointer",
+                    fontSize:12, color:"#60a5fa", fontWeight:600,
+                  }}>⬇ Download</button>
                   <button onClick={() => deleteBackup(b.filename)} style={{
                     background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.3)",
                     color:"#f87171", borderRadius:6, padding:"4px 10px", fontSize:12, cursor:"pointer",

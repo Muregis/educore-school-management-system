@@ -3,67 +3,96 @@
  * Enforces enterprise password requirements
  */
 
-const PASSWORD_POLICY = {
+export const DEFAULT_PASSWORD_POLICY = {
   minLength: 8,
   requireUppercase: true,
   requireLowercase: true,
-  requireNumbers: true,
-  requireSpecialChars: true,
+  requireNumber: true,
+  requireSymbol: false,
   preventCommonPasswords: true,
   preventUserInfo: true,
-  maxAge: 90, // days
-  historyCount: 5, // number of previous passwords to remember
-  preventReuse: true
+  preventReuse: 5,
+  expiryDays: 0,
 };
 
 const COMMON_PASSWORDS = [
-  'password', '123456', '12345678', 'qwerty', 'abc123',
-  'monkey', 'master', 'dragon', '111111', 'baseball'
+  'password', 'password1', 'password123', 'passw0rd', '123456', '1234567',
+  '12345678', '123456789', 'qwerty', 'qwerty123', 'abc123', 'monkey',
+  'master', 'dragon', '111111', 'baseball', 'letmein', 'welcome',
+  'welcome1', 'admin', 'admin123', 'director', 'school', 'school123',
+  'changeme', 'default', 'iloveyou', 'sunshine', 'football', 'superadmin123',
 ];
+
+/**
+ * Build an effective policy from a school's `security_settings.passwordPolicy`.
+ * Unknown or missing keys fall back to the platform defaults.
+ */
+export function resolvePasswordPolicy(schoolPolicy = null) {
+  if (!schoolPolicy || typeof schoolPolicy !== 'object') return { ...DEFAULT_PASSWORD_POLICY };
+
+  const numeric = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  const boolean = (value, fallback) => (typeof value === 'boolean' ? value : fallback);
+
+  return {
+    ...DEFAULT_PASSWORD_POLICY,
+    minLength: Math.max(numeric(schoolPolicy.minLength, DEFAULT_PASSWORD_POLICY.minLength), DEFAULT_PASSWORD_POLICY.minLength),
+    requireUppercase: boolean(schoolPolicy.requireUppercase, DEFAULT_PASSWORD_POLICY.requireUppercase),
+    requireLowercase: boolean(schoolPolicy.requireLowercase, DEFAULT_PASSWORD_POLICY.requireLowercase),
+    requireNumber: boolean(schoolPolicy.requireNumber, DEFAULT_PASSWORD_POLICY.requireNumber),
+    requireSymbol: boolean(schoolPolicy.requireSymbol, DEFAULT_PASSWORD_POLICY.requireSymbol),
+    preventReuse: numeric(schoolPolicy.preventReuse, DEFAULT_PASSWORD_POLICY.preventReuse),
+    expiryDays: numeric(schoolPolicy.expiryDays, DEFAULT_PASSWORD_POLICY.expiryDays),
+  };
+}
 
 /**
  * Validate password against policy
  */
-export function validatePassword(password, userInfo = {}) {
+export function validatePassword(password, userInfo = {}, policy = DEFAULT_PASSWORD_POLICY) {
   const errors = [];
+  const value = String(password || '');
+  const effective = { ...DEFAULT_PASSWORD_POLICY, ...policy };
 
-  if (password.length < PASSWORD_POLICY.minLength) {
-    errors.push(`Password must be at least ${PASSWORD_POLICY.minLength} characters`);
+  if (value.length < effective.minLength) {
+    errors.push(`Password must be at least ${effective.minLength} characters`);
   }
 
-  if (PASSWORD_POLICY.requireUppercase && !/[A-Z]/.test(password)) {
+  if (effective.requireUppercase && !/[A-Z]/.test(value)) {
     errors.push('Password must contain at least one uppercase letter');
   }
 
-  if (PASSWORD_POLICY.requireLowercase && !/[a-z]/.test(password)) {
+  if (effective.requireLowercase && !/[a-z]/.test(value)) {
     errors.push('Password must contain at least one lowercase letter');
   }
 
-  if (PASSWORD_POLICY.requireNumbers && !/\d/.test(password)) {
+  if (effective.requireNumber && !/\d/.test(value)) {
     errors.push('Password must contain at least one number');
   }
 
-  if (PASSWORD_POLICY.requireSpecialChars && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+  if (effective.requireSymbol && !/[!@#$%^&*(),.?":{}|<>]/.test(value)) {
     errors.push('Password must contain at least one special character');
   }
 
-  if (PASSWORD_POLICY.preventCommonPasswords && COMMON_PASSWORDS.includes(password.toLowerCase())) {
+  if (effective.preventCommonPasswords && COMMON_PASSWORDS.includes(value.toLowerCase())) {
     errors.push('Password is too common');
   }
 
-  if (PASSWORD_POLICY.preventUserInfo) {
-    const { email, firstName, lastName } = userInfo;
-    const lowerPassword = password.toLowerCase();
-    
-    if (email && lowerPassword.includes(email.split('@')[0].toLowerCase())) {
+  if (effective.preventUserInfo) {
+    const { email, firstName, lastName } = userInfo || {};
+    const lowerPassword = value.toLowerCase();
+
+    if (email && lowerPassword.includes(String(email).split('@')[0].toLowerCase())) {
       errors.push('Password must not contain email username');
     }
-    
-    if (firstName && lowerPassword.includes(firstName.toLowerCase())) {
+
+    if (firstName && lowerPassword.includes(String(firstName).toLowerCase())) {
       errors.push('Password must not contain first name');
     }
-    
-    if (lastName && lowerPassword.includes(lastName.toLowerCase())) {
+
+    if (lastName && lowerPassword.includes(String(lastName).toLowerCase())) {
       errors.push('Password must not contain last name');
     }
   }
