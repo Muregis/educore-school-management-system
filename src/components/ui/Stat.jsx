@@ -1,7 +1,7 @@
 import React from "react";
 import Card from "./Card";
 
-export default React.memo(function Stat({ label, value, icon, tone = "primary", trend, accentColor, style = {} }) {
+export default React.memo(function Stat({ label, value, icon, title, tone = "primary", trend, accentColor, style = {} }) {
   const color = accentColor || {
     primary: "var(--color-primary)",
     success: "var(--color-success)",
@@ -11,12 +11,14 @@ export default React.memo(function Stat({ label, value, icon, tone = "primary", 
     neutral: "var(--color-text-muted)"
   }[tone] || "var(--color-primary)";
 
+  const valueFontSize = typeof value === "string" && value.length > 12 ? "24px" : "30px";
+
   return (
     <Card
       className="animate-in"
       style={{
         position: "relative",
-        overflow: "hidden",
+        overflow: "visible",
         minHeight: 132,
         ...style
       }}
@@ -36,11 +38,31 @@ export default React.memo(function Stat({ label, value, icon, tone = "primary", 
           <div style={{ color: "var(--color-text-muted)", fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em" }}>
             {label}
           </div>
-          <div style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-heading)", fontSize: 30, fontWeight: 850, marginTop: "var(--space-2)" }}>
+          <div style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-heading)", fontSize: valueFontSize, fontWeight: 850, marginTop: "var(--space-2)", lineHeight: 1.2, wordBreak: "break-all" }}>
             {value}
           </div>
           {trend && <div style={{ color, fontSize: 12, fontWeight: 800, marginTop: "var(--space-2)" }}>{trend}</div>}
         </div>
+        {title && (
+          <div
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: "var(--radius-md)",
+              background: "var(--color-primary-muted)",
+              color,
+              display: "grid",
+              placeItems: "center",
+              fontSize: 20,
+              flexShrink: 0,
+              opacity: 0.8,
+              cursor: "help"
+            }}
+            title={title}
+          >
+            ℹ
+          </div>
+        )}
         {icon && (
           <div
             style={{

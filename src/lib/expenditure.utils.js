@@ -12,6 +12,21 @@ export function formatCurrency(amount) {
   }).format(num);
 }
 
+export function formatCurrencyCompact(amount) {
+  const num = Number(amount || 0);
+  if (isNaN(num)) return "KES 0";
+  if (num === 0) return "KES 0";
+  if (num >= 1_000_000) {
+    const m = num / 1_000_000;
+    return m >= 100 ? `KES ${m.toFixed(1)}M` : `KES ${(m * 10).toFixed(0)}M`.replace(".0M", "M");
+  }
+  if (num >= 1_000) {
+    const k = num / 1_000;
+    return k >= 100 ? `KES ${k.toFixed(1)}K` : `KES ${(k * 10).toFixed(0)}`.replace("0K", "K");
+  }
+  return `KES ${num}`;
+}
+
 export function formatDate(dateString, format = "short") {
   if (!dateString) return "";
   const date = new Date(dateString);

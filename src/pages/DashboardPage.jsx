@@ -70,6 +70,7 @@ const ProgressRow = ({ label, value, max, color = "var(--color-primary)", displa
 };
 // Fallback apiFetch if it was magically global, but better to import it
 import { apiFetch } from "../lib/api";
+import { formatCurrency, formatCurrencyCompact } from "../lib/expenditure.utils";
 
 export default function DashboardPage({ auth, school, students, teachers, attendance, payments, feeStructures: rawFeeStructures = [], results, toast, showFinance = true }) {
   const { term: currentTerm, startDate, endDate } = useCurrentTerm(auth);
@@ -274,7 +275,10 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   const totalStudents = students.length;
   
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
+  // Africa/Nairobi (EAT = UTC+3) so "today" follows the school's local calendar date
+  const eatOffsetMs = 3 * 60 * 60 * 1000;
+  const eatToday = new Date(today.getTime() + eatOffsetMs);
+  const todayStr = eatToday.toISOString().slice(0, 10);
   
   // Filter attendance for today only
   const todayAttendance = attendance.filter(a => {
@@ -323,7 +327,7 @@ const todayPayments = payments.filter(p => {
     }, {})
   ).slice(-7);
 
-  // Admin/Secretary dashboard - limited view (receives payments, no outstanding view)
+// Admin/Secretary dashboard - limited view (receives payments, no outstanding view)
   if (auth?.role === "admin") {
     const cards = [
       ["Boys", boys, "var(--color-primary)"],
@@ -331,14 +335,14 @@ const todayPayments = payments.filter(p => {
       ["Total Students", totalStudents, "var(--color-success)"],
       ["Teachers", teachers.length, "var(--color-warning)"],
       ["Present Records", present, "var(--color-sky)"],
-      ["Today's Collection", money(todayCollection), "var(--color-green)"],
+      ["Today's Collection", formatCurrencyCompact(todayCollection), "var(--color-green)", formatCurrency(todayCollection)],
     ];
 
     return (
       <div className="stagger-in" style={{ display: "grid", gap: "var(--space-4)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "var(--space-3)" }}>
-          {cards.map(([label, value, accentColor]) => (
-            <StatCard key={label} label={label} value={value} color={accentColor} />
+          {cards.map(([label, value, accentColor, title]) => (
+            <StatCard key={label} label={label} value={value} color={accentColor} title={title} />
           ))}
         </div>
 
@@ -378,7 +382,7 @@ const todayPayments = payments.filter(p => {
     );
   }
 
-  // Director/Superadmin dashboard - full management view
+// Director/Superadmin dashboard - full management view
   if (["director", "superadmin"].includes(auth?.role)) {
     const pendingPlans = lessonPlansLoading ? "…" : lessonPlans.length;
     const cards = [
@@ -387,17 +391,16 @@ const todayPayments = payments.filter(p => {
       ["Total Students", totalStudents, "var(--color-success)"],
       ["Teachers", teachers.length, "var(--color-warning)"],
       ["Present Records", present, "var(--color-sky)"],
-      ["Today's Collection", money(todayCollection), "var(--color-green)"],
-      ["Total Collection", money(totalPaid), "var(--color-primary)"],
-      ["Outstanding", money(outstanding), "var(--color-danger)"],
-      ["Pending Plans", pendingPlans, "var(--color-amber)"],
+      ["Today's Collection", formatCurrencyCompact(todayCollection), "var(--color-green)", formatCurrency(todayCollection)],
+      ["Total Collection", formatCurrencyCompact(totalPaid), "var(--color-primary)", formatCurrency(totalPaid)],
+      ["Outstanding", formatCurrencyCompact(outstanding), "var(--color-danger)", formatCurrency(outstanding)],
     ];
 
     return (
       <div className="stagger-in" style={{ display: "grid", gap: "var(--space-4)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "var(--space-3)" }}>
-          {cards.map(([label, value, accentColor]) => (
-            <StatCard key={label} label={label} value={value} color={accentColor} />
+          {cards.map(([label, value, accentColor, title]) => (
+            <StatCard key={label} label={label} value={value} color={accentColor} title={title} />
           ))}
         </div>
 
@@ -562,7 +565,7 @@ const todayPayments = payments.filter(p => {
     );
   }
 
-  // Finance dashboard
+// Finance dashboard
   if (auth?.role === "finance") {
     const thisMonth = new Date().getMonth();
     const thisYear = new Date().getFullYear();
@@ -570,8 +573,8 @@ const monthlyPayments = payments.filter(p => {
        const paymentDate = new Date(p.date || p.payment_date);
        if (currentTerm && (p.term || p.term_name) && (p.term || p.term_name) !== currentTerm) return false;
        return paymentDate.getMonth() === thisMonth && paymentDate.getFullYear() === thisYear;
-     });
-    
+      });
+     
     const collectedThisMonth = monthlyPayments.reduce((s, p) => s + Number(p.amount), 0);
     
     const outstandingByClass = students.map(s => {
@@ -589,17 +592,17 @@ const monthlyPayments = payments.filter(p => {
       .slice(0, 5);
 
     const cards = [
-      ["Today's Collection", money(todayCollection), "var(--color-success)"],
-      ["This Month", money(collectedThisMonth), "var(--color-primary)"],
-      ["Outstanding", money(outstanding), "var(--color-warning)"],
+      ["Today's Collection", formatCurrencyCompact(todayCollection), "var(--color-success)", formatCurrency(todayCollection)],
+      ["This Month", formatCurrencyCompact(collectedThisMonth), "var(--color-primary)", formatCurrency(collectedThisMonth)],
+      ["Outstanding", formatCurrencyCompact(outstanding), "var(--color-warning)", formatCurrency(outstanding)],
       ["Students", students.length, "var(--color-sky)"],
     ];
 
     return (
       <div className="stagger-in" style={{ display: "grid", gap: "var(--space-4)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-3)" }}>
-          {cards.map(([label, value, accentColor]) => (
-            <StatCard key={label} label={label} value={value} color={accentColor} />
+          {cards.map(([label, value, accentColor, title]) => (
+            <StatCard key={label} label={label} value={value} color={accentColor} title={title} />
           ))}
         </div>
 
