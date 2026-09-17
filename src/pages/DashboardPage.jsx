@@ -428,8 +428,6 @@ const todayPayments = payments.filter(p => {
           ) : lessonPlans.length === 0 ? (
             <EmptyState icon="📝" title="All Caught Up" description="Submit lesson plans" />
               headers={["Teacher","Subject","Class","Term / Week","Status","Updated"]}
-            />
-          )}
         </ChartCard>
       </div>
     );
