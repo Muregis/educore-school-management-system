@@ -81,11 +81,10 @@ export async function authLogin(email, password, schoolId = 1) {
       .eq('user_id', creds.user_id);
 
     return { user, source: 'private.credentials' };
-  } catch (err) {
+} catch (err) {
     console.error('Auth service error:', err.message);
     return null;
   }
-}
 }
 
 console.log('✅ Supabase auth service ready');
