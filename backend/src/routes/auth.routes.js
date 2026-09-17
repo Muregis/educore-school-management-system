@@ -29,7 +29,13 @@ router.get("/resolve-school", async (req, res, next) => {
       .single();
 
     if (error || !school) {
-      return res.status(404).json({ message: "School not found" });
+      // Return fallback school data so login UI can proceed
+      return res.status(200).json({
+        schoolId: null,
+        schoolName: "EduCore",
+        schoolSlug: hostname,
+        plan: "starter",
+      });
     }
 
     res.json({
@@ -56,7 +62,13 @@ router.get("/lookup-school", async (req, res, next) => {
       .single();
 
     if (error || !school) {
-      return res.status(404).json({ message: "School not found" });
+      // Return fallback school data so login UI can proceed
+      return res.status(200).json({
+        schoolId: null,
+        schoolName: "EduCore",
+        schoolSlug: null,
+        plan: "starter",
+      });
     }
 
     res.json({
