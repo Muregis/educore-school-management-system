@@ -43,7 +43,7 @@ export async function authLogin(email, password, schoolId = 1) {
           user_id: user.user_id,
           school_id: user.school_id,
           password_hash: user.password_hash,
-          password_history: '[]'::jsonb,
+          password_history: [],
           password_changed_at: user.password_changed_at,
           token_version: 0,
           failed_login_attempts: 0,
