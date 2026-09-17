@@ -12,32 +12,12 @@ import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 // Define money here locally just in case it was a global that gets lost in strict module scope
 const money = (val) => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(val || 0);
 const StatCard = ({ label, value, color, loading = false, icon = "●" }) => (
-  <Card
-    hoverable
-    style={{
-      minHeight: 118,
-      position: "relative",
-      overflow: "hidden",
-      background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 92%, transparent) 0%, var(--color-bg-card) 100%)",
-      border: "1px solid var(--color-border)",
-      boxShadow: "var(--shadow-sm)",
-      transition: "transform 180ms ease, box-shadow 180ms ease"
-    }}
-  >
-    <div style={{ position: "absolute", inset: 0, background: `linear-gradient(135deg, color-mix(in srgb, ${color} 12%, transparent) 0%, transparent 70%)`, pointerEvents: "none" }} />
-    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: color, opacity: 0.85 }} />
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-3)" }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ color: "var(--color-text-muted)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 800 }}>{label}</div>
-        <div style={{ color: "var(--color-text-primary)", fontWeight: 800, fontSize: "clamp(15px, 1.8vw, 22px)", marginTop: "var(--space-2)", fontFamily: "var(--font-heading)", lineHeight: 1.2, wordBreak: "break-all" }}>
-          {value}
-        </div>
-      </div>
-      <div style={{ width: 44, height: 44, borderRadius: "var(--radius-md)", display: "grid", placeItems: "center", background: `color-mix(in srgb, ${color} 16%, var(--color-bg-base))`, color, fontSize: 20, flexShrink: 0 }}>
-        {icon}
-      </div>
-    </div>
-  </Card>
+  <Stat
+    label={label}
+    value={value}
+    icon={icon}
+    tone={color ? color.replace("var(--color-)", "") : "primary"}
+  />
 );
 
 const ChartCard = ({ title, subtitle, children, loading = false }) => (
@@ -446,18 +426,8 @@ const todayPayments = payments.filter(p => {
           ) : lessonPlansError ? (
             <div style={{ color: "var(--color-danger)", fontSize: "13px", padding: "var(--space-3)", background: "var(--color-danger-muted)", borderRadius: "var(--radius-md)" }}>{lessonPlansError}</div>
           ) : lessonPlans.length === 0 ? (
-            <EmptyState icon="📝" title="All Caught Up" description="No pending lesson plans." />
-          ) : (
-            <Table
+            <EmptyState icon="📝" title="All Caught Up" description="Submit lesson plans" />
               headers={["Teacher","Subject","Class","Term / Week","Status","Updated"]}
-              data={lessonPlans.slice(0, 6).map(p => [
-                p.teacher_name || "-",
-                p.subject,
-                p.class_name,
-                `${p.term}${p.week ? ` · Wk ${p.week}` : ""}`,
-                <Badge key="st" text={p.status} variant={p.status === "pending" ? "warning" : "info"} />,
-                new Date(p.updated_at).toLocaleDateString(),
-              ])}
             />
           )}
         </ChartCard>
@@ -505,10 +475,10 @@ const todayPayments = payments.filter(p => {
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "var(--space-3)", alignItems: "start" }}>
-          <ChartCard title="My Classes Attendance (Last 7 Days)">
+<div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "var(--space-3)", alignItems: "start" }}>
+          <ChartCard title="Attendance Trend (Last 7 Days)">
             {attendanceByDate.length === 0 ? (
-              <EmptyState icon="📅" title="No Attendance" description="No attendance data yet." />
+              <EmptyState icon="📅" title="No Attendance" description="Mark attendance" />
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", alignItems: "end", gap: 8, minHeight: 120 }}>
                 {attendanceByDate.map(([date, values]) => {
@@ -547,7 +517,7 @@ const todayPayments = payments.filter(p => {
           ) : lessonPlansError ? (
             <div style={{ color: "var(--color-danger)", fontSize: "13px", padding: "var(--space-3)", background: "var(--color-danger-muted)", borderRadius: "var(--radius-md)" }}>{lessonPlansError}</div>
           ) : lessonPlans.length === 0 ? (
-            <EmptyState icon="📝" title="No Lesson Plans" description="You haven't submitted any lesson plans yet." />
+            <EmptyState icon="📝" title="No Lesson Plans" description="Submit lesson plans" />
           ) : (
             <Table
               headers={["Type","Subject","Class","Status","Updated"]}
@@ -610,7 +580,7 @@ const monthlyPayments = payments.filter(p => {
           <ChartCard title="Recent Payments">
             <div style={{ fontSize: "13px", maxHeight: "250px", overflowY: "auto", paddingRight: "var(--space-2)" }}>
               {recentPayments.length === 0 ? (
-                <EmptyState icon="💰" title="No Payments" description="No recent payments to show." />
+                <EmptyState icon="💰" title="No Payments" description="Record a payment" />
               ) : (
                 recentPayments.map(p => (
                   <div key={p.id} style={{ 

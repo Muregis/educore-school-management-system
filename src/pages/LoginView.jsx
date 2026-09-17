@@ -21,22 +21,22 @@ const DEFAULT_BRANDING = {
 const FEATURES = [
   {
     title: "Academic Reports",
-    desc: "Grades, report cards, and performance updates in one place.",
+    desc: "Grades and report cards in one place.",
     icon: "AR",
   },
   {
     title: "Fee Payments",
-    desc: "Track balances and complete payments securely online.",
+    desc: "Track balances and complete payments online.",
     icon: "FP",
   },
   {
     title: "Attendance Tracking",
-    desc: "See attendance records and daily school activity clearly.",
+    desc: "Mark and view daily attendance.",
     icon: "AT",
   },
   {
     title: "School Communication",
-    desc: "Receive announcements and updates from staff in real time.",
+    desc: "Receive announcements and updates from staff.",
     icon: "SC",
   },
 ];
@@ -428,10 +428,10 @@ export default function LoginView({ onLogin }) {
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14, marginTop: 32 }}>
               {FEATURES.map(feature => (
-                <div key={feature.title} style={{ padding: 18, borderRadius: 18, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 12, display: "grid", placeItems: "center", background: "linear-gradient(135deg, var(--primary-color), var(--secondary-color))", color: "#08111f", fontSize: 12, fontWeight: 800, marginBottom: 12 }}>{feature.icon}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>{feature.title}</div>
-                  <div style={{ color: "#88a0bf", fontSize: 13, lineHeight: 1.6 }}>{feature.desc}</div>
+                <div key={feature.title} style={{ padding: 14, borderRadius: 12, background: "transparent", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, display: "grid", placeItems: "center", color: "var(--primary-color)", fontSize: 16, marginBottom: 8 }}>{feature.icon}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{feature.title}</div>
+                  <div style={{ color: "#88a0bf", fontSize: 12, lineHeight: 1.5 }}>{feature.desc}</div>
                 </div>
               ))}
             </div>
