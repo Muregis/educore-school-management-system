@@ -64,15 +64,18 @@ export async function authLogin(email, password, schoolId = 1) {
       return null;
     }
 
-    // 5. Check must_change_password flag from private.user_credentials via secure RPC
-    const { data: credentials, error: credentialsError } = await supabase
-      .rpc('get_user_credential_metadata', { p_user_id: user.user_id });
+    // 5. Check must_change_password flag from public.users (simplified approach)
+    const { data: userWithFlag, error: flagError } = await supabase
+      .from('users')
+      .select('must_change_password, password_changed_at')
+      .eq('user_id', user.user_id)
+      .single();
 
-    if (credentialsError) {
-      console.error('Auth service: error fetching user credentials via RPC:', credentialsError.message);
+    if (flagError) {
+      console.error('Auth service: error fetching user flag:', flagError.message);
     }
 
-    const mustChangePassword = credentials?.must_change_password === true;
+    const mustChangePassword = userWithFlag?.must_change_password === true;
 
     // 6. If user must change password, return requires_password_change flag
     if (mustChangePassword) {
@@ -103,15 +106,14 @@ export async function authLogin(email, password, schoolId = 1) {
     if (!validation.valid) {
       // Password is valid (hash matches) but doesn't comply with current policy
       // Force password change on next login
-      // Mark user for password reset in private.user_credentials via secure RPC
+      // Mark user for password reset in public.users (simplified approach)
       const { error: setError } = await supabase
-        .rpc('set_must_change_password', { 
-          p_user_id: user.user_id, 
-          p_must_change: true 
-        });
+        .from('users')
+        .update({ must_change_password: true })
+        .eq('user_id', user.user_id);
       
       if (setError) {
-        console.error('Auth service: error setting must_change_password via RPC:', setError.message);
+        console.error('Auth service: error setting must_change_password:', setError.message);
       }
 
       // Log password policy violation

@@ -145,19 +145,7 @@ app.use("/api/public", publicRoutes);
 app.use("/api/teacherassignments", teacherAssignmentsRoutes);
 app.use("/api/teacher-assignments", teacherAssignmentsRoutes);
 app.use("/api/parent", authRequired, validateSession, parentRoutes);
-
-// Apply global auth middleware to all /api routes except specific exemptions
-app.use("/api", (req, res, next) => {
-  const exemptPaths = ['/api/health', '/api/auth', '/api/public', '/api/teacherassignments', '/api/teacher-assignments'];
-  const isExempt = exemptPaths.some(path => req.path.startsWith(path));
-  
-  if (isExempt) {
-    return next();
-  }
-  
-  return authRequired(req, res, next);
-});
-
+app.use("/api", authRequired);
 app.use("/api", validateSession);
 app.use("/api", tenantContext);
 app.use("/api", tenantSecurityCheck);
