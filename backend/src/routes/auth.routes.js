@@ -216,8 +216,6 @@ router.post(
 
       const user = userFromBody.data;
       const schoolId = user.school_id;
-      const userId = user.user_id;
-      const schoolId = user.school_id;
 
       // Determine if this is a forced password change (no current password verification)
       const isForcedChange = !currentPassword;
