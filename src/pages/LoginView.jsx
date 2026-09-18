@@ -244,7 +244,7 @@ async function submitStaff(event) {
     try {
       const raw = await apiFetch("/auth/login", {
         method: "POST",
-        body: { email, password },
+        body: { email, password, schoolId: branding.schoolId || branding.school_id || null },
       });
       const data = raw?.data || raw;
 
