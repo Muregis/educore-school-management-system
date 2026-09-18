@@ -8,17 +8,42 @@ import Skeleton from "../components/ui/Skeleton";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
 import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
-import StatCard from "../components/ui/StatCard";
 
 // Define money here locally just in case it was a global that gets lost in strict module scope
 const money = (val) => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(val || 0);
-const StatCard = ({ label, value, color, loading = false, icon = "●" }) => (
-  <Stat
-    label={label}
-    value={value}
-    icon={icon}
-    tone={color ? color.replace("var(--color-)", "") : "primary"}
-  />
+const StatCard = ({ label, value, color, title, loading = false }) => (
+  <Card
+    style={{
+      position: "relative",
+      overflow: "hidden",
+      minHeight: 100,
+      borderLeft: `4px solid ${color || "var(--color-primary)"}`,
+    }}
+    title={title}
+  >
+    <div
+      style={{
+        color: "var(--color-text-muted)",
+        fontSize: 12,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.04em",
+      }}
+    >
+      {label}
+    </div>
+    <div
+      style={{
+        marginTop: 8,
+        fontSize: typeof value === "string" && String(value).length > 12 ? 22 : 28,
+        fontWeight: 800,
+        color: "var(--color-text-primary)",
+        wordBreak: "break-word",
+      }}
+    >
+      {loading ? "…" : value}
+    </div>
+  </Card>
 );
 
 const ChartCard = ({ title, subtitle, children, loading = false }) => (
