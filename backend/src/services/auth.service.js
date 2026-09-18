@@ -1,6 +1,6 @@
 import '../config/env.js';
 import bcrypt from 'bcryptjs';
-import { supabase, supabasePrivate } from '../config/supabaseClient.js';
+import { supabase } from '../config/supabaseClient.js';
 import { resolvePasswordPolicy, validatePassword } from '../middleware/passwordPolicy.js';
 import { getSchoolPasswordPolicy } from '../helpers/password-policy.helper.js';
 import { logActivity } from '../helpers/activity.logger.js';
@@ -64,15 +64,12 @@ export async function authLogin(email, password, schoolId = 1) {
       return null;
     }
 
-    // 5. Check must_change_password flag from private.user_credentials (via supabasePrivate client)
-    const { data: credentials, error: credentialsError } = await supabasePrivate
-      .from('user_credentials')
-      .select('must_change_password, password_changed_at')
-      .eq('user_id', user.user_id)
-      .single();
+    // 5. Check must_change_password flag from private.user_credentials via secure RPC
+    const { data: credentials, error: credentialsError } = await supabase
+      .rpc('get_user_credential_metadata', { p_user_id: user.user_id });
 
     if (credentialsError) {
-      console.error('Auth service: error fetching user credentials:', credentialsError.message);
+      console.error('Auth service: error fetching user credentials via RPC:', credentialsError.message);
     }
 
     const mustChangePassword = credentials?.must_change_password === true;
@@ -106,11 +103,16 @@ export async function authLogin(email, password, schoolId = 1) {
     if (!validation.valid) {
       // Password is valid (hash matches) but doesn't comply with current policy
       // Force password change on next login
-      // Mark user for password reset in private.user_credentials (via supabasePrivate client)
-      await supabasePrivate
-        .from('user_credentials')
-        .update({ must_change_password: true })
-        .eq('user_id', user.user_id);
+      // Mark user for password reset in private.user_credentials via secure RPC
+      const { error: setError } = await supabase
+        .rpc('set_must_change_password', { 
+          p_user_id: user.user_id, 
+          p_must_change: true 
+        });
+      
+      if (setError) {
+        console.error('Auth service: error setting must_change_password via RPC:', setError.message);
+      }
 
       // Log password policy violation
       try {

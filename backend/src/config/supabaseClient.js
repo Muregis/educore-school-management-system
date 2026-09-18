@@ -35,25 +35,6 @@ export const supabase = (supabaseUrl && supabaseServiceKey)
     })
   : null;
 
-// Separate client for accessing private schema tables
-export const supabasePrivate = (supabaseUrl && supabaseServiceKey)
-  ? createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false
-      },
-      db: {
-        schema: 'private'
-      },
-      global: {
-        headers: {
-          'x-tenant-source': 'educore-backend'
-        }
-      }
-    })
-  : null;
-
 export function withTenantFilter(query, schoolId) {
   return query.eq('school_id', schoolId);
 }
