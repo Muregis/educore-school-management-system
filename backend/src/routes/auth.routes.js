@@ -207,7 +207,7 @@ router.post(
       // Resolve user from userId (set by changePasswordGate from changeToken or auth session)
       const userFromBody = await supabase
         .from("public.users")
-        .select("password_hash, school_id, email, full_name, must_change_password")
+        .select("password_hash, school_id, email, full_name")
         .eq("user_id", userId)
         .single();
 
@@ -217,7 +217,12 @@ router.post(
 
       const user = userFromBody.data;
       const schoolId = user.school_id;
-      const mustChangePassword = user.must_change_password === true;
+
+      // Get must_change_password via secure RPC (private.user_credentials)
+      const { data: credentials, error: credentialsError } = await supabase
+        .rpc('get_user_credential_metadata', { p_user_id: userId });
+
+      const mustChangePassword = credentials?.must_change_password === true;
 
       // Determine if this is a forced password change (no current password verification)
       const isForcedChange = !currentPassword;
@@ -253,13 +258,12 @@ router.post(
 
       // Begin updating credential records
 
-      // 1. Update public.users.password_hash and must_change_password
+      // 1. Update public.users.password_hash and password_changed_at
       const { error: pubError } = await supabase
         .from("public.users")
         .update({
           password_hash: newHash,
           password_changed_at: new Date().toISOString(),
-          must_change_password: false,
         })
         .eq("user_id", userId);
 
@@ -267,25 +271,18 @@ router.post(
         return res.status(500).json({ message: "Failed to update public password hash" });
       }
 
-      // 2. Update private.user_credentials.password_hash (keep in sync) - skip if private schema not accessible
-      try {
-        const { error: privError } = await supabase
-          .schema('private')
-          .from('user_credentials')
-          .update({
-            password_hash: newHash,
-            password_changed_at: new Date().toISOString(),
-            must_change_password: false,
-          })
-          .eq('user_id', userId);
+      // 2. Update private.user_credentials via secure RPC (password hash + must_change_password)
+      const { error: privError } = await supabase
+        .rpc('update_user_credentials', {
+          p_user_id: userId,
+          p_password_hash: newHash,
+          p_password_changed_at: new Date().toISOString(),
+          p_must_change_password: false
+        });
 
-        if (privError) {
-          console.error('Auth route: failed to update private.user_credentials:', privError.message);
-          // Public hash already updated; continue with warning
-        }
-      } catch (err) {
-        console.error('Auth route: private schema not accessible, skipping sync:', err.message);
-        // Public hash already updated; continue without private sync
+      if (privError) {
+        console.error('Auth route: failed to update private.user_credentials via RPC:', privError.message);
+        // Public hash already updated; continue with warning
       }
 
       // 3. Update password_history in public.users
