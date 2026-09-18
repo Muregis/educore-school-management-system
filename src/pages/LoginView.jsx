@@ -258,8 +258,7 @@ async function submitStaff(event) {
 
       // NEW: Handle requires_password_change from policy enforcement
       if (data?.requires_password_change) {
-        setError("");
-        setPasswordChangeToken(data.user_id);
+        setPasswordChangeToken(data.changeToken);
         setPasswordChangeReasons(data.policyViolation || []);
         setNotice("Your current password does not meet the current policy requirements. Please set a new password to continue.");
         setLoading(false);

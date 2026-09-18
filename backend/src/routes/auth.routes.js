@@ -1,5 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { authRequired } from "../middleware/auth.js";
 import { supabase } from "../config/supabaseClient.js";
 import { logActivity } from "../helpers/activity.logger.js";
@@ -124,8 +125,15 @@ router.post("/login", async (req, res, next) => {
 
     // NEW: Handle requires_password_change response
     if (result.requires_password_change) {
+      // Issue short-lived changeToken JWT (TTL 10 minutes)
+      const changeToken = jwt.sign(
+        { user_id: result.user_id, school_id: result.school_id, purpose: "password_change" },
+        process.env.JWT_SECRET,
+        { expiresIn: "10m" }
+      );
       return res.json({
         requires_password_change: true,
+        changeToken,
         user_id: result.user_id,
         school_id: result.school_id,
         message: "Password change required. Please update your password.",
@@ -185,18 +193,21 @@ router.post(
   changePasswordGate,
   async (req, res, next) => {
     try {
+      if (!req.user?.user_id) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
       const { currentPassword, newPassword } = req.body || {};
-      const effectiveUserId = req.body?.userId || req.user?.user_id;
+      const userId = req.user.user_id;
 
       if (!newPassword) {
         return res.status(400).json({ message: "New password is required" });
       }
 
-      // Resolve user
+      // Resolve user from userId (set by changePasswordGate from changeToken or auth session)
       const userFromBody = await supabase
         .from("public.users")
-        .select("password_hash, school_id, email, full_name")
-        .eq("user_id", effectiveUserId)
+        .select("password_hash, school_id, email, full_name, must_change_password")
+        .eq("user_id", userId)
         .single();
 
       if (userFromBody.error || !userFromBody.data) {
@@ -204,6 +215,7 @@ router.post(
       }
 
       const user = userFromBody.data;
+      const schoolId = user.school_id;
       const userId = user.user_id;
       const schoolId = user.school_id;
 
@@ -224,7 +236,7 @@ router.post(
       }
 
       // Validate new password against policy
-      const policy = await getSchoolPasswordPolicy(schoolId);
+      const policy = resolvePasswordPolicy();
       const check = validatePassword(newPassword, {
         email: user.email,
         firstName: user.full_name,
@@ -247,6 +259,7 @@ router.post(
         .update({
           password_hash: newHash,
           password_changed_at: new Date().toISOString(),
+          must_change_password: false,
         })
         .eq("user_id", userId);
 

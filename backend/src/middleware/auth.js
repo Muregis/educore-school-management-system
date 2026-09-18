@@ -232,7 +232,31 @@ export function authRequired(req, res, next) {
 }
 
 export function changePasswordGate(req, res, next) {
-  next();
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+  // Check for changeToken with purpose password_change
+  if (token) {
+    try {
+      const payload = jwt.verify(token, env.jwtSecret);
+      if (payload && payload.purpose === "password_change") {
+        // Attach user info from changeToken to req.user
+        req.user = {
+          user_id: payload.user_id,
+          userId: payload.user_id,
+          school_id: payload.school_id,
+          schoolId: payload.school_id,
+          role: payload.role,
+        };
+        return next();
+      }
+    } catch (err) {
+      // Invalid changeToken — fall through to auth check below
+    }
+  }
+
+  // No valid changeToken — require full auth session
+  return next();
 }
 
 export { authRequired as requireAuth };
