@@ -8,6 +8,7 @@ import Skeleton from "../components/ui/Skeleton";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
 import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
+import StatCard from "../components/ui/StatCard";
 
 // Define money here locally just in case it was a global that gets lost in strict module scope
 const money = (val) => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(val || 0);
