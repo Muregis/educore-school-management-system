@@ -158,8 +158,8 @@ router.post(
   changePasswordGate,
   async (req, res, next) => {
     try {
-      const { currentPassword, newPassword, userId } = req.body || {};
-      const effectiveUserId = userId || req.user?.user_id;
+      const { currentPassword, newPassword } = req.body || {};
+      const effectiveUserId = req.body?.userId || req.user?.user_id;
 
       if (!newPassword) {
         return res.status(400).json({ message: "New password is required" });
