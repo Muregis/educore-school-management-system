@@ -73,6 +73,15 @@ export function authRequired(req, res, next) {
       });
     }
 
+      // Password-change tokens cannot access normal APIs
+    if (payload.purpose === "password_change") {
+      return res.status(403).json({
+        message: "Password change required",
+        code: "AUTH_PASSWORD_CHANGE_REQUIRED",
+        requestId: req.requestId,
+      });
+    }
+
     const payloadRole = (payload.role || "").toLowerCase();
     const isSuperadminToken = (payload.email === SUPERADMIN_EMAIL) || (payloadRole === 'superadmin');
     const isDirectorToken = payloadRole === 'director';
