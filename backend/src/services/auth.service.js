@@ -84,7 +84,9 @@ export async function authLogin(email, password, schoolId = 1) {
             schoolId: user.school_id,
             userId: user.user_id,
             role: user.role
-          }
+          },
+          headers: {}, // Empty headers object to satisfy logActivity requirements
+          socket: null
         };
         await logActivity(
           logReq,
@@ -130,7 +132,9 @@ export async function authLogin(email, password, schoolId = 1) {
             schoolId: user.school_id,
             userId: user.user_id,
             role: user.role
-          }
+          },
+          headers: {}, // Empty headers object to satisfy logActivity requirements
+          socket: null
         };
         await logActivity(
           logReq,

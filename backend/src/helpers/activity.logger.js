@@ -9,7 +9,7 @@ import { logTenantQuery } from "./tenant-debug.logger.js";
  */
 export async function logActivity(req, { action, entity = null, entityId = null, description = null }) {
   try {
-    // Handle null req case (used in auth service before request context exists)
+    // Handle null/undefined req case (used in auth service before request context exists)
     if (!req) {
       return;
     }
@@ -17,9 +17,14 @@ export async function logActivity(req, { action, entity = null, entityId = null,
     const schoolId = req.user?.schoolId ?? req.user?.school_id ?? req.schoolId ?? null;
     const userId   = req.user?.userId   ?? req.user?.user_id   ?? null;
     const role     = req.user?.role     ?? null;
-    const ip       = (req.headers["x-forwarded-for"] || "").split(",")[0].trim()
-                  || req.socket?.remoteAddress
-                  || null;
+    
+    // Safely extract IP address
+    let ip = null;
+    if (req.headers && req.headers["x-forwarded-for"]) {
+      ip = req.headers["x-forwarded-for"].split(",")[0].trim();
+    } else if (req.socket && req.socket.remoteAddress) {
+      ip = req.socket.remoteAddress;
+    }
 
     // Skip logging if essential fields are missing
     if (!schoolId && !userId) {
