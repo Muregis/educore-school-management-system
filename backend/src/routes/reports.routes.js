@@ -429,7 +429,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
     // (single source of truth shared with the Fees page / Dashboard).
     const classSummary = {};
     allStudents?.forEach(student => {
-      const cls = student.class_name;
+      const cls = student.class_name || "Unassigned";
       if (!classSummary[cls]) {
         classSummary[cls] = {
           class_name: cls,
@@ -454,8 +454,10 @@ router.get("/class-fee-summary", async (req, res, next) => {
       }
     });
     
-    // Convert to array and sort by class name
-    const result = Object.values(classSummary).sort((a, b) => a.class_name.localeCompare(b.class_name));
+     // Convert to array and sort by class name
+     const result = Object.values(classSummary).sort((a, b) =>
+     String(a.class_name || "").localeCompare(String(b.class_name || ""))
+     );
     
     res.json(result);
   } catch (err) { next(err); }
