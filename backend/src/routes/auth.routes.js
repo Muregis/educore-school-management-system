@@ -84,14 +84,40 @@ router.get("/lookup-school", async (req, res, next) => {
 });
 
 // ─── POST /api/auth/login ───────────────────────────────────────────────
-router.post("/login", changePasswordGate, async (req, res, next) => {
+router.post("/login", async (req, res, next) => {
   try {
     const { email, password, schoolId } = req.body || {};
-    if (!email || !password || !schoolId) {
-      return res.status(400).json({ message: "Email, password, and schoolId are required" });
+    
+    // If schoolId not provided, resolve it from email
+    let effectiveSchoolId = schoolId;
+    if (!schoolId) {
+      const { data: users, error } = await supabase
+        .from('users')
+        .select('school_id')
+        .ilike('email', email.trim().toLowerCase())
+        .eq('is_deleted', false)
+        .limit(5);
+      if (error || !users || users.length === 0) {
+        return res.status(400).json({ message: "User not found" });
+      }
+      if (users.length === 1) {
+        effectiveSchoolId = users[0].school_id;
+      } else {
+        // Many schools for this email — return school options
+        const schoolOptions = users.map(u => ({
+          schoolId: u.school_id,
+          schoolName: u.full_name || u.email
+        }));
+        return res.status(400).json({
+          message: "Multiple schools found for this email. Please select a school.",
+          schoolOptions
+        });
+      }
+    } else {
+      effectiveSchoolId = Number(schoolId);
     }
 
-    const result = await authLogin(email, password, schoolId);
+    const result = await authLogin(email, password, effectiveSchoolId);
     if (!result) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
