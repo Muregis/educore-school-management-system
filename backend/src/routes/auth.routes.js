@@ -205,9 +205,10 @@ router.post(
       }
 
       // Resolve user from userId (set by changePasswordGate from changeToken or auth session)
+      // Join with private.user_credentials to get must_change_password flag
       const userFromBody = await supabase
         .from("public.users")
-        .select("password_hash, school_id, email, full_name, must_change_password")
+        .select("password_hash, school_id, email, full_name")
         .eq("user_id", userId)
         .single();
 
@@ -217,6 +218,15 @@ router.post(
 
       const user = userFromBody.data;
       const schoolId = user.school_id;
+
+      // Get must_change_password from private.user_credentials
+      const { data: credentials, error: credentialsError } = await supabase
+        .from("private.user_credentials")
+        .select("must_change_password")
+        .eq("user_id", userId)
+        .single();
+
+      const mustChangePassword = credentials?.must_change_password === true;
 
       // Determine if this is a forced password change (no current password verification)
       const isForcedChange = !currentPassword;
@@ -258,7 +268,6 @@ router.post(
         .update({
           password_hash: newHash,
           password_changed_at: new Date().toISOString(),
-          must_change_password: false,
         })
         .eq("user_id", userId);
 

@@ -145,7 +145,23 @@ app.use("/api/public", publicRoutes);
 app.use("/api/teacherassignments", teacherAssignmentsRoutes);
 app.use("/api/teacher-assignments", teacherAssignmentsRoutes);
 app.use("/api/parent", authRequired, validateSession, parentRoutes);
-app.use("/api", authRequired);
+// Apply global auth middleware to all /api routes except auth, health, public, and teacherassignments
+app.use("/api", (req, res, next) => {
+  // Skip auth middleware for specific routes
+  const skipAuth = [
+    '/api/health',
+    '/api/auth',
+    '/api/public',
+    '/api/teacherassignments',
+    '/api/teacher-assignments'
+  ].some(path => req.path.startsWith(path));
+  
+  if (skipAuth) {
+    return next();
+  }
+  
+  return authRequired(req, res, next);
+});
 app.use("/api", validateSession);
 app.use("/api", tenantContext);
 app.use("/api", tenantSecurityCheck);

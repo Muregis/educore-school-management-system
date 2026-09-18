@@ -64,18 +64,18 @@ export async function authLogin(email, password, schoolId = 1) {
       return null;
     }
 
-    // 5. Check must_change_password flag from public.users
-    const { data: userWithFlag, error: flagError } = await supabase
-      .from('users')
+    // 5. Check must_change_password flag from private.user_credentials
+    const { data: credentials, error: credentialsError } = await supabase
+      .from('private.user_credentials')
       .select('must_change_password, password_changed_at')
       .eq('user_id', user.user_id)
       .single();
 
-    if (flagError) {
-      console.error('Auth service: error fetching user flag:', flagError.message);
+    if (credentialsError) {
+      console.error('Auth service: error fetching user credentials:', credentialsError.message);
     }
 
-    const mustChangePassword = userWithFlag?.must_change_password === true;
+    const mustChangePassword = credentials?.must_change_password === true;
 
     // 6. If user must change password, return requires_password_change flag
     if (mustChangePassword) {
@@ -106,9 +106,9 @@ export async function authLogin(email, password, schoolId = 1) {
     if (!validation.valid) {
       // Password is valid (hash matches) but doesn't comply with current policy
       // Force password change on next login
-      // Mark user for password reset
+      // Mark user for password reset in private.user_credentials
       await supabase
-        .from('users')
+        .from('private.user_credentials')
         .update({ must_change_password: true })
         .eq('user_id', user.user_id);
 
