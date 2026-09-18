@@ -9,12 +9,22 @@ import { logTenantQuery } from "./tenant-debug.logger.js";
  */
 export async function logActivity(req, { action, entity = null, entityId = null, description = null }) {
   try {
+    // Handle null req case (used in auth service before request context exists)
+    if (!req) {
+      return;
+    }
+
     const schoolId = req.user?.schoolId ?? req.user?.school_id ?? req.schoolId ?? null;
     const userId   = req.user?.userId   ?? req.user?.user_id   ?? null;
     const role     = req.user?.role     ?? null;
     const ip       = (req.headers["x-forwarded-for"] || "").split(",")[0].trim()
                   || req.socket?.remoteAddress
                   || null;
+
+    // Skip logging if essential fields are missing
+    if (!schoolId && !userId) {
+      return;
+    }
 
     logTenantQuery("activity_logs.insert", {
       table: "activity_logs",

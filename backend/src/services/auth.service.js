@@ -78,8 +78,16 @@ export async function authLogin(email, password, schoolId = 1) {
     if (mustChangePassword) {
       // Log forced password reset initiation
       try {
+        // Create a minimal req object for logging since we don't have the full request context
+        const logReq = {
+          user: {
+            schoolId: user.school_id,
+            userId: user.user_id,
+            role: user.role
+          }
+        };
         await logActivity(
-          null,
+          logReq,
           { action: "auth.password_reset_forced", userId: user.user_id, description: "Password reset forced by policy violation" }
         );
       } catch (e) {
@@ -116,8 +124,16 @@ export async function authLogin(email, password, schoolId = 1) {
 
       // Log password policy violation
       try {
+        // Create a minimal req object for logging since we don't have the full request context
+        const logReq = {
+          user: {
+            schoolId: user.school_id,
+            userId: user.user_id,
+            role: user.role
+          }
+        };
         await logActivity(
-          null,
+          logReq,
           { action: "auth.password_policy_violation", userId: user.user_id, description: "Password does not meet current policy", details: validation.errors }
         );
       } catch (e) {
