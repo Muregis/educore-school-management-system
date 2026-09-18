@@ -6,9 +6,9 @@ import { logActivity } from '../helpers/activity.logger.js';
 
 /**
  * Single-source-of-truth auth service
- * Password hashes live in private.user_credentials
- * Login and change-password both use this as the primary credential store.
- * public.users is used for user lookup only.
+ * Password hashes live in public.users.password_hash (authoritative store).
+ * public.users is the primary source for login and change-password.
+ * private.user_credentials is NOT used for login — kept in sync only by change-password migration.
  */
 
 export async function authLogin(email, password, schoolId = 1) {
@@ -33,35 +33,25 @@ export async function authLogin(email, password, schoolId = 1) {
       return null;
     }
 
-    // 3. Verify password against private.user_credentials.password_hash (authoritative store)
-    const { data: cred, error: credError } = await supabase
-      .from('private.user_credentials')
-      .select('password_hash')
-      .eq('user_id', user.user_id)
-      .single();
-
-    if (credError || !cred || !cred.password_hash) {
-      console.error('Auth service: credential record not found for user', user.user_id, credError?.message);
-      return null;
-    }
-
-    const isValidPassword = await bcrypt.compare(password, cred.password_hash);
+    // 3. Verify password against authoritative store: public.users.password_hash
+    const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
       return null;
     }
 
-    // 4. Check must_change_password flag from same credential record
-    const { data: credFull, error: credFullError } = await supabase
-      .from('private.user_credentials')
+    // 4. Check must_change_password flag — NOT from private store during login.
+    //    This flag is set/cleared only by change-password flow; if present, force reset.
+    const { data: userWithFlag, error: flagError } = await supabase
+      .from('users')
       .select('must_change_password, password_changed_at')
       .eq('user_id', user.user_id)
       .single();
 
-    if (credFullError) {
-      console.error('Auth service: error fetching full credential record:', credFullError.message);
+    if (flagError) {
+      console.error('Auth service: error fetching user flag:', flagError.message);
     }
 
-    const mustChangePassword = credFull?.must_change_password === true;
+    const mustChangePassword = userWithFlag?.must_change_password === true;
 
     // 5. If user must change password, return requires_password_change flag
     if (mustChangePassword) {
@@ -83,7 +73,7 @@ export async function authLogin(email, password, schoolId = 1) {
 
     // 6. Check password policy compliance for existing valid password
     //    If the password doesn't meet the current policy, force a change
-    const policy = await getSchoolPasswordPolicy(schoolId);
+    const policy = resolvePasswordPolicy();
     const validation = validatePassword(password, {
       email: user.email,
       firstName: user.full_name,
@@ -92,9 +82,9 @@ export async function authLogin(email, password, schoolId = 1) {
     if (!validation.valid) {
       // Password is valid (hash matches) but doesn't comply with current policy
       // Force password change on next login
-      // Mark user for password reset
+      // Mark user for password reset in public.users
       await supabase
-        .from('private.user_credentials')
+        .from('users')
         .update({ must_change_password: true })
         .eq('user_id', user.user_id);
 
