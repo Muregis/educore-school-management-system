@@ -2,45 +2,69 @@ import '../config/env.js';
 import bcrypt from 'bcryptjs';
 import { supabase } from '../config/supabaseClient.js';
 import { resolvePasswordPolicy, validatePassword } from '../middleware/passwordPolicy.js';
+import { getSchoolPasswordPolicy } from '../helpers/password-policy.helper.js';
 import { logActivity } from '../helpers/activity.logger.js';
 
 /**
  * Single-source-of-truth auth service
- * Password hashes live in public.users.password_hash (authoritative store).
- * public.users is the primary source for login and change-password.
- * private.user_credentials is NOT used for login — kept in sync only by change-password migration.
+ * Password hashes live in public.users.password_hash (authoritative store for Option A).
+ * Login and change-password both read/write this column primarily.
+ * private.user_credentials is kept in sync only by the change-password flow.
+ * School ID is required for policy lookups; if missing, it is resolved by email.
  */
 
 export async function authLogin(email, password, schoolId = 1) {
   try {
     const normalizedEmail = email.trim().toLowerCase();
 
-    // 1. Resolve user from public.users by email + school_id
-    const { data: user, error } = await supabase
+    // 1. Resolve schoolId if not provided (unique email → one school; many → schoolOptions)
+    let effectiveSchoolId = schoolId;
+    if (!schoolId) {
+      const { data: users, error } = await supabase
+        .from('users')
+        .select('school_id')
+        .ilike('email', normalizedEmail)
+        .eq('is_deleted', false)
+        .limit(5);
+      if (error || !users || users.length === 0) {
+        return null;
+      }
+      if (users.length === 1) {
+        effectiveSchoolId = users[0].school_id;
+      } else {
+        // Many schools for this email — return null so frontend can show school selector
+        return null;
+      }
+    }
+
+    // Ensure effectiveSchoolId is a number
+    effectiveSchoolId = Number(effectiveSchoolId);
+
+    // 2. Resolve user from public.users by email + school_id
+    const { data: user, error: userError } = await supabase
       .from('users')
       .select('user_id, school_id, full_name, email, role, status, is_deleted, password_hash')
       .ilike('email', normalizedEmail)
-      .eq('school_id', schoolId)
+      .eq('school_id', effectiveSchoolId)
       .eq('is_deleted', false)
       .single();
 
-    if (error || !user) {
+    if (userError || !user) {
       return null; // safe: no stack trace leaked
     }
 
-    // 2. Reject deleted / inactive accounts
+    // 3. Reject deleted / inactive accounts
     if (user.status !== 'active') {
       return null;
     }
 
-    // 3. Verify password against authoritative store: public.users.password_hash
+    // 4. Verify password against the authoritative store: public.users.password_hash
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
       return null;
     }
 
-    // 4. Check must_change_password flag — NOT from private store during login.
-    //    This flag is set/cleared only by change-password flow; if present, force reset.
+    // 5. Check must_change_password flag from public.users
     const { data: userWithFlag, error: flagError } = await supabase
       .from('users')
       .select('must_change_password, password_changed_at')
@@ -53,7 +77,7 @@ export async function authLogin(email, password, schoolId = 1) {
 
     const mustChangePassword = userWithFlag?.must_change_password === true;
 
-    // 5. If user must change password, return requires_password_change flag
+    // 6. If user must change password, return requires_password_change flag
     if (mustChangePassword) {
       // Log forced password reset initiation
       try {
@@ -71,9 +95,9 @@ export async function authLogin(email, password, schoolId = 1) {
       };
     }
 
-    // 6. Check password policy compliance for existing valid password
+    // 7. Check password policy compliance for existing valid password
     //    If the password doesn't meet the current policy, force a change
-    const policy = resolvePasswordPolicy();
+    const policy = getSchoolPasswordPolicy(effectiveSchoolId);
     const validation = validatePassword(password, {
       email: user.email,
       firstName: user.full_name,
@@ -82,7 +106,7 @@ export async function authLogin(email, password, schoolId = 1) {
     if (!validation.valid) {
       // Password is valid (hash matches) but doesn't comply with current policy
       // Force password change on next login
-      // Mark user for password reset in public.users
+      // Mark user for password reset
       await supabase
         .from('users')
         .update({ must_change_password: true })
@@ -106,7 +130,7 @@ export async function authLogin(email, password, schoolId = 1) {
       };
     }
 
-    // 7. Return full user object needed by login handler
+    // 8. Return full user object needed by login handler
     return {
       user: {
         user_id: user.user_id,
