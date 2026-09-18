@@ -1,12 +1,14 @@
 import '../config/env.js';
 import bcrypt from 'bcryptjs';
 import { supabase } from '../config/supabaseClient.js';
+import { resolvePasswordPolicy, validatePassword } from '../middleware/passwordPolicy.js';
+import { logActivity } from '../helpers/activity.logger.js';
 
 /**
  * Single-source-of-truth auth service
  * Password hashes live in public.users.password_hash
- * Login and change-password both read/write this column only.
- * No private.user_credentials dependency for login.
+ * Login and change-password both read/write this column primarily.
+ * private.user_credentials is checked for must_change_password flag.
  */
 
 export async function authLogin(email, password, schoolId = 1) {
@@ -37,7 +39,73 @@ export async function authLogin(email, password, schoolId = 1) {
       return null;
     }
 
-    // 4. Return full user object needed by login handler
+    // 4. Check must_change_password flag from private.user_credentials
+    const { data: cred, error: credError } = await supabase
+      .from('user_credentials')
+      .select('must_change_password')
+      .eq('user_id', user.user_id)
+      .single();
+
+    if (credError && credError.code !== 'PGRST116') {
+      console.error('Auth service: error fetching user_credentials:', credError.message);
+    }
+
+    const mustChangePassword = cred?.must_change_password === true;
+
+    // 5. If user must change password, return requires_password_change flag
+    if (mustChangePassword) {
+      // Log forced password reset initiation
+      try {
+        await logActivity(
+          null,
+          { action: "auth.password_reset_forced", userId: user.user_id, description: "Password reset forced by policy violation" }
+        );
+      } catch (e) {
+        // logActivity is fire-and-forget; don't break login flow
+      }
+      return {
+        requires_password_change: true,
+        user_id: user.user_id,
+        school_id: user.school_id,
+      };
+    }
+
+    // 6. Check password policy compliance for existing valid password
+    //    If the password doesn't meet the current policy, force a change
+    const policy = await getSchoolPasswordPolicy(schoolId);
+    const validation = validatePassword(password, {
+      email: user.email,
+      firstName: user.full_name,
+    }, policy);
+
+    if (!validation.valid) {
+      // Password is valid (hash matches) but doesn't comply with current policy
+      // Force password change on next login
+      // Mark user for password reset
+      await supabase
+        .from('private.user_credentials')
+        .update({ must_change_password: true })
+        .eq('user_id', user.user_id);
+
+      // Log password policy violation
+      try {
+        await logActivity(
+          null,
+          { action: "auth.password_policy_violation", userId: user.user_id, description: "Password does not meet current policy", details: validation.errors }
+        );
+      } catch (e) {
+        // logActivity is fire-and-forget; don't break login flow
+      }
+
+      return {
+        requires_password_change: true,
+        user_id: user.user_id,
+        school_id: user.school_id,
+        policyViolation: validation.errors,
+      };
+    }
+
+    // 7. Return full user object needed by login handler
     return {
       user: {
         user_id: user.user_id,

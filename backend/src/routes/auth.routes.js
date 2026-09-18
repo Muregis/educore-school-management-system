@@ -95,6 +95,16 @@ router.post("/login", changePasswordGate, async (req, res, next) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    // NEW: Handle requires_password_change response
+    if (result.requires_password_change) {
+      return res.json({
+        requires_password_change: true,
+        user_id: result.user_id,
+        school_id: result.school_id,
+        message: "Password change required. Please update your password.",
+      });
+    }
+
     const user = result.user;
     const token = jwt.sign(
       { user_id: user.user_id, school_id: user.school_id, role: user.role },
@@ -148,25 +158,46 @@ router.post(
   changePasswordGate,
   async (req, res, next) => {
     try {
-      const { currentPassword, newPassword } = req.body || {};
-      if (!currentPassword || !newPassword) {
-        return res.status(400).json({ message: "Current and new passwords are required" });
+      const { currentPassword, newPassword, userId } = req.body || {};
+      const effectiveUserId = userId || req.user?.user_id;
+
+      if (!newPassword) {
+        return res.status(400).json({ message: "New password is required" });
       }
 
-      // Verify current password
-      const user = req.user;
-      const isValid = await bcrypt.compare(currentPassword, user.password_hash);
-      if (!isValid) {
-        // Increment failed login attempts
-        await supabase
-          .from("public.users")
-          .update({ failed_login_attempts: user.failed_login_attempts + 1 })
-          .eq("user_id", user.user_id);
-        return res.status(401).json({ message: "Current password is incorrect" });
+      // Resolve user
+      const userFromBody = await supabase
+        .from("public.users")
+        .select("password_hash, school_id, email, full_name")
+        .eq("user_id", effectiveUserId)
+        .single();
+
+      if (userFromBody.error || !userFromBody.data) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const user = userFromBody.data;
+      const userId = user.user_id;
+      const schoolId = user.school_id;
+
+      // Determine if this is a forced password change (no current password verification)
+      const isForcedChange = !currentPassword;
+
+      // If not forced change, verify current password
+      if (!isForcedChange && currentPassword) {
+        const isValidCurrent = await bcrypt.compare(currentPassword, user.password_hash);
+        if (!isValidCurrent) {
+          // Increment failed login attempts
+          await supabase
+            .from("public.users")
+            .update({ failed_login_attempts: user.failed_login_attempts + 1 })
+            .eq("user_id", userId);
+          return res.status(401).json({ message: "Current password is incorrect" });
+        }
       }
 
       // Validate new password against policy
-      const policy = await getSchoolPasswordPolicy(user.school_id);
+      const policy = await getSchoolPasswordPolicy(schoolId);
       const check = validatePassword(newPassword, {
         email: user.email,
         firstName: user.full_name,
@@ -181,29 +212,88 @@ router.post(
       // Hash new password
       const newHash = await bcrypt.hash(newPassword, 12);
 
-      // Update only public.users.password_hash (single store)
-      const { error } = await supabase
+      // Begin updating credential records
+
+      // 1. Update public.users.password_hash (authoritative source)
+      const { error: pubError } = await supabase
         .from("public.users")
         .update({
           password_hash: newHash,
           password_changed_at: new Date().toISOString(),
         })
-        .eq("user_id", user.user_id);
+        .eq("user_id", userId);
 
-      if (error) {
-        return res.status(500).json({ message: "Failed to update password" });
+      if (pubError) {
+        return res.status(500).json({ message: "Failed to update public password hash" });
       }
 
-      // Invalidate sessions by incrementing token version
-      await supabase
+      // 2. Update private.user_credentials.password_hash (keep in sync)
+      //    Also set must_change_password = false and password_changed_at
+      const { error: privError } = await supabase
+        .from("private.user_credentials")
+        .update({
+          password_hash: newHash,
+          password_changed_at: new Date().toISOString(),
+          must_change_password: false,
+        })
+        .eq("user_id", userId);
+
+      if (privError) {
+        console.error('Auth route: failed to update private.user_credentials:', privError.message);
+        // Public hash already updated; continue with warning
+      }
+
+      // 3. Update password_history in public.users
+      //    Retain only the configured number of previous hashes (prevent unbounded growth)
+      const { data: existingUser } = await supabase
+        .from("public.users")
+        .select('password_history')
+        .eq("user_id", userId)
+        .single();
+
+      let history = existingUser?.password_history || [];
+      // Add current hash (before it was replaced) to history if not already present
+      const currentHashBeforeUpdate = user.password_hash;
+      if (history.length > 0 && history[0] !== currentHashBeforeUpdate) {
+        history.unshift(currentHashBeforeUpdate);
+      }
+      // Limit to 5 previous hashes (matching preventReuse policy config)
+      const maxHistory = 5;
+      history = history.slice(0, maxHistory);
+
+      const { error: histError } = await supabase
+        .from("public.users")
+        .update({ password_history: history })
+        .eq("user_id", userId);
+
+      if (histError) {
+        console.error('Auth route: failed to update password_history:', histError.message);
+      }
+
+      // 4. Invalidate sessions by incrementing token version
+      const { error: versionError } = await supabase
         .from("public.users")
         .update({ token_version: user.token_version + 1 })
-        .eq("user_id", user.user_id);
+        .eq("user_id", userId);
 
-      // Log the change
-      await logActivity(req, { action: "auth.password_change", userId: user.user_id, description: "Password changed" });
+      if (versionError) {
+        return res.status(500).json({ message: "Failed to invalidate sessions" });
+      }
 
-      res.json({ message: "Password updated. Please sign in with your new password." });
+      // 5. Log audit events
+      await logActivity(req, { action: "auth.password_change", userId: userId, description: "Password changed successfully" });
+      await supabase
+        .from("public.users")
+        .update({ failed_login_attempts: 0 }) // Reset failed attempts on successful change
+        .eq("user_id", userId);
+
+      // 6. Return success response
+      // If this was a forced change, also indicate that a normal session can now be created
+      res.json({ 
+        message: "Password updated. Please sign in with your new password.",
+        passwordChangedAt: new Date().toISOString(),
+        wasForcedChange: isForcedChange
+      });
     } catch (err) {
       next(err);
     }

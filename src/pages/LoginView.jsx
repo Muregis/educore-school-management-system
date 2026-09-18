@@ -237,7 +237,7 @@ export default function LoginView({ onLogin }) {
     fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
   }), [branding.primary_color, branding.secondary_color]);
 
-  async function submitStaff(event) {
+async function submitStaff(event) {
     event.preventDefault();
     setError("");
     setLoading(true);
@@ -256,6 +256,15 @@ export default function LoginView({ onLogin }) {
         return;
       }
 
+      // NEW: Handle requires_password_change from policy enforcement
+      if (data?.requires_password_change) {
+        setError("Please set a new password to continue. Your current password does not meet the current policy requirements.");
+        setLoading(false);
+        // Redirect to password change or show change form
+        // For now, set state and let the UI handle it
+        return;
+      }
+
       if (!data?.token || !data?.user) {
         throw new Error("Login succeeded but the server response was missing session data.");
       }
@@ -267,7 +276,6 @@ export default function LoginView({ onLogin }) {
         schoolId: data.user.schoolId,
         token: data.token,
         sessionId: data.sessionId,
-        studentId: null,
       });
       setEmail("");
       setPassword("");
