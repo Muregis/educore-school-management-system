@@ -5,6 +5,7 @@
 
 import jwt from 'jsonwebtoken';
 import { promisify } from 'util';
+import { env } from '../config/env.js';
 
 // Role permissions mapping
 const ROLE_PERMISSIONS = {
@@ -65,7 +66,7 @@ const verifyToken = async (token) => {
   }
   
   try {
-    const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = await promisify(jwt.verify)(token, env.jwtSecret);
     return decoded;
   } catch (error) {
     throw new Error('Invalid token');

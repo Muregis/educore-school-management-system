@@ -251,7 +251,14 @@ export function changePasswordGate(req, res, next) {
         return next();
       }
     } catch (err) {
-      // Invalid changeToken — fall through to auth check below
+      // Invalid changeToken — return 401 error
+      const errorType = err.name === "TokenExpiredError" ? "EXPIRED" : "INVALID";
+      return res.status(401).json({
+        error: errorType === "EXPIRED"
+          ? "Password change token expired. Please login again."
+          : "Invalid password change token. Please login again.",
+        code: errorType === "EXPIRED" ? "AUTH_TOKEN_EXPIRED" : "AUTH_INVALID_TOKEN"
+      });
     }
   }
 

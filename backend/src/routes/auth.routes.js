@@ -13,6 +13,7 @@ import multer from "multer";
 import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
 import { getPortalStudentIds, requirePortalStudentAccess } from "../utils/portalAccess.js";
 import { changePasswordGate } from "../middleware/auth.js";
+import { env } from "../config/env.js";
 
 const router = Router();
 
@@ -128,7 +129,7 @@ router.post("/login", async (req, res, next) => {
       // Issue short-lived changeToken JWT (TTL 10 minutes)
       const changeToken = jwt.sign(
         { user_id: result.user_id, school_id: result.school_id, purpose: "password_change" },
-        process.env.JWT_SECRET,
+        env.jwtSecret,
         { expiresIn: "10m" }
       );
       return res.json({
