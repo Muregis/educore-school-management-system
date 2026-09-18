@@ -86,12 +86,12 @@ router.get("/lookup-school", async (req, res, next) => {
 // ─── POST /api/auth/login ───────────────────────────────────────────────
 router.post("/login", changePasswordGate, async (req, res, next) => {
   try {
-    const { email, password } = req.body || {};
+    const { email, password, schoolId } = req.body || {};
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    const result = await authLogin(email, password, req.user.school_id);
+    const result = await authLogin(email, password, schoolId || 1);
     if (!result) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
