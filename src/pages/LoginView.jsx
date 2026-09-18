@@ -258,10 +258,12 @@ async function submitStaff(event) {
 
       // NEW: Handle requires_password_change from policy enforcement
       if (data?.requires_password_change) {
-        setError("Please set a new password to continue. Your current password does not meet the current policy requirements.");
+        setError("");
+        setPasswordChangeToken(data.user_id);
+        setPasswordChangeReasons(data.policyViolation || []);
+        setNotice("Your current password does not meet the current policy requirements. Please set a new password to continue.");
         setLoading(false);
-        // Redirect to password change or show change form
-        // For now, set state and let the UI handle it
+        setMode("passwordChange");
         return;
       }
 
