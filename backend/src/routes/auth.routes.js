@@ -14,6 +14,7 @@ import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
 import { getPortalStudentIds, requirePortalStudentAccess } from "../utils/portalAccess.js";
 import { changePasswordGate } from "../middleware/auth.js";
 import { env } from "../config/env.js";
+import { resolvePasswordPolicy, validatePassword } from "../middleware/passwordPolicy.js";
 
 const router = Router();
 
@@ -26,7 +27,7 @@ router.get("/resolve-school", async (req, res, next) => {
     }
     // Resolve school by hostname - simplified lookup
     const { data: school, error } = await supabase
-      .from("public.schools")
+      .from("schools")
       .select("school_id, name, slug, plan")
       .eq("slug", hostname)
       .single();
@@ -59,7 +60,7 @@ router.get("/lookup-school", async (req, res, next) => {
       return res.status(400).json({ message: "schoolId query param required" });
     }
     const { data: school, error } = await supabase
-      .from("public.schools")
+      .from("schools")
       .select("school_id, name, slug, plan")
       .eq("school_id", schoolId)
       .single();
@@ -145,7 +146,7 @@ router.post("/login", async (req, res, next) => {
     const token = jwt.sign(
       { user_id: user.user_id, school_id: user.school_id, role: user.role },
       env.jwtSecret,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
+      { expiresIn: env.jwtExpiresIn || process.env.JWT_EXPIRES_IN || "7d" }
     );
 
     // Fetch school plan info
@@ -189,6 +190,10 @@ router.post("/login", async (req, res, next) => {
 });
 
 // ─── POST /api/auth/change-password ───────────────────────────────────────
+// resolve-school / lookup-school:
+.from("schools")   // not "public.schools"
+
+// change-password:
 router.post(
   "/change-password",
   changePasswordGate,
@@ -197,6 +202,7 @@ router.post(
       if (!req.user?.user_id) {
         return res.status(401).json({ message: "Authentication required" });
       }
+
       const { currentPassword, newPassword } = req.body || {};
       const userId = req.user.user_id;
 
@@ -204,9 +210,105 @@ router.post(
         return res.status(400).json({ message: "New password is required" });
       }
 
+      const { data: user, error: userError } = await supabase
+        .from("users")
+        .select(
+          "user_id, password_hash, school_id, email, full_name, token_version, failed_login_attempts, password_history"
+        )
+        .eq("user_id", userId)
+        .single();
+
+      if (userError || !user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const schoolId = user.school_id;
+      const isForcedChange = !currentPassword;
+
+      if (!isForcedChange && currentPassword) {
+        if (!user.password_hash) {
+          return res.status(401).json({ message: "Current password is incorrect" });
+        }
+        const isValidCurrent = await bcrypt.compare(currentPassword, user.password_hash);
+        if (!isValidCurrent) {
+          await supabase
+            .from("users")
+            .update({
+              failed_login_attempts: (user.failed_login_attempts || 0) + 1,
+            })
+            .eq("user_id", userId);
+          return res.status(401).json({ message: "Current password is incorrect" });
+        }
+      }
+
+      const policy = resolvePasswordPolicy();
+      const check = validatePassword(
+        newPassword,
+        { email: user.email, firstName: user.full_name },
+        policy
+      );
+      if (!check.valid) {
+        return res.status(400).json({
+          message: "Password does not meet security requirements",
+          errors: check.errors,
+        });
+      }
+
+      const newHash = await bcrypt.hash(newPassword, 12);
+      const changedAt = new Date().toISOString();
+
+      let history = Array.isArray(user.password_history) ? [...user.password_history] : [];
+      if (user.password_hash) {
+        history.unshift(user.password_hash);
+      }
+      history = history.slice(0, 5);
+
+      const { error: pubError } = await supabase
+        .from("users")
+        .update({
+          password_hash: newHash,
+          password_changed_at: changedAt,
+          password_history: history,
+          token_version: (user.token_version || 0) + 1,
+          failed_login_attempts: 0,
+        })
+        .eq("user_id", userId);
+
+      if (pubError) {
+        console.error("change-password users update:", pubError.message);
+        return res.status(500).json({ message: "Failed to update password" });
+      }
+
+      // Optional sync — do not fail the request if RPC missing
+      const { error: privError } = await supabase.rpc("update_user_credentials", {
+        p_user_id: userId,
+        p_password_hash: newHash,
+        p_password_changed_at: changedAt,
+        p_must_change_password: false,
+      });
+      if (privError) {
+        console.error("update_user_credentials:", privError.message);
+      }
+
+      await logActivity(req, {
+        action: "auth.password_change",
+        userId,
+        description: "Password changed successfully",
+      });
+
+      return res.json({
+        message: "Password updated. Please sign in with your new password.",
+        passwordChangedAt: changedAt,
+        wasForcedChange: isForcedChange,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
       // Resolve user from userId (set by changePasswordGate from changeToken or auth session)
       const userFromBody = await supabase
-        .from("public.users")
+        .from("users")
         .select("password_hash, school_id, email, full_name")
         .eq("user_id", userId)
         .single();
@@ -231,9 +333,10 @@ router.post(
       if (!isForcedChange && currentPassword) {
         const isValidCurrent = await bcrypt.compare(currentPassword, user.password_hash);
         if (!isValidCurrent) {
+
           // Increment failed login attempts
           await supabase
-            .from("public.users")
+            .from("users")
             .update({ failed_login_attempts: user.failed_login_attempts + 1 })
             .eq("user_id", userId);
           return res.status(401).json({ message: "Current password is incorrect" });
@@ -260,7 +363,7 @@ router.post(
 
       // 1. Update public.users.password_hash and password_changed_at
       const { error: pubError } = await supabase
-        .from("public.users")
+        .from("users")
         .update({
           password_hash: newHash,
           password_changed_at: new Date().toISOString(),
@@ -288,7 +391,7 @@ router.post(
       // 3. Update password_history in public.users
       //    Retain only the configured number of previous hashes (prevent unbounded growth)
       const { data: existingUser } = await supabase
-        .from("public.users")
+        .from("users")
         .select('password_history')
         .eq("user_id", userId)
         .single();
@@ -304,7 +407,7 @@ router.post(
       history = history.slice(0, maxHistory);
 
       const { error: histError } = await supabase
-        .from("public.users")
+        .from("users")
         .update({ password_history: history })
         .eq("user_id", userId);
 
@@ -314,7 +417,7 @@ router.post(
 
       // 4. Invalidate sessions by incrementing token version
       const { error: versionError } = await supabase
-        .from("public.users")
+        .from("users")
         .update({ token_version: user.token_version + 1 })
         .eq("user_id", userId);
 
@@ -325,7 +428,7 @@ router.post(
       // 5. Log audit events
       await logActivity(req, { action: "auth.password_change", userId: userId, description: "Password changed successfully" });
       await supabase
-        .from("public.users")
+        .from("users")
         .update({ failed_login_attempts: 0 }) // Reset failed attempts on successful change
         .eq("user_id", userId);
 
