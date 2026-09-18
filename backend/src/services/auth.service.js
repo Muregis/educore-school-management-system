@@ -1,6 +1,6 @@
 import '../config/env.js';
 import bcrypt from 'bcryptjs';
-import { supabase } from '../config/supabaseClient.js';
+import { supabase, supabasePrivate } from '../config/supabaseClient.js';
 import { resolvePasswordPolicy, validatePassword } from '../middleware/passwordPolicy.js';
 import { getSchoolPasswordPolicy } from '../helpers/password-policy.helper.js';
 import { logActivity } from '../helpers/activity.logger.js';
@@ -64,9 +64,9 @@ export async function authLogin(email, password, schoolId = 1) {
       return null;
     }
 
-    // 5. Check must_change_password flag from private.user_credentials
-    const { data: credentials, error: credentialsError } = await supabase
-      .from('private.user_credentials')
+    // 5. Check must_change_password flag from private.user_credentials (via supabasePrivate client)
+    const { data: credentials, error: credentialsError } = await supabasePrivate
+      .from('user_credentials')
       .select('must_change_password, password_changed_at')
       .eq('user_id', user.user_id)
       .single();
@@ -106,9 +106,9 @@ export async function authLogin(email, password, schoolId = 1) {
     if (!validation.valid) {
       // Password is valid (hash matches) but doesn't comply with current policy
       // Force password change on next login
-      // Mark user for password reset in private.user_credentials
-      await supabase
-        .from('private.user_credentials')
+      // Mark user for password reset in private.user_credentials (via supabasePrivate client)
+      await supabasePrivate
+        .from('user_credentials')
         .update({ must_change_password: true })
         .eq('user_id', user.user_id);
 

@@ -17,7 +17,7 @@ if (supabaseServiceKey.length > 0 && !supabaseServiceKey.startsWith('sb_') && !s
   console.error(`[Supabase] CRITICAL: Service Key format looks invalid! Prefix: "${supabaseServiceKey.substring(0, 10)}..."`);
 }
 
-export const supabase = (supabaseUrl && supabaseServiceKey) 
+export const supabase = (supabaseUrl && supabaseServiceKey)
   ? createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
@@ -26,6 +26,25 @@ export const supabase = (supabaseUrl && supabaseServiceKey)
       },
       db: {
         schema: 'public'
+      },
+      global: {
+        headers: {
+          'x-tenant-source': 'educore-backend'
+        }
+      }
+    })
+  : null;
+
+// Separate client for accessing private schema tables
+export const supabasePrivate = (supabaseUrl && supabaseServiceKey)
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+      },
+      db: {
+        schema: 'private'
       },
       global: {
         headers: {

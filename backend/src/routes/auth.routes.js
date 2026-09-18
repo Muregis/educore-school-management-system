@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { authRequired } from "../middleware/auth.js";
-import { supabase } from "../config/supabaseClient.js";
+import { supabase, supabasePrivate } from "../config/supabaseClient.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { authLogin } from "../services/auth.service.js";
 import { requireRoles, requireDirector } from "../middleware/roles.js";
@@ -205,7 +205,7 @@ router.post(
       }
 
       // Resolve user from userId (set by changePasswordGate from changeToken or auth session)
-      // Join with private.user_credentials to get must_change_password flag
+      // Join with private.user_credentials to get must_change_password flag (via supabasePrivate client)
       const userFromBody = await supabase
         .from("public.users")
         .select("password_hash, school_id, email, full_name")
@@ -219,9 +219,9 @@ router.post(
       const user = userFromBody.data;
       const schoolId = user.school_id;
 
-      // Get must_change_password from private.user_credentials
-      const { data: credentials, error: credentialsError } = await supabase
-        .from("private.user_credentials")
+      // Get must_change_password from private.user_credentials (via supabasePrivate client)
+      const { data: credentials, error: credentialsError } = await supabasePrivate
+        .from("user_credentials")
         .select("must_change_password")
         .eq("user_id", userId)
         .single();
@@ -275,10 +275,10 @@ router.post(
         return res.status(500).json({ message: "Failed to update public password hash" });
       }
 
-      // 2. Update private.user_credentials.password_hash (keep in sync)
+      // 2. Update private.user_credentials.password_hash (keep in sync via supabasePrivate)
       //    Also set must_change_password = false and password_changed_at
-      const { error: privError } = await supabase
-        .from("private.user_credentials")
+      const { error: privError } = await supabasePrivate
+        .from("user_credentials")
         .update({
           password_hash: newHash,
           password_changed_at: new Date().toISOString(),
@@ -287,7 +287,7 @@ router.post(
         .eq("user_id", userId);
 
       if (privError) {
-        console.error('Auth route: failed to update private.user_credentials:', privError.message);
+        console.error('Auth route: failed to update private.user_credentials (via supabasePrivate):', privError.message);
         // Public hash already updated; continue with warning
       }
 
