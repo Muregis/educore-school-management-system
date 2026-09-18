@@ -831,11 +831,11 @@ const fullNav = useMemo(() => {
           alignItems: "center"
         }}>
           <div>
-            <a href="#/dashboard" onClick={(e) => { e.preventDefault(); navigateTo("dashboard"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Home</a>
-            <a href="#/students" onClick={(e) => { e.preventDefault(); navigateTo("students"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Students</a>
-            <a href="#/fees" onClick={(e) => { e.preventDefault(); navigateTo("fees"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Fees</a>
-            <a href="#/grades" onClick={(e) => { e.preventDefault(); navigateTo("grades"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Grades</a>
-            <a href="#/attendance" onClick={(e) => { e.preventDefault(); navigateTo("attendance"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>Attendance</a>
+            <a href="#/dashboard" onClick={(e) => { e.preventDefault(); setPage("dashboard"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Home</a>
+            <a href="#/students" onClick={(e) => { e.preventDefault(); setPage("students"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Students</a>
+            <a href="#/fees" onClick={(e) => { e.preventDefault(); setPage("fees"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Fees</a>
+            <a href="#/grades" onClick={(e) => { e.preventDefault(); setPage("grades"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none", marginRight: 12 }}>Grades</a>
+            <a href="#/attendance" onClick={(e) => { e.preventDefault(); setPage("attendance"); }} style={{ color: "var(--color-text-muted)", textDecoration: "none" }}>Attendance</a>
           </div>
           <div style={{ marginTop: isMobile ? 8 : 0 }}>
             <span>© {new Date().getFullYear()} EduCore. All rights reserved.</span>
@@ -846,7 +846,7 @@ const fullNav = useMemo(() => {
       {isMobile && (
         <nav className="ec-bottom-nav">
           {bottomNavItems.map(n => (
-            <button key={n.id} className={`ec-bottom-nav-item ${page === n.id ? "active" : ""} touch-target`} onClick={() => navigateTo(n.id)}>
+            <button key={n.id} className={`ec-bottom-nav-item ${page === n.id ? "active" : ""} touch-target`} onClick={() => setPage(n.id)}>
               <span className="icon">{n.icon}</span>
               <span>{n.label.length > 8 ? n.label.slice(0,7)+"…" : n.label}</span>
             </button>
