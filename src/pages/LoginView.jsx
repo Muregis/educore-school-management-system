@@ -256,13 +256,34 @@ async function submitStaff(event) {
         return;
       }
 
-      // NEW: Handle requires_password_change from policy enforcement
-      if (data?.requires_password_change) {
-        setPasswordChangeToken(data.changeToken);
-        setPasswordChangeReasons(data.policyViolation || []);
-        setNotice("Your current password does not meet the current policy requirements. Please set a new password to continue.");
-        setLoading(false);
+      // Forced password change: server returns changeToken, not a full session
+      const changeTok =
+        data?.changeToken ||
+        data?.change_token ||
+        data?.passwordChangeToken;
+      const mustChange =
+        data?.requires_password_change === true ||
+        data?.passwordChangeRequired === true ||
+        data?.password_change_required === true ||
+        Boolean(changeTok && !data?.token);
+
+      if (mustChange) {
+        if (!changeTok) {
+          throw new Error(
+            "Password change is required, but the server did not return a change token. Try again or contact support."
+          );
+        }
+        setPasswordChangeToken(changeTok);
+        setPasswordChangeReasons(
+          data.policyViolation || data.errors || data.passwordChangeReasons || []
+        );
+        setError("");
+        setNotice(
+          data.message ||
+            "Your current password does not meet policy. Set a new password to continue."
+        );
         setMode("passwordChange");
+        setLoading(false);
         return;
       }
 
@@ -281,10 +302,21 @@ async function submitStaff(event) {
       setEmail("");
       setPassword("");
     } catch (err) {
-      if (err?.status === 403 && err.body?.passwordChangeRequired) {
-        setPasswordChangeToken(err.body.changeToken);
-        setPasswordChangeReasons(err.body.errors || []);
-        setError(err.body.message || "Please set a new password to continue.");
+      const body = err?.body || {};
+      const changeTok =
+        body.changeToken || body.change_token || body.passwordChangeToken;
+      const mustChange =
+        body.requires_password_change ||
+        body.passwordChangeRequired ||
+        body.password_change_required ||
+        (err?.status === 403 && changeTok);
+
+      if (mustChange && changeTok) {
+        setPasswordChangeToken(changeTok);
+        setPasswordChangeReasons(body.policyViolation || body.errors || []);
+        setError("");
+        setNotice(body.message || "Please set a new password to continue.");
+        setMode("passwordChange");
       } else {
         setError(err.message || "Login failed");
       }
@@ -312,6 +344,7 @@ async function submitStaff(event) {
       setNewPassword("");
       setConfirmPassword("");
       setPassword("");
+      setMode("staff");
       setNotice("Password updated. Please sign in with your new password.");
     } catch (err) {
       const details = err.body?.errors?.join(", ");
@@ -422,7 +455,7 @@ async function submitStaff(event) {
 
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 14px", borderRadius: 999, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--primary-color)", fontSize: 12, fontWeight: 700, marginBottom: 24 }}>
               <span>{branding.location}</span>
-              {branding.established_year ? <span>� Since {branding.established_year}</span> : null}
+              {branding.established_year ? <span>· Since {branding.established_year}</span> : null}
             </div>
 
             <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(36px, 4vw, 60px)", lineHeight: 1.05, margin: 0, maxWidth: 620 }}>
@@ -447,7 +480,7 @@ async function submitStaff(event) {
           </div>
 
           <div style={{ color: "#6d819d", fontSize: 12 }}>
-            Powered by <span style={{ color: "var(--primary-color)" }}>EduCore</span> � Tenant-aware secure login
+            Powered by <span style={{ color: "var(--primary-color)" }}>EduCore</span> · Tenant-aware secure login
           </div>
         </section>
 
@@ -537,7 +570,6 @@ async function submitStaff(event) {
                  </form>
                ) : mode === "staff" ? (
                  <form onSubmit={submitStaff} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
-                  {/* Hidden fields to trick browser autofill */}
                   <input type="text" name="fake_username" style={{ display: 'none' }} autoComplete="off" />
                   <input type="password" name="fake_password" style={{ display: 'none' }} autoComplete="off" />
                   
@@ -557,14 +589,6 @@ async function submitStaff(event) {
                       data-form-type="other"
                       placeholder="you@school.ac.ke" 
                       style={fieldStyle}
-                      onFocus={(e) => {
-                        e.target.autocomplete = 'new-password';
-                      }}
-                      onBlur={(e) => {
-                        if (e.target.value !== email) {
-                          setEmail(e.target.value);
-                        }
-                      }}
                     />
                   </label>
                   <label style={labelStyle}>
@@ -575,125 +599,72 @@ async function submitStaff(event) {
                         onChange={(e) => setPassword(e.target.value)} 
                         type={showPassword ? "text" : "password"} 
                         autoComplete="new-password"
-                        name={`password_staff_${randomFieldSuffix}`}
-                        readOnly={false}
-                        spellCheck={false}
-                        autoCapitalize="off"
-                        autoCorrect="off"
+                        name={`password_${randomFieldSuffix}`}
                         data-lpignore="true"
                         data-form-type="other"
-                        placeholder="Enter password" 
-                        style={{ ...fieldStyle, paddingRight: 52 }}
-                         onFocus={(e) => {
-                           e.target.autocomplete = 'new-password';
-                         }}
-                        onBlur={(e) => {
-                          if (e.target.value !== password) {
-                            setPassword(e.target.value);
-                          }
-                        }}
+                        style={{ ...fieldStyle, paddingRight: 64 }} 
                       />
-                      <button type="button" onClick={() => setShowPassword(prev => !prev)} style={toggleButtonStyle}>{showPassword ? "Hide" : "Show"}</button>
+                      <button type="button" onClick={() => setShowPassword(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", border: "none", background: "transparent", color: "#8ea3c4", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{showPassword ? "Hide" : "Show"}</button>
                     </div>
                   </label>
+                  {schoolOptions.length > 1 ? (
+                    <label style={labelStyle}>
+                      <span style={labelTextStyle}>School</span>
+                      <select
+                        value={branding.schoolId || branding.school_id || ""}
+                        onChange={(e) => setBranding(prev => ({ ...prev, schoolId: e.target.value, school_id: e.target.value }))}
+                        style={fieldStyle}
+                      >
+                        <option value="">Select school</option>
+                        {schoolOptions.map(opt => (
+                          <option key={opt.schoolId || opt.school_id} value={opt.schoolId || opt.school_id}>{opt.schoolName || opt.name || opt.schoolId}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  {error ? (
+                    <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div>
+                  ) : null}
                   <SubmitButton loading={loading} text="Sign In" />
                 </form>
-              ) : (
-                <form onSubmit={submitPortal} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
-                  {/* Hidden fields to trick browser autofill */}
-                  <input type="text" name="fake_username_portal" style={{ display: 'none' }} autoComplete="off" />
-                  <input type="password" name="fake_password_portal" style={{ display: 'none' }} autoComplete="off" />
-                  
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    {[
-                      { id: "parent", label: "Parent" },
-                      { id: "student", label: "Student" },
-                    ].map(option => {
-                      const active = portalRole === option.id;
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => setPortalRole(option.id)}
-                          style={{
-                            borderRadius: 12,
-                            padding: "11px 12px",
-                            border: active ? "1px solid var(--primary-color)" : "1px solid rgba(255,255,255,0.1)",
-                            background: active ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
-                            color: active ? "var(--primary-color)" : "#d7e4fb",
-                            cursor: "pointer",
-                            fontWeight: 700,
-                          }}
-                        >
-                          {option.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <label style={labelStyle}>
-                    <span style={labelTextStyle}>Admission number</span>
-                    <input 
-                      value={admission} 
-                      onChange={(e) => setAdmission(e.target.value)} 
-                      autoComplete="new-password"
-                      name={`admission_${randomFieldSuffix}`}
-                      readOnly={false}
-                      spellCheck={false}
-                      autoCapitalize="off"
-                      autoCorrect="off"
-                      data-lpignore="true"
-                      data-form-type="other"
-                      placeholder="e.g. ADM-2020-001" 
-                      style={fieldStyle}
-                      onFocus={(e) => {
-                        e.target.autocomplete = 'new-password';
-                      }}
-                      onBlur={(e) => {
-                        if (e.target.value !== admission) {
-                          setAdmission(e.target.value);
-                        }
-                      }}
-                    />
-                  </label>
-                  <label style={labelStyle}>
-                    <span style={labelTextStyle}>Password</span>
-                    <div style={{ position: "relative" }}>
-                      <input 
-                        value={password} 
-                        onChange={(e) => setPassword(e.target.value)} 
-                        type={showPassword ? "text" : "password"} 
-                        autoComplete="new-password"
-                        name={`password_portal_${randomFieldSuffix}`}
-                        readOnly={false}
-                        spellCheck={false}
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        data-lpignore="true"
-                        data-form-type="other"
-                        placeholder="Enter password" 
-                        style={{ ...fieldStyle, paddingRight: 52 }}
-                         onFocus={(e) => {
-                           e.target.autocomplete = 'new-password';
+               ) : (
+                 <form onSubmit={submitPortal} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
+                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                     {["parent", "student"].map(role => (
+                       <button
+                         key={role}
+                         type="button"
+                         onClick={() => setPortalRole(role)}
+                         style={{
+                           border: "none",
+                           borderRadius: 10,
+                           padding: "10px 12px",
+                           background: portalRole === role ? "linear-gradient(135deg, var(--primary-color), var(--secondary-color))" : "rgba(255,255,255,0.04)",
+                           color: portalRole === role ? "#08111f" : "#d7e4fb",
+                           fontWeight: 700,
+                           cursor: "pointer",
+                           textTransform: "capitalize",
                          }}
-                        onBlur={(e) => {
-                          if (e.target.value !== password) {
-                            setPassword(e.target.value);
-                          }
-                        }}
-                      />
-                      <button type="button" onClick={() => setShowPassword(prev => !prev)} style={toggleButtonStyle}>{showPassword ? "Hide" : "Show"}</button>
-                    </div>
-                  </label>
-                  <SubmitButton loading={loading} text="Access Portal" />
-                </form>
-              )}
-
-              {error ? (
-                <div style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(244,63,94,0.12)", border: "1px solid rgba(244,63,94,0.24)", color: "#ffb6c1", fontSize: 13 }}>
-                  {error}
-                </div>
-              ) : null}
-            </div>
+                       >
+                         {role}
+                       </button>
+                     ))}
+                   </div>
+                   <label style={labelStyle}>
+                     <span style={labelTextStyle}>Admission / Portal ID</span>
+                     <input value={admission} onChange={(e) => setAdmission(e.target.value)} type="text" autoComplete="off" placeholder="Admission number" style={fieldStyle} />
+                   </label>
+                   <label style={labelStyle}>
+                     <span style={labelTextStyle}>Password</span>
+                     <input value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? "text" : "password"} autoComplete="off" style={fieldStyle} />
+                   </label>
+                   {error ? (
+                     <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div>
+                   ) : null}
+                   <SubmitButton loading={loading} text="Sign In" />
+                 </form>
+               )}
+             </div>
           </div>
         </section>
       </div>
@@ -701,74 +672,47 @@ async function submitStaff(event) {
   );
 }
 
+const labelStyle = { display: "flex", flexDirection: "column", gap: 6 };
+const labelTextStyle = { fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8ea3c4" };
+const fieldStyle = {
+  width: "100%",
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(255,255,255,0.04)",
+  color: "#edf4ff",
+  padding: "12px 14px",
+  fontSize: 14,
+  outline: "none",
+  boxSizing: "border-box",
+};
+
 function SubmitButton({ loading, text }) {
   return (
     <button
       type="submit"
       disabled={loading}
       style={{
-        marginTop: 6,
         border: "none",
-        borderRadius: 14,
-        padding: "14px 18px",
+        borderRadius: 12,
+        padding: "12px 16px",
         background: "linear-gradient(135deg, var(--primary-color), var(--secondary-color))",
         color: "#08111f",
-        fontSize: 15,
         fontWeight: 800,
-        cursor: loading ? "not-allowed" : "pointer",
+        fontSize: 15,
+        cursor: loading ? "wait" : "pointer",
         opacity: loading ? 0.7 : 1,
       }}
     >
-      {loading ? "Signing in..." : text}
+      {loading ? "Please wait…" : text}
     </button>
   );
 }
 
 SubmitButton.propTypes = {
-  loading: PropTypes.bool.isRequired,
+  loading: PropTypes.bool,
   text: PropTypes.string.isRequired,
-};
-
-const labelStyle = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 6,
-};
-
-const labelTextStyle = {
-  color: "#95a9c6",
-  fontSize: 12,
-  fontWeight: 700,
-  textTransform: "uppercase",
-  letterSpacing: "0.08em",
-};
-
-const fieldStyle = {
-  width: "100%",
-  boxSizing: "border-box",
-  borderRadius: 14,
-  border: "1px solid rgba(255,255,255,0.12)",
-  background: "rgba(255,255,255,0.04)",
-  color: "#edf4ff",
-  padding: "13px 14px",
-  outline: "none",
-  fontSize: 14,
-};
-
-const toggleButtonStyle = {
-  position: "absolute",
-  right: 12,
-  top: "50%",
-  transform: "translateY(-50%)",
-  border: "none",
-  background: "transparent",
-  color: "#9db0cb",
-  fontSize: 12,
-  fontWeight: 700,
-  cursor: "pointer",
 };
 
 LoginView.propTypes = {
   onLogin: PropTypes.func.isRequired,
 };
-
