@@ -40,7 +40,6 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
   const [launchingGenerator, setLaunchingGenerator] = useState(false);
   const [generatorError, setGeneratorError] = useState("");
   const fileRef = useRef();
-  const launchedGeneratorRef = useRef(false);
 
   const [form, setForm] = useState({
     className: filterClass, dayOfWeek: "Monday", period: "",
@@ -80,15 +79,6 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    const role = String(auth?.role || "").toLowerCase();
-    const canUseGenerator = ["admin", "director", "superadmin"].includes(role);
-    if (!canUseGenerator || launchedGeneratorRef.current) return;
-
-    launchedGeneratorRef.current = true;
-    launchGenerator();
-  }, [auth?.role, launchGenerator]);
-
   const save = async () => {
     try {
       const body = { ...form, className: filterClass };
@@ -112,7 +102,6 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
     } catch (e) { toast(e.message, "error"); }
   };
 
-  // ── CSV Upload ──────────────────────────────────────────────────────────────
   const parseCSV = (text) => {
     const lines = text.trim().split("\n").map(l => l.trim()).filter(Boolean);
     if (lines.length < 2) return [];
@@ -166,7 +155,6 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
     load();
   };
 
-  // Group by day
   const byDay = DAYS.map(day => ({
     day,
     items: entries.filter(e => e.day_of_week === day).sort((a,b) => a.start_time?.localeCompare(b.start_time))
@@ -180,33 +168,30 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
     setShowModal(true);
   };
 
-  if (["admin", "director", "superadmin"].includes(String(auth?.role || "").toLowerCase())) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+  const canUseGenerator = ["admin", "director", "superadmin"].includes(String(auth?.role || "").toLowerCase());
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      {canUseGenerator && (
         <Card style={{ padding: "var(--space-5)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap" }}>
             <div>
               <h2 style={{ margin: 0, fontSize: "var(--text-xl)", color: "var(--color-text-primary)" }}>
-                Timetable Generator
+                Advanced Timetable Generator
               </h2>
               <p style={{ margin: "var(--space-2) 0 0", color: "var(--color-text-secondary)", maxWidth: "560px" }}>
                 {launchingGenerator
-                  ? "Opening the timetable generator..."
-                  : generatorError || "Use single sign-on to open the timetable generator."}
+                  ? "Opening EduCore Ratiba…"
+                  : generatorError || "Open the FET-based generator (EduCore Ratiba) via single sign-on. Your class timetable below stays available here."}
               </p>
             </div>
             <Button onClick={launchGenerator} disabled={launchingGenerator}>
-              {launchingGenerator ? "Opening..." : "Open Generator"}
+              {launchingGenerator ? "Opening..." : "Open Ratiba Generator"}
             </Button>
           </div>
         </Card>
-      </div>
-    );
-  }
+      )}
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-      {/* Toolbar */}
       <Card style={{ padding: "var(--space-3)" }}>
         <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ minWidth: "200px" }}>
@@ -230,7 +215,6 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
         </div>
       </Card>
 
-      {/* Timetable grid */}
       {entries.length === 0 ? (
         <EmptyState 
           icon="📅" 
@@ -253,7 +237,6 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
                       {e.period ? ` · Period ${e.period}` : ""}
                     </div>
                     {e.teacher_name && <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>{e.teacher_name}</div>}
-                    
                     {canEdit && (
                       <div style={{ display: "flex", gap: "var(--space-1)", marginTop: "var(--space-2)" }}>
                         <Button size="sm" variant="secondary" onClick={() => openEdit(e)} style={{ padding: "2px 8px", fontSize: "11px", height: "auto", minHeight: "24px" }}>Edit</Button>
@@ -268,7 +251,6 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
         </div>
       )}
 
-      {/* Add/Edit Modal */}
       <Modal isOpen={showModal} title={editing ? "Edit Entry" : "Add Timetable Entry"} onClose={() => { setShowModal(false); setEditing(null); }} footer={
         <>
           <Button variant="ghost" onClick={() => { setShowModal(false); setEditing(null); }}>Cancel</Button>
@@ -276,57 +258,15 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
         </>
       }>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
-          <Select 
-            label="Day"
-            value={form.dayOfWeek} 
-            onChange={e => setForm(f => ({...f, dayOfWeek: e.target.value}))}
-            options={DAYS.map(d => ({ value: d, label: d }))}
-          />
-          
-          <Select 
-            label="Subject"
-            value={form.subject} 
-            onChange={e => setForm(f => ({...f, subject: e.target.value}))}
-            options={SUBJECTS.map(s => ({ value: s, label: s }))}
-          />
-          
-          <Input 
-            label="Start Time" 
-            type="time" 
-            value={form.startTime} 
-            onChange={v => setForm(f => ({...f, startTime: v.target.value}))} 
-          />
-          
-          <Input 
-            label="End Time" 
-            type="time" 
-            value={form.endTime} 
-            onChange={v => setForm(f => ({...f, endTime: v.target.value}))} 
-          />
-          
-          <Input 
-            label="Period #" 
-            type="number"
-            value={form.period} 
-            onChange={v => setForm(f => ({...f, period: v.target.value}))} 
-          />
-          
-          <Select 
-            label="Teacher (optional)"
-            value={form.teacherId} 
-            onChange={e => setForm(f => ({...f, teacherId: e.target.value}))}
-            options={[
-              { value: "", label: "— None —" },
-              ...teachers.map(t => ({ 
-                value: t.teacher_id || t.id, 
-                label: `${t.first_name || t.firstName} ${t.last_name || t.lastName}` 
-              }))
-            ]}
-          />
+          <Select label="Day" value={form.dayOfWeek} onChange={e => setForm(f => ({...f, dayOfWeek: e.target.value}))} options={DAYS.map(d => ({ value: d, label: d }))} />
+          <Select label="Subject" value={form.subject} onChange={e => setForm(f => ({...f, subject: e.target.value}))} options={SUBJECTS.map(s => ({ value: s, label: s }))} />
+          <Input label="Start Time" type="time" value={form.startTime} onChange={v => setForm(f => ({...f, startTime: v.target.value}))} />
+          <Input label="End Time" type="time" value={form.endTime} onChange={v => setForm(f => ({...f, endTime: v.target.value}))} />
+          <Input label="Period #" type="number" value={form.period} onChange={v => setForm(f => ({...f, period: v.target.value}))} />
+          <Select label="Teacher (optional)" value={form.teacherId} onChange={e => setForm(f => ({...f, teacherId: e.target.value}))} options={[{ value: "", label: "— None —" }, ...teachers.map(t => ({ value: t.teacher_id || t.id, label: `${t.first_name || t.firstName} ${t.last_name || t.lastName}` }))]} />
         </div>
       </Modal>
 
-      {/* CSV Upload Modal */}
       <Modal isOpen={showUpload} title="Upload Timetable CSV" onClose={() => { setShowUpload(false); setCsvPreview([]); }} footer={
         <>
           <Button variant="ghost" onClick={() => { setShowUpload(false); setCsvPreview([]); }}>Cancel</Button>
@@ -341,44 +281,27 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
             <code style={{ display: "block", color: "var(--color-success)", background: "var(--color-bg-base)", padding: "var(--space-2)", borderRadius: "var(--radius-sm)", marginBottom: "var(--space-2)" }}>day_of_week,subject,start_time,end_time,period,class_name,teacher_id</code>
             <div style={{ color: "var(--color-text-muted)", marginBottom: "var(--space-1)" }}>Example row:</div>
             <code style={{ display: "block", color: "var(--color-info)", background: "var(--color-bg-base)", padding: "var(--space-2)", borderRadius: "var(--radius-sm)" }}>Monday,Mathematics,08:00,09:00,1,Grade 7,</code>
-            <div style={{ marginTop: "var(--space-3)", fontSize: "12px", color: "var(--color-text-muted)" }}>
-              Leave teacher_id blank if not assigned. class_name overrides the selected class filter.
-            </div>
           </div>
-          
-          <input ref={fileRef} type="file" accept=".csv,.txt" onChange={handleFile}
-            style={{ color: "var(--color-text-primary)", fontSize: "14px", padding: "var(--space-2)" }} />
-
+          <input ref={fileRef} type="file" accept=".csv,.txt" onChange={handleFile} style={{ color: "var(--color-text-primary)", fontSize: "14px", padding: "var(--space-2)" }} />
           {csvPreview.length > 0 && (
             <div style={{ marginTop: "var(--space-2)" }}>
-              <div style={{ fontWeight: 600, color: "var(--color-text-primary)", marginBottom: "var(--space-2)" }}>
-                Preview — {csvPreview.length} entries found
-              </div>
+              <div style={{ fontWeight: 600, color: "var(--color-text-primary)", marginBottom: "var(--space-2)" }}>Preview — {csvPreview.length} entries found</div>
               <div style={{ maxHeight: "200px", overflowY: "auto", border: `1px solid var(--color-border)`, borderRadius: "var(--radius-md)" }}>
                 <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse" }}>
                   <thead style={{ position: "sticky", top: 0, background: "var(--color-bg-surface)", zIndex: 1 }}>
-                    <tr>
-                      {["Day","Subject","Start","End","Period","Class"].map(h => (
-                        <th key={h} style={{ padding: "8px 10px", textAlign: "left", color: "var(--color-text-secondary)", borderBottom: `1px solid var(--color-border)`, fontWeight: 600 }}>{h}</th>
-                      ))}
-                    </tr>
+                    <tr>{["Day","Subject","Start","End","Period","Class"].map(h => (<th key={h} style={{ padding: "8px 10px", textAlign: "left", color: "var(--color-text-secondary)", borderBottom: `1px solid var(--color-border)`, fontWeight: 600 }}>{h}</th>))}</tr>
                   </thead>
                   <tbody>
                     {csvPreview.slice(0,20).map((r, i) => (
                       <tr key={i} style={{ borderBottom: `1px solid var(--color-border)` }}>
-                        <td style={{ padding: "6px 10px", color: "var(--color-text-primary)" }}>{r.day_of_week}</td>
-                        <td style={{ padding: "6px 10px", color: "var(--color-text-primary)" }}>{r.subject}</td>
-                        <td style={{ padding: "6px 10px", color: "var(--color-text-secondary)" }}>{r.start_time}</td>
-                        <td style={{ padding: "6px 10px", color: "var(--color-text-secondary)" }}>{r.end_time}</td>
-                        <td style={{ padding: "6px 10px", color: "var(--color-text-muted)" }}>{r.period}</td>
-                        <td style={{ padding: "6px 10px", color: "var(--color-text-muted)" }}>{r.class_name || filterClass}</td>
+                        <td style={{ padding: "6px 10px" }}>{r.day_of_week}</td>
+                        <td style={{ padding: "6px 10px" }}>{r.subject}</td>
+                        <td style={{ padding: "6px 10px" }}>{r.start_time}</td>
+                        <td style={{ padding: "6px 10px" }}>{r.end_time}</td>
+                        <td style={{ padding: "6px 10px" }}>{r.period}</td>
+                        <td style={{ padding: "6px 10px" }}>{r.class_name || filterClass}</td>
                       </tr>
                     ))}
-                    {csvPreview.length > 20 && (
-                      <tr><td colSpan={6} style={{ padding: "10px", color: "var(--color-text-muted)", textAlign: "center", fontStyle: "italic", background: "var(--color-bg-surface)" }}>
-                        +{csvPreview.length - 20} more rows
-                      </td></tr>
-                    )}
                   </tbody>
                 </table>
               </div>
