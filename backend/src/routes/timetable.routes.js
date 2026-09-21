@@ -41,7 +41,7 @@ function normalise(r) {
 }
 
 function buildTimetableSsoUrl(token) {
-  const baseUrl = String(env.fetTimetableBaseUrl || "/fet-timetable").replace(/\/+$/, "");
+  const baseUrl = String(env.fetTimetableBaseUrl || "https://educore-ratiba.onrender.com").replace(/\/+$/, "");
   const ssoPath = baseUrl.endsWith("/sso.php") ? baseUrl : `${baseUrl}/sso.php`;
   const separator = ssoPath.includes("?") ? "&" : "?";
   return `${ssoPath}${separator}token=${encodeURIComponent(token)}`;
@@ -101,17 +101,23 @@ router.post(
         return res.status(404).json({ message: "School not found" });
       }
 
-      // FIX: Use full_name instead of first_name/last_name
-      const adminName = admin?.full_name?.trim() || req.user.name || req.user.email || "EduCore Admin";
+      // Stable username for Ratiba school_admins mapping (prefer email)
+      const adminUsername = (
+        admin?.email ||
+        req.user.email ||
+        admin?.full_name ||
+        req.user.name ||
+        `admin-${userId}`
+      ).toString().trim().slice(0, 100);
 
-      // FIX: Build payload matching what sso.php expects
+      // Claims must match Educore-Ratiba sso.php (HS256)
       const payload = {
         educore_school_id: String(school.school_id),
-        educore_school_name: school.name,
-        educore_admin_username: adminName,
-        exp: Math.floor(Date.now() / 1000) + (5 * 60) // 5 minutes
+        educore_school_name: school.name || "EduCore School",
+        educore_admin_username: adminUsername,
       };
 
+      // Same secret as Ratiba SSO_SHARED_SECRET (env.fetTimetableJwtSecret)
       const token = jwt.sign(payload, env.fetTimetableJwtSecret, {
         algorithm: "HS256",
         expiresIn: env.fetTimetableJwtExpiresIn || "5m",
