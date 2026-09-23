@@ -36,7 +36,7 @@ export default React.memo(function Table({
 
   return (
     <div className={`ui-table-wrap ${className}`} style={style} role="region" aria-busy={loading} aria-live="polite">
-      <div className="ui-table-scroll">
+      <div className="ui-table-scroll" data-table-scroll="true">
         <table className="ui-table">
           <thead>
             <tr>

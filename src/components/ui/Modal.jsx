@@ -93,18 +93,20 @@ export default function Modal({ isOpen, onClose, title, children, footer, maxWid
         aria-labelledby={titleId}
         aria-label={title}
         tabIndex={-1}
+        data-modal-panel="true"
         style={{
           background: "var(--color-bg-card)",
           border: "1px solid var(--color-border)",
           borderRadius: "var(--radius-xl)",
           width: "100%",
-          maxWidth,
-          maxHeight: "90vh",
+          maxWidth: `min(100vw - 2rem, ${maxWidth})`,
+          maxHeight: "min(100dvh - 2rem, 90vh)",
           display: "flex",
           flexDirection: "column",
           boxShadow: "var(--shadow-elevated)",
           overflow: "hidden",
-          contain: "layout paint"
+          contain: "layout paint",
+          boxSizing: "border-box"
         }}
         onClick={(event) => event.stopPropagation()}
       >
@@ -142,7 +144,7 @@ export default function Modal({ isOpen, onClose, title, children, footer, maxWid
           {children}
         </div>
         {footer && (
-          <div style={{ padding: "var(--space-4) var(--space-5)", borderTop: "1px solid var(--color-border)", background: "var(--color-bg-base)", borderBottomLeftRadius: "inherit", borderBottomRightRadius: "inherit", display: "flex", justifyContent: "flex-end", gap: "var(--space-3)", flexWrap: "wrap" }}>
+          <div className="ui-modal-footer" style={{ padding: "var(--space-4) var(--space-5)", borderTop: "1px solid var(--color-border)", background: "var(--color-bg-base)", borderBottomLeftRadius: "inherit", borderBottomRightRadius: "inherit", display: "flex", justifyContent: "flex-end", gap: "var(--space-3)", flexWrap: "wrap" }}>
             {footer}
           </div>
         )}
