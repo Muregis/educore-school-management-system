@@ -127,14 +127,12 @@ export default function LoginView({ onLogin }) {
   const lastResolvedIdentifierRef = useRef("");
   const lastResolveRoleRef = useRef("");
 
-  // Reset form fields on component mount
   useEffect(() => {
     setEmail("");
     setPassword("");
     setAdmission("");
   }, []);
-  
-  // Generate random form field names to prevent browser recognition
+
   const [randomFieldSuffix] = useState(() => Math.random().toString(36).substring(2, 15));
 
   const activeIdentifier = mode === "staff" ? email : admission;
@@ -143,21 +141,17 @@ export default function LoginView({ onLogin }) {
   function shouldResolveIdentifier(identifier, currentMode, currentPortalRole) {
     const trimmed = String(identifier || "").trim();
     if (!trimmed) return false;
-
     if (currentMode === "staff") {
       return trimmed.includes("@") && trimmed.includes(".");
     }
-
     if (currentPortalRole === "student") {
       return trimmed.length >= 4;
     }
-
     return trimmed.length >= 6;
   }
 
   useEffect(() => {
     let cancelled = false;
-
     async function primeBranding() {
       try {
         const hostname = window.location.hostname;
@@ -169,43 +163,34 @@ export default function LoginView({ onLogin }) {
           setBranding({ ...DEFAULT_BRANDING, ...res, schoolOptions: res.schoolOptions || [] });
         }
       } catch (_err) {
-        if (!cancelled) {
-          setBranding(DEFAULT_BRANDING);
-        }
+        if (!cancelled) setBranding(DEFAULT_BRANDING);
       } finally {
         if (!cancelled) setTenantReady(true);
       }
     }
-
     primeBranding();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
     if (!tenantReady) return undefined;
     const trimmedIdentifier = String(activeIdentifier || "").trim();
     const currentRole = mode === "portal" ? portalRole : "staff";
-
     if (!trimmedIdentifier) {
       lastResolvedIdentifierRef.current = "";
       lastResolveRoleRef.current = "";
       setBranding(prev => ({ ...DEFAULT_BRANDING, ...prev, schoolOptions: [] }));
       return undefined;
     }
-
     if (!shouldResolveIdentifier(trimmedIdentifier, mode, portalRole)) {
       return undefined;
     }
-
     if (
       lastResolvedIdentifierRef.current === trimmedIdentifier &&
       lastResolveRoleRef.current === currentRole
     ) {
       return undefined;
     }
-
     const timer = window.setTimeout(async () => {
       try {
         const resolvePath = buildResolveSchoolPath({
@@ -213,7 +198,6 @@ export default function LoginView({ onLogin }) {
           loginId: trimmedIdentifier,
           role: currentRole,
         });
-        
         const res = await apiFetch(resolvePath);
         const newBranding = { ...DEFAULT_BRANDING, ...res, schoolOptions: res.schoolOptions || [] };
         lastResolvedIdentifierRef.current = trimmedIdentifier;
@@ -224,7 +208,6 @@ export default function LoginView({ onLogin }) {
         setBranding(DEFAULT_BRANDING);
       }
     }, 900);
-
     return () => window.clearTimeout(timer);
   }, [activeIdentifier, portalRole, mode, tenantReady]);
 
@@ -237,16 +220,22 @@ export default function LoginView({ onLogin }) {
     fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
   }), [branding.primary_color, branding.secondary_color]);
 
-async function submitStaff(event) {
+  async function submitStaff(event) {
     event.preventDefault();
     setError("");
     setLoading(true);
     try {
       const raw = await apiFetch("/auth/login", {
         method: "POST",
-        body: { email, password, schoolId: branding.schoolId || branding.school_id || null },
+        body: {
+          email: String(email || "").trim().toLowerCase(),
+          password,
+          schoolId: branding.schoolId || branding.school_id || null,
+        },
       });
-      const data = raw?.data || raw;
+      const nested = raw?.data && typeof raw.data === "object" ? raw.data : {};
+      const data = { ...nested, ...(raw && typeof raw === "object" ? raw : {}) };
+      if (data.data) delete data.data;
 
       if (data?.twoFactorRequired) {
         setTempToken(data.tempToken);
@@ -256,21 +245,23 @@ async function submitStaff(event) {
         return;
       }
 
-      // Forced password change: server returns changeToken, not a full session
       const changeTok =
         data?.changeToken ||
         data?.change_token ||
-        data?.passwordChangeToken;
-      const mustChange =
-        data?.requires_password_change === true ||
-        data?.passwordChangeRequired === true ||
-        data?.password_change_required === true ||
-        Boolean(changeTok && !data?.token);
+        data?.passwordChangeToken ||
+        nested?.changeToken;
+      const mustChangeFlag =
+        data?.requires_password_change ||
+        data?.passwordChangeRequired ||
+        data?.password_change_required ||
+        nested?.requires_password_change;
+      const mustChange = Boolean(mustChangeFlag || (changeTok && !data?.token));
 
       if (mustChange) {
         if (!changeTok) {
           throw new Error(
-            "Password change is required, but the server did not return a change token. Try again or contact support."
+            data?.message ||
+              "Password change is required, but the server did not return a change token. Try again or contact support."
           );
         }
         setPasswordChangeToken(changeTok);
@@ -288,7 +279,10 @@ async function submitStaff(event) {
       }
 
       if (!data?.token || !data?.user) {
-        throw new Error("Login succeeded but the server response was missing session data.");
+        const hint = data?.message ? ` Server said: ${data.message}` : "";
+        throw new Error(
+          "Login succeeded but the server response was missing session data." + hint
+        );
       }
       onLogin({
         id: data.user.userId,
@@ -452,22 +446,18 @@ async function submitStaff(event) {
                 <div style={{ color: "var(--primary-color)", textTransform: "uppercase", letterSpacing: "0.14em", fontSize: 11, marginTop: 4 }}>{branding.tagline}</div>
               </div>
             </div>
-
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 14px", borderRadius: 999, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--primary-color)", fontSize: 12, fontWeight: 700, marginBottom: 24 }}>
               <span>{branding.location}</span>
               {branding.established_year ? <span>· Since {branding.established_year}</span> : null}
             </div>
-
             <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(36px, 4vw, 60px)", lineHeight: 1.05, margin: 0, maxWidth: 620 }}>
               {branding.name}
               <br />
               <span style={{ color: "var(--primary-color)", fontStyle: "italic" }}>{branding.tagline}</span>
             </h1>
-
             <p style={{ fontSize: 16, lineHeight: 1.8, color: "#99abc6", maxWidth: 520, marginTop: 20 }}>
               {branding.hero_message}
             </p>
-
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14, marginTop: 32 }}>
               {FEATURES.map(feature => (
                 <div key={feature.title} style={{ padding: 14, borderRadius: 12, background: "transparent", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -478,7 +468,6 @@ async function submitStaff(event) {
               ))}
             </div>
           </div>
-
           <div style={{ color: "#6d819d", fontSize: 12 }}>
             Powered by <span style={{ color: "var(--primary-color)" }}>EduCore</span> · Tenant-aware secure login
           </div>
@@ -494,6 +483,7 @@ async function submitStaff(event) {
               </div>
             </div>
 
+            {!passwordChangeToken ? (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: 6, marginBottom: 24 }}>
               {[
                 { id: "staff", label: "Staff Login" },
@@ -520,9 +510,9 @@ async function submitStaff(event) {
                 );
               })}
             </div>
+            ) : null}
 
              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-               
                {notice ? (
                  <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(34,197,94,0.12)", color: "#86efac", fontSize: 13 }}>
                    {notice}
@@ -534,7 +524,7 @@ async function submitStaff(event) {
                    <div style={{ textAlign: "center" }}>
                      <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Password Update Required</div>
                      <div style={{ fontSize: 13, marginTop: 4, color: "#cbd5f5" }}>
-                       {passwordChangeReasons.length ? passwordChangeReasons.join(". ") : "Your password does not meet the school's security policy."}
+                       {passwordChangeReasons.length ? passwordChangeReasons.join(". ") : "Your password does not meet the school's security policy. Set a new password to continue."}
                      </div>
                    </div>
                    <label style={labelStyle}>
@@ -545,20 +535,23 @@ async function submitStaff(event) {
                      <span style={labelTextStyle}>Confirm new password</span>
                      <input value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} type="password" autoComplete="new-password" style={fieldStyle} />
                    </label>
+                   {error ? (
+                     <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div>
+                   ) : null}
                    <SubmitButton loading={loading} text="Update Password" />
                  </form>
                ) : twoFactorRequired ? (
                  <form onSubmit={submitTwoFactor} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
                    <div style={{ textAlign: "center", marginBottom: "8px" }}>
-                     <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Two-Factor Authentication</div>
-                     <div style={{ fontSize: "13px", color: "var(--color-text-muted)", marginTop: "4px" }}>Enter the 6-digit code from your authenticator app</div>
+                     <div style={{ fontSize: "12px", color: "#8ea3c4", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Two-Factor Authentication</div>
+                     <div style={{ fontSize: "13px", color: "#8ea3c4", marginTop: "4px" }}>Enter the 6-digit code from your authenticator app</div>
                    </div>
                    <label style={labelStyle}>
                      <span style={labelTextStyle}>Verification Code</span>
-                     <input 
-                       value={twoFactorToken} 
-                       onChange={(e) => setTwoFactorToken(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} 
-                       type="text" 
+                     <input
+                       value={twoFactorToken}
+                       onChange={(e) => setTwoFactorToken(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                       type="text"
                        inputMode="numeric"
                        autoComplete="off"
                        placeholder="123456"
@@ -566,43 +559,37 @@ async function submitStaff(event) {
                        maxLength={6}
                      />
                    </label>
+                   {error ? (
+                     <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div>
+                   ) : null}
                    <SubmitButton loading={loading} text="Verify" />
                  </form>
                ) : mode === "staff" ? (
                  <form onSubmit={submitStaff} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
-                  <input type="text" name="fake_username" style={{ display: 'none' }} autoComplete="off" />
-                  <input type="password" name="fake_password" style={{ display: 'none' }} autoComplete="off" />
-                  
+                  <input type="text" name="fake_username" style={{ display: "none" }} autoComplete="off" />
+                  <input type="password" name="fake_password" style={{ display: "none" }} autoComplete="off" />
                   <label style={labelStyle}>
                     <span style={labelTextStyle}>Email address</span>
-                    <input 
-                      value={email} 
-                      onChange={(e) => setEmail(e.target.value)} 
-                      type="email" 
-                      autoComplete="new-password"
+                    <input
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      type="email"
+                      autoComplete="username"
                       name={`email_${randomFieldSuffix}`}
-                      readOnly={false}
-                      spellCheck={false}
-                      autoCapitalize="off"
-                      autoCorrect="off"
-                      data-lpignore="true"
-                      data-form-type="other"
-                      placeholder="you@school.ac.ke" 
+                      placeholder="you@school.ac.ke"
                       style={fieldStyle}
                     />
                   </label>
                   <label style={labelStyle}>
                     <span style={labelTextStyle}>Password</span>
                     <div style={{ position: "relative" }}>
-                      <input 
-                        value={password} 
-                        onChange={(e) => setPassword(e.target.value)} 
-                        type={showPassword ? "text" : "password"} 
-                        autoComplete="new-password"
+                      <input
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
                         name={`password_${randomFieldSuffix}`}
-                        data-lpignore="true"
-                        data-form-type="other"
-                        style={{ ...fieldStyle, paddingRight: 64 }} 
+                        style={{ ...fieldStyle, paddingRight: 64 }}
                       />
                       <button type="button" onClick={() => setShowPassword(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", border: "none", background: "transparent", color: "#8ea3c4", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{showPassword ? "Hide" : "Show"}</button>
                     </div>
