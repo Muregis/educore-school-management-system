@@ -136,3 +136,72 @@ main {
     min-height: 44px;
   }
 }
+
+/* ---- Page utilities (finish mobile-first refactor) ---- */
+.ec-grid-responsive {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 1fr;
+}
+
+@media screen and (min-width: 768px) {
+  .ec-grid-responsive.ec-grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ec-grid-responsive.ec-grid-2-wide {
+    grid-template-columns: 1.4fr 1fr;
+  }
+}
+
+/* Prefer auto-fit over fixed multi-column when used as utility */
+.ec-grid-auto {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+}
+
+.ec-chart-bars {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: 8px;
+  min-height: 120px;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Login shell: single column on phones, two columns on desktop */
+.ec-login-shell {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: 1fr;
+}
+
+@media screen and (min-width: 900px) {
+  .ec-login-shell {
+    grid-template-columns: minmax(280px, 1.05fr) minmax(280px, 0.95fr);
+  }
+}
+
+@media screen and (max-width: 899px) {
+  .ec-login-hero {
+    display: none !important;
+  }
+  .ec-login-panel {
+    padding: 24px 16px !important;
+  }
+}
+
+/* Forms / inputs never exceed viewport */
+.ec-page-content input,
+.ec-page-content select,
+.ec-page-content textarea,
+.ec-page-content button {
+  max-width: 100%;
+}
+
+.ec-page-content img {
+  max-width: 100%;
+  height: auto;
+}
