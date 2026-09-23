@@ -19,26 +19,10 @@ const DEFAULT_BRANDING = {
 };
 
 const FEATURES = [
-  {
-    title: "Academic Reports",
-    desc: "Grades and report cards in one place.",
-    icon: "AR",
-  },
-  {
-    title: "Fee Payments",
-    desc: "Track balances and complete payments online.",
-    icon: "FP",
-  },
-  {
-    title: "Attendance Tracking",
-    desc: "Mark and view daily attendance.",
-    icon: "AT",
-  },
-  {
-    title: "School Communication",
-    desc: "Receive announcements and updates from staff.",
-    icon: "SC",
-  },
+  { title: "Academic Reports", desc: "Grades and report cards in one place.", icon: "AR" },
+  { title: "Fee Payments", desc: "Track balances and complete payments online.", icon: "FP" },
+  { title: "Attendance Tracking", desc: "Mark and view daily attendance.", icon: "AT" },
+  { title: "School Communication", desc: "Receive announcements and updates from staff.", icon: "SC" },
 ];
 
 function getInitialSchoolId() {
@@ -59,50 +43,19 @@ function SchoolMark({ branding, small = false }) {
   const size = small ? 44 : 56;
   const fontSize = small ? 18 : 24;
   const initial = String(branding?.name || "E").charAt(0).toUpperCase();
-
   if (branding?.logo_url) {
     return (
-      <img
-        src={branding.logo_url}
-        alt={`${branding.name} logo`}
-        style={{
-          width: size,
-          height: size,
-          borderRadius: small ? 12 : 16,
-          objectFit: "cover",
-          border: "1px solid rgba(255,255,255,0.12)",
-          background: "rgba(255,255,255,0.04)",
-        }}
-      />
+      <img src={branding.logo_url} alt={`${branding.name} logo`} style={{ width: size, height: size, borderRadius: small ? 12 : 16, objectFit: "cover", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)" }} />
     );
   }
-
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: small ? 12 : 16,
-        background: "linear-gradient(135deg, var(--primary-color), var(--secondary-color))",
-        color: "#08111f",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "'Playfair Display', serif",
-        fontWeight: 800,
-        fontSize,
-        boxShadow: "0 12px 30px rgba(0,0,0,0.2)",
-      }}
-    >
+    <div style={{ width: size, height: size, borderRadius: small ? 12 : 16, background: "linear-gradient(135deg, var(--primary-color), var(--secondary-color))", color: "#08111f", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Playfair Display', serif", fontWeight: 800, fontSize, boxShadow: "0 12px 30px rgba(0,0,0,0.2)" }}>
       {initial}
     </div>
   );
 }
 
-SchoolMark.propTypes = {
-  branding: PropTypes.object,
-  small: PropTypes.bool,
-};
+SchoolMark.propTypes = { branding: PropTypes.object, small: PropTypes.bool };
 
 export default function LoginView({ onLogin }) {
   const [mode, setMode] = useState("staff");
@@ -127,26 +80,16 @@ export default function LoginView({ onLogin }) {
   const lastResolvedIdentifierRef = useRef("");
   const lastResolveRoleRef = useRef("");
 
-  useEffect(() => {
-    setEmail("");
-    setPassword("");
-    setAdmission("");
-  }, []);
-
+  useEffect(() => { setEmail(""); setPassword(""); setAdmission(""); }, []);
   const [randomFieldSuffix] = useState(() => Math.random().toString(36).substring(2, 15));
-
   const activeIdentifier = mode === "staff" ? email : admission;
   const schoolOptions = branding.schoolOptions || [];
 
   function shouldResolveIdentifier(identifier, currentMode, currentPortalRole) {
     const trimmed = String(identifier || "").trim();
     if (!trimmed) return false;
-    if (currentMode === "staff") {
-      return trimmed.includes("@") && trimmed.includes(".");
-    }
-    if (currentPortalRole === "student") {
-      return trimmed.length >= 4;
-    }
+    if (currentMode === "staff") return trimmed.includes("@") && trimmed.includes(".");
+    if (currentPortalRole === "student") return trimmed.length >= 4;
     return trimmed.length >= 6;
   }
 
@@ -155,13 +98,8 @@ export default function LoginView({ onLogin }) {
     async function primeBranding() {
       try {
         const hostname = window.location.hostname;
-        const res = await apiFetch(buildResolveSchoolPath({
-          hostname,
-          role: mode === "portal" ? portalRole : "staff",
-        }));
-        if (!cancelled) {
-          setBranding({ ...DEFAULT_BRANDING, ...res, schoolOptions: res.schoolOptions || [] });
-        }
+        const res = await apiFetch(buildResolveSchoolPath({ hostname, role: mode === "portal" ? portalRole : "staff" }));
+        if (!cancelled) setBranding({ ...DEFAULT_BRANDING, ...res, schoolOptions: res.schoolOptions || [] });
       } catch (_err) {
         if (!cancelled) setBranding(DEFAULT_BRANDING);
       } finally {
@@ -182,27 +120,15 @@ export default function LoginView({ onLogin }) {
       setBranding(prev => ({ ...DEFAULT_BRANDING, ...prev, schoolOptions: [] }));
       return undefined;
     }
-    if (!shouldResolveIdentifier(trimmedIdentifier, mode, portalRole)) {
-      return undefined;
-    }
-    if (
-      lastResolvedIdentifierRef.current === trimmedIdentifier &&
-      lastResolveRoleRef.current === currentRole
-    ) {
-      return undefined;
-    }
+    if (!shouldResolveIdentifier(trimmedIdentifier, mode, portalRole)) return undefined;
+    if (lastResolvedIdentifierRef.current === trimmedIdentifier && lastResolveRoleRef.current === currentRole) return undefined;
     const timer = window.setTimeout(async () => {
       try {
-        const resolvePath = buildResolveSchoolPath({
-          hostname: window.location.hostname,
-          loginId: trimmedIdentifier,
-          role: currentRole,
-        });
+        const resolvePath = buildResolveSchoolPath({ hostname: window.location.hostname, loginId: trimmedIdentifier, role: currentRole });
         const res = await apiFetch(resolvePath);
-        const newBranding = { ...DEFAULT_BRANDING, ...res, schoolOptions: res.schoolOptions || [] };
         lastResolvedIdentifierRef.current = trimmedIdentifier;
         lastResolveRoleRef.current = currentRole;
-        setBranding(newBranding);
+        setBranding({ ...DEFAULT_BRANDING, ...res, schoolOptions: res.schoolOptions || [] });
       } catch (err) {
         if (err?.status === 429) return;
         setBranding(DEFAULT_BRANDING);
@@ -227,16 +153,11 @@ export default function LoginView({ onLogin }) {
     try {
       const raw = await apiFetch("/auth/login", {
         method: "POST",
-        body: {
-          email: String(email || "").trim().toLowerCase(),
-          password,
-          schoolId: branding.schoolId || branding.school_id || null,
-        },
+        body: { email: String(email || "").trim().toLowerCase(), password, schoolId: branding.schoolId || branding.school_id || null },
       });
       const nested = raw?.data && typeof raw.data === "object" ? raw.data : {};
       const data = { ...nested, ...(raw && typeof raw === "object" ? raw : {}) };
       if (data.data) delete data.data;
-
       if (data?.twoFactorRequired) {
         setTempToken(data.tempToken);
         setTempSessionId(data.tempSessionId);
@@ -244,67 +165,30 @@ export default function LoginView({ onLogin }) {
         setLoading(false);
         return;
       }
-
-      const changeTok =
-        data?.changeToken ||
-        data?.change_token ||
-        data?.passwordChangeToken ||
-        nested?.changeToken;
-      const mustChangeFlag =
-        data?.requires_password_change ||
-        data?.passwordChangeRequired ||
-        data?.password_change_required ||
-        nested?.requires_password_change;
+      const changeTok = data?.changeToken || data?.change_token || data?.passwordChangeToken || nested?.changeToken;
+      const mustChangeFlag = data?.requires_password_change || data?.passwordChangeRequired || data?.password_change_required || nested?.requires_password_change;
       const mustChange = Boolean(mustChangeFlag || (changeTok && !data?.token));
-
       if (mustChange) {
-        if (!changeTok) {
-          throw new Error(
-            data?.message ||
-              "Password change is required, but the server did not return a change token. Try again or contact support."
-          );
-        }
+        if (!changeTok) throw new Error(data?.message || "Password change is required, but the server did not return a change token. Try again or contact support.");
         setPasswordChangeToken(changeTok);
-        setPasswordChangeReasons(
-          data.policyViolation || data.errors || data.passwordChangeReasons || []
-        );
+        setPasswordChangeReasons(data.policyViolation || data.errors || data.passwordChangeReasons || []);
         setError("");
-        setNotice(
-          data.message ||
-            "Your current password does not meet policy. Set a new password to continue."
-        );
+        setNotice(data.message || "Your current password does not meet policy. Set a new password to continue.");
         setMode("passwordChange");
         setLoading(false);
         return;
       }
-
       if (!data?.token || !data?.user) {
         const hint = data?.message ? ` Server said: ${data.message}` : "";
-        throw new Error(
-          "Login succeeded but the server response was missing session data." + hint
-        );
+        throw new Error("Login succeeded but the server response was missing session data." + hint);
       }
-      onLogin({
-        id: data.user.userId,
-        name: data.user.name,
-        email: data.user.email ?? email,
-        role: data.user.role,
-        schoolId: data.user.schoolId,
-        token: data.token,
-        sessionId: data.sessionId,
-      });
+      onLogin({ id: data.user.userId, name: data.user.name, email: data.user.email ?? email, role: data.user.role, schoolId: data.user.schoolId, token: data.token, sessionId: data.sessionId });
       setEmail("");
       setPassword("");
     } catch (err) {
       const body = err?.body || {};
-      const changeTok =
-        body.changeToken || body.change_token || body.passwordChangeToken;
-      const mustChange =
-        body.requires_password_change ||
-        body.passwordChangeRequired ||
-        body.password_change_required ||
-        (err?.status === 403 && changeTok);
-
+      const changeTok = body.changeToken || body.change_token || body.passwordChangeToken;
+      const mustChange = body.requires_password_change || body.passwordChangeRequired || body.password_change_required || (err?.status === 403 && changeTok);
       if (mustChange && changeTok) {
         setPasswordChangeToken(changeTok);
         setPasswordChangeReasons(body.policyViolation || body.errors || []);
@@ -322,17 +206,10 @@ export default function LoginView({ onLogin }) {
   async function submitPasswordChange(event) {
     event.preventDefault();
     setError("");
-    if (newPassword !== confirmPassword) {
-      setError("New passwords do not match");
-      return;
-    }
+    if (newPassword !== confirmPassword) { setError("New passwords do not match"); return; }
     setLoading(true);
     try {
-      await apiFetch("/auth/change-password", {
-        method: "POST",
-        token: passwordChangeToken,
-        body: { currentPassword: password, newPassword },
-      });
+      await apiFetch("/auth/change-password", { method: "POST", token: passwordChangeToken, body: { currentPassword: password, newPassword } });
       setPasswordChangeToken("");
       setPasswordChangeReasons([]);
       setNewPassword("");
@@ -353,25 +230,10 @@ export default function LoginView({ onLogin }) {
     setError("");
     setLoading(true);
     try {
-      const raw = await apiFetch("/auth/verify-2fa", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${tempToken}` },
-        body: { token: twoFactorToken },
-      });
+      const raw = await apiFetch("/auth/verify-2fa", { method: "POST", headers: { Authorization: `Bearer ${tempToken}` }, body: { token: twoFactorToken } });
       const data = raw?.data || raw;
-      if (!data?.token || !data?.user) {
-        throw new Error("2FA verification succeeded but the server response was missing session data.");
-      }
-      onLogin({
-        id: data.user.userId,
-        name: data.user.name,
-        email: data.user.email ?? email,
-        role: data.user.role,
-        schoolId: data.user.schoolId,
-        token: data.token,
-        sessionId: data.sessionId,
-        studentId: null,
-      });
+      if (!data?.token || !data?.user) throw new Error("2FA verification succeeded but the server response was missing session data.");
+      onLogin({ id: data.user.userId, name: data.user.name, email: data.user.email ?? email, role: data.user.role, schoolId: data.user.schoolId, token: data.token, sessionId: data.sessionId, studentId: null });
       setTwoFactorToken("");
       setTempToken("");
       setTempSessionId("");
@@ -389,29 +251,10 @@ export default function LoginView({ onLogin }) {
     setError("");
     setLoading(true);
     try {
-      const raw = await apiFetch("/auth/portal-login", {
-        method: "POST",
-        body: {
-          admissionNumber: admission.trim(),
-          password,
-          role: portalRole,
-        },
-      });
+      const raw = await apiFetch("/auth/portal-login", { method: "POST", body: { admissionNumber: admission.trim(), password, role: portalRole } });
       const data = raw?.data || raw;
-      if (!data?.token || !data?.user) {
-        throw new Error("Login succeeded but the server response was missing session data.");
-      }
-      onLogin({
-        id: data.user.userId,
-        name: data.user.name,
-        role: data.user.role,
-        schoolId: data.user.schoolId,
-        token: data.token,
-        sessionId: data.sessionId,
-        studentId: data.user.studentId,
-        admission: admission.trim(),
-        feeBlocked: data.feeBlocked ?? false,
-      });
+      if (!data?.token || !data?.user) throw new Error("Login succeeded but the server response was missing session data.");
+      onLogin({ id: data.user.userId, name: data.user.name, role: data.user.role, schoolId: data.user.schoolId, token: data.token, sessionId: data.sessionId, studentId: data.user.studentId, admission: admission.trim(), feeBlocked: data.feeBlocked ?? false });
       setAdmission("");
       setPassword("");
     } catch (err) {
@@ -436,8 +279,8 @@ export default function LoginView({ onLogin }) {
 
   return (
     <div style={themeStyle}>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1.05fr) minmax(320px, 0.95fr)", minHeight: "100vh" }}>
-        <section style={{ padding: "48px 56px", display: "flex", flexDirection: "column", justifyContent: "space-between", background: "linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))", borderRight: "1px solid rgba(255,255,255,0.08)" }}>
+      <div className="ec-login-shell">
+        <section className="ec-login-hero" style={{ padding: "48px 56px", display: "flex", flexDirection: "column", justifyContent: "space-between", background: "linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))", borderRight: "1px solid rgba(255,255,255,0.08)" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 36 }}>
               <SchoolMark branding={branding} />
@@ -451,13 +294,9 @@ export default function LoginView({ onLogin }) {
               {branding.established_year ? <span>· Since {branding.established_year}</span> : null}
             </div>
             <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "clamp(36px, 4vw, 60px)", lineHeight: 1.05, margin: 0, maxWidth: 620 }}>
-              {branding.name}
-              <br />
-              <span style={{ color: "var(--primary-color)", fontStyle: "italic" }}>{branding.tagline}</span>
+              {branding.name}<br /><span style={{ color: "var(--primary-color)", fontStyle: "italic" }}>{branding.tagline}</span>
             </h1>
-            <p style={{ fontSize: 16, lineHeight: 1.8, color: "#99abc6", maxWidth: 520, marginTop: 20 }}>
-              {branding.hero_message}
-            </p>
+            <p style={{ fontSize: 16, lineHeight: 1.8, color: "#99abc6", maxWidth: 520, marginTop: 20 }}>{branding.hero_message}</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14, marginTop: 32 }}>
               {FEATURES.map(feature => (
                 <div key={feature.title} style={{ padding: 14, borderRadius: 12, background: "transparent", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -468,12 +307,10 @@ export default function LoginView({ onLogin }) {
               ))}
             </div>
           </div>
-          <div style={{ color: "#6d819d", fontSize: 12 }}>
-            Powered by <span style={{ color: "var(--primary-color)" }}>EduCore</span> · Tenant-aware secure login
-          </div>
+          <div style={{ color: "#6d819d", fontSize: 12 }}>Powered by <span style={{ color: "var(--primary-color)" }}>EduCore</span> · Tenant-aware secure login</div>
         </section>
 
-        <section style={{ display: "grid", placeItems: "center", padding: "40px 24px" }}>
+        <section className="ec-login-panel" style={{ display: "grid", placeItems: "center", padding: "40px 24px" }}>
           <div style={{ width: "min(100%, 440px)", background: "rgba(7,17,29,0.86)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 28, padding: 30, boxShadow: "0 24px 80px rgba(0,0,0,0.28)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
               <SchoolMark branding={branding} small />
@@ -485,26 +322,10 @@ export default function LoginView({ onLogin }) {
 
             {!passwordChangeToken ? (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: 6, marginBottom: 24 }}>
-              {[
-                { id: "staff", label: "Staff Login" },
-                { id: "portal", label: "Parent / Student" },
-              ].map(tab => {
+              {[{ id: "staff", label: "Staff Login" }, { id: "portal", label: "Parent / Student" }].map(tab => {
                 const active = mode === tab.id;
                 return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => { setMode(tab.id); setError(""); }}
-                    style={{
-                      border: "none",
-                      borderRadius: 10,
-                      padding: "10px 12px",
-                      background: active ? "linear-gradient(135deg, var(--primary-color), var(--secondary-color))" : "transparent",
-                      color: active ? "#08111f" : "#d7e4fb",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                    }}
-                  >
+                  <button key={tab.id} type="button" onClick={() => { setMode(tab.id); setError(""); }} style={{ border: "none", borderRadius: 10, padding: "10px 12px", background: active ? "linear-gradient(135deg, var(--primary-color), var(--secondary-color))" : "transparent", color: active ? "#08111f" : "#d7e4fb", fontWeight: 700, cursor: "pointer" }}>
                     {tab.label}
                   </button>
                 );
@@ -512,146 +333,56 @@ export default function LoginView({ onLogin }) {
             </div>
             ) : null}
 
-             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-               {notice ? (
-                 <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(34,197,94,0.12)", color: "#86efac", fontSize: 13 }}>
-                   {notice}
-                 </div>
-               ) : null}
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {notice ? <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(34,197,94,0.12)", color: "#86efac", fontSize: 13 }}>{notice}</div> : null}
 
-               {passwordChangeToken ? (
-                 <form onSubmit={submitPasswordChange} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
-                   <div style={{ textAlign: "center" }}>
-                     <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Password Update Required</div>
-                     <div style={{ fontSize: 13, marginTop: 4, color: "#cbd5f5" }}>
-                       {passwordChangeReasons.length ? passwordChangeReasons.join(". ") : "Your password does not meet the school's security policy. Set a new password to continue."}
-                     </div>
-                   </div>
-                   <label style={labelStyle}>
-                     <span style={labelTextStyle}>New password</span>
-                     <input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} type="password" autoComplete="new-password" style={fieldStyle} />
-                   </label>
-                   <label style={labelStyle}>
-                     <span style={labelTextStyle}>Confirm new password</span>
-                     <input value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} type="password" autoComplete="new-password" style={fieldStyle} />
-                   </label>
-                   {error ? (
-                     <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div>
-                   ) : null}
-                   <SubmitButton loading={loading} text="Update Password" />
-                 </form>
-               ) : twoFactorRequired ? (
-                 <form onSubmit={submitTwoFactor} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
-                   <div style={{ textAlign: "center", marginBottom: "8px" }}>
-                     <div style={{ fontSize: "12px", color: "#8ea3c4", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Two-Factor Authentication</div>
-                     <div style={{ fontSize: "13px", color: "#8ea3c4", marginTop: "4px" }}>Enter the 6-digit code from your authenticator app</div>
-                   </div>
-                   <label style={labelStyle}>
-                     <span style={labelTextStyle}>Verification Code</span>
-                     <input
-                       value={twoFactorToken}
-                       onChange={(e) => setTwoFactorToken(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
-                       type="text"
-                       inputMode="numeric"
-                       autoComplete="off"
-                       placeholder="123456"
-                       style={fieldStyle}
-                       maxLength={6}
-                     />
-                   </label>
-                   {error ? (
-                     <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div>
-                   ) : null}
-                   <SubmitButton loading={loading} text="Verify" />
-                 </form>
-               ) : mode === "staff" ? (
-                 <form onSubmit={submitStaff} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
+              {passwordChangeToken ? (
+                <form onSubmit={submitPasswordChange} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Password Update Required</div>
+                    <div style={{ fontSize: 13, marginTop: 4, color: "#cbd5f5" }}>{passwordChangeReasons.length ? passwordChangeReasons.join(". ") : "Your password does not meet the school's security policy. Set a new password to continue."}</div>
+                  </div>
+                  <label style={labelStyle}><span style={labelTextStyle}>New password</span><input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} type="password" autoComplete="new-password" style={fieldStyle} /></label>
+                  <label style={labelStyle}><span style={labelTextStyle}>Confirm new password</span><input value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} type="password" autoComplete="new-password" style={fieldStyle} /></label>
+                  {error ? <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div> : null}
+                  <SubmitButton loading={loading} text="Update Password" />
+                </form>
+              ) : twoFactorRequired ? (
+                <form onSubmit={submitTwoFactor} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
+                  <div style={{ textAlign: "center", marginBottom: "8px" }}>
+                    <div style={{ fontSize: "12px", color: "#8ea3c4", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Two-Factor Authentication</div>
+                    <div style={{ fontSize: "13px", color: "#8ea3c4", marginTop: "4px" }}>Enter the 6-digit code from your authenticator app</div>
+                  </div>
+                  <label style={labelStyle}><span style={labelTextStyle}>Verification Code</span><input value={twoFactorToken} onChange={(e) => setTwoFactorToken(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} type="text" inputMode="numeric" autoComplete="off" placeholder="123456" style={fieldStyle} maxLength={6} /></label>
+                  {error ? <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div> : null}
+                  <SubmitButton loading={loading} text="Verify" />
+                </form>
+              ) : mode === "staff" ? (
+                <form onSubmit={submitStaff} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
                   <input type="text" name="fake_username" style={{ display: "none" }} autoComplete="off" />
                   <input type="password" name="fake_password" style={{ display: "none" }} autoComplete="off" />
-                  <label style={labelStyle}>
-                    <span style={labelTextStyle}>Email address</span>
-                    <input
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      type="email"
-                      autoComplete="username"
-                      name={`email_${randomFieldSuffix}`}
-                      placeholder="you@school.ac.ke"
-                      style={fieldStyle}
-                    />
-                  </label>
-                  <label style={labelStyle}>
-                    <span style={labelTextStyle}>Password</span>
-                    <div style={{ position: "relative" }}>
-                      <input
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        type={showPassword ? "text" : "password"}
-                        autoComplete="current-password"
-                        name={`password_${randomFieldSuffix}`}
-                        style={{ ...fieldStyle, paddingRight: 64 }}
-                      />
-                      <button type="button" onClick={() => setShowPassword(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", border: "none", background: "transparent", color: "#8ea3c4", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{showPassword ? "Hide" : "Show"}</button>
-                    </div>
-                  </label>
+                  <label style={labelStyle}><span style={labelTextStyle}>Email address</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="username" name={`email_${randomFieldSuffix}`} placeholder="you@school.ac.ke" style={fieldStyle} /></label>
+                  <label style={labelStyle}><span style={labelTextStyle}>Password</span><div style={{ position: "relative" }}><input value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? "text" : "password"} autoComplete="current-password" name={`password_${randomFieldSuffix}`} style={{ ...fieldStyle, paddingRight: 64 }} /><button type="button" onClick={() => setShowPassword(v => !v)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", border: "none", background: "transparent", color: "#8ea3c4", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{showPassword ? "Hide" : "Show"}</button></div></label>
                   {schoolOptions.length > 1 ? (
-                    <label style={labelStyle}>
-                      <span style={labelTextStyle}>School</span>
-                      <select
-                        value={branding.schoolId || branding.school_id || ""}
-                        onChange={(e) => setBranding(prev => ({ ...prev, schoolId: e.target.value, school_id: e.target.value }))}
-                        style={fieldStyle}
-                      >
-                        <option value="">Select school</option>
-                        {schoolOptions.map(opt => (
-                          <option key={opt.schoolId || opt.school_id} value={opt.schoolId || opt.school_id}>{opt.schoolName || opt.name || opt.schoolId}</option>
-                        ))}
-                      </select>
-                    </label>
+                    <label style={labelStyle}><span style={labelTextStyle}>School</span><select value={branding.schoolId || branding.school_id || ""} onChange={(e) => setBranding(prev => ({ ...prev, schoolId: e.target.value, school_id: e.target.value }))} style={fieldStyle}><option value="">Select school</option>{schoolOptions.map(opt => (<option key={opt.schoolId || opt.school_id} value={opt.schoolId || opt.school_id}>{opt.schoolName || opt.name || opt.schoolId}</option>))}</select></label>
                   ) : null}
-                  {error ? (
-                    <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div>
-                  ) : null}
+                  {error ? <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div> : null}
                   <SubmitButton loading={loading} text="Sign In" />
                 </form>
-               ) : (
-                 <form onSubmit={submitPortal} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
-                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                     {["parent", "student"].map(role => (
-                       <button
-                         key={role}
-                         type="button"
-                         onClick={() => setPortalRole(role)}
-                         style={{
-                           border: "none",
-                           borderRadius: 10,
-                           padding: "10px 12px",
-                           background: portalRole === role ? "linear-gradient(135deg, var(--primary-color), var(--secondary-color))" : "rgba(255,255,255,0.04)",
-                           color: portalRole === role ? "#08111f" : "#d7e4fb",
-                           fontWeight: 700,
-                           cursor: "pointer",
-                           textTransform: "capitalize",
-                         }}
-                       >
-                         {role}
-                       </button>
-                     ))}
-                   </div>
-                   <label style={labelStyle}>
-                     <span style={labelTextStyle}>Admission / Portal ID</span>
-                     <input value={admission} onChange={(e) => setAdmission(e.target.value)} type="text" autoComplete="off" placeholder="Admission number" style={fieldStyle} />
-                   </label>
-                   <label style={labelStyle}>
-                     <span style={labelTextStyle}>Password</span>
-                     <input value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? "text" : "password"} autoComplete="off" style={fieldStyle} />
-                   </label>
-                   {error ? (
-                     <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div>
-                   ) : null}
-                   <SubmitButton loading={loading} text="Sign In" />
-                 </form>
-               )}
-             </div>
+              ) : (
+                <form onSubmit={submitPortal} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    {["parent", "student"].map(role => (
+                      <button key={role} type="button" onClick={() => setPortalRole(role)} style={{ border: "none", borderRadius: 10, padding: "10px 12px", background: portalRole === role ? "linear-gradient(135deg, var(--primary-color), var(--secondary-color))" : "rgba(255,255,255,0.04)", color: portalRole === role ? "#08111f" : "#d7e4fb", fontWeight: 700, cursor: "pointer", textTransform: "capitalize" }}>{role}</button>
+                    ))}
+                  </div>
+                  <label style={labelStyle}><span style={labelTextStyle}>Admission / Portal ID</span><input value={admission} onChange={(e) => setAdmission(e.target.value)} type="text" autoComplete="off" placeholder="Admission number" style={fieldStyle} /></label>
+                  <label style={labelStyle}><span style={labelTextStyle}>Password</span><input value={password} onChange={(e) => setPassword(e.target.value)} type={showPassword ? "text" : "password"} autoComplete="off" style={fieldStyle} /></label>
+                  {error ? <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div> : null}
+                  <SubmitButton loading={loading} text="Sign In" />
+                </form>
+              )}
+            </div>
           </div>
         </section>
       </div>
@@ -661,45 +392,15 @@ export default function LoginView({ onLogin }) {
 
 const labelStyle = { display: "flex", flexDirection: "column", gap: 6 };
 const labelTextStyle = { fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8ea3c4" };
-const fieldStyle = {
-  width: "100%",
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.12)",
-  background: "rgba(255,255,255,0.04)",
-  color: "#edf4ff",
-  padding: "12px 14px",
-  fontSize: 14,
-  outline: "none",
-  boxSizing: "border-box",
-};
+const fieldStyle = { width: "100%", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)", color: "#edf4ff", padding: "12px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" };
 
 function SubmitButton({ loading, text }) {
   return (
-    <button
-      type="submit"
-      disabled={loading}
-      style={{
-        border: "none",
-        borderRadius: 12,
-        padding: "12px 16px",
-        background: "linear-gradient(135deg, var(--primary-color), var(--secondary-color))",
-        color: "#08111f",
-        fontWeight: 800,
-        fontSize: 15,
-        cursor: loading ? "wait" : "pointer",
-        opacity: loading ? 0.7 : 1,
-      }}
-    >
+    <button type="submit" disabled={loading} style={{ border: "none", borderRadius: 12, padding: "12px 16px", background: "linear-gradient(135deg, var(--primary-color), var(--secondary-color))", color: "#08111f", fontWeight: 800, fontSize: 15, cursor: loading ? "wait" : "pointer", opacity: loading ? 0.7 : 1 }}>
       {loading ? "Please wait…" : text}
     </button>
   );
 }
 
-SubmitButton.propTypes = {
-  loading: PropTypes.bool,
-  text: PropTypes.string.isRequired,
-};
-
-LoginView.propTypes = {
-  onLogin: PropTypes.func.isRequired,
-};
+SubmitButton.propTypes = { loading: PropTypes.bool, text: PropTypes.string.isRequired };
+LoginView.propTypes = { onLogin: PropTypes.func.isRequired };
