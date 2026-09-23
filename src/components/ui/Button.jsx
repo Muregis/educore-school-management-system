@@ -60,7 +60,7 @@ export default React.memo(function Button({
   return (
     <button
       type={type}
-      className={`ui-btn ui-btn-${variant} ${className}`.trim()}
+      className={`touch-target ui-btn ui-btn-${variant} ${className}`.trim()}
       disabled={isDisabled}
       aria-busy={loading || undefined}
       aria-disabled={isDisabled || undefined}
@@ -80,25 +80,13 @@ export default React.memo(function Button({
         willChange: "transform",
         contain: "layout paint",
         ...sizes[size],
-        ...(variants[variant] || variants.primary),
+        ...variants[variant],
         ...style
       }}
       {...props}
     >
-      {loading ? (
-        <span
-          aria-hidden="true"
-          style={{
-            width: "1em",
-            height: "1em",
-            border: "2px solid currentColor",
-            borderRightColor: "transparent",
-            borderRadius: "50%",
-            animation: "spin 800ms linear infinite"
-          }}
-        />
-      ) : leftIcon}
-      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{children}</span>
+      {loading ? <span aria-hidden="true">…</span> : leftIcon}
+      <span>{children}</span>
       {!loading && rightIcon}
     </button>
   );
