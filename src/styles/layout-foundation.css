@@ -1,0 +1,138 @@
+/**
+ * layout-foundation.css
+ * ----------------------------------------------------------------------------
+ * Structural layout ONLY (ui/mobile-first-shell track).
+ *
+ * Goals:
+ * - Stop horizontal viewport blowout on phones
+ * - Give flex/grid children min-width: 0 so they can shrink
+ * - Contain tables and modals inside the viewport
+ * - Safe-area padding on small screens
+ * - Viewport-safe mobile drawer width (overrides App RESPONSIVE_CSS)
+ *
+ * Non-goals:
+ * - Brand colors / typography rewrites
+ * - Auth / API / business logic
+ *
+ * Cascade: index.css → design-system.css → mobile.css → mobile-modern.css → THIS FILE
+ */
+
+html {
+  overflow-x: clip;
+}
+
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+#root {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.ec-app-shell,
+.ec-main,
+.ec-page,
+.ec-page-content,
+.ec-sidebar,
+main {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ec-page-content {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ec-app-shell {
+  overflow-x: clip;
+}
+
+/* Tables: scroll the table, not the whole page */
+.ec-table-wrap,
+.table-responsive,
+[data-table-scroll] {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ec-table-wrap table,
+.table-responsive table,
+[data-table-scroll] table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ec-table-wrap th.nowrap,
+.ec-table-wrap td.nowrap,
+[data-table-scroll] th.nowrap,
+[data-table-scroll] td.nowrap {
+  white-space: nowrap;
+}
+
+/* Modals: viewport-safe panel */
+.ec-modal-panel,
+[data-modal-panel] {
+  width: 100%;
+  max-width: min(100vw - 2rem, 32rem);
+  max-height: min(100dvh - 2rem, 90vh);
+  overflow: auto;
+  box-sizing: border-box;
+}
+
+/* Mobile drawer injected by App.jsx RESPONSIVE_CSS — keep on-screen */
+.ec-drawer {
+  width: min(280px, 85vw) !important;
+  max-width: 100%;
+}
+
+@media screen and (max-width: 767px) {
+  .ec-page-content {
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+
+  .ec-btn,
+  button.touch-target {
+    min-height: 44px;
+  }
+}
+
+/* ---- Shared UI primitives (reinforce design-system on small screens) ---- */
+.ui-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ui-modal-overlay {
+  padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
+}
+
+.ui-modal-content,
+.ui-modal-content[data-modal-panel] {
+  max-width: min(100vw - 2rem, 560px);
+}
+
+@media screen and (max-width: 767px) {
+  .ui-modal-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .ui-modal-footer > * {
+    width: 100%;
+  }
+
+  .ui-btn.touch-target,
+  button.touch-target {
+    min-height: 44px;
+  }
+}
