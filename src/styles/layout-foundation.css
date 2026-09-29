@@ -221,3 +221,20 @@ main {
   contain: none !important;
   overflow: visible !important;
 }
+
+/* Form grids: single column on phones, multi when space allows */
+.ec-form-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 1fr;
+  min-width: 0;
+}
+
+@media screen and (min-width: 640px) {
+  .ec-form-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ec-form-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
