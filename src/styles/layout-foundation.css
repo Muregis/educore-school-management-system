@@ -3,17 +3,6 @@
  * ----------------------------------------------------------------------------
  * Structural layout ONLY (ui/mobile-first-shell track).
  *
- * Goals:
- * - Stop horizontal viewport blowout on phones
- * - Give flex/grid children min-width: 0 so they can shrink
- * - Contain tables and modals inside the viewport
- * - Safe-area padding on small screens
- * - Viewport-safe mobile drawer width (overrides App RESPONSIVE_CSS)
- *
- * Non-goals:
- * - Brand colors / typography rewrites
- * - Auth / API / business logic
- *
  * Cascade: index.css → design-system.css → mobile.css → mobile-modern.css → THIS FILE
  */
 
@@ -198,10 +187,6 @@ main {
   height: auto;
 }
 
-/* Dashboard KPI cards — never clip money/labels
- * design-system sets contain:layout paint on .ui-card which clips text
- * even when overflow:visible is set in JS.
- */
 .ec-stat-card.ui-card,
 .ec-stat-card.premium-card,
 .ui-card.ec-stat-card,
@@ -228,4 +213,11 @@ main {
   .ec-stat-card {
     padding: 12px !important;
   }
+}
+
+/* NUCLEAR: design-system contain:paint clips all card text on mobile KPIs */
+.ui-card,
+.premium-card {
+  contain: none !important;
+  overflow: visible !important;
 }

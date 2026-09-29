@@ -161,7 +161,6 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     }, {})
   ).slice(-7);
 
-  // Director / superadmin
   if (["director", "superadmin"].includes(auth?.role)) {
     const pendingPlans = lessonPlansLoading ? "…" : lessonPlans.length;
     const cards = [
@@ -177,7 +176,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     ];
     return (
       <div className="stagger-in" style={{ display: "grid", gap: "var(--space-4)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-3)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 158px), 1fr))", gap: "var(--space-3)" }}>
           {cards.map(([label, value, accentColor, title]) => (
             <StatCard key={label} label={label} value={value} color={accentColor} title={title} />
           ))}
@@ -236,7 +235,6 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     );
   }
 
-  // Default / other roles — compact overview
   const cards = [
     ["Boys", boys, "var(--color-primary)"],
     ["Girls", girls, "var(--color-teal)"],
@@ -250,7 +248,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
 
   return (
     <div className="stagger-in" style={{ display: "grid", gap: "var(--space-4)" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-3)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 158px), 1fr))", gap: "var(--space-3)" }}>
         {cards.map(([label, value, accentColor, title]) => (
           <StatCard key={label} label={label} value={value} color={accentColor} title={title} />
         ))}
