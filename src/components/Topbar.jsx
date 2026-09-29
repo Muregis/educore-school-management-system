@@ -16,18 +16,6 @@ const ROLE_COLORS = {
   superadmin: "#3B82F6",
 };
 
-const ROLE_AVATARS = {
-  admin: "A",
-  teacher: "T",
-  finance: "F",
-  hr: "H",
-  librarian: "L",
-  parent: "P",
-  student: "S",
-  director: "D",
-  superadmin: "A",
-};
-
 export default function Topbar({
   auth,
   school,
@@ -46,7 +34,6 @@ export default function Topbar({
   onSchoolSwitch,
 }) {
   const roleColor = ROLE_COLORS[auth?.role] || "#3B82F6";
-  const roleAvatar = ROLE_AVATARS[auth?.role] || "?";
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => {
@@ -65,6 +52,7 @@ export default function Topbar({
   }, [currentNav, page]);
 
   const CurrentIcon = currentNav?.icon && typeof currentNav.icon !== "string" ? currentNav.icon : Sparkles;
+  const profileInitial = (auth?.name || auth?.role || "?").toString().trim().charAt(0).toUpperCase();
 
   return (
     <header
@@ -106,21 +94,23 @@ export default function Topbar({
 
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", minWidth: 0 }}>
-            <div style={{ width: 36, height: 36, borderRadius: "var(--radius-md)", display: "grid", placeItems: "center", background: "color-mix(in srgb, var(--color-primary) 16%, var(--color-bg-card))", color: "var(--color-primary)" }}>
+            <div style={{ width: 36, height: 36, borderRadius: "var(--radius-md)", display: "grid", placeItems: "center", background: "color-mix(in srgb, var(--color-primary) 16%, var(--color-bg-card))", color: "var(--color-primary)", flexShrink: 0 }}>
               {typeof currentNav?.icon === "string" ? <span>{currentNav.icon}</span> : <CurrentIcon size={18} />}
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: isMobile ? "18px" : "20px", color: "var(--color-text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {currentNav?.label || page}
               </div>
-              <nav aria-label="Breadcrumbs" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--space-2)", color: "var(--color-text-muted)", fontSize: "12px", marginTop: "2px" }}>
-                {breadcrumbs.map((crumb, index) => (
-                  <span key={`${crumb.value}-${index}`} style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)" }}>
-                    <span>{crumb.label}</span>
-                    {index < breadcrumbs.length - 1 && <span>/</span>}
-                  </span>
-                ))}
-              </nav>
+              {!isMobile && (
+                <nav aria-label="Breadcrumbs" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--space-2)", color: "var(--color-text-muted)", fontSize: "12px", marginTop: "2px" }}>
+                  {breadcrumbs.map((crumb, index) => (
+                    <span key={`${crumb.value}-${index}`} style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)" }}>
+                      <span>{crumb.label}</span>
+                      {index < breadcrumbs.length - 1 && <span>/</span>}
+                    </span>
+                  ))}
+                </nav>
+              )}
             </div>
           </div>
         </div>
@@ -159,8 +149,11 @@ export default function Topbar({
             }}
             style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-full)", padding: "6px 10px", background: "var(--color-bg-card)", color: "var(--color-text-primary)", cursor: "pointer" }}
           >
-            <div style={{ width: 30, height: 30, borderRadius: "50%", background: `color-mix(in srgb, ${roleColor} 18%, transparent)`, display: "grid", placeItems: "center", color: roleColor, fontWeight: 800 }}>
-              {roleAvatar}
+            <div
+              style={{ width: 32, height: 32, borderRadius: "50%", background: roleColor, display: "grid", placeItems: "center", color: "#fff", fontWeight: 800, fontSize: "13px" }}
+              title={auth?.name || auth?.role}
+            >
+              {profileInitial}
             </div>
             {!isMobile && <ChevronDown size={15} />}
           </button>
