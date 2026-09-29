@@ -12,7 +12,6 @@ import { Pager } from "../components/Helpers";
 import { csv, pager } from "../lib/utils";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
-// New UI Components
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
@@ -22,7 +21,6 @@ import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
 
-// Normalise a student row coming from the backend into the shape the UI expects
 function normalise(s) {
   return {
     id:          s.student_id  ?? s.id,
@@ -82,11 +80,11 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const [availableClasses, setAvailableClasses] = useState([]);
   const emptyFeeForm = () => ({
   opening_balance: "", opening_balance_type: "owing",
-  transport_fee: "",                  // agreed flat transport amount (overrides rate calc)
+  transport_fee: "",
   transport_direction: "none", transport_base_fee: "",
-  lunch_fee: "",                      // agreed flat lunch amount (overrides rate calc)
+  lunch_fee: "",
   lunch_enabled: false, lunch_daily_rate: "", lunch_days: "", lunch_billing_type: "termly",
-  breakfast_termly_fee: "",                  // agreed flat breakfast amount (overrides rate calc)
+  breakfast_termly_fee: "",
   breakfast_enabled: false, breakfast_daily_rate: "", breakfast_days: "", breakfast_billing_type: "termly",
   discount_type: "", discount_value: "", discount_is_percentage: true,
 });
@@ -166,11 +164,8 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
   const save = async () => {
     setErr("");
     if (!f.firstName.trim() || !f.lastName.trim()) return setErr("First and last name are required.");
-    
-    // Validate admission number uniqueness (only for new students)
     if (!editId && f.admission && f.admission.trim() && Array.isArray(students) && students.length > 0) {
       const cleanAdmission = f.admission.trim();
-      // Check if admission number already exists in current students list
       const existingStudent = students.find(s => 
         s && (s.admission === cleanAdmission || s.admission_number === cleanAdmission)
       );
@@ -178,7 +173,6 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         return setErr(`Admission number "${cleanAdmission}" already exists. Please use a different admission number.`);
       }
     }
-    
     if (f.parentPhone) {
       const cleanPhone = f.parentPhone.replace(/[^\d+]/g, '');
       const phoneRegex = /^(\+?254|0)[17][0-9]{8}$/;
@@ -186,10 +180,8 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         return setErr("Invalid Kenyan phone format. Use: 07xxxxxxxx, 01xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx, +2547xxxxxxxx, or +2541xxxxxxxx");
       }
     }
-    
     try {
       if (editId) {
-        // PUT — personal info only, no fee fields
         await apiFetch(`/students/${editId}`, {
           method: "PUT",
           body: {
@@ -217,8 +209,6 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           },
           token: auth?.token,
         });
-
-        // PATCH — fee/balance fields separately, no admission number
         const patchPayload = {
           opening_balance: parseFloat(f.opening_balance) || 0,
           opening_balance_type: f.opening_balance_type || "owing",
@@ -239,9 +229,8 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           discount_value: parseFloat(f.discount_value) || 0,
           discount_is_percentage: f.discount_is_percentage !== false,
         };
-        
         try {
-          const patchResponse = await apiFetch(`/students/${editId}/fees`, {
+          await apiFetch(`/students/${editId}/fees`, {
             method: "PATCH",
             body: patchPayload,
             token: auth?.token,
@@ -249,23 +238,15 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           toast('Student fee settings updated successfully', 'success');
         } catch (feeErr) {
           console.error('Fee settings failed:', feeErr);
-          
-          // Show detailed error to user
           const errorMsg = `Fee settings failed: ${feeErr.message || 'Unknown error'} (Status: ${feeErr.status || 'N/A'})`;
           toast(errorMsg, 'error');
-          
-          // Don't close modal on fee error - let user try again
           return;
         }
-
-        // Only update local state and show success if both PUT and PATCH succeeded
         setStudents(prev => prev.map(s =>
           (s.student_id === editId || s.id === editId)
             ? { ...normalise(s), ...f, id: editId }
             : s
         ));
-        
-        // Refresh full list to ensure we have latest data from backend
         apiFetch("/students", { token: auth.token })
           .then(data => setStudents(data.map(normalise)))
           .catch(() => {});
@@ -278,8 +259,6 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           token: auth?.token,
         });
         setStudents(prev => [...prev, normalise(res)]);
-        
-        // Refresh full list for new student
         apiFetch("/students", { token: auth.token })
           .then(data => setStudents(data.map(normalise)))
           .catch(() => {});
@@ -287,7 +266,6 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         toast("Student saved", "success");
       }
     } catch (err) {
-      // Handle duplicate admission number error specifically
       if (err.message?.includes("Admission number already exists") || 
           err.message?.includes("duplicate key") ||
           err.message?.includes("23505") ||
@@ -310,23 +288,17 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
   const uploadPhoto = async (studentId) => {
     if (!selectedFile) return;
-
     setUploadingPhoto(true);
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('studentId', studentId);
-
       const response = await fetch(`${API_BASE}/students/upload-photo`, {
         method: 'POST',
         headers: getAuthHeaders(auth?.token),
         body: formData,
       });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
+      if (!response.ok) throw new Error('Upload failed');
       const result = await response.json();
       setF({ ...f, photoUrl: result.photoUrl });
       setSelectedFile(null);
@@ -360,13 +332,11 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         toast("Invalid QR code", "error");
         return;
       }
-
       const scannedId = String(parsedQr.studentId).trim();
       const student = students.find(s =>
         String(s.student_id ?? s.id ?? "") === scannedId ||
         String(s.admission ?? s.admission_number ?? "") === scannedId
       );
-
       if (student) {
         setProfile(student);
         toast("Student found and profile opened", "success");
@@ -379,45 +349,76 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     setShowQRScanner(false);
   };
 
+  const openEdit = (s) => {
+    setEditId(s.id);
+    apiFetch(`/students/${s.id}`, { token: auth.token })
+      .then(fresh => {
+        setF(normalise(fresh));
+        setShow(true);
+      })
+      .catch(err => {
+        console.error('Failed to fetch fresh student data, using list data:', err);
+        setF(normalise(s));
+        setShow(true);
+      });
+  };
+
+  const boyCount = filtered.filter(s => s.gender === "male").length;
+  const girlCount = filtered.filter(s => s.gender === "female").length;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-      {/* Top Bar Stats */}
-      <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-        <Badge text={`Total: ${filtered.length}`} variant="success" />
-        <Badge text={`Boys: ${filtered.filter(s => s.gender === "male").length}`} variant="primary" />
-        <Badge text={`Girls: ${filtered.filter(s => s.gender === "female").length}`} variant="warning" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "var(--space-3)" }}>
+        {[
+          { label: "Total", value: filtered.length, color: "var(--color-success)" },
+          { label: "Boys", value: boyCount, color: "var(--color-primary)" },
+          { label: "Girls", value: girlCount, color: "var(--color-warning)" },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            style={{
+              background: "var(--color-bg-card)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-lg)",
+              padding: "14px 12px",
+              textAlign: "center",
+              minWidth: 0,
+            }}
+          >
+            <div style={{ fontSize: "22px", fontWeight: 800, color: stat.color, fontFamily: "var(--font-heading)", lineHeight: 1.1 }}>{stat.value}</div>
+            <div style={{ fontSize: "12px", color: "var(--color-text-muted)", fontWeight: 600, marginTop: 4 }}>{stat.label}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Controls */}
-      <Card style={{ padding: "var(--space-3)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--space-3)", alignItems: "end" }}>
-          <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search students..." />
-<Select 
-  value={cls} 
-  onChange={e => setCls(e.target.value)}
-  options={[
-    { value: "all", label: "All classes" },
-    ...(availableClasses ?? []).map(c => ({ value: c, label: c }))
-  ]}
+      <Card style={{ padding: "var(--space-4)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-3)", alignItems: "end" }}>
+          <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search name, admission, phone..." />
+          <Select
+            value={cls}
+            onChange={e => setCls(e.target.value)}
+            options={[
+              { value: "all", label: "All classes" },
+              ...(availableClasses ?? []).map(c => ({ value: c, label: c })),
+            ]}
           />
-          <Select 
-            value={status} 
+          <Select
+            value={status}
             onChange={e => setStatus(e.target.value)}
             options={[
               { value: "all", label: "All status" },
               { value: "active", label: "Active" },
-              { value: "inactive", label: "Inactive" }
+              { value: "inactive", label: "Inactive" },
             ]}
           />
-          <div style={{ display: "flex", gap: "var(--space-2)" }}>
-            <Button variant="ghost" onClick={() => { csv("students.csv", ["Admission","First","Last","Class","Gender","Parent","Phone","Status"], filtered.map(s => [s.admission,s.firstName,s.lastName,s.className,s.gender,s.parentName||"",s.parentPhone||"",s.status])); toast("Students CSV exported","success"); }}>Export CSV</Button>
-            <Button variant="secondary" onClick={() => setShowQRScanner(true)}>📱 Scan QR</Button>
-            {canEdit && auth.role !== "finance" && <Button variant="primary" onClick={openAdd}>Add Student</Button>}
-          </div>
+        </div>
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-3)" }}>
+          <Button variant="ghost" onClick={() => { csv("students.csv", ["Admission","First","Last","Class","Gender","Parent","Phone","Status"], filtered.map(s => [s.admission,s.firstName,s.lastName,s.className,s.gender,s.parentName||"",s.parentPhone||"",s.status])); toast("Students CSV exported","success"); }}>Export CSV</Button>
+          <Button variant="secondary" onClick={() => setShowQRScanner(true)}>Scan QR</Button>
+          {canEdit && auth.role !== "finance" && <Button variant="primary" onClick={openAdd}>Add Student</Button>}
         </div>
       </Card>
 
-      {/* Table Area */}
       {filtered.length === 0 ? (
         <EmptyState icon="👨‍🎓" title="No Students" description="Could not find any students matching your criteria." />
       ) : (
@@ -425,35 +426,71 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <Table
             headers={["Student", "Admission", "Class", "Parent", "Status", "Actions"]}
             data={rows.map(s => [
-              <div key={s.id}>
-                <div style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{s.firstName} {s.lastName}</div>
-                <div style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>{s.dob || "-"}</div>
+              <div key={s.id} style={{ minWidth: 140 }}>
+                <div style={{ color: "var(--color-text-primary)", fontWeight: 700, fontSize: "14px", lineHeight: 1.35 }}>{s.firstName} {s.lastName}</div>
+                <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: 2 }}>{s.dob || "—"}</div>
               </div>,
               s.admission,
-              s.className,
-              `${s.parentName || "-"} ${s.parentPhone ? `(${s.parentPhone})` : ""}`,
+              s.className || "—",
+              <div key="p" style={{ minWidth: 100 }}>
+                <div>{s.parentName || "—"}</div>
+                {s.parentPhone && <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>{s.parentPhone}</div>}
+              </div>,
               <Badge key="b" text={s.status} variant={s.status === "active" ? "success" : "danger"} />,
-              <div key="a" style={{ display: "flex", gap: "var(--space-2)" }}>
+              <div key="a" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 <Button size="sm" variant="ghost" onClick={() => setProfile(s)}>Profile</Button>
-                <Button size="sm" variant="ghost" onClick={() => setIdCardStudent(s)}>🪪 ID</Button>
-                {canEdit && auth.role !== "finance" && <Button size="sm" variant="secondary" onClick={() => { 
-                  setEditId(s.id); 
-                  apiFetch(`/students/${s.id}`, { token: auth.token })
-                    .then(fresh => {
-                      const normalisedData = normalise(fresh);
-                      setF(normalisedData);
-                      setShow(true);
-                    })
-                    .catch(err => {
-                      console.error('Failed to fetch fresh student data, using list data:', err);
-                      const normalisedListData = normalise(s);
-                      setF(normalisedListData); 
-                      setShow(true);
-                    });
-                }}>Edit</Button>}
+                <Button size="sm" variant="ghost" onClick={() => setIdCardStudent(s)}>ID</Button>
+                {canEdit && auth.role !== "finance" && <Button size="sm" variant="secondary" onClick={() => openEdit(s)}>Edit</Button>}
                 {canEdit && auth.role !== "finance" && <Button size="sm" variant="danger" onClick={() => del(s.id)}>Delete</Button>}
-              </div>
+              </div>,
             ])}
+            renderMobileCard={(_row, i) => {
+              const s = rows[i];
+              if (!s) return null;
+              return (
+                <div
+                  key={s.id}
+                  className="ui-table-mobile-card"
+                  style={{
+                    padding: 16,
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-lg)",
+                    background: "var(--color-bg-card)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 800, fontSize: "16px", color: "var(--color-text-primary)", lineHeight: 1.3 }}>
+                        {s.firstName} {s.lastName}
+                      </div>
+                      <div style={{ fontSize: "13px", color: "var(--color-text-muted)", marginTop: 4 }}>
+                        {s.admission || "—"}{s.className ? ` · ${s.className}` : ""}
+                      </div>
+                    </div>
+                    <Badge text={s.status} variant={s.status === "active" ? "success" : "danger"} />
+                  </div>
+                  {(s.parentName || s.parentPhone) && (
+                    <div style={{ fontSize: "13px", color: "var(--color-text-secondary)", padding: "10px 12px", background: "var(--color-bg-surface)", borderRadius: "var(--radius-md)" }}>
+                      <div style={{ fontWeight: 600 }}>{s.parentName || "Parent"}</div>
+                      {s.parentPhone && <div style={{ marginTop: 2, color: "var(--color-text-muted)" }}>{s.parentPhone}</div>}
+                    </div>
+                  )}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <Button size="sm" variant="ghost" onClick={() => setProfile(s)}>Profile</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setIdCardStudent(s)}>ID Card</Button>
+                    {canEdit && auth.role !== "finance" && (
+                      <Button size="sm" variant="secondary" onClick={() => openEdit(s)}>Edit</Button>
+                    )}
+                    {canEdit && auth.role !== "finance" && (
+                      <Button size="sm" variant="danger" onClick={() => del(s.id)}>Delete</Button>
+                    )}
+                  </div>
+                </div>
+              );
+            }}
           />
           <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
             <Pager page={page} pages={pages} setPage={setPage} />
@@ -461,283 +498,72 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         </Card>
       )}
 
-      {/* Edit/Add Modal */}
       <Modal isOpen={show} title={editId ? "Edit Student" : "Add Student"} onClose={() => setShow(false)} maxWidth="800px" footer={
         <>
           <Button variant="ghost" onClick={() => setShow(false)}>Cancel</Button>
           <Button variant="primary" onClick={save}>{editId ? "Update Student" : "Save Student"}</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-4)" }}>
           <Input label="First Name" value={f.firstName} onChange={e => handleChange('firstName', e.target.value)} />
           <Input label="Last Name" value={f.lastName} onChange={e => handleChange('lastName', e.target.value)} />
-          <Input label="Admission" value={f.admission || ""} onChange={e => handleChange('admission', e.target.value)} />
-          
+          <Input label="Admission Number" value={f.admission} onChange={e => handleChange('admission', e.target.value)} placeholder="Leave blank to auto-generate" />
           <Select label="Class" value={f.className} onChange={e => handleChange('className', e.target.value)} options={(availableClasses ?? []).map(c => ({ value: c, label: c }))} />
-          <Select label="Gender" value={f.gender} onChange={e => handleChange('gender', e.target.value)} options={[{value:"female", label:"Female"}, {value:"male", label:"Male"}]} />
-          <Select label="Status" value={f.status} onChange={e => handleChange('status', e.target.value)} options={[{value:"active", label:"Active"}, {value:"inactive", label:"Inactive"}]} />
-          
-          <Input label="Parent Name" value={f.parentName || ""} onChange={e => handleChange('parentName', e.target.value)} />
-          <Input label="Parent WhatsApp" value={f.parentPhone || ""} onChange={e => handleChange('parentPhone', e.target.value)} placeholder="07xxxxxxxx" />
-          <Input label="Date of Birth" type="date" value={f.dob || ""} onChange={e => handleChange('dob', e.target.value)} />
-          <Input label="NEMIS Number" value={f.nemisNumber || ""} onChange={e => handleChange('nemisNumber', e.target.value.toUpperCase())} placeholder="e.g. NEM12345678" />
-          
-          <Select label="Blood Group" value={f.bloodGroup || ""} onChange={e => handleChange('bloodGroup', e.target.value)} options={[{value:"", label:"-- Select --"}, {value:"A+", label:"A+"}, {value:"A-", label:"A-"}, {value:"B+", label:"B+"}, {value:"B-", label:"B-"}, {value:"O+", label:"O+"}, {value:"O-", label:"O-"}, {value:"AB+", label:"AB+"}, {value:"AB-", label:"AB-"}]} />
-          <Input label="Allergies" value={f.allergies || ""} onChange={e => handleChange('allergies', e.target.value)} placeholder="e.g. Peanuts" />
-          
-          <div style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-            <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Medical Conditions</label>
-            <textarea 
-              style={{
-                width: '100%',
-                background: 'var(--color-bg-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-                padding: 'var(--space-2) var(--space-3)',
-                color: 'var(--color-text-primary)',
-                fontFamily: 'var(--font-body)',
-                fontSize: '14px',
-                outline: 'none',
-                minHeight: '60px',
-                resize: 'vertical'
-              }} 
-              value={f.medicalConditions || ""} 
-              onChange={e => handleChange('medicalConditions', e.target.value)} 
-              placeholder="Any medical conditions or special needs" 
-            />
-          </div>
-
-          <Input label="Emergency Contact" value={f.emergencyContactName || ""} onChange={e => handleChange('emergencyContactName', e.target.value)} placeholder="Name" />
-          <Input label="Emergency Phone" value={f.emergencyContactPhone || ""} onChange={e => handleChange('emergencyContactPhone', e.target.value)} placeholder="07xxxxxxxx" />
-          <Input label="Relationship" value={f.emergencyContactRelationship || ""} onChange={e => handleChange('emergencyContactRelationship', e.target.value)} placeholder="e.g. Parent, Guardian" />
-          
-          {/* Transport */}
-          <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
-            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Transport Settings</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)" }}>
-              <Select value={f.transport_direction || "none"} onChange={e => handleChange('transport_direction', e.target.value)} options={[
-                { value: "none", label: "No Transport" },
-                { value: "one_way", label: "One Way (50% fee)" },
-                { value: "two_way", label: "Two Way (100% fee)" }
-              ]} />
-              <Input type="number" value={f.transport_base_fee || ""} onChange={e => handleChange('transport_base_fee', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder="Base transport fee (KES)" disabled={f.transport_direction === "none"} />
-              <Input type="number" value={f.transport_fee || ""} onChange={e => handleChange('transport_fee', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder="Agreed transport (KES) — overrides rate" />
-            </div>
-            <small style={{ color: "var(--color-text-muted)", fontSize: "11px", display: "block", marginTop: "var(--space-2)" }}>
-              If <strong>Agreed transport</strong> is set, it replaces the rate × direction calculation and the parent is charged exactly this amount.
-            </small>
-          </div>
-
-          {/* Lunch */}
-          <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
-            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Lunch Program</div>
-            <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer", marginBottom: "var(--space-3)", color: "var(--color-text-primary)", fontSize: "14px" }}>
-              <input type="checkbox" checked={f.lunch_enabled || false} onChange={e => handleChange('lunch_enabled', e.target.checked)} style={{ width: "16px", height: "16px", cursor: "pointer" }} />
-              <span>Enrolled in lunch program</span>
-            </label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "var(--space-3)" }}>
-              <Select value={f.lunch_billing_type || 'termly'} onChange={e => handleChange('lunch_billing_type', e.target.value)} options={[{value:"termly", label:"Termly (flat)"}, {value:"daily", label:"Daily × Days"}]} />
-              <Input type="number" value={f.lunch_daily_rate || ""} onChange={e => handleChange('lunch_daily_rate', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder={f.lunch_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
-              {f.lunch_billing_type === 'daily' && (
-                <Input type="number" value={f.lunch_days || ""} onChange={e => handleChange('lunch_days', e.target.value)} placeholder="School days" />
-              )}
-              {f.lunch_billing_type === 'termly' && <div />}
-              <Input type="number" value={f.lunch_fee || ""} onChange={e => handleChange('lunch_fee', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder="Agreed lunch (KES) — overrides rate" />
-            </div>
-            <small style={{ color: "var(--color-text-muted)", fontSize: "11px", display: "block", marginTop: "var(--space-2)" }}>
-              If <strong>Agreed lunch</strong> is set, it replaces the rate × days calculation.
-            </small>
-          </div>
-
-          {/* Breakfast */}
-          <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
-            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Breakfast Program</div>
-            <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer", marginBottom: "var(--space-3)", color: "var(--color-text-primary)", fontSize: "14px" }}>
-              <input type="checkbox" checked={f.breakfast_enabled || false} onChange={e => handleChange('breakfast_enabled', e.target.checked)} style={{ width: "16px", height: "16px", cursor: "pointer" }} />
-              <span>Enrolled in breakfast program</span>
-            </label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "var(--space-3)" }}>
-              <Select value={f.breakfast_billing_type || 'termly'} onChange={e => handleChange('breakfast_billing_type', e.target.value)} options={[{value:"termly", label:"Termly (flat)"}, {value:"daily", label:"Daily × Days"}]} />
-              <Input type="number" value={f.breakfast_daily_rate || ""} onChange={e => handleChange('breakfast_daily_rate', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder={f.breakfast_billing_type === 'termly' ? "Termly rate (KES)" : "Daily rate (KES)"} />
-              {f.breakfast_billing_type === 'daily' && (
-                <Input type="number" value={f.breakfast_days || ""} onChange={e => handleChange('breakfast_days', e.target.value)} placeholder="School days" />
-              )}
-              {f.breakfast_billing_type === 'termly' && <div />}
-              <Input type="number" value={f.breakfast_termly_fee || ""} onChange={e => handleChange('breakfast_termly_fee', e.target.value ? parseFloat(e.target.value) || 0 : 0)} placeholder="Agreed breakfast (KES) — overrides rate" />
-            </div>
-            <small style={{ color: "var(--color-text-muted)", fontSize: "11px", display: "block", marginTop: "var(--space-2)" }}>
-              If <strong>Agreed breakfast</strong> is set, it replaces the rate × days calculation.
-            </small>
-          </div>
-
-          {/* Fee Discount */}
-          <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
-            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Fee Discount</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-3)", alignItems: "start" }}>
-              <Select value={f.discount_type || ""} onChange={e => setF({ ...f, discount_type: e.target.value })} options={[
-                { value: "", label: "No Discount" },
-                { value: "sibling_2nd", label: "2nd Sibling" },
-                { value: "sibling_3rd", label: "3rd Sibling" },
-                { value: "sibling_4th_plus", label: "4th+ Sibling" },
-                { value: "staff_child", label: "Staff Child" },
-                { value: "scholarship", label: "Scholarship" },
-                { value: "bursary", label: "Bursary" },
-                { value: "other", label: "Other" }
-              ]} />
-              <Input type="number" value={f.discount_value || ""} onChange={e => setF({ ...f, discount_value: e.target.value ? parseFloat(e.target.value) || 0 : 0 })} placeholder={f.discount_is_percentage ? "Discount %" : "Amount (KES)"} disabled={!f.discount_type} />
-              <Select value={f.discount_is_percentage ? "percentage" : "amount"} onChange={e => setF({ ...f, discount_is_percentage: e.target.value === "percentage" })} disabled={!f.discount_type} options={[
-                { value: "percentage", label: "Percentage (%)" },
-                { value: "amount", label: "Fixed Amount (KES)" }
-              ]} />
-            </div>
-            {f.discount_type && (
-              <small style={{ color: "var(--color-warning)", fontSize: "11px", display: "block", marginTop: "var(--space-2)" }}>
-                Discount applies to base tuition fee only. Transport, lunch, and breakfast are not discounted.
-              </small>
-            )}
-          </div>
-
-          {/* Opening Balance */}
-          <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
-            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Opening Balance (KES)</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "var(--space-3)" }}>
-              <Input type="number" value={f.opening_balance || ""} onChange={e => setF({ ...f, opening_balance: e.target.value ? parseFloat(e.target.value) || 0 : 0 })} placeholder="Amount carried forward" />
-              <Select style={{ width: "160px" }} value={f.opening_balance_type || "owing"} onChange={e => setF({ ...f, opening_balance_type: e.target.value })} options={[
-                { value: "owing", label: "Student Owes" },
-                { value: "credit", label: "Credit (Prepaid)" }
-              ]} />
-            </div>
-            <small style={{ color: "var(--color-text-muted)", fontSize: "11px", display: "block", marginTop: "var(--space-2)" }}>
-              Opening balance is added to the student's total expected fees
-            </small>
-          </div>
-
-          {/* Photo */}
-          <div style={{ gridColumn: "1 / -1", padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-bg-surface)" }}>
-            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Student Photo</div>
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-              <input type="file" accept="image/*" onChange={handleFileSelect} style={{ flex: 1, color: "var(--color-text-primary)" }} />
-              {f.photoUrl && (
-                <img src={f.photoUrl} alt="Student photo" style={{ width: 50, height: 50, objectFit: "cover", borderRadius: "var(--radius-sm)", boxShadow: "var(--shadow-card)" }} />
-              )}
-              {selectedFile && editId && (
-                <Button onClick={() => uploadPhoto(editId)} loading={uploadingPhoto}>
-                  Upload
-                </Button>
-              )}
-            </div>
-            <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "var(--space-2)" }}>
-              Upload a photo for the student ID card (max 2MB, JPG/PNG only)
-            </div>
-          </div>
+          <Select label="Gender" value={f.gender} onChange={e => handleChange('gender', e.target.value)} options={[{ value: "female", label: "Female" }, { value: "male", label: "Male" }]} />
+          <Input label="Date of Birth" type="date" value={f.dob} onChange={e => handleChange('dob', e.target.value)} />
+          <Input label="Parent Name" value={f.parentName} onChange={e => handleChange('parentName', e.target.value)} />
+          <Input label="Parent Phone" value={f.parentPhone} onChange={e => handleChange('parentPhone', e.target.value)} />
+          <Input label="NEMIS Number" value={f.nemisNumber} onChange={e => handleChange('nemisNumber', e.target.value)} />
+          <Input label="Blood Group" value={f.bloodGroup} onChange={e => handleChange('bloodGroup', e.target.value)} />
+          <Select label="Status" value={f.status} onChange={e => handleChange('status', e.target.value)} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} />
         </div>
         {err && <div style={{ color: "var(--color-danger)", background: "var(--color-danger-muted)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", marginTop: "var(--space-4)", fontSize: "14px", borderLeft: "4px solid var(--color-danger)" }}>{err}</div>}
       </Modal>
 
-      {/* Profile Modal */}
-      <Modal isOpen={!!profile} title="Student Profile" onClose={() => setProfile(null)} footer={
-        <>
-          <Button variant="ghost" onClick={() => { setProfile(null); setIdCardStudent(profile); }}>🪪 View ID Card</Button>
-          <Button variant="primary" onClick={() => { 
-            const rowsHtml = results.filter(r => (r.studentId ?? r.student_id) === (profile.student_id ?? profile.id)).map(r => `<li>${r.subject}: ${r.marks}/${r.total || r.total_marks} (${r.grade})</li>`).join(""); 
-            const html = `<h2>${profile.firstName} ${profile.lastName}</h2><p>${profile.admission}</p><ul>${rowsHtml||"<li>No results</li>"}</ul>`;
-            printHTML(html, { title: `Report - ${profile.firstName} ${profile.lastName}` });
-          }}>Export Report (Print/PDF)</Button>
-        </>
-      }>
-        {profile && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", marginBottom: "var(--space-2)" }}>
-              {profile.photoUrl ? (
-                <img src={profile.photoUrl} alt="Student profile photo" style={{ width: 80, height: 80, borderRadius: "var(--radius-md)", objectFit: "cover", boxShadow: "var(--shadow-card)" }} />
-              ) : (
-                <div style={{ width: 80, height: 80, borderRadius: "var(--radius-md)", background: "var(--color-primary-muted)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-primary)", fontSize: "24px", fontWeight: "bold" }}>
-                  {profile.firstName[0]}{profile.lastName[0]}
-                </div>
-              )}
-              <div>
-                <div style={{ color: "var(--color-text-primary)", fontWeight: 800, fontSize: "24px", fontFamily: "var(--font-heading)" }}>{profile.firstName} {profile.lastName}</div>
-                <div style={{ color: "var(--color-text-secondary)", fontSize: "14px", marginTop: "4px" }}>{profile.admission} • {profile.className}</div>
-              </div>
+      {profile && (
+        <Modal isOpen={!!profile} title="Student Profile" onClose={() => setProfile(null)} maxWidth="640px">
+          <div style={{ display: "flex", gap: "var(--space-4)", alignItems: "center", marginBottom: "var(--space-4)" }}>
+            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--color-primary)", color: "#fff", display: "grid", placeItems: "center", fontWeight: 800, fontSize: 22 }}>
+              {profile.firstName?.[0]}{profile.lastName?.[0]}
             </div>
-            
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
-              <div style={{ background: "var(--color-bg-base)", padding: "var(--space-3)", borderRadius: "var(--radius-md)" }}>
-                <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: 700, marginBottom: "4px" }}>Personal Info</div>
-                <div style={{ color: "var(--color-text-primary)", fontSize: "13px", lineHeight: "1.6" }}>
-                  {profile.dob && <div><strong>DOB:</strong> {new Date(profile.dob).toLocaleDateString()}</div>}
-                  {profile.nemisNumber && <div><strong>NEMIS:</strong> {profile.nemisNumber}</div>}
-                  {profile.bloodGroup && <div><strong>Blood Group:</strong> {profile.bloodGroup}</div>}
-                  {profile.allergies && <div style={{ color: "var(--color-warning)" }}>⚠️ <strong>Allergies:</strong> {profile.allergies}</div>}
-                  {profile.medicalConditions && <div><strong>Medical:</strong> {profile.medicalConditions}</div>}
-                </div>
-              </div>
-
-              <div style={{ background: "var(--color-bg-base)", padding: "var(--space-3)", borderRadius: "var(--radius-md)" }}>
-                <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: 700, marginBottom: "4px" }}>Contact Info</div>
-                <div style={{ color: "var(--color-text-primary)", fontSize: "13px", lineHeight: "1.6" }}>
-                  <div><strong>Parent:</strong> {profile.parentName}</div>
-                  <div><strong>Phone:</strong> {profile.parentPhone || "-"}</div>
-                  {profile.emergencyContactName && (
-                    <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid var(--color-border)" }}>
-                      <strong style={{ color: "var(--color-danger)" }}>Emergency:</strong><br/>
-                      {profile.emergencyContactName} ({profile.emergencyContactRelationship})<br/>
-                      {profile.emergencyContactPhone || "-"}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ background: "var(--color-bg-base)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: 700 }}>Financial Status</div>
-                <div style={{ color: "var(--color-text-primary)", fontSize: "14px", marginTop: "4px" }}>
-                  Expected: {money(expected(profile.className))}
-                </div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "11px", color: "var(--color-text-muted)", textTransform: "uppercase", fontWeight: 700 }}>Paid Amount</div>
-                <div style={{ color: "var(--color-success)", fontWeight: 700, fontSize: "18px", marginTop: "4px" }}>
-                  {money(payments.filter(p => (p.studentId ?? p.student_id) === (profile.student_id ?? profile.id) && isPaidStatus(p.status)).reduce((s, p) => s + Number(p.amount), 0))}
-                </div>
-              </div>
-            </div>
-            
-            <div style={{ background: "var(--color-bg-base)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: "13px", color: "var(--color-text-primary)", fontWeight: 600 }}>Results Recorded</div>
-              <Badge text={results.filter(r => (r.studentId ?? r.student_id) === (profile.student_id ?? profile.id)).length.toString()} variant="primary" />
+            <div>
+              <div style={{ color: "var(--color-text-primary)", fontWeight: 800, fontSize: "24px", fontFamily: "var(--font-heading)" }}>{profile.firstName} {profile.lastName}</div>
+              <div style={{ color: "var(--color-text-muted)" }}>{profile.admission} · {profile.className}</div>
             </div>
           </div>
-        )}
-      </Modal>
-
-      {/* ID Card / Scanner */}
-      {idCardStudent && (
-        <StudentIDCard 
-          student={idCardStudent} 
-          school={feeStructures[0]?.school || { name: "School", year: new Date().getFullYear() }} 
-          onClose={() => setIdCardStudent(null)} 
-        />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-3)" }}>
+            <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Gender</div><div style={{ fontWeight: 600 }}>{profile.gender}</div></div>
+            <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Status</div><div style={{ fontWeight: 600 }}>{profile.status}</div></div>
+            <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Parent</div><div style={{ fontWeight: 600 }}>{profile.parentName || "—"}</div></div>
+            <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Phone</div><div style={{ fontWeight: 600 }}>{profile.parentPhone || "—"}</div></div>
+            <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>DOB</div><div style={{ fontWeight: 600 }}>{profile.dob || "—"}</div></div>
+            <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>NEMIS</div><div style={{ fontWeight: 600 }}>{profile.nemisNumber || "—"}</div></div>
+          </div>
+        </Modal>
       )}
+
+      {idCardStudent && (
+        <Modal isOpen={!!idCardStudent} title="Student ID Card" onClose={() => setIdCardStudent(null)} maxWidth="420px">
+          <StudentIDCard student={idCardStudent} school={school} />
+        </Modal>
+      )}
+
       {showQRScanner && (
-        <QRScanner
-          title="Scan Student QR Code"
-          onScan={handleQRScan}
-          onClose={() => setShowQRScanner(false)}
-        />
+        <Modal isOpen={showQRScanner} title="Scan Student QR" onClose={() => setShowQRScanner(false)} maxWidth="480px">
+          <QRScanner onScan={handleQRScan} onClose={() => setShowQRScanner(false)} />
+        </Modal>
       )}
     </div>
   );
 }
 
 StudentsPage.propTypes = {
-  auth: PropTypes.object,
+  auth: PropTypes.object.isRequired,
   students: PropTypes.array.isRequired,
   setStudents: PropTypes.func.isRequired,
-  canEdit: PropTypes.bool.isRequired,
-  results: PropTypes.array.isRequired,
-  payments: PropTypes.array.isRequired,
+  canEdit: PropTypes.bool,
+  results: PropTypes.array,
+  payments: PropTypes.array,
   feeStructures: PropTypes.array.isRequired,
   toast: PropTypes.func.isRequired,
 };
