@@ -153,7 +153,6 @@ main {
   }
 }
 
-/* Prefer auto-fit over fixed multi-column when used as utility */
 .ec-grid-auto {
   display: grid;
   gap: var(--space-3);
@@ -171,7 +170,6 @@ main {
   overflow-x: auto;
 }
 
-/* Login shell: single column on phones, two columns on desktop */
 .ec-login-shell {
   display: grid;
   min-height: 100vh;
@@ -193,7 +191,6 @@ main {
   }
 }
 
-/* Forms / inputs never exceed viewport */
 .ec-page-content input,
 .ec-page-content select,
 .ec-page-content textarea,
@@ -204,4 +201,23 @@ main {
 .ec-page-content img {
   max-width: 100%;
   height: auto;
+}
+
+/* Dashboard KPI cards — never clip money/labels */
+.ec-stat-card {
+  min-width: 0 !important;
+  max-width: 100%;
+  overflow: visible !important;
+}
+
+.ec-stat-card * {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media screen and (max-width: 420px) {
+  .ec-stat-card {
+    padding: 12px !important;
+  }
 }
