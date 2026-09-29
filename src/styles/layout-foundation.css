@@ -51,7 +51,6 @@ main {
   overflow-x: clip;
 }
 
-/* Tables: scroll the table, not the whole page */
 .ec-table-wrap,
 .table-responsive,
 [data-table-scroll] {
@@ -75,7 +74,6 @@ main {
   white-space: nowrap;
 }
 
-/* Modals: viewport-safe panel */
 .ec-modal-panel,
 [data-modal-panel] {
   width: 100%;
@@ -85,7 +83,6 @@ main {
   box-sizing: border-box;
 }
 
-/* Mobile drawer injected by App.jsx RESPONSIVE_CSS — keep on-screen */
 .ec-drawer {
   width: min(280px, 85vw) !important;
   max-width: 100%;
@@ -103,7 +100,6 @@ main {
   }
 }
 
-/* ---- Shared UI primitives (reinforce design-system on small screens) ---- */
 .ui-table-scroll {
   width: 100%;
   max-width: 100%;
@@ -137,7 +133,6 @@ main {
   }
 }
 
-/* ---- Page utilities (finish mobile-first refactor) ---- */
 .ec-grid-responsive {
   display: grid;
   gap: var(--space-3);
@@ -203,17 +198,30 @@ main {
   height: auto;
 }
 
-/* Dashboard KPI cards — never clip money/labels */
+/* Dashboard KPI cards — never clip money/labels
+ * design-system sets contain:layout paint on .ui-card which clips text
+ * even when overflow:visible is set in JS.
+ */
+.ec-stat-card.ui-card,
+.ec-stat-card.premium-card,
+.ui-card.ec-stat-card,
+.premium-card.ec-stat-card,
 .ec-stat-card {
   min-width: 0 !important;
   max-width: 100%;
   overflow: visible !important;
+  contain: none !important;
+  text-overflow: unset !important;
+  white-space: normal !important;
 }
 
 .ec-stat-card * {
   max-width: 100%;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow: visible !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  white-space: normal !important;
+  text-overflow: unset !important;
 }
 
 @media screen and (max-width: 420px) {
