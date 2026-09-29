@@ -238,3 +238,41 @@ main {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/*
+ * NUCLEAR MOBILE FORM STACK
+ * Inline style={{ gridTemplateColumns: "1fr 1fr" }} beats normal CSS.
+ * !important on grid-template-columns forces single-column on phones for
+ * every form/filter grid inside page content and modals — Students, Fees,
+ * Attendance, Teachers, Staff, and every other page with rigid columns.
+ */
+@media screen and (max-width: 639px) {
+  .ec-page-content div[style*="display: grid"],
+  .ec-page-content div[style*="display:grid"],
+  .ui-modal-content div[style*="display: grid"],
+  .ui-modal-content div[style*="display:grid"],
+  [data-modal-panel] div[style*="display: grid"],
+  [data-modal-panel] div[style*="display:grid"],
+  .ec-modal-panel div[style*="display: grid"],
+  .ec-modal-panel div[style*="display:grid"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* filter toolbars: kill forced minWidths past viewport */
+  .ec-page-content [style*="minWidth"],
+  .ec-page-content [style*="min-width"] {
+    min-width: 0 !important;
+  }
+
+  /* form fields fill the single column */
+  .ec-page-content input,
+  .ec-page-content select,
+  .ec-page-content textarea,
+  .ui-modal-content input,
+  .ui-modal-content select,
+  .ui-modal-content textarea {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+}
