@@ -14,18 +14,22 @@ export function formatCurrency(amount) {
 
 export function formatCurrencyCompact(amount) {
   const num = Number(amount || 0);
-  if (isNaN(num)) return "KES 0";
-  if (num === 0) return "KES 0";
-  if (num >= 1_000_000) {
-    const m = num / 1_000_000;
-    return m >= 100 ? `KES ${m.toFixed(1)}M` : `KES ${(m * 10).toFixed(0)}M`.replace(".0M", "M");
+  if (isNaN(num) || num === 0) return "KES 0";
+  const abs = Math.abs(num);
+  const sign = num < 0 ? "-" : "";
+  if (abs >= 1_000_000) {
+    const m = abs / 1_000_000;
+    const body = m >= 10 ? m.toFixed(0) : m.toFixed(1).replace(/\.0$/, "");
+    return `${sign}KES ${body}M`;
   }
-  if (num >= 1_000) {
-    const k = num / 1_000;
-    return k >= 100 ? `KES ${k.toFixed(1)}K` : `KES ${(k * 10).toFixed(0)}`.replace("0K", "K");
+  if (abs >= 1_000) {
+    const k = abs / 1_000;
+    const body = k >= 100 ? k.toFixed(0) : k.toFixed(1).replace(/\.0$/, "");
+    return `${sign}KES ${body}K`;
   }
-  return `KES ${num}`;
+  return `${sign}KES ${Math.round(abs)}`;
 }
+
 
 export function formatDate(dateString, format = "short") {
   if (!dateString) return "";
@@ -95,25 +99,50 @@ export function getStatusLabel(status) {
   return labels[status] || status;
 }
 
-export async function downloadCSV(expenses, filename = "expenditures.csv") {
+export function filterExpensesByDateRange(expenses, startDate, endDate) {
+  if (!startDate && !endDate) return expenses;
+  return expenses.filter((expense) => {
+    const expenseDate = new Date(expense.expense_date || expense.created_at);
+    if (startDate && expenseDate < new Date(startDate)) return false;
+    if (endDate && expenseDate > new Date(endDate)) return false;
+    return true;
+  });
+}
+
+export function groupExpensesByCategory(expenses) {
+  return expenses.reduce((acc, expense) => {
+    const cat = expense.category || "Other";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(expense);
+    return acc;
+  }, {});
+}
+
+export function calculateCategoryTotals(expenses) {
+  const grouped = groupExpensesByCategory(expenses);
+  return Object.entries(grouped).map(([category, items]) => ({
+    category,
+    count: items.length,
+    total: items.reduce((sum, e) => sum + Number(e.amount || 0), 0),
+  }));
+}
+
+export function exportExpensesToCSV(expenses) {
   const headers = [
     "Date",
     "Category",
-    "Item Name",
-    "Payee",
-    "Amount (KES)",
+    "Description",
+    "Amount",
     "Payment Method",
     "Reference",
     "M-Pesa Code",
     "Status",
     "Notes",
   ];
-
   const rows = expenses.map((e) => [
-    formatDate(e.expense_date),
+    e.expense_date || "",
     e.category || "",
-    e.item_name || "",
-    e.paid_to_name || e.vendor_name || "",
+    e.description || "",
     e.amount || 0,
     e.payment_method || "",
     e.reference_number || "",
@@ -121,26 +150,8 @@ export async function downloadCSV(expenses, filename = "expenditures.csv") {
     e.approval_status || "pending",
     (e.notes || "").replace(/"/g, '""'),
   ]);
-
-  const csvContent = [
-    headers.join(","),
-    ...rows.map((row) =>
-      row
-        .map((cell) => {
-          const str = String(cell || "");
-          return str.includes(",") || str.includes('"') ? `"${str}"` : str;
-        })
-        .join(",")
-    ),
-  ].join("\n");
-
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
+  const csvContent = [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n");
+  return csvContent;
 }
 
 export function validateMpesaCode(code) {
@@ -190,7 +201,7 @@ export function getApprovalStatusIcon(status) {
 export function generatePrintableReport(summary, expenses) {
   const now = new Date();
   const reportDate = formatDate(now, "long");
-  const schoolName = "School Name"; // Would come from context/props
+  const schoolName = "School Name";
 
   return {
     title: `Expenditure Report - ${schoolName}`,
