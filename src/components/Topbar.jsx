@@ -1,6 +1,6 @@
 import PropTypes from "prop-types";
 import { useEffect, useMemo, useState } from "react";
-import { Bell, ChevronDown, Menu, Search, Sparkles } from "lucide-react";
+import { Bell, ChevronDown, Menu, Sparkles } from "lucide-react";
 import BranchSelector from "./BranchSelector";
 import NotificationPanel from "./NotificationPanel";
 
@@ -44,7 +44,6 @@ export default function Topbar({
   onLogout,
   activeSchoolId,
   onSchoolSwitch,
-  showSearch = true,
 }) {
   const roleColor = ROLE_COLORS[auth?.role] || "#3B82F6";
   const roleAvatar = ROLE_AVATARS[auth?.role] || "?";
@@ -128,18 +127,7 @@ export default function Topbar({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexShrink: 0 }}>
-        {showSearch && (
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-full)", background: "var(--color-bg-card)", padding: "8px 12px", minWidth: isMobile ? 0 : 240 }}>
-            <Search size={16} color="var(--color-text-muted)" />
-            <input
-              aria-label="Search"
-              placeholder="Search"
-              style={{ border: "none", background: "transparent", color: "var(--color-text-primary)", outline: "none", width: "100%", fontSize: "13px" }}
-            />
-          </div>
-        )}
-
-        {!isMobile && ["admin", "director", "superadmin"].includes(auth?.role) && (
+        {["admin", "director", "superadmin"].includes(auth?.role) && (
           <BranchSelector token={auth?.token} activeSchoolId={activeSchoolId} onSwitch={onSchoolSwitch} />
         )}
 
@@ -207,5 +195,4 @@ Topbar.propTypes = {
   onLogout: PropTypes.func,
   activeSchoolId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onSchoolSwitch: PropTypes.func,
-  showSearch: PropTypes.bool,
 };
