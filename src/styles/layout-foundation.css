@@ -240,13 +240,12 @@ main {
 }
 
 /*
- * NUCLEAR MOBILE FORM STACK
+ * NUCLEAR MOBILE FORM STACK (all pages — P0 + P1)
  * Inline style={{ gridTemplateColumns: "1fr 1fr" }} beats normal CSS.
- * !important on grid-template-columns forces single-column on phones for
- * every form/filter grid inside page content and modals — Students, Fees,
- * Attendance, Teachers, Staff, and every other page with rigid columns.
+ * !important forces single-column under 768px for every form/filter grid
+ * inside page content and modals.
  */
-@media screen and (max-width: 639px) {
+@media screen and (max-width: 767px) {
   .ec-page-content div[style*="display: grid"],
   .ec-page-content div[style*="display:grid"],
   .ui-modal-content div[style*="display: grid"],
@@ -258,13 +257,11 @@ main {
     grid-template-columns: 1fr !important;
   }
 
-  /* filter toolbars: kill forced minWidths past viewport */
   .ec-page-content [style*="minWidth"],
   .ec-page-content [style*="min-width"] {
     min-width: 0 !important;
   }
 
-  /* form fields fill the single column */
   .ec-page-content input,
   .ec-page-content select,
   .ec-page-content textarea,
