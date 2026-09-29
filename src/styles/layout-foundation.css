@@ -273,3 +273,23 @@ main {
     box-sizing: border-box;
   }
 }
+
+/* Student / table names must never clip mid-word on narrow screens */
+.ui-table td,
+.ui-table-mobile-value {
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  text-overflow: unset !important;
+  max-width: 100%;
+}
+
+.ui-table-mobile-row {
+  align-items: flex-start !important;
+}
+
+.ui-table-mobile-value {
+  text-align: right;
+  min-width: 0;
+  flex: 1;
+}
