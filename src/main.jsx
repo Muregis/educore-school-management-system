@@ -23,8 +23,8 @@ if (typeof caches !== 'undefined' && caches.keys) {
 
 // Prune stale IndexedDB entity caches when online (keep pending offline queues)
 if (typeof navigator !== 'undefined' && navigator.onLine) {
-  import('./services/offlineDatabase.js')
-    .then((m) => m.default?.pruneStaleCaches?.())
+  import('./services/offlinePrune.js')
+    .then((m) => m.pruneStaleOfflineCaches?.())
     .catch(() => {});
 }
 
