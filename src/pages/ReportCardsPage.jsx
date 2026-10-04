@@ -348,7 +348,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
                 <Button variant="secondary" onClick={printCard}>🖨 Print</Button>
               </div>
               
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)", marginBottom: "var(--space-4)" }}>
+              <div className="ec-form-grid ec-form-grid-2">
                 {[
                   ["Average", `${fullData.average}%`], 
                   ["Present", `${fullData.attendance?.present||0} days`], 
@@ -408,7 +408,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
           <Button onClick={save}>Save Report Card</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
             <Select 
               label="Class"

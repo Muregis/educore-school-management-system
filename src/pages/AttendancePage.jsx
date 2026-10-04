@@ -15,6 +15,7 @@ import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
+import StatCard from "../components/ui/StatCard";
 
 function normalise(a) {
   let studentName = "";
@@ -203,27 +204,14 @@ export default function AttendancePage({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: "var(--space-3)" }}>
-        {[
-          { label: "Present", value: normalised.filter(a => a.status === "present").length, tone: "success" },
-          { label: "Absent", value: normalised.filter(a => a.status === "absent").length, tone: "danger" },
-          { label: "Late", value: normalised.filter(a => a.status === "late").length, tone: "warning" },
-        ].map((item) => (
-          <Card key={item.label} style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 96%, transparent) 0%, var(--color-bg-card) 100%)", boxShadow: "var(--shadow-sm)", padding: "var(--space-4)" }}>
-            <div style={{ fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-text-muted)", fontWeight: 800 }}>{item.label}</div>
-            <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-text-primary)", marginTop: "var(--space-2)", fontFamily: "var(--font-heading)" }}>{item.value}</div>
-            <div style={{ marginTop: "var(--space-2)" }}><Badge text={item.label} variant={item.tone} /></div>
-          </Card>
-        ))}
+      <div className="ec-grid-auto">
+        <StatCard title="Present" value={normalised.filter(a => a.status === "present").length} icon="✅" tone="success" />
+        <StatCard title="Absent" value={normalised.filter(a => a.status === "absent").length} icon="❌" tone="danger" />
+        <StatCard title="Late" value={normalised.filter(a => a.status === "late").length} icon="⏰" tone="warning" />
       </div>
 
-      <Card style={{ padding: "var(--space-4)", background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 96%, transparent) 0%, var(--color-bg-card) 100%)", boxShadow: "var(--shadow-sm)" }}>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
-          gap: "var(--space-3)",
-          alignItems: "end"
-        }}>
+      <Card>
+        <div className="ec-form-grid ec-form-grid-3">
           <Select
             value={filterClass}
             onChange={e => setFilterClass(e.target.value)}
@@ -233,7 +221,7 @@ export default function AttendancePage({
             ]}
           />
           <Input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} />
-          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+          <div className="ec-page-header-actions">
             <Button variant="ghost" onClick={() => {
               csv("attendance.csv", ["Date","Class","Student","Status"], filtered.map(a => [a.date, a.className, a.studentName, a.status]));
               toast("Attendance CSV exported","success");
@@ -262,6 +250,26 @@ export default function AttendancePage({
                 {canEdit && (<Button size="sm" variant="danger" onClick={() => del(a.id)}>Delete</Button>)}
               </div>
             ])}
+            renderMobileCard={(row, index) => {
+              const a = rows[index];
+              return (
+                <Card key={a.id} style={{ marginBottom: "var(--space-3)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
+                    <div style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{a.studentName}</div>
+                    <Badge text={a.status} variant={a.status === "present" ? "success" : a.status === "late" ? "warning" : "danger"} />
+                  </div>
+                  <div style={{ color: "var(--color-text-secondary)", fontSize: "14px", marginBottom: "var(--space-3)" }}>
+                    {a.date} • {a.className}
+                  </div>
+                  {canEdit && (
+                    <div style={{ display: "flex", gap: "var(--space-2)", borderTop: "1px solid var(--color-border)", paddingTop: "var(--space-3)" }}>
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(a)}>Edit</Button>
+                      <Button size="sm" variant="danger" onClick={() => del(a.id)}>Delete</Button>
+                    </div>
+                  )}
+                </Card>
+              );
+            }}
           />
           <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
             <Pager page={page} pages={pages} setPage={setPage} />
@@ -275,7 +283,7 @@ export default function AttendancePage({
           <Button variant="primary" onClick={saveBulk}>Save Class Attendance</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2" style={{ marginBottom: "var(--space-4)" }}>
           <Select label="Class" value={cls} onChange={e => setCls(e.target.value)} options={(availableClasses ?? []).map(c => ({ value: c, label: c }))} />
           <Input label="Date" type="date" value={date} onChange={e => setDate(e.target.value)} />
         </div>
@@ -306,7 +314,7 @@ export default function AttendancePage({
         </>
       }>
         {editing && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-4)" }}>
+          <div className="ec-form-grid ec-form-grid-2">
             <Input label="Student" value={editing.studentName} disabled />
             <Input label="Class" value={editing.className} disabled />
             <Input label="Date" type="date" value={editing.date} onChange={e => setEditing({ ...editing, date: e.target.value })} />

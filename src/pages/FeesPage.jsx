@@ -19,6 +19,7 @@ import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
+import StatCard from "../components/ui/StatCard";
 
 // Inline helpers
 function csv(filename, headers, rows) {
@@ -685,47 +686,42 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       </div>
 
       {/* Controls Container */}
-      <Card style={{ padding: "var(--space-3)" }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", alignItems: "end" }}>
-          
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-            <Select 
-              value={tab} 
-              onChange={e => setTab(e.target.value)}
-              options={[
-                { value: "payments", label: "Payments" },
-                { value: "balances", label: "Balances" },
-                { value: "structure", label: "Fee Structure" }
-              ]}
-            />
-            <Select 
-              value={filterClass} 
-              onChange={e => setFilterClass(e.target.value)}
-              options={[
-                { value: "all", label: "All classes" },
-                ...(availableClasses ?? []).map(c => ({ value: c, label: c }))
-              ]}
-            />
-            <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flex: "1 1 320px", minWidth: "280px" }}>
-              <Input
-                placeholder="Search by name, admission, receipt, phone, class, transaction ID..."
-                value={recordSearch}
-                onChange={e => {
-                  setRecordSearch(e.target.value);
-                  if (e.target.value) setFilterStudent("all");
-                }}
-                style={{ flex: 1, minWidth: "240px" }}
-              />
-              {/* Removed limiting filterStudent Select in favor of live searchable input */}
-            </div>
-          </div>
+      <Card style={{ padding: "var(--space-3)", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-3">
+          <Select 
+            value={tab} 
+            onChange={e => setTab(e.target.value)}
+            options={[
+              { value: "payments", label: "Payments" },
+              { value: "balances", label: "Balances" },
+              { value: "structure", label: "Fee Structure" }
+            ]}
+          />
+          <Select 
+            value={filterClass} 
+            onChange={e => setFilterClass(e.target.value)}
+            options={[
+              { value: "all", label: "All classes" },
+              ...(availableClasses ?? []).map(c => ({ value: c, label: c }))
+            ]}
+          />
+          <Input
+            placeholder="Search by name, admission, receipt, phone, class, transaction ID..."
+            value={recordSearch}
+            onChange={e => {
+              setRecordSearch(e.target.value);
+              if (e.target.value) setFilterStudent("all");
+            }}
+          />
+        </div>
 
+        <div className="ec-page-header-actions" style={{ justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
             <Button variant={filterDate==="all" ? "primary" : "ghost"} onClick={() => setFilterDate("all")}>All Time</Button>
             <Button variant={filterDate==="today" ? "primary" : "ghost"} onClick={() => setFilterDate("today")}>Today</Button>
           </div>
           
-          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginLeft: "auto" }}>
+          <div className="ec-page-header-actions">
             {canViewTotals && <Button variant="ghost" onClick={()=>{
               if (tab==="payments") csv("payments.csv",["Date","Student","Class","Amount","Type","Method","Status","Ref"],filteredPayments.map(p=>[p.date,p.studentName,p.className,p.amount,p.feeType,p.method,p.status,p.reference]));
               if (tab==="balances") csv("balances.csv",["Student","Class","Paid","Balance"],balances.map(b=>[b.name,b.className,b.paid,b.balance]));
@@ -816,43 +812,34 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
               const activeStudentIdForProgress = uniqueStudents.length === 1 ? uniqueStudents[0] : null;
               if (!activeStudentIdForProgress) return null;
               
+              const studentName = `${students.find(s => String(s.student_id ?? s.id) === activeStudentIdForProgress)?.first_name || ""} ${students.find(s => String(s.student_id ?? s.id) === activeStudentIdForProgress)?.last_name || ""}`;
+              const studentBal = balances.find(b => String(b.studentId) === activeStudentIdForProgress);
+              const percent = (!studentBal || studentBal.expected === 0) ? "0%" : `${Math.round((studentBal.paid / studentBal.expected) * 100)}%`;
+
               return (
-              <Card style={{ marginBottom: "var(--space-4)", background: "var(--color-info-muted)", borderColor: "var(--color-info-border)" }}>
-                <div style={{ fontWeight: 700, marginBottom: "var(--space-2)", color: "var(--color-info)" }}>
-                  📊 Payment Progress for {students.find(s => String(s.student_id ?? s.id) === activeStudentIdForProgress)?.first_name} {students.find(s => String(s.student_id ?? s.id) === activeStudentIdForProgress)?.last_name}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "var(--space-3)" }}>
-                  <div>
-                    <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Total Paid</div>
-                    <div style={{ fontWeight: 600, color: "var(--color-info)" }}>
-                      {money(filteredPayments.reduce((sum, p) => sum + Number(p.amount), 0))}
-                    </div>
+                <div style={{ marginBottom: "var(--space-4)" }}>
+                  <div style={{ fontWeight: 600, marginBottom: "var(--space-3)", color: "var(--color-text-primary)" }}>
+                    Payment Progress for {studentName}
                   </div>
-                  <div>
-                    <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Payment Count</div>
-                    <div style={{ fontWeight: 600, color: "var(--color-info)" }}>
-                      {filteredPayments.length} payments
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Outstanding Balance</div>
-                    <div style={{ fontWeight: 600, color: "var(--color-info)" }}>
-                      {money(balances.find(b => String(b.studentId) === activeStudentIdForProgress)?.balance || 0)}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Completion</div>
-                    <div style={{ fontWeight: 600, color: "var(--color-info)" }}>
-                      {(() => {
-                        const studentBal = balances.find(b => String(b.studentId) === activeStudentIdForProgress);
-                        if (!studentBal || studentBal.expected === 0) return "0%";
-                        const percent = Math.round((studentBal.paid / studentBal.expected) * 100);
-                        return `${percent}%`;
-                      })()}
-                    </div>
+                  <div className="ec-grid-auto">
+                    <StatCard 
+                      label="Total Paid" 
+                      value={money(filteredPayments.reduce((sum, p) => sum + Number(p.amount), 0))}
+                    />
+                    <StatCard 
+                      label="Payment Count" 
+                      value={`${filteredPayments.length} payments`}
+                    />
+                    <StatCard 
+                      label="Outstanding Balance" 
+                      value={money(studentBal?.balance || 0)}
+                    />
+                    <StatCard 
+                      label="Completion" 
+                      value={percent}
+                    />
                   </div>
                 </div>
-              </Card>
               );
             })()}
             <Card style={{ padding: 0, overflow: "hidden" }}>
@@ -867,7 +854,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                   <span key="pb" style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{p.paidBy || "—"}</span>,
                   <Badge key="st" text={p.status} variant={p.status==="paid" ? "success" : p.status==="pending" ? "warning" : "danger"} />,
                   <span key="ref" style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>{p.reference || "—"}</span>,
-                  <div key="actions" style={{ display: "flex", gap: "var(--space-2)" }}>
+                  <div key="actions" style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
                     {["admin", "director", "superadmin"].includes(auth?.role) && (
                       <Button size="sm" variant="secondary" onClick={() => setEditingPayment({
                         id: p.id,
@@ -889,6 +876,26 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                     {!["admin", "director", "superadmin"].includes(auth?.role) && !canDeletePayments && "—"}
                   </div>
                 ])}
+                renderMobileCard={(row) => (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <span style={{ fontWeight: 600, color: "var(--color-text-primary)", whiteSpace: "normal", wordWrap: "break-word", flex: 1, paddingRight: "var(--space-2)" }}>{row[1]}</span>
+                      {row[6]}
+                    </div>
+                    <div style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>
+                      {row[2]} • {row[4]}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-1)" }}>
+                      <span style={{ fontWeight: 700, fontSize: "14px", color: "var(--color-text-primary)" }}>{row[3]}</span>
+                      <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>{row[0]}</span>
+                    </div>
+                    {row[8] !== "—" && (
+                      <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--color-border)" }}>
+                        {row[8]}
+                      </div>
+                    )}
+                  </div>
+                )}
               />
               <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
                 <Pager page={page} pages={pages} setPage={setPage} />
@@ -905,7 +912,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           {bankDetails && (bankDetails.bank_name || bankDetails.bank_account_number) && (
             <Card style={{ background: "var(--color-info-muted)", borderColor: "var(--color-info-border)", marginBottom: "var(--space-4)" }}>
               <div style={{ fontWeight: 700, marginBottom: "var(--space-2)", color: "var(--color-info)" }}>🏦 Bank Deposit Instructions</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+              <div className="ec-form-grid ec-form-grid-2">
                 <div>
                   <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Bank Name</div>
                   <div style={{ fontWeight: 600, color: "var(--color-info)" }}>{bankDetails.bank_name || "Not set"}</div>
@@ -937,29 +944,21 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             <>
               {/* Class Summary Cards - Director/Superadmin only */}
               {["director", "superadmin"].includes(auth?.role) && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+                <div className="ec-grid-auto" style={{ marginBottom: "var(--space-4)" }}>
                   {(availableClasses ?? []).map(cls => {
                     const classBalances = balances.filter(b => b.className === cls);
                     const classStudents = classBalances.length;
                     const totalOutstanding = classBalances.reduce((sum, b) => sum + Math.max(0, b.balance), 0);
                     const totalPaid = classBalances.reduce((sum, b) => sum + b.paid, 0);
-                    const totalExpected = classBalances.reduce((sum, b) => sum + b.expected, 0);
                     if (classStudents === 0) return null;
                     return (
-                      <Card key={cls} style={{ padding: "var(--space-3)" }}>
-                        <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px", fontWeight: 600 }}>{cls}</div>
-                        <div style={{ fontSize: "20px", fontWeight: 800, color: totalOutstanding > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
-                          {money(totalOutstanding)}
-                        </div>
-                        <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "8px" }}>
-                          {classStudents} students · {money(totalPaid)} paid
-                        </div>
-                        {totalExpected > 0 && (
-                          <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "4px" }}>
-                            Expected: {money(totalExpected)}
-                          </div>
-                        )}
-                      </Card>
+                      <StatCard
+                        key={cls}
+                        label={cls}
+                        value={money(totalOutstanding)}
+                        trend={`${classStudents} students · ${money(totalPaid)} paid`}
+                        trendUp={totalOutstanding === 0}
+                      />
                     );
                   })}
                 </div>
@@ -1011,6 +1010,33 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                       </div>
                     ) : "—"
                   ])}
+                  renderMobileCard={(row, i) => {
+                    const b = filteredBalances[i];
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                          <span style={{ fontWeight: 600, color: "var(--color-text-primary)", whiteSpace: "normal", wordWrap: "break-word", flex: 1, paddingRight: "var(--space-2)" }}>{b.name}</span>
+                          <Badge text={b.expected === 0 ? "No Structure" : b.isOverpaid ? "Credit" : b.balance > 0 ? "Pending" : "Cleared"} variant={b.expected === 0 ? "neutral" : b.isOverpaid ? "success" : b.balance > 0 ? "warning" : "success"} />
+                        </div>
+                        <div style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>
+                          {b.className}
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-1)" }}>
+                          <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Balance</span>
+                          <span style={{ fontWeight: 700, fontSize: "15px", color: b.isOverpaid ? 'var(--color-success)' : b.balance > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                            {b.isOverpaid ? `-${money(b.overpaymentAmount)}` : money(b.balance)}
+                          </span>
+                        </div>
+                        {b.expected > 0 && b.balance > 0 && (
+                          <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--color-border)", display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+                            <Button size="sm" onClick={() => openPaystack(b)}>💳 Paystack</Button>
+                            <Button variant="secondary" size="sm" onClick={() => openMpesa(b)}>📱 Mpesa</Button>
+                            {canEdit && <Button variant="ghost" size="sm" onClick={() => openBankDeposit(b)}>🏦 Bank</Button>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }}
                 />
               </Card>
 
@@ -1045,6 +1071,21 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 <strong key="total">{money(Number(f.tuition) + Number(f.activity) + Number(f.misc))}</strong>,
                 canEdit ? <Button key="ed" size="sm" variant="secondary" onClick={() => { setEditStruct(f); setStructForm({ className: f.className, term: f.term || displayTerm, tuition: String(f.tuition), activity: String(f.activity), misc: String(f.misc) }); setShowStruct(true); }}>Edit</Button> : "—"
               ])}
+              renderMobileCard={(row) => (
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <span style={{ fontWeight: 600, color: "var(--color-text-primary)", whiteSpace: "normal", wordWrap: "break-word", flex: 1, paddingRight: "var(--space-2)" }}>{row[0]}</span>
+                    {row[6]}
+                  </div>
+                  <div style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>
+                    {row[1]}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-1)" }}>
+                    <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Total</span>
+                    <span style={{ fontWeight: 700, fontSize: "15px", color: "var(--color-text-primary)" }}>{row[5]}</span>
+                  </div>
+                </div>
+              )}
             />
           </Card>
         )
@@ -1069,7 +1110,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         <div style={{ background: "var(--color-primary-muted)", border: "1px solid var(--color-primary-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)", marginBottom: "var(--space-4)", fontSize: "13px", color: "var(--color-primary)" }}>
           💳 Payment will be processed securely via <strong>Paystack</strong> — supports card, bank transfer & mobile money.
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <Input label="Parent Email (for receipt)" value={paystackForm.email} onChange={e => setPaystackForm({ ...paystackForm, email: e.target.value })} placeholder="parent@email.com" />
           <div style={{ display: "flex", flexDirection: "column" }}>
             <Input 
@@ -1109,7 +1150,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         <div style={{ background: "var(--color-success-muted)", border: "1px solid var(--color-success-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)", marginBottom: "var(--space-4)", fontSize: "13px", color: "var(--color-success)" }}>
           📱 An STK push will be sent to the parent's phone. They will enter their M-Pesa PIN to complete payment.
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-3)" }}>
+        <div className="ec-form-grid ec-form-grid-2" style={{ marginBottom: "var(--space-3)" }}>
           <Input 
             label="Phone Number"
             value={mpesaForm.phone}
@@ -1151,8 +1192,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           </Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
-          <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
+          <div style={{ gridColumn: "1 / -1" }} className="ec-form-grid ec-form-grid-2">
             <Select 
               label="Class"
               value={paymentClass} 
@@ -1255,7 +1296,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         </>
       }>
         {editingPayment && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div className="ec-form-grid ec-form-grid-2">
             <Input label="Student" value={editingPayment.studentName} disabled />
             <Input label="Class" value={editingPayment.className} disabled />
             
@@ -1337,7 +1378,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           <Button onClick={saveStructure}>Save Structure</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <Select 
             label="Class"
             value={structForm.className} 
@@ -1394,7 +1435,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         <div style={{ background: "var(--color-info-muted)", border: "1px solid var(--color-info-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)", marginBottom: "var(--space-4)", fontSize: "13px", color: "var(--color-info)" }}>
           📎 Attach deposit slip, receipt, or transaction confirmation. Payment will be marked as pending until approved.
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <Select 
             label="Student"
             value={bankDepositForm.studentId} 

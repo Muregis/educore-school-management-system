@@ -122,7 +122,7 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
         <Card style={{ padding: "var(--space-3)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
             <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "var(--color-text-primary)" }}>Transport Routes</h3>
-            {canEdit && <Button onClick={() => setShowRoute(true)}>+ Add Route</Button>}
+            {canEdit && <div className="ec-page-header-actions"><Button onClick={() => setShowRoute(true)}>+ Add Route</Button></div>}
           </div>
           
           {loading ? (
@@ -133,6 +133,23 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
             <div style={{ margin: "calc(var(--space-3) * -1)", marginTop: 0 }}>
               <Table
                 headers={["Route", "Driver", "Vehicle", "Fee (KES)", "Students", "Status", "Actions"]}
+                renderMobileCard={(row, i) => (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ fontWeight: 600 }}>{row[0]}</div>
+                      <div>{row[5]}</div>
+                    </div>
+                    <div style={{ fontSize: "14px", color: "var(--color-text-secondary)", wordBreak: "break-word" }}>
+                      Driver: {row[1]} | Vehicle: {row[2]}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+                        Fee: {row[3]} {row[4]}
+                      </div>
+                      <div>{row[6]}</div>
+                    </div>
+                  </div>
+                )}
                 data={routes.map(r => {
                   const routeAssignments = assignments.filter(a => a.transport_id === r.transport_id && a.status === "active");
                   return [
@@ -155,7 +172,7 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
         <Card style={{ padding: "var(--space-3)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
             <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600, color: "var(--color-text-primary)" }}>Student Transport Assignments</h3>
-            {canEdit && <Button onClick={() => setShowAssign(true)}>+ Assign Student</Button>}
+            {canEdit && <div className="ec-page-header-actions"><Button onClick={() => setShowAssign(true)}>+ Assign Student</Button></div>}
           </div>
           
           {loading ? (
@@ -166,6 +183,25 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
             <div style={{ margin: "calc(var(--space-3) * -1)", marginTop: 0 }}>
               <Table
                 headers={["Student", "Admission", "Class", "Route", "Transport Fee", "Paid", "Start Date", "End Date", "Status"]}
+                renderMobileCard={(row, i) => (
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ fontWeight: 600, wordBreak: "break-word" }}>{row[0]}</div>
+                      <div>{row[8]}</div>
+                    </div>
+                    <div style={{ fontSize: "14px", color: "var(--color-text-secondary)" }}>
+                      Adm: {row[1]} | Class: {row[2]} | Route: {row[3]}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-1)" }}>
+                      <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+                        Fee: {row[4]} {row[5]}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
+                        {row[6]} - {row[7]}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 data={assignments.map(a => {
                   const student = a.student || {};
                   const route = a.route || {};
@@ -195,7 +231,7 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
             <Button onClick={saveRoute}>Save Route</Button>
           </>
         }>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div className="ec-form-grid ec-form-grid-2">
             <Input 
               label="Route Name *"
               value={rf.routeName}
@@ -244,7 +280,7 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
             <Button onClick={saveAssignment}>Assign Student</Button>
           </>
         }>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div className="ec-form-grid ec-form-grid-2">
             <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
               <Select 
                 label="Class Filter"
@@ -334,6 +370,18 @@ options={[
                   <Card style={{ padding: 0, overflow: "hidden", margin: "0 calc(var(--space-4) * -1)" }}>
                     <Table
                       headers={["Student", "Admission", "Class", "Parent Phone", "Start Date"]}
+                      renderMobileCard={(row, i) => (
+                        <div key={i} style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                          <div style={{ fontWeight: 600, wordBreak: "break-word" }}>{row[0]}</div>
+                          <div style={{ fontSize: "14px", color: "var(--color-text-secondary)" }}>
+                            Adm: {row[1]} | Class: {row[2]}
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div>Phone: {row[3]}</div>
+                            <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>{row[4]}</div>
+                          </div>
+                        </div>
+                      )}
                       data={routeAssignments.map(a => {
                         const student = a.student || {};
                         return [

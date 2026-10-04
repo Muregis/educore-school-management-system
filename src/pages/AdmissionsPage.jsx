@@ -4,6 +4,8 @@ import Btn from "../components/Btn";
 import Field from "../components/Field";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
+import Table from "../components/Table";
+import StatCard from "../components/ui/StatCard";
 
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
@@ -161,17 +163,14 @@ setForm({
   return (
     <div>
       {/* Stats */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+      <div className="ec-grid-auto" style={{ marginBottom: "var(--space-4)" }}>
         {Object.entries(counts).map(([s, n]) => (
-          <div key={s} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 18px", minWidth: 100 }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: C.text }}>{n}</div>
-            <div style={{ fontSize: 12, color: C.textMuted, textTransform: "capitalize" }}>{s}</div>
-          </div>
+          <StatCard key={s} title={s.charAt(0).toUpperCase() + s.slice(1)} value={n} />
         ))}
       </div>
 
       {/* Toolbar */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+      <div className="ec-page-header-actions" style={{ marginBottom: "var(--space-3)" }}>
         <select style={{ ...inputStyle, width: "auto" }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="all">All Status</option>
           <option value="pending">Pending</option>
@@ -189,28 +188,34 @@ setForm({
         <div style={{ color: C.textMuted, padding: 24 }}>No applications found.</div>
       ) : (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>{["Date","Name","Class","Parent","Phone","Status","Actions"].map(h =>
-                <th key={h} style={{ textAlign: "left", padding: "8px 10px", borderBottom: `1px solid ${C.border}`, color: C.textMuted, fontSize: 12 }}>{h}</th>
-              )}</tr>
-            </thead>
-            <tbody>
-              {filtered.map(a => (
-                <tr key={a.admission_id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                  <td style={{ padding: "8px 10px", color: C.textMuted, fontSize: 12 }}>{a.created_at?.slice(0,10)}</td>
-                  <td style={{ padding: "8px 10px", color: C.text, fontWeight: 600 }}>{a.full_name}</td>
-                  <td style={{ padding: "8px 10px", color: C.textSub }}>{a.applying_class}</td>
-                  <td style={{ padding: "8px 10px", color: C.textSub }}>{a.parent_name || "—"}</td>
-                  <td style={{ padding: "8px 10px", color: C.textMuted, fontSize: 12 }}>{a.parent_phone || "—"}</td>
-                  <td style={{ padding: "8px 10px" }}><Badge text={a.status} tone={STATUS_TONE[a.status]} /></td>
-                  <td style={{ padding: "8px 10px" }}>
-                    <Btn variant="ghost" onClick={() => setShowDetail(a)}>View</Btn>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Table
+            headers={["Date","Name","Class","Parent","Phone","Status","Actions"]}
+            rows={filtered.map(a => [
+              a.created_at?.slice(0,10),
+              <span key="name" style={{ color: C.text, fontWeight: 600, whiteSpace: "normal" }}>{a.full_name}</span>,
+              a.applying_class,
+              a.parent_name || "—",
+              a.parent_phone || "—",
+              <Badge key="status" text={a.status} tone={STATUS_TONE[a.status]} />,
+              <Btn key="action" variant="ghost" onClick={() => setShowDetail(a)}>View</Btn>
+            ])}
+            renderMobileCard={(row) => (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ fontWeight: 600, color: "var(--color-text-primary)", whiteSpace: "normal" }}>{row[1]}</div>
+                  <div>{row[5]}</div>
+                </div>
+                <div style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>
+                  <div><strong>Class:</strong> {row[2]}</div>
+                  <div><strong>Parent:</strong> {row[3]} ({row[4]})</div>
+                  <div><strong>Date:</strong> {row[0]}</div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
+                  {row[6]}
+                </div>
+              </div>
+            )}
+          />
         </div>
       )}
 
@@ -226,7 +231,7 @@ setForm({
               <div>â¢ Check for existing applications before submitting</div>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div className="ec-form-grid ec-form-grid-2">
             <Field label="Full Name *" style={{ gridColumn: "1 / -1" }}>
               <input 
                 style={inputStyle} 
@@ -311,7 +316,7 @@ setForm({
       {/* Detail Modal */}
       {showDetail && (
         <Modal title="Application Details" onClose={() => setShowDetail(null)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+          <div className="ec-form-grid ec-form-grid-2" style={{ marginBottom: 16 }}>
             {[
               ["Full Name", showDetail.full_name],
               ["Applying For", showDetail.applying_class],

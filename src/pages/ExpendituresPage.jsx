@@ -54,39 +54,7 @@ function toneForCategory(category) {
   return "success";
 }
 
-function StatCard({ label, value, tone = "default", hint }) {
-  const colors = {
-    success: "var(--color-success)",
-    warning: "var(--color-warning)",
-    danger: "var(--color-danger)",
-    info: "var(--color-info)",
-    default: "var(--color-primary)",
-  };
-
-  return (
-    <Card style={{ padding: "var(--space-4)", minWidth: "180px", flex: 1 }}>
-      <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-2)" }}>
-        {label}
-      </div>
-      <div style={{ fontSize: "26px", fontWeight: 800, color: colors[tone] || colors.default }}>
-        {value}
-      </div>
-      {hint && (
-        <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "var(--space-2)" }}>
-          {hint}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-StatCard.propTypes = {
-  label: PropTypes.string.isRequired,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-  tone: PropTypes.string,
-  hint: PropTypes.string,
-};
-
+import StatCard from "../components/ui/StatCard";
 export default function ExpendituresPage({ auth, canEdit, toast }) {
   const { startDate } = useCurrentTerm(auth);
   const [expenses, setExpenses] = useState([]);
@@ -251,13 +219,15 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
           </div>
         </div>
         {canEdit && (
-          <Button onClick={openCreate}>
-            + Record Expense
-          </Button>
+          <div className="ec-page-header-actions">
+            <Button onClick={openCreate}>
+              + Record Expense
+            </Button>
+          </div>
         )}
       </div>
 
-      <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+      <div className="ec-grid-auto">
         <StatCard label="Total Expenses" value={money(summary?.totals?.total || 0)} tone="danger" hint="Manual expenses plus paid payroll" />
         <StatCard label="Payroll Costs" value={money(summary?.totals?.payroll || 0)} tone="warning" hint={`${summary?.totals?.payrollEntries || 0} paid payslips`} />
         <StatCard label="Manual Expenses" value={money(summary?.totals?.manual || 0)} tone="info" hint={`${summary?.totals?.transactions || 0} recorded items`} />
@@ -323,7 +293,7 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
           <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-text-primary)" }}>
             Manual Expense Records
           </div>
-          <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+          <div className="ec-form-grid">
             <div style={{ minWidth: "220px" }}>
               <Input
                 placeholder="Search item, payee, released by..."
@@ -347,6 +317,20 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
         <Table
           headers={["Date", "Category", "Paid To", "Purpose", "Released By", "Method", "Amount", "Reference", "Actions"]}
           loading={loading}
+          renderMobileCard={(row, i) => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>{row[1]}</div>
+                <div>{row[0]}</div>
+              </div>
+              <div style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{row[2]}</div>
+              <div style={{ fontSize: "14px", color: "var(--color-text-secondary)", wordBreak: "break-word" }}>{row[3]}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>{row[6]}</div>
+                <div style={{ display: "flex", gap: "var(--space-2)" }}>{row[8]}</div>
+              </div>
+            </div>
+          )}
           data={filteredExpenses.map((expense) => [
             <span key="date" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{expense.expense_date}</span>,
             <Badge key="category" text={expense.category} tone={toneForCategory(expense.category)} />,
@@ -392,6 +376,20 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
         <Table
           headers={["Date", "Source", "Category", "Paid To", "Purpose", "Released By", "Amount", "Method"]}
           loading={loading}
+          renderMobileCard={(row, i) => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: "var(--space-2)" }}>{row[1]}{row[2]}</div>
+                <div>{row[0]}</div>
+              </div>
+              <div style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{row[3]}</div>
+              <div style={{ fontSize: "14px", color: "var(--color-text-secondary)", wordBreak: "break-word" }}>{row[4]}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>{row[6]}</div>
+                <div style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>{row[7]}</div>
+              </div>
+            </div>
+          )}
           data={(summary?.recent || []).slice(0, 12).map((item) => [
             <span key="date" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{item.expense_date}</span>,
             <Badge key="source" text={item.source_label} tone={item.source_type === "payroll" ? "warning" : "info"} />,
@@ -423,7 +421,7 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
           </>
         }
       >
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <Input
             label="Expense Date"
             type="date"

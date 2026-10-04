@@ -12,6 +12,7 @@ import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
+import StatCard from "../components/ui/StatCard";
 
 const CATEGORIES = ["Languages", "Sciences", "Humanities", "Technical", "Creative", "Other"];
 
@@ -239,47 +240,35 @@ export default function SubjectsPage({ auth, toast, canEdit = true }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Stats */}
-      <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
-        <Badge text={`Total: ${subjects.length}`} variant="info" />
-        <Badge text={`Active: ${subjects.filter(s => s.isActive).length}`} variant="success" />
-        <Badge text={`Categories: ${categories.length}`} variant="warning" />
+      <div className="ec-grid-auto">
+        <StatCard title="Total Subjects" value={subjects.length} />
+        <StatCard title="Active" value={subjects.filter(s => s.isActive).length} valueColor="var(--color-success)" />
+        <StatCard title="Categories" value={categories.length} valueColor="var(--color-warning)" />
       </div>
 
-      {/* Operations */}
-      <Card style={{ padding: "var(--space-3)" }}>
-        <h4 style={{ margin: "0 0 var(--space-2)", color: "var(--color-text-primary)", fontSize: "16px", fontWeight: 600 }}>Operations</h4>
-        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-          <Button variant="secondary" onClick={exportCSV}>📤 Export CSV</Button>
-        </div>
-      </Card>
+      {/* Actions */}
+      <div className="ec-page-header-actions">
+        {canEdit && <Button variant="secondary" onClick={seedDefaults}>⚡ Load Defaults</Button>}
+        <Button variant="secondary" onClick={exportCSV}>📤 Export CSV</Button>
+        {canEdit && <Button onClick={() => { resetForm(); setShowModal(true); }}>+ Add Subject</Button>}
+      </div>
 
-      {/* Actions & Filters */}
+      {/* Filters */}
       <Card style={{ padding: "var(--space-3)" }}>
-        <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "end" }}>
-          <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", flex: 1 }}>
-            <div style={{ minWidth: "200px" }}>
-              <Input 
-                placeholder="Search subjects..." 
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
-            <div style={{ minWidth: "180px" }}>
-              <Select 
-                value={filterCategory} 
-                onChange={e => setFilterCategory(e.target.value)}
-                options={[
-                  { value: "all", label: "All Categories" },
-                  ...categories.map(c => ({ value: c, label: c }))
-                ]}
-              />
-            </div>
-          </div>
-          
-          <div style={{ display: "flex", gap: "var(--space-2)" }}>
-            {canEdit && <Button variant="secondary" onClick={seedDefaults}>⚡ Load Defaults</Button>}
-            {canEdit && <Button onClick={() => { resetForm(); setShowModal(true); }}>+ Add Subject</Button>}
-          </div>
+        <div className="ec-form-grid">
+          <Input 
+            placeholder="Search subjects..." 
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <Select 
+            value={filterCategory} 
+            onChange={e => setFilterCategory(e.target.value)}
+            options={[
+              { value: "all", label: "All Categories" },
+              ...categories.map(c => ({ value: c, label: c }))
+            ]}
+          />
         </div>
       </Card>
 
@@ -303,6 +292,23 @@ export default function SubjectsPage({ auth, toast, canEdit = true }) {
                 {canEdit && <Button size="sm" variant="danger" onClick={() => del(s.id)}>Delete</Button>}
               </div>,
             ])}
+            renderMobileCard={(row, i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <span style={{ fontWeight: 600, color: "var(--color-text-primary)", whiteSpace: "normal", wordWrap: "break-word" }}>{row[0]}</span>
+                  {row[4]}
+                </div>
+                <div style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>
+                  Code: {row[1]} • Category: {row[2]}
+                </div>
+                <div style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>
+                  Grading: {row[3]}
+                </div>
+                <div style={{ marginTop: "var(--space-2)" }}>
+                  {row[5]}
+                </div>
+              </div>
+            )}
           />
           <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
             <Pager page={page} pages={pages} setPage={setPage} />
@@ -317,7 +323,7 @@ export default function SubjectsPage({ auth, toast, canEdit = true }) {
           <Button onClick={save} loading={saving}>{editingId ? "Save Changes" : "Create Subject"}</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <Input 
             label="Subject Name *"
             value={form.name} 
