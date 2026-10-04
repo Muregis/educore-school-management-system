@@ -1,1 +1,1 @@
-PLACEHOLDER_WILL_FAIL
+export { default } from '../App.jsx';
