@@ -7,7 +7,7 @@ export class TenantCacheManager {
     this.options = {
       keyPrefix: 'tenant:',
       separator: ':',
-      defaultTTL: 3600, // 1 hour
+      defaultTTL: 60, // 60s — avoid stale multi-tenant reads
       encryptionKey: options.encryptionKey,
       ...options
     };

@@ -1,6 +1,6 @@
 /**
- * Simple in-memory cache
- * Placeholder for Redis implementation
+ * In-memory response cache with TTL and school-scoped invalidation.
+ * Suitable for single-instance Node. Prefer Redis in multi-instance production.
  */
 
 class Cache {
@@ -9,9 +9,9 @@ class Cache {
     this.ttls = new Map();
   }
 
-  set(key, value, ttl = 3600) {
+  set(key, value, ttlSeconds = 60) {
     this.cache.set(key, value);
-    this.ttls.set(key, Date.now() + (ttl * 1000));
+    this.ttls.set(key, Date.now() + ttlSeconds * 1000);
   }
 
   get(key) {
@@ -20,7 +20,7 @@ class Cache {
       this.delete(key);
       return null;
     }
-    return this.cache.get(key) || null;
+    return this.cache.has(key) ? this.cache.get(key) : null;
   }
 
   delete(key) {
@@ -28,9 +28,21 @@ class Cache {
     this.ttls.delete(key);
   }
 
+  /** Delete every key that starts with prefix (e.g. "schoolId:") */
+  deleteByPrefix(prefix) {
+    const p = String(prefix);
+    for (const key of [...this.cache.keys()]) {
+      if (key.startsWith(p)) this.delete(key);
+    }
+  }
+
   clear() {
     this.cache.clear();
     this.ttls.clear();
+  }
+
+  size() {
+    return this.cache.size;
   }
 }
 
