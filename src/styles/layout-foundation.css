@@ -187,69 +187,65 @@ main {
   height: auto;
 }
 
-/* ---- Standard page patterns ---- */
-.ec-page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+.ec-stat-card.ui-card,
+.ec-stat-card.premium-card,
+.ui-card.ec-stat-card,
+.premium-card.ec-stat-card,
+.ec-stat-card {
+  min-width: 0 !important;
+  max-width: 100%;
+  overflow: visible !important;
+  contain: none !important;
+  text-overflow: unset !important;
+  white-space: normal !important;
 }
 
-.ec-page-header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-shrink: 0;
+.ec-stat-card * {
+  max-width: 100%;
+  overflow: visible !important;
+  overflow-wrap: break-word !important;
+  word-break: normal !important;
+  white-space: normal !important;
+  text-overflow: unset !important;
 }
 
-/* Filter form grids â€” single column mobile, multi column from 640px */
+@media screen and (max-width: 420px) {
+  .ec-stat-card {
+    padding: 12px !important;
+  }
+}
+
+/* NUCLEAR: design-system contain:paint clips all card text on mobile KPIs */
+.ui-card,
+.premium-card {
+  contain: none !important;
+  overflow: visible !important;
+}
+
+/* Form grids: single column on phones, multi when space allows */
 .ec-form-grid {
   display: grid;
   gap: var(--space-3);
   grid-template-columns: 1fr;
-  align-items: end;
+  min-width: 0;
 }
 
 @media screen and (min-width: 640px) {
   .ec-form-grid-2 {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .ec-form-grid-3 {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-}
-
-@media screen and (max-width: 639px) {
-  .ec-form-grid .ec-form-actions {
-    display: grid;
-    gap: var(--space-2);
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-/* Stat cards: prevent currency/text clipping */
-.ec-grid-auto .ui-card,
-.ec-grid-auto .premium-card {
-  contain: none;
-  overflow: visible;
 }
 
 /*
- * NUCLEAR MOBILE FORM STACK (all pages — P0 + P1)
+ * NUCLEAR MOBILE FORM STACK (all pages â€” P0 + P1)
  * Inline style={{ gridTemplateColumns: "1fr 1fr" }} beats normal CSS.
  * !important forces single-column under 768px for every form/filter grid
  * inside page content and modals.
  */
 @media screen and (max-width: 767px) {
-  .ec-page-content .ec-form-grid {
-    grid-template-columns: 1fr !important;
-  }
-  
-  .ec-page-content .ec-form-grid .ec-form-actions {
-    grid-template-columns: 1fr;
-  }
-
   .ec-page-content div[style*="display: grid"],
   .ec-page-content div[style*="display:grid"],
   .ui-modal-content div[style*="display: grid"],
@@ -278,7 +274,7 @@ main {
   }
 }
 
-/* Table cells: wrap at word boundaries only — never mid-letter */
+/* Table cells: wrap at word boundaries only â€” never mid-letter */
 .ui-table td,
 .ui-table-mobile-value {
   white-space: normal !important;
@@ -311,7 +307,7 @@ main {
   font-weight: 600;
 }
 
-/* Student name column — comfortable, not slender */
+/* Student name column â€” comfortable, not slender */
 .ui-table td:first-child,
 .ui-table th:first-child {
   min-width: 140px;

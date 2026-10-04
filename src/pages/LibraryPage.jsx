@@ -12,7 +12,6 @@ import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
-import StatCard from "../components/ui/StatCard";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
@@ -237,24 +236,19 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Stats bar */}
-      <div className="ec-grid-auto">
-        <StatCard label="Total Items" value={totalBooks} tone="info" />
-        <StatCard label="Available" value={totalAvailable} tone="success" />
-        <StatCard label="Checked Out" value={totalOut} tone="warning" />
-        <StatCard label="Active Borrows" value={activeBorrows} tone="default" />
-        <StatCard label="Overdue" value={overdue} tone="danger" />
-
-
-
-
-
-
-
-
-
-
-
-
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "var(--space-3)" }}>
+        {[
+          { label: "Total Items", value: totalBooks, color: "var(--color-info)" },
+          { label: "Available",   value: totalAvailable, color: "var(--color-success)" },
+          { label: "Checked Out", value: totalOut,       color: "var(--color-warning)" },
+          { label: "Active Borrows", value: activeBorrows, color: "var(--color-primary)" },
+          { label: "Overdue",     value: overdue,        color: "var(--color-danger)" },
+        ].map(s => (
+          <Card key={s.label} style={{ padding: "var(--space-3)" }}>
+            <div style={{ fontSize: "24px", fontWeight: 800, color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "4px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</div>
+          </Card>
+        ))}
       </div>
 
       {/* Tabs & Operations Container */}
@@ -271,7 +265,7 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
             {(tab === "borrows" || tab === "overdue") && <Button variant="ghost" onClick={exportBorrows}>📤 Export {tab === "overdue" ? "Overdue" : "Borrows"} CSV</Button>}
           </div>
           
-          <div className="ec-form-grid" style={{ alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "center" }}>
             {tab === "books" && (
               <>
                 <div style={{ flex: 2, minWidth: "200px" }}>
@@ -285,10 +279,8 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
             
             <div style={{ flex: 1 }} />
             
-            <div className="ec-page-header-actions">
-              {isLibrarian && tab === "books" && <Button onClick={() => { setEditBook(null); setFb(BLANK_BOOK); setErr(""); setShowBook(true); }}>+ Add Book</Button>}
-              {isLibrarian && tab === "borrows" && <Button onClick={() => { setFw(BLANK_BORROW); setErr(""); setShowBorrow(true); }}>+ Issue Book</Button>}
-            </div>
+            {isLibrarian && tab === "books" && <Button onClick={() => { setEditBook(null); setFb(BLANK_BOOK); setErr(""); setShowBook(true); }}>+ Add Book</Button>}
+            {isLibrarian && tab === "borrows" && <Button onClick={() => { setFw(BLANK_BORROW); setErr(""); setShowBorrow(true); }}>+ Issue Book</Button>}
           </div>
         </div>
       </Card>
@@ -302,23 +294,6 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
             <Card style={{ padding: 0, overflow: "hidden" }}>
               <Table
                 headers={["Title", "Author", "Category", "ISBN", "Total", "Available", "Out", "Actions"]}
-                renderMobileCard={(row, i) => (
-                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ fontWeight: 600, wordBreak: "break-word" }}>{row[0]}</div>
-                      <div>{row[2]}</div>
-                    </div>
-                    <div style={{ fontSize: "14px", color: "var(--color-text-secondary)" }}>
-                      Author: {row[1]} | ISBN: {row[3]}
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
-                        Total: {row[4]} | Avail: {row[5]} | Out: {row[6]}
-                      </div>
-                      <div style={{ display: "flex", gap: "var(--space-2)" }}>{row[7]}</div>
-                    </div>
-                  </div>
-                )}
                 data={bkRows.map(b => {
                   const out = Number(b.quantity_total) - Number(b.quantity_available);
                   return [
@@ -353,23 +328,6 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
             <Card style={{ padding: 0, overflow: "hidden" }}>
               <Table
                 headers={["Book", "Borrower", "Type", "Issued", "Due", "Days Out", "Status", "Actions"]}
-                renderMobileCard={(row, i) => (
-                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ fontWeight: 600, wordBreak: "break-word" }}>{row[0]}</div>
-                      <div>{row[6]}</div>
-                    </div>
-                    <div style={{ fontSize: "14px", color: "var(--color-text-secondary)" }}>
-                      By: {row[1]} | Type: {row[2]}
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>
-                        Issued: {row[3]} | Due: {row[4]} | Out: {row[5]}
-                      </div>
-                      <div>{row[7]}</div>
-                    </div>
-                  </div>
-                )}
                 data={brRows.filter(b => b.status === "borrowed").map(b => {
                   const isOverdue = b.due_date < today();
                   return [
@@ -399,20 +357,6 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
             <Card style={{ padding: 0, overflow: "hidden" }}>
               <Table
                 headers={["Book", "Borrower", "Type", "Due Date", "Days Overdue", "Actions"]}
-                renderMobileCard={(row, i) => (
-                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ fontWeight: 600, wordBreak: "break-word" }}>{row[0]}</div>
-                      <div>{row[5]}</div>
-                    </div>
-                    <div style={{ fontSize: "14px", color: "var(--color-text-secondary)" }}>
-                      By: {row[1]} | Type: {row[2]}
-                    </div>
-                    <div style={{ fontSize: "13px", color: "var(--color-danger)", fontWeight: 700 }}>
-                      Due: {row[3]} ({row[4]})
-                    </div>
-                  </div>
-                )}
                 data={borrows.filter(b => b.status === "borrowed" && b.due_date < today()).map(b => {
                   const daysLate = Math.floor((new Date() - new Date(b.due_date)) / 86400000);
                   return [
@@ -438,7 +382,7 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
             <Button onClick={saveBook}>{editBook ? "Update Book" : "Add Book"}</Button>
           </>
         }>
-          <div className="ec-form-grid ec-form-grid-2">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
             <Input 
               label="Title / Item Name *"
               value={fb.title} 
@@ -487,7 +431,7 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
             <Button onClick={issueBorrow}>Issue Book</Button>
           </>
         }>
-          <div className="ec-form-grid ec-form-grid-2">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
             <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
               <Select 
                 label="Borrower Type"

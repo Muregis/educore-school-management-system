@@ -38,7 +38,7 @@ export default React.memo(function Stat({ label, value, icon, title, tone = "pri
           <div style={{ color: "var(--color-text-muted)", fontSize: 12, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em" }}>
             {label}
           </div>
-          <div style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-heading)", fontSize: valueFontSize, fontWeight: 850, marginTop: "var(--space-2)", lineHeight: 1.2, wordBreak: "break-word" }}>
+          <div style={{ color: "var(--color-text-primary)", fontFamily: "var(--font-heading)", fontSize: valueFontSize, fontWeight: 850, marginTop: "var(--space-2)", lineHeight: 1.2, wordBreak: "break-all" }}>
             {value}
           </div>
           {trend && <div style={{ color, fontSize: 12, fontWeight: 800, marginTop: "var(--space-2)" }}>{trend}</div>}

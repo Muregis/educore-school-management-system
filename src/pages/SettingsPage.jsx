@@ -138,7 +138,7 @@ function SchoolTab({ school, setSchool, toast, auth }) {
         </div>
       </div>
       
-      <div className="ec-form-grid ec-form-grid-2">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
         <Input label="School Name" value={form.name || ""} onChange={e => setForm(p => ({...p, name: e.target.value}))} />
         <Input label="County / Location" value={form.county || ""} onChange={e => setForm(p => ({...p, county: e.target.value}))} />
         <Input label="Phone" value={form.phone || ""} onChange={e => setForm(p => ({...p, phone: e.target.value}))} />
@@ -320,7 +320,7 @@ function UsersTab({ auth, toast }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <Card style={{ padding: "var(--space-3)" }}>
-        <div className="ec-page-header-actions">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--color-text-secondary)" }}>{users.length} staff accounts</div>
           <Button variant={showForm ? "secondary" : "primary"} onClick={() => setShowForm(v => !v)}>
             {showForm ? "Cancel" : "+ New User"}
@@ -331,7 +331,7 @@ function UsersTab({ auth, toast }) {
       {showForm && (
         <Card style={{ padding: "var(--space-4)", background: "var(--color-bg-base)", border: "1px solid var(--color-primary-muted)" }}>
           <h3 style={{ margin: "0 0 var(--space-4) 0", fontSize: "16px", color: "var(--color-text-primary)" }}>Create New Account</h3>
-          <div className="ec-form-grid ec-form-grid-2">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
             <Input label="Full Name" value={form.full_name} onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} />
             <Input label="Email" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
             <Select 
@@ -359,7 +359,7 @@ function UsersTab({ auth, toast }) {
           <Table
             headers={["Name", "Email", "Role", "Status", "Action"]}
             data={users.map(u => [
-              <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600, whiteSpace: "normal" }}>{u.full_name}</span>,
+              <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{u.full_name}</span>,
               <span key="email" style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>{u.email}</span>,
               <Badge key="role" text={u.role} variant={u.role === "admin" ? "primary" : u.role === "finance" ? "warning" : u.role === "hr" ? "danger" : u.role === "librarian" ? "success" : "info"} />,
               <Badge key="status" text={u.status} variant={u.status === "active" ? "success" : "danger"} />,
@@ -369,21 +369,6 @@ function UsersTab({ auth, toast }) {
                 </Button>
               ) : <span key="action"></span>
             ])}
-            renderMobileCard={(row) => (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <div style={{ fontWeight: 600, color: "var(--color-text-primary)", whiteSpace: "normal" }}>{row[0]}</div>
-                    <div>{row[1]}</div>
-                  </div>
-                  <div>{row[3]}</div>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-2)" }}>
-                  <div>{row[2]}</div>
-                  <div>{row[4]}</div>
-                </div>
-              </div>
-            )}
           />
         </Card>
       )}

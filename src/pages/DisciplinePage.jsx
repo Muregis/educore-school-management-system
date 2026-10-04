@@ -95,7 +95,7 @@ export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId =
 
   return (
     <div>
-      <div className="ec-page-header-actions" style={{ marginBottom: "var(--space-3)" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <Btn variant={filter === "all"    ? "primary" : "ghost"} onClick={() => setFilter("all")}>All</Btn>
         <Btn variant={filter === "open"   ? "primary" : "ghost"} onClick={() => setFilter("open")}>Open</Btn>
         <Btn variant={filter === "closed" ? "primary" : "ghost"} onClick={() => setFilter("closed")}>Closed</Btn>
@@ -112,7 +112,7 @@ export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId =
             <Table
               headers={["Student", "Type", "Date", "Action Taken", "Status"]}
               rows={rows.map(r => [
-                <span key={r.discipline_id} style={{ color: C.text, fontWeight: 600, whiteSpace: "normal" }}>
+                <span key={r.discipline_id} style={{ color: C.text, fontWeight: 600 }}>
                   {r.first_name ? `${r.first_name} ${r.last_name}` : `Student #${r.student_id}`}
                 </span>,
                 r.incident_type,
@@ -121,19 +121,6 @@ export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId =
                 <Badge key="s" text={r.status}
                   tone={r.status === "open" ? "warning" : r.status === "closed" ? "success" : "info"} />,
               ])}
-              renderMobileCard={(row) => (
-                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div style={{ fontWeight: 600, color: "var(--color-text-primary)", whiteSpace: "normal" }}>{row[0]}</div>
-                    <div>{row[4]}</div>
-                  </div>
-                  <div style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>
-                    <strong>Type:</strong> {row[1]}<br/>
-                    <strong>Date:</strong> {row[2]}<br/>
-                    <strong>Action:</strong> <span style={{ whiteSpace: "normal" }}>{row[3]}</span>
-                  </div>
-                </div>
-              )}
             />
           </div>
           <Pager page={page} pages={pages} setPage={setPage} />
@@ -142,7 +129,7 @@ export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId =
 
       {show && (
         <Modal title="Log Discipline Incident" onClose={() => setShow(false)}>
-          <div className="ec-form-grid ec-form-grid-2">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: 10 }}>
             <Field label="Class">
               <select style={inputStyle} value={f.studentClass} onChange={e => { setF({ ...f, studentClass: e.target.value, studentId: "" }); }}>
                 <option value="">All Classes</option>

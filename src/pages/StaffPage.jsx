@@ -11,7 +11,6 @@ import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
-import StatCard from "../components/ui/StatCard";
 
 const DEPT_COLORS = {
   Academic:"var(--color-info)",
@@ -129,14 +128,17 @@ export default function StaffPage({ auth, canEdit, toast, onTeachersChanged }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-      <div className="ec-grid-auto">
+      <div style={{ display:"grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-3)" }}>
         {[
-          { label:"Total Staff", value:staff.length, color:"info" },
-          { label:"Active", value:staff.filter(s=>s.status==="active").length, color:"success" },
-          { label:"On Leave", value:staff.filter(s=>s.status==="on-leave").length, color:"warning" },
-          { label:"Monthly Payroll", value:money(totalPayroll), color:"primary" },
+          { label:"Total Staff", value:staff.length, color:"var(--color-info)" },
+          { label:"Active", value:staff.filter(s=>s.status==="active").length, color:"var(--color-success)" },
+          { label:"On Leave", value:staff.filter(s=>s.status==="on-leave").length, color:"var(--color-warning)" },
+          { label:"Monthly Payroll", value:money(totalPayroll), color:"var(--color-primary)" },
         ].map(c => (
-          <StatCard key={c.label} title={c.label} value={c.value} variant={c.color} />
+          <Card key={c.label} style={{ padding:"var(--space-3)" }}>
+            <div style={{ fontSize:"12px", color:"var(--color-text-muted)", marginBottom:"4px", fontWeight:600, textTransform:"uppercase", letterSpacing:"0.05em" }}>{c.label}</div>
+            <div style={{ fontSize:"24px", fontWeight:800, color:c.color }}>{c.value}</div>
+          </Card>
         ))}
       </div>
 
@@ -148,9 +150,11 @@ export default function StaffPage({ auth, canEdit, toast, onTeachersChanged }) {
               <div key={d.dept} onClick={()=>setFilter(filter===d.dept?"all":d.dept)} style={{ padding:"4px 12px", borderRadius:"20px", fontSize:"12px", cursor:"pointer", background:filter===d.dept?(DEPT_COLORS[d.dept]||"var(--color-primary)"):"var(--color-bg-surface)", color:filter===d.dept?"#fff":"var(--color-text-secondary)", border:`1px solid ${filter===d.dept?"transparent":"var(--color-border)"}`, fontWeight: 500 }}>{d.dept} ({d.count})</div>
             ))}
           </div>
-          <div className="ec-form-grid">
-            <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name, email, title..." />
-            <div className="ec-page-header-actions">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", alignItems: "center" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name, email, title..." />
+            </div>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
               <Button variant="secondary" onClick={exportCSV}>Export CSV</Button>
               {canEdit && (<Button onClick={()=>{ setEditing(null); setForm(blank); setShowModal(true); }}>+ Add Staff</Button>)}
             </div>
@@ -167,9 +171,9 @@ export default function StaffPage({ auth, canEdit, toast, onTeachersChanged }) {
           <Table
             headers={["Name","Department","Role / Title","Contract","Salary","Status","Actions"]}
             data={filtered.map(s => [
-              <div key="n"><div style={{ fontWeight:600, whiteSpace: "normal" }}>{s.full_name}</div><div style={{ fontSize:"12px", color:"var(--color-text-secondary)" }}>{s.email||"—"}</div></div>,
+              <div key="n"><div style={{ fontWeight:600 }}>{s.full_name}</div><div style={{ fontSize:"12px", color:"var(--color-text-secondary)" }}>{s.email||"—"}</div></div>,
               <span key="d" style={{ padding:"4px 10px", borderRadius:"12px", fontSize:"12px", background:(DEPT_COLORS[s.department]||"var(--color-text-muted)")+"22", color:DEPT_COLORS[s.department]||"var(--color-text-secondary)", fontWeight: 600 }}>{s.department}</span>,
-              <span key="role" style={{ whiteSpace: "normal" }}>{s.job_title||"—"}</span>,
+              <span key="role">{s.job_title||"—"}</span>,
               <span key="contract">{s.contract_type||"—"}</span>,
               <strong key="sal" style={{ color:"var(--color-success)" }}>{money(s.salary)}</strong>,
               <Badge key="st" variant={s.status==="active"?"success":s.status==="on-leave"?"warning":"danger"} text={s.status} />,
@@ -177,23 +181,6 @@ export default function StaffPage({ auth, canEdit, toast, onTeachersChanged }) {
                 {canEdit ? (<><Button size="sm" variant="secondary" onClick={()=>{ setEditing(s); setForm({ fullName:s.full_name, email:s.email||"", phone:s.phone||"", nationalId:s.national_id||"", department:s.department||"Academic", jobTitle:s.job_title||"", contractType:s.contract_type||"Permanent", startDate:s.start_date?.slice(0,10)||"", salary:s.salary||"", status:s.status||"active", notes:s.notes||"" }); setShowModal(true); }}>Edit</Button><Button size="sm" variant="danger" onClick={()=>remove(s.staff_id)}>Remove</Button></>) : (<span style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>View Only</span>)}
               </div>
             ])}
-            renderMobileCard={(row) => (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)" }}>
-                  <div style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>{row[0]}</div>
-                  <div>{row[5]}</div>
-                </div>
-                <div style={{ fontSize: "13px", display: "grid", gridTemplateColumns: "1fr", gap: "4px", color: "var(--color-text-primary)" }}>
-                  <div><span style={{ color: "var(--color-text-secondary)" }}>Department:</span> {row[1]}</div>
-                  <div><span style={{ color: "var(--color-text-secondary)" }}>Role:</span> <span style={{ whiteSpace: "normal" }}>{row[2]}</span></div>
-                  <div><span style={{ color: "var(--color-text-secondary)" }}>Contract:</span> {row[3]}</div>
-                  <div><span style={{ color: "var(--color-text-secondary)" }}>Salary:</span> {row[4]}</div>
-                </div>
-                <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--color-border)" }}>
-                  {row[6]}
-                </div>
-              </div>
-            )}
           />
         </Card>
       )}
@@ -203,34 +190,12 @@ export default function StaffPage({ auth, canEdit, toast, onTeachersChanged }) {
           <div style={{ padding: "var(--space-3) var(--space-4)", borderBottom: "1px solid var(--color-border)" }}>
             <div style={{ fontWeight:700, fontSize:"16px" }}>Portal Accounts</div>
           </div>
-          <Table 
-            headers={["Name","Email / Login","Role","Status"]} 
-            data={users.filter(u=>["teacher","hr","finance","librarian","admin"].includes(u.role)).map(u=>[
-              <span key="name" style={{ whiteSpace: "normal" }}>{u.full_name}</span>, 
-              <div key="e" style={{ whiteSpace: "normal" }}>{u.email}</div>, 
-              <Badge key="r" variant="info" text={u.role} />, 
-              <Badge key="s" variant={u.status==="active"?"success":"danger"} text={u.status} />
-            ])} 
-            renderMobileCard={(row) => (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)" }}>
-                  <div style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>
-                    <div style={{ fontWeight: 600 }}>{row[0]}</div>
-                    <div style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>{row[1]}</div>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-end" }}>
-                    {row[3]}
-                    {row[2]}
-                  </div>
-                </div>
-              </div>
-            )}
-          />
+          <Table headers={["Name","Email / Login","Role","Status"]} data={users.filter(u=>["teacher","hr","finance","librarian","admin"].includes(u.role)).map(u=>[<span key="name">{u.full_name}</span>, <div key="e">{u.email}</div>, <Badge key="r" variant="info" text={u.role} />, <Badge key="s" variant={u.status==="active"?"success":"danger"} text={u.status} />])} />
         </Card>
       )}
 
       <Modal isOpen={showModal} title={editing?"Edit Staff Member":"Add Staff Member"} onClose={()=>{ setShowModal(false); setEditing(null); }} footer={<><Button variant="ghost" onClick={()=>{ setShowModal(false); setEditing(null); }}>Cancel</Button><Button onClick={save}>{editing?"Update Staff":"Add Staff"}</Button></>}>
-        <div className="ec-form-grid ec-form-grid-2">
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap:"var(--space-4)" }}>
           <Input label="Full Name *" value={form.fullName} onChange={v => setForm(f => ({...f, fullName: v.target.value}))} placeholder="e.g. John Kamau" />
           <Input label="Job Title *" value={form.jobTitle} onChange={v => setForm(f => ({...f, jobTitle: v.target.value}))} placeholder="e.g. Class Teacher" />
           <Input label="Email" value={form.email} onChange={v => setForm(f => ({...f, email: v.target.value}))} type="email" placeholder="john@school.com" />

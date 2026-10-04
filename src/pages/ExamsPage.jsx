@@ -12,7 +12,6 @@ import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
-import StatCard from "../components/ui/StatCard";
 
 const EXAM_TYPES = [
   { id: "internal", label: "Internal Exam" },
@@ -143,16 +142,31 @@ export default function ExamsPage({ auth, students, subjects, toast }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Stats */}
-      <div className="ec-grid-auto">
-        <StatCard title="Total Exams" value={exams.length} />
-        <StatCard title="Active" value={exams.filter(e => e.status === "active").length} valueColor="var(--color-success)" />
-        <StatCard title="Published" value={exams.filter(e => e.status === "published").length} valueColor="var(--color-info)" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "var(--space-3)" }}>
+        <Card style={{ padding: "var(--space-3)" }}>
+          <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px", fontWeight: 600 }}>Total Exams</div>
+          <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-text-primary)" }}>{exams.length}</div>
+        </Card>
+        <Card style={{ padding: "var(--space-3)" }}>
+          <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px", fontWeight: 600 }}>Active</div>
+          <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-success)" }}>
+            {exams.filter(e => e.status === "active").length}
+          </div>
+        </Card>
+        <Card style={{ padding: "var(--space-3)" }}>
+          <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px", fontWeight: 600 }}>Published</div>
+          <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-info)" }}>
+            {exams.filter(e => e.status === "published").length}
+          </div>
+        </Card>
       </div>
 
       {/* Actions Container */}
-      <div className="ec-page-header-actions">
-        <Button onClick={() => setShowModal(true)}>+ Create Exam</Button>
-      </div>
+      <Card style={{ padding: "var(--space-3)" }}>
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          <Button onClick={() => setShowModal(true)}>+ Create Exam</Button>
+        </div>
+      </Card>
 
       {/* Table */}
       {loading ? (
@@ -181,23 +195,6 @@ export default function ExamsPage({ auth, students, subjects, toast }) {
                 <Button size="sm" variant="danger" onClick={() => deleteExam(e.exam_id)}>Delete</Button>
               </div>,
             ])}
-            renderMobileCard={(row, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <span style={{ fontWeight: 600, color: "var(--color-text-primary)", whiteSpace: "normal", wordWrap: "break-word" }}>{row[0]}</span>
-                  {row[5]}
-                </div>
-                <div style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>
-                  Type: {row[1]} • Term: {row[2]} • Year: {row[3]}
-                </div>
-                <div style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>
-                  Dates: {row[4]}
-                </div>
-                <div style={{ marginTop: "var(--space-2)" }}>
-                  {row[6]}
-                </div>
-              </div>
-            )}
           />
           <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
             <Pager page={page} pages={pages} setPage={setPage} />
@@ -212,7 +209,7 @@ export default function ExamsPage({ auth, students, subjects, toast }) {
           <Button onClick={saveExam}>Create Exam</Button>
         </>
       }>
-        <div className="ec-form-grid ec-form-grid-2">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
           <div style={{ gridColumn: "1 / -1" }}>
             <Input
               label="Exam Name *"

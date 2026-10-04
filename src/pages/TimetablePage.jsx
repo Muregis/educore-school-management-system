@@ -192,25 +192,26 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
         </Card>
       )}
 
-      {canEdit && (
-        <div className="ec-page-header-actions">
-          <Button variant="secondary" onClick={() => setShowUpload(true)}>
-            📂 Upload CSV
-          </Button>
-          <Button onClick={() => { setEditing(null); setForm({ className: filterClass, dayOfWeek: "Monday", period: "", startTime: "08:00", endTime: "09:00", subject: SUBJECTS[0], teacherId: "" }); setShowModal(true); }}>
-            + Add Entry
-          </Button>
-        </div>
-      )}
-
       <Card style={{ padding: "var(--space-3)" }}>
-        <div className="ec-form-grid">
-          <Select 
-            label="Filter by Class"
-            value={filterClass} 
-            onChange={e => setFilterClass(e.target.value)}
-            options={(availableClasses ?? []).map(c => ({ value: c, label: c }))}
-          />
+        <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ minWidth: "200px" }}>
+            <Select 
+              value={filterClass} 
+              onChange={e => setFilterClass(e.target.value)}
+              options={(availableClasses ?? []).map(c => ({ value: c, label: c }))}
+            />
+          </div>
+          <div style={{ flex: 1 }} />
+          {canEdit && (
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <Button variant="secondary" onClick={() => setShowUpload(true)}>
+                📂 Upload CSV
+              </Button>
+              <Button onClick={() => { setEditing(null); setForm({ className: filterClass, dayOfWeek: "Monday", period: "", startTime: "08:00", endTime: "09:00", subject: SUBJECTS[0], teacherId: "" }); setShowModal(true); }}>
+                + Add Entry
+              </Button>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -256,7 +257,7 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
           <Button onClick={save}>{editing ? "Update Entry" : "Add Entry"}</Button>
         </>
       }>
-        <div className="ec-form-grid ec-form-grid-2">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
           <Select label="Day" value={form.dayOfWeek} onChange={e => setForm(f => ({...f, dayOfWeek: e.target.value}))} options={DAYS.map(d => ({ value: d, label: d }))} />
           <Select label="Subject" value={form.subject} onChange={e => setForm(f => ({...f, subject: e.target.value}))} options={SUBJECTS.map(s => ({ value: s, label: s }))} />
           <Input label="Start Time" type="time" value={form.startTime} onChange={v => setForm(f => ({...f, startTime: v.target.value}))} />

@@ -255,12 +255,16 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <Card style={{ padding: "var(--space-3)" }}>
-        <div className="ec-form-grid">
-          <Input placeholder="Search teacher, class, subject..." value={q} onChange={e => setQ(e.target.value)} />
-          <Select value={status} onChange={e => setStatus(e.target.value)} options={[
-            { value: "all", label: "All status" }, { value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }
-          ]} />
-          <div className="ec-page-header-actions">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", alignItems: "center" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Input placeholder="Search teacher, class, subject..." value={q} onChange={e => setQ(e.target.value)} />
+          </div>
+          <div style={{ width: "150px" }}>
+            <Select value={status} onChange={e => setStatus(e.target.value)} options={[
+              { value: "all", label: "All status" }, { value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }
+            ]} />
+          </div>
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
             <Button variant="secondary" onClick={() => {
               const headers = ["Name","Email","Phone","Staff Number","TSC/Staff ID","Status","Classes","Subjects"];
               const exportRows = filtered.map(t => [`${t.firstName} ${t.lastName}`,t.email,t.phone||"",t.staffNumber||"",t.tscStaffId||"",t.status,(t.classes||[]).join("|"),(t.subjects||[]).join("|")]);
@@ -283,15 +287,15 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
           <Table
             headers={["Name","Email","Phone","Staff No.","TSC/Staff ID","Classes","Subjects","Timetable","Status","Actions"]}
             data={rows.map(t => [
-              <span key={t.id} style={{ color: "var(--color-text-primary)", fontWeight: 600, whiteSpace: "normal" }}>{t.firstName} {t.lastName}</span>,
+              <span key={t.id} style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{t.firstName} {t.lastName}</span>,
               <span key="email" style={{ color: "var(--color-text-secondary)" }}>{t.email}</span>,
               <span key="phone" style={{ color: "var(--color-text-secondary)" }}>{t.phone || "-"}</span>,
               <span key="staffNo" style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{t.staffNumber || "-"}</span>,
               <span key="tscId" style={{ fontFamily: "var(--font-mono)", color: "var(--color-text-secondary)" }}>{t.tscStaffId || "-"}</span>,
-              <span key="classes" style={{ fontSize: "13px", whiteSpace: "normal" }}>
+              <span key="classes" style={{ fontSize: "13px" }}>
                 {assignmentsForTeacher(t).length ? assignmentsForTeacher(t).map(a => a.class_name).filter(Boolean).join(", ") : (t.classes||[]).join(", ") || "-"}
               </span>,
-              <span key="subjects" style={{ fontSize: "13px", whiteSpace: "normal" }}>
+              <span key="subjects" style={{ fontSize: "13px" }}>
                 {assignmentsForTeacher(t).length ? assignmentsForTeacher(t).map(a => a.subject_name).filter(Boolean).join(", ") || "General" : (t.subjects||[]).join(", ") || "-"}
               </span>,
               <span key="tt" style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>{t.timetable || "-"}</span>,
@@ -308,28 +312,6 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
                 {canEdit && <Button size="sm" variant="danger" onClick={() => del(t.id)}>Delete</Button>}
               </div>
             ])}
-            renderMobileCard={(row) => (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)" }}>
-                  <div style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>
-                    {row[0]}
-                    <div style={{ fontSize: "13px", color: "var(--color-text-secondary)", marginTop: "4px" }}>
-                      {row[1]} • {row[2]}
-                    </div>
-                  </div>
-                  <div>{row[8]}</div>
-                </div>
-                <div style={{ fontSize: "13px", display: "grid", gridTemplateColumns: "1fr", gap: "4px", color: "var(--color-text-primary)" }}>
-                  <div><span style={{ color: "var(--color-text-secondary)" }}>Staff No:</span> {row[3]}</div>
-                  <div><span style={{ color: "var(--color-text-secondary)" }}>TSC:</span> {row[4]}</div>
-                  <div style={{ display: "flex" }}><span style={{ color: "var(--color-text-secondary)", marginRight: "8px" }}>Classes:</span> <div style={{ flex: 1, whiteSpace: "normal" }}>{row[5]}</div></div>
-                  <div style={{ display: "flex" }}><span style={{ color: "var(--color-text-secondary)", marginRight: "8px" }}>Subjects:</span> <div style={{ flex: 1, whiteSpace: "normal" }}>{row[6]}</div></div>
-                </div>
-                <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--color-border)" }}>
-                  {row[9]}
-                </div>
-              </div>
-            )}
           />
           <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
             <Pager page={page} pages={pages} setPage={setPage} />
@@ -343,7 +325,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
           <Button variant="primary" onClick={save}>Save</Button>
         </>
       }>
-        <div className="ec-form-grid ec-form-grid-2">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-4)" }}>
           <Input label="First Name" value={f.firstName} onChange={e => setF({ ...f, firstName: e.target.value })} />
           <Input label="Last Name" value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} />
           <Input label="Email" type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} />
@@ -364,7 +346,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
           <Button variant="primary" onClick={saveAssignment}>Assign</Button>
         </>
       }>
-        <div className="ec-form-grid ec-form-grid-2">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-4)" }}>
           <Select label="Class" value={assignmentForm.classId} onChange={e => setAssignmentForm(prev => ({ ...prev, classId: e.target.value }))}
             options={[{ value: "", label: "Select class" }, ...classOptions.map(c => ({ value: String(c.class_id ?? c.id), label: c.class_name ?? c.name ?? String(c.class_id) }))]} />
           <Select label="Subject" value={assignmentForm.subjectId} onChange={e => setAssignmentForm(prev => ({ ...prev, subjectId: e.target.value }))}

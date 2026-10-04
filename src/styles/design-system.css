@@ -170,7 +170,10 @@ html {
 }
 
 body {
-  background: var(--color-bg-base);
+  background: 
+    radial-gradient(circle at 10% 20%, rgba(37, 99, 235, 0.08) 0%, transparent 35%),
+    radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 35%),
+    linear-gradient(180deg, var(--color-bg-page) 0%, var(--color-bg-base) 100%);
   color: var(--color-text-primary);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
@@ -324,7 +327,8 @@ textarea:focus-visible,
 .ui-card:hover,
 .premium-card:hover {
   border-color: var(--color-border-strong);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-elevated);
+  transform: translateY(-2px);
 }
 
 /* ===========================================
@@ -339,7 +343,7 @@ textarea:focus-visible,
 }
 
 .ui-btn:not(:disabled):hover {
-  filter: brightness(1.08);
+  transform: translateY(-1px);
 }
 
 .ui-btn:not(:disabled):active {
@@ -458,12 +462,18 @@ textarea:focus-visible,
    ANIMATION CLASSES
    =========================================== */
 .animate-in {
-  /* animation removed — prefer no entrance choreography */
+  animation: fadeInUp var(--transition-smooth) both;
 }
 
 .stagger-in > * {
-  animation: fadeIn var(--transition-base) both;
+  animation: fadeInUp var(--transition-smooth) both;
 }
+
+.stagger-in > *:nth-child(2) { animation-delay: 40ms; }
+.stagger-in > *:nth-child(3) { animation-delay: 80ms; }
+.stagger-in > *:nth-child(4) { animation-delay: 120ms; }
+.stagger-in > *:nth-child(5) { animation-delay: 160ms; }
+.stagger-in > *:nth-child(6) { animation-delay: 200ms; }
 
 .page-fade {
   animation: fadeIn var(--transition-smooth);

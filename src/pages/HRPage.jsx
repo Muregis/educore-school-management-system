@@ -5,7 +5,6 @@ import Field from "../components/Field";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
 import Table from "../components/Table";
-import StatCard from "../components/ui/StatCard";
 import { Pager, Msg } from "../components/Helpers";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch, apiDownload } from "../lib/api";
@@ -392,15 +391,18 @@ export default function HRPage({ auth, canEdit, toast, school }) {
     <div style={{ padding:4 }}>
 
       {/* Summary cards */}
-      <div className="ec-grid-auto" style={{ marginBottom: 20 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))", gap:12, marginBottom:20 }}>
         {[
-          { label:"Total Staff",     value:totalStaff,         color:"info" },
-          { label:"Active",          value:activeStaff,        color:"success" },
-          { label:"On Leave",        value:onLeave,            color:"warning" },
-          { label:"Pending Leave",   value:pendingLeave,       color:"danger" },
-          { label:"Monthly Payroll", value:money(totalPayroll),color:"primary" },
+          { label:"Total Staff",     value:totalStaff,         color:"#3b82f6" },
+          { label:"Active",          value:activeStaff,        color:"#22c55e" },
+          { label:"On Leave",        value:onLeave,            color:"#f59e0b" },
+          { label:"Pending Leave",   value:pendingLeave,       color:"#ec4899" },
+          { label:"Monthly Payroll", value:money(totalPayroll),color:"#8b5cf6" },
         ].map(c => (
-          <StatCard key={c.label} title={c.label} value={c.value} variant={c.color} />
+          <div key={c.label} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:12, padding:"14px 16px" }}>
+            <div style={{ fontSize:20, fontWeight:800, color:c.color }}>{c.value}</div>
+            <div style={{ fontSize:11, color:C.textMuted, marginTop:2 }}>{c.label}</div>
+          </div>
         ))}
       </div>
 
@@ -416,15 +418,13 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       {/* ── STAFF TAB ── */}
       {tab === "staff" && (
         <div>
-          <div className="ec-form-grid" style={{ marginBottom:12 }}>
+          <div style={{ display:"flex", gap:8, marginBottom:12, flexWrap:"wrap" }}>
             <select style={inputStyle} value={deptFilter} onChange={e=>setDeptFilter(e.target.value)}>
               <option value="all">All Departments</option>
               {DEPARTMENTS.map(d=><option key={d}>{d}</option>)}
             </select>
-            <div className="ec-page-header-actions">
-              {canEdit && <Btn tone="secondary" size="sm" onClick={syncTeachers}>🔄 Sync to Teachers</Btn>}
-              {canEdit && <Btn onClick={()=>{ setEditStaff(null); setStaffForm(BLANK_STAFF); setErr(""); setShowStaff(true); }}>+ Add Staff</Btn>}
-            </div>
+            {canEdit && <Btn tone="secondary" size="sm" onClick={syncTeachers}>🔄 Sync to Teachers</Btn>}
+            {canEdit && <Btn onClick={()=>{ setEditStaff(null); setStaffForm(BLANK_STAFF); setErr(""); setShowStaff(true); }}>+ Add Staff</Btn>}
           </div>
           {filteredStaff.length===0 ? <Msg text="No staff found." /> : (
             <>
@@ -432,9 +432,9 @@ export default function HRPage({ auth, canEdit, toast, school }) {
                 <Table
                   headers={["Name","Department","Job Title","Contract","Start Date","Salary","Status",""]}
                   rows={sRows.map(s=>[
-                    <div key="n"><div style={{fontWeight:700,color:C.text, whiteSpace: "normal"}}>{s.full_name}</div><div style={{fontSize:11,color:C.textMuted}}>{s.email||"—"} · {s.phone||"—"}</div></div>,
+                    <div key="n"><div style={{fontWeight:700,color:C.text}}>{s.full_name}</div><div style={{fontSize:11,color:C.textMuted}}>{s.email||"—"} · {s.phone||"—"}</div></div>,
                     s.department,
-                    <span key="jt" style={{ whiteSpace: "normal" }}>{s.job_title}</span>,
+                    s.job_title,
                     <Badge key="ct" text={s.contract_type} tone="info" />,
                     s.start_date?.slice(0,10)||"—",
                     <span key="sal" style={{fontWeight:700,color:"#22c55e"}}>{money(s.salary)}</span>,
@@ -449,23 +449,6 @@ export default function HRPage({ auth, canEdit, toast, school }) {
                       </div>
                     ):null,
                   ])}
-                  renderMobileCard={(row) => (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)" }}>
-                        <div style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>{row[0]}</div>
-                        <div>{row[6]}</div>
-                      </div>
-                      <div style={{ fontSize: "13px", display: "grid", gridTemplateColumns: "1fr", gap: "4px" }}>
-                        <div><span style={{ color: "var(--color-text-secondary)" }}>Department:</span> {row[1]}</div>
-                        <div style={{ display: "flex" }}><span style={{ color: "var(--color-text-secondary)", marginRight: "8px" }}>Job Title:</span> <div style={{ flex: 1, whiteSpace: "normal" }}>{row[2]}</div></div>
-                        <div><span style={{ color: "var(--color-text-secondary)" }}>Contract:</span> {row[3]}</div>
-                        <div><span style={{ color: "var(--color-text-secondary)" }}>Salary:</span> {row[5]}</div>
-                      </div>
-                      <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--color-border)" }}>
-                        {row[7]}
-                      </div>
-                    </div>
-                  )}
                 />
               </div>
               <Pager page={sPage} pages={sPages} setPage={setSPage} />
@@ -477,7 +460,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       {/* ── LEAVE TAB ── */}
       {tab === "leave" && (
         <div>
-          <div className="ec-page-header-actions" style={{ marginBottom:12 }}>
+          <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:12 }}>
             {canEdit && <Btn onClick={()=>{ setLeaveForm(BLANK_LEAVE); setErr(""); setShowLeave(true); }}>+ Add Leave Request</Btn>}
           </div>
           {leave.length===0 ? <Msg text="No leave requests." /> : (
@@ -488,13 +471,13 @@ export default function HRPage({ auth, canEdit, toast, school }) {
                   rows={lRows.map(l=>{
                     const days = l.from_date && l.to_date ? Math.ceil((new Date(l.to_date)-new Date(l.from_date))/86400000)+1 : "—";
                     return [
-                      <span key="n" style={{fontWeight:600,color:C.text, whiteSpace:"normal"}}>{l.staff_name}</span>,
+                      <span key="n" style={{fontWeight:600,color:C.text}}>{l.staff_name}</span>,
                       l.department,
                       <Badge key="lt" text={l.leave_type} tone="info" />,
                       l.from_date?.slice(0,10),
                       l.to_date?.slice(0,10),
                       days,
-                      <span key="r" style={{color:C.textSub,fontSize:12, whiteSpace:"normal"}}>{l.reason||"—"}</span>,
+                      <span key="r" style={{color:C.textSub,fontSize:12}}>{l.reason||"—"}</span>,
                       <Badge key="s" text={l.status} tone={l.status==="approved"?"success":l.status==="rejected"?"danger":"warning"} />,
                       canEdit && l.status==="pending" ? (
                         <div key="a" style={{display:"flex",gap:4}}>
@@ -504,23 +487,6 @@ export default function HRPage({ auth, canEdit, toast, school }) {
                       ):null,
                     ];
                   })}
-                  renderMobileCard={(row) => (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)" }}>
-                        <div style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>{row[0]}</div>
-                        <div>{row[7]}</div>
-                      </div>
-                      <div style={{ fontSize: "13px", display: "grid", gridTemplateColumns: "1fr", gap: "4px" }}>
-                        <div><span style={{ color: "var(--color-text-secondary)" }}>Department:</span> {row[1]}</div>
-                        <div><span style={{ color: "var(--color-text-secondary)" }}>Type:</span> {row[2]}</div>
-                        <div><span style={{ color: "var(--color-text-secondary)" }}>Dates:</span> {row[3]} to {row[4]} ({row[5]} days)</div>
-                        <div style={{ display: "flex" }}><span style={{ color: "var(--color-text-secondary)", marginRight: "8px" }}>Reason:</span> <div style={{ flex: 1, whiteSpace: "normal" }}>{row[6]}</div></div>
-                      </div>
-                      <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--color-border)" }}>
-                        {row[8]}
-                      </div>
-                    </div>
-                  )}
                 />
               </div>
               <Pager page={lPage} pages={lPages} setPage={setLPage} />
@@ -532,12 +498,10 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       {/* ── ATTENDANCE TAB ── */}
       {tab === "attendance" && (
         <div>
-          <div className="ec-form-grid" style={{ marginBottom:14, alignItems: "center" }}>
+          <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:14, flexWrap:"wrap" }}>
             <Field label="Date"><input type="date" style={inputStyle} value={attDate} max={today()} onChange={e=>setAttDate(e.target.value)} /></Field>
             <div style={{ color:C.textMuted, fontSize:13 }}>{bulkAtt.length} staff</div>
-            <div className="ec-page-header-actions">
-              {canEdit && <Btn onClick={saveAttendance} disabled={attSaving}>{attSaving?"Saving...":"Save Attendance"}</Btn>}
-            </div>
+            {canEdit && <Btn onClick={saveAttendance} disabled={attSaving}>{attSaving?"Saving...":"Save Attendance"}</Btn>}
           </div>
 
           {bulkAtt.length === 0 ? <Msg text="No active staff found." /> : (
@@ -545,7 +509,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
               <Table
                 headers={["Name","Department","Check In","Check Out","Status"]}
                 rows={bulkAtt.map((r,i)=>[
-                  <span key="n" style={{fontWeight:600,color:C.text, whiteSpace: "normal"}}>{r.name}</span>,
+                  <span key="n" style={{fontWeight:600,color:C.text}}>{r.name}</span>,
                   r.dept,
                   canEdit ? <input key="ci" type="time" style={{...inputStyle,width:100}} value={r.checkIn} onChange={e=>setBulkAtt(prev=>prev.map((x,j)=>j===i?{...x,checkIn:e.target.value}:x))} /> : r.checkIn||"—",
                   canEdit ? <input key="co" type="time" style={{...inputStyle,width:100}} value={r.checkOut} onChange={e=>setBulkAtt(prev=>prev.map((x,j)=>j===i?{...x,checkOut:e.target.value}:x))} /> : r.checkOut||"—",
@@ -559,19 +523,6 @@ export default function HRPage({ auth, canEdit, toast, school }) {
                     </select>
                   ) : <Badge key="s" text={r.status} tone={r.status==="present"?"success":r.status==="absent"?"danger":"warning"} />,
                 ])}
-                renderMobileCard={(row) => (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)" }}>
-                      <div style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>{row[0]}</div>
-                      <div>{row[1]}</div>
-                    </div>
-                    <div style={{ fontSize: "13px", display: "grid", gridTemplateColumns: "1fr", gap: "8px", marginTop: "4px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ color: "var(--color-text-secondary)" }}>Check In:</span> {row[2]}</div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ color: "var(--color-text-secondary)" }}>Check Out:</span> {row[3]}</div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ color: "var(--color-text-secondary)" }}>Status:</span> {row[4]}</div>
-                    </div>
-                  </div>
-                )}
               />
             </div>
           )}
@@ -593,7 +544,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       {/* ── PAYROLL TAB ── */}
       {tab === "payroll" && (
         <div>
-          <div className="ec-form-grid" style={{ marginBottom:16, alignItems: "end" }}>
+          <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16, flexWrap:"wrap" }}>
             <Field label="Month">
               <select style={inputStyle} value={payMonth} onChange={e=>setPayMonth(Number(e.target.value))}>
                 {MONTHS.map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
@@ -602,16 +553,14 @@ export default function HRPage({ auth, canEdit, toast, school }) {
             <Field label="Year">
               <input type="number" style={{...inputStyle,width:90}} value={payYear} onChange={e=>setPayYear(Number(e.target.value))} />
             </Field>
-            <div className="ec-page-header-actions">
-              {canEdit && (
-                <>
-                  <Btn onClick={generatePayslips} disabled={generating}>{generating?"Generating...":"Generate Payslips"}</Btn>
-                  {curPayslips.some(p=>p.status==="draft") && <Btn onClick={approvePayroll}>Approve All</Btn>}
-                  {curPayslips.some(p=>p.status==="approved") && <Btn tone="success" onClick={markPaid}>Mark as Paid</Btn>}
-                  <Btn tone="secondary" onClick={exportPayroll}>📥 Export CSV</Btn>
-                </>
-              )}
-            </div>
+            {canEdit && (
+              <>
+                <Btn onClick={generatePayslips} disabled={generating}>{generating?"Generating...":"Generate Payslips"}</Btn>
+                {curPayslips.some(p=>p.status==="draft") && <Btn onClick={approvePayroll}>Approve All</Btn>}
+                {curPayslips.some(p=>p.status==="approved") && <Btn tone="success" onClick={markPaid}>Mark as Paid</Btn>}
+                <Btn tone="secondary" onClick={exportPayroll}>📥 Export CSV</Btn>
+              </>
+            )}
           </div>
 
           {/* Dept summary */}
@@ -641,7 +590,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       {/* ── PAYSLIPS TAB ── */}
       {tab === "payslips" && (
         <div>
-          <div className="ec-form-grid" style={{ marginBottom:12, alignItems: "center" }}>
+          <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:12, flexWrap:"wrap" }}>
             <Field label="Month">
               <select style={inputStyle} value={payMonth} onChange={e=>setPayMonth(Number(e.target.value))}>
                 {MONTHS.map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
@@ -661,7 +610,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
                 <Table
                   headers={["Staff","Department","Basic","Allowances","Deductions","Net Pay","Status",""]}
                   rows={pRows.map(p=>[
-                    <div key="n"><div style={{fontWeight:700,color:C.text, whiteSpace:"normal"}}>{p.staff_name}</div><div style={{fontSize:11,color:C.textMuted}}>{p.job_title}</div></div>,
+                    <div key="n"><div style={{fontWeight:700,color:C.text}}>{p.staff_name}</div><div style={{fontSize:11,color:C.textMuted}}>{p.job_title}</div></div>,
                     p.department,
                     money(p.basic_salary),
                     money(p.allowances),
@@ -670,24 +619,6 @@ export default function HRPage({ auth, canEdit, toast, school }) {
                     <Badge key="s" text={p.status} tone={p.status==="paid"?"success":p.status==="approved"?"info":"warning"} />,
                     <Btn key="pr" size="xs" variant="ghost" onClick={()=>printPayslip(p)}>🖨 Print</Btn>,
                   ])}
-                  renderMobileCard={(row) => (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)" }}>
-                        <div style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>{row[0]}</div>
-                        <div>{row[6]}</div>
-                      </div>
-                      <div style={{ fontSize: "13px", display: "grid", gridTemplateColumns: "1fr", gap: "4px" }}>
-                        <div><span style={{ color: "var(--color-text-secondary)" }}>Department:</span> {row[1]}</div>
-                        <div><span style={{ color: "var(--color-text-secondary)" }}>Basic:</span> {row[2]}</div>
-                        <div><span style={{ color: "var(--color-text-secondary)" }}>Allowances:</span> {row[3]}</div>
-                        <div><span style={{ color: "var(--color-text-secondary)" }}>Deductions:</span> {row[4]}</div>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}><span style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>Net Pay:</span> {row[5]}</div>
-                      </div>
-                      <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--color-border)" }}>
-                        {row[7]}
-                      </div>
-                    </div>
-                  )}
                 />
               </div>
               <Pager page={pPage} pages={pPages} setPage={setPPage} />
@@ -699,7 +630,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       {/* ── STAFF MODAL ── */}
       {showStaff && (
         <Modal title={editStaff?"Edit Staff Member":"Add Staff Member"} onClose={()=>{ setShowStaff(false); setEditStaff(null); }}>
-          <div className="ec-form-grid ec-form-grid-2">
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
             <Field label="Full Name *"><input style={inputStyle} value={staffForm.fullName} onChange={e=>setStaffForm(f=>({...f,fullName:e.target.value}))} /></Field>
             <Field label="Job Title *"><input style={inputStyle} value={staffForm.jobTitle} onChange={e=>setStaffForm(f=>({...f,jobTitle:e.target.value}))} /></Field>
             <Field label="Email"><input style={inputStyle} value={staffForm.email} onChange={e=>setStaffForm(f=>({...f,email:e.target.value}))} /></Field>
@@ -740,7 +671,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       {/* ── LEAVE MODAL ── */}
       {showLeave && (
         <Modal title="Add Leave Request" onClose={()=>setShowLeave(false)}>
-          <div className="ec-form-grid ec-form-grid-2">
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
             <Field label="Staff Member">
               <select style={inputStyle} value={leaveForm.staffId} onChange={e=>setLeaveForm(f=>({...f,staffId:e.target.value}))}>
                 <option value="">-- Select staff --</option>
@@ -756,7 +687,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
             </Field>
             <Field label="From Date"><input type="date" style={inputStyle} value={leaveForm.fromDate} onChange={e=>setLeaveForm(f=>({...f,fromDate:e.target.value}))} /></Field>
             <Field label="To Date"><input type="date" style={inputStyle} value={leaveForm.toDate} min={leaveForm.fromDate} onChange={e=>setLeaveForm(f=>({...f,toDate:e.target.value}))} /></Field>
-            <Field label="Reason" style={{ gridColumn:"1 / -1" }}>
+            <Field label="Reason" style={{ gridColumn:"span 2" }}>
               <input style={inputStyle} value={leaveForm.reason} onChange={e=>setLeaveForm(f=>({...f,reason:e.target.value}))} placeholder="Optional reason" />
             </Field>
           </div>
@@ -771,7 +702,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       {/* ── PAYMENT MODAL ── */}
       {showPayModal && (
         <Modal title={`Record Salary Payment — ${MONTHS[payMonth-1]} ${payYear}`} onClose={()=>setShowPayModal(false)}>
-          <div className="ec-form-grid">
+          <div style={{ display:"grid", gap:14 }}>
             <div style={{ padding:10, background:"#f8fafc", borderRadius:8, border:`1px solid ${C.border}`, fontSize:13 }}>
               You are marking <strong>{curPayslips.filter(p=>p.status==="approved").length}</strong> approved payslips as paid.
             </div>
@@ -802,7 +733,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       {/* ── TRANSFER MODAL ── */}
       {showTransfer && (
         <Modal title={`Transfer Staff: ${transferStaff?.full_name}`} onClose={() => setShowTransfer(false)}>
-          <div className="ec-form-grid">
+          <div style={{ display: "grid", gap: 14 }}>
             <div style={{ padding: 10, background: "#f0f9ff", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, color: "#0369a1" }}>
               Moving a staff member will transfer their profile, teacher records, and user account to the selected branch. Historical records like attendance and payslips will remain at the current branch.
             </div>
