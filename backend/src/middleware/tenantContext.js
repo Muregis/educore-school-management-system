@@ -1,15 +1,13 @@
 import { supabase } from "../config/supabaseClient.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 
-// FIX: Removed broken `pool` import from config/db.js (pool has no .from() method)
-// The tenantContext middleware only needs supabase and audit logging
-
-// NEW: Tenant context middleware for automatic tenant isolation
+// Tenant context middleware for automatic tenant isolation
 export function tenantContext(req, res, next) {
   // Skip tenant validation for auth routes, health checks, and superadmin
   const openPaths = [
     '/auth/',
     '/health',
+    '/api/health',
     '/paystack/webhook',
     '/paystack/callback',
     '/mpesa/callback',
@@ -22,7 +20,6 @@ export function tenantContext(req, res, next) {
 
   // Superadmin bypass - can access all schools
   if (req.user?.isSuperadmin || req.user?.role === 'superadmin') {
-    // Allow superadmin to specify which school to work with via query param
     const requestedSchoolId = req.body?.school_id || req.query?.school_id || req.params?.school_id;
     if (requestedSchoolId) {
       req.user.school_id = Number(requestedSchoolId);
@@ -39,7 +36,6 @@ export function tenantContext(req, res, next) {
     return res.status(401).json({ error: "Invalid tenant context" });
   }
 
-  // Ensure consistent schoolId access
   req.user.school_id = resolvedSchoolId;
   req.user.schoolId = resolvedSchoolId;
   req.schoolId = resolvedSchoolId;
@@ -47,12 +43,11 @@ export function tenantContext(req, res, next) {
   next();
 }
 
-// NEW: Tenant security check middleware
 export function tenantSecurityCheck(req, res, next) {
-  // Skip for auth routes and health checks
   const openPaths = [
     '/auth/',
     '/health',
+    '/api/health',
     '/paystack/webhook',
     '/paystack/callback',
     '/mpesa/callback',
@@ -63,7 +58,6 @@ export function tenantSecurityCheck(req, res, next) {
     return next();
   }
 
-  // Superadmin bypass - can access any school's data
   if (req.user?.isSuperadmin || req.user?.role === 'superadmin') {
     return next();
   }
@@ -84,7 +78,6 @@ export function tenantSecurityCheck(req, res, next) {
       timestamp: new Date().toISOString()
     });
     
-    // Log cross-tenant attempt to audit table (fire-and-forget)
     logAuditEvent(req, AUDIT_ACTIONS.CROSS_TENANT_ATTEMPT, {
       description: `Cross-tenant access attempt: user from school ${req.schoolId} trying to access school ${requestedSchoolId}`,
       newValues: { requestedSchoolId, path: req.path, method: req.method }

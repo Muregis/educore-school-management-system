@@ -49,6 +49,9 @@ export const env = {
   supabaseServiceKey:   clean(process.env.SUPABASE_SERVICE_KEY),
   supabaseAnonKey:      clean(process.env.SUPABASE_ANON_KEY),
 
+  // Shared secret for external cron (daily backups). Header: Authorization: Bearer <CRON_SECRET>
+  cronSecret:           clean(process.env.CRON_SECRET),
+
   // Local PostgreSQL (when DATABASE_MODE=local)
   pgHost:     process.env.PG_HOST     || "localhost",
   pgPort:     Number(process.env.PG_PORT || 5432),
@@ -87,19 +90,19 @@ function validateProductionEnv() {
     const missing = required.filter(key => !process.env[key]);
     
     if (missing.length > 0) {
-      console.error('❌ Missing required production environment variables:');
+      console.error('Missing required production environment variables:');
       missing.forEach(key => console.error(`   - ${key}`));
       console.error('\nPlease set these environment variables before starting in production mode.');
       console.error('[ENV] Continuing startup despite missing variables - errors will occur...');
     }
     
     if (process.env.JWT_SECRET === 'educore_dev_secret_change_me') {
-      console.error('⚠️ SECURITY WARNING: JWT_SECRET is set to default development value in production!');
+      console.error('SECURITY WARNING: JWT_SECRET is set to default development value in production!');
       console.error('   Please set a strong, unique JWT_SECRET for production.');
     }
     
     if (!process.env.CORS_ORIGIN || process.env.CORS_ORIGIN === 'http://localhost:5173') {
-      console.error('⚠️ SECURITY WARNING: CORS_ORIGIN should be explicitly set to your production frontend URL');
+      console.error('SECURITY WARNING: CORS_ORIGIN should be explicitly set to your production frontend URL');
       console.error('   Current value:', process.env.CORS_ORIGIN || 'not set');
       console.error('   Example: https://your-school-app.vercel.app');
     }
@@ -110,12 +113,13 @@ function validateProductionEnv() {
       'PAYSTACK_SECRET_KEY',
       'MPESA_CONSUMER_KEY',
       'MPESA_CONSUMER_SECRET',
-      'SSO_SHARED_SECRET'
+      'SSO_SHARED_SECRET',
+      'CRON_SECRET'
     ];
     
     const missingRecommended = recommended.filter(key => !process.env[key]);
     if (missingRecommended.length > 0) {
-      console.warn('⚠️  Recommended environment variables not set:');
+      console.warn('Recommended environment variables not set:');
       missingRecommended.forEach(key => console.warn(`   - ${key}`));
       console.warn('Some features may not work properly without these.\n');
     }
