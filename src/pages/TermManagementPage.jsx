@@ -286,48 +286,52 @@ export default function TermManagementPage({ auth }) {
           </div>
         </div>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-            <thead>
-              <tr style={{ background: "var(--color-bg-surface)", color: C.textSub, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                <th style={{ textAlign: "left", padding: "12px 16px", fontWeight: 700 }}>Term</th>
-                <th style={{ textAlign: "left", padding: "12px 16px", fontWeight: 700 }}>Year</th>
-                <th style={{ textAlign: "left", padding: "12px 16px", fontWeight: 700 }}>Start</th>
-                <th style={{ textAlign: "left", padding: "12px 16px", fontWeight: 700 }}>End</th>
-                <th style={{ textAlign: "left", padding: "12px 16px", fontWeight: 700 }}>Status</th>
-                <th style={{ textAlign: "right", padding: "12px 16px", fontWeight: 700 }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {terms.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ padding: "24px 16px", textAlign: "center", color: C.textSub }}>
-                    No terms found. Create your first term to get started.
-                  </td>
-                </tr>
-              ) : (
-                terms.map(term => (
-                  <tr key={term.term_id} style={{ borderTop: "1px solid var(--color-border)" }}>
-                    <td style={{ padding: "12px 16px", fontWeight: 600, color: C.text }}>{term.term_name}</td>
-                    <td style={{ padding: "12px 16px", color: C.textSub }}>{term.academic_year}</td>
-                    <td style={{ padding: "12px 16px", color: C.textSub }}>{term.start_date ? new Date(term.start_date).toLocaleDateString() : "-"}</td>
-                    <td style={{ padding: "12px 16px", color: C.textSub }}>{term.end_date ? new Date(term.end_date).toLocaleDateString() : "-"}</td>
-                    <td style={{ padding: "12px 16px" }}>
-                      <Badge status={term.status === "active" ? "success" : term.status === "closed" || term.status === "completed" ? "danger" : "default"}>
-                        {term.status}
-                      </Badge>
-                    </td>
-                    <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                      {term.status !== "active" && term.status !== "closed" && term.status !== "completed" && (
-                        <Btn size="sm" onClick={() => activateTerm(term.term_id)} disabled={saving}>
-                          Activate
-                        </Btn>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <Table
+              headers={["Term", "Year", "Start", "End", "Status", "Actions"]}
+              data={terms.map(term => [
+                <span key="t" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{term.name}</span>,
+                <span key="y" style={{ color: "var(--color-text-secondary)" }}>{term.academic_year}</span>,
+                <span key="s" style={{ color: "var(--color-text-secondary)" }}>{new Date(term.start_date).toLocaleDateString()}</span>,
+                <span key="e" style={{ color: "var(--color-text-secondary)" }}>{new Date(term.end_date).toLocaleDateString()}</span>,
+                <Badge key="st" text={term.status} variant={term.status === "active" ? "success" : "secondary"} />,
+                <div key="a" style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                  <Button size="sm" variant="ghost" onClick={() => editTerm(term)}>Edit</Button>
+                  <Button size="sm" variant={term.status === "active" ? "secondary" : "primary"} onClick={() => toggleStatus(term.term_id, term.status)}>
+                    {term.status === "active" ? "End Term" : "Activate"}
+                  </Button>
+                  {term.status !== "active" && (
+                    <Button size="sm" variant="danger" onClick={() => {
+                      if (window.confirm("Delete this term?")) deleteTerm(term.term_id);
+                    }}>Delete</Button>
+                  )}
+                </div>
+              ])}
+              renderMobileCard={(_row, i) => {
+                const term = terms[i];
+                if (!term) return null;
+                return (
+                  <div key={term.term_id} className="ui-table-mobile-card" style={{ padding: 16, border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", background: "var(--color-bg-card)", display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: "16px", color: "var(--color-text-primary)" }}>{term.name}</div>
+                        <div style={{ fontSize: "13px", color: "var(--color-text-muted)", marginTop: 4 }}>{term.academic_year}</div>
+                      </div>
+                      <Badge text={term.status} variant={term.status === "active" ? "success" : "secondary"} />
+                    </div>
+                    <div style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>
+                      <div><strong>Start:</strong> {new Date(term.start_date).toLocaleDateString()}</div>
+                      <div><strong>End:</strong> {new Date(term.end_date).toLocaleDateString()}</div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)" }}>
+                      <Button size="sm" variant="ghost" onClick={() => editTerm(term)}>Edit</Button>
+                      <Button size="sm" variant={term.status === "active" ? "secondary" : "primary"} onClick={() => toggleStatus(term.term_id, term.status)}>
+                        {term.status === "active" ? "End Term" : "Activate"}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              }}
+            />
         </div>
       </Card>
 

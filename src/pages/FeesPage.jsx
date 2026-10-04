@@ -10,6 +10,7 @@ import { printFinancialReport } from "../utils/financialPrint";
 import discountService from "../services/discountService";
 import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
+import { useEntitySync } from "../hooks/useEntitySync";
 
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -166,10 +167,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     setPayments((data || []).map(normalisePayment));
   }, [auth, setPayments, term]);
 
-  useEffect(() => {
-    if (!term) return;
-    reloadPayments();
-  }, [reloadPayments, term]);
+  useEntitySync({ url: `/payments?term=${encodeURIComponent(term)}`, token: auth?.token, setter: setPayments, transform: (data) => (data || []).map(normalisePayment), dependencies: [term], enabled: !!term });
 
   const normalisedPayments   = payments.map(p => p.payment_id ? normalisePayment(p) : p);
   const allStructures        = feeStructures.map(f => f.fee_structure_id ? normaliseFeeStruct(f) : f);
@@ -1521,3 +1519,4 @@ FeesPage.propTypes = {
     email: PropTypes.string,
   }),
 };
+

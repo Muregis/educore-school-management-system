@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
 import { csv } from "../lib/utils";
+import { useEntitySync } from "../hooks/useEntitySync";
 
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -68,12 +69,7 @@ export default function StaffPage({ auth, canEdit, toast, onTeachersChanged }) {
     }
   };
 
-  useEffect(() => {
-    if (!auth?.token) return;
-    const ac = new AbortController();
-    load(ac.signal);
-    return () => ac.abort();
-  }, [auth]);
+  useEntitySync({ token: auth?.token, fetcher: load, dependencies: [] });
 
   const filtered = staff.filter(s => {
     const matchDept = filter === "all" || s.department === filter;
@@ -225,3 +221,4 @@ StaffPage.propTypes = {
   toast: PropTypes.func.isRequired,
   onTeachersChanged: PropTypes.func,
 };
+

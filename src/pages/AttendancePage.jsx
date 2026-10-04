@@ -6,6 +6,7 @@ import { apiFetch } from "../lib/api";
 import { parseStudentQrContent } from "../lib/qr";
 import { Pager, csv, pager } from "../components/Helpers";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
+import { useEntitySync } from "../hooks/useEntitySync";
 
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -69,15 +70,13 @@ export default function AttendancePage({
       .catch(e => { console.warn("Failed to load classes", e); setAvailableClasses([]); });
   }, [auth]);
 
-  useEffect(() => {
-    if (!auth?.token) return;
-    const ac = new AbortController();
-    const tq = (startDate && endDate) ? `?from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}` : '';
-    apiFetch(`/attendance${tq}`, { token: auth.token, signal: ac.signal })
-      .then(data => setAttendance(data.map(normalise)))
-      .catch(e => { if (e?.code !== "EABORT") console.warn("Failed to load attendance", e); });
-    return () => ac.abort();
-  }, [auth, setAttendance]);
+  useEntitySync({
+    url: `/attendance${(startDate && endDate) ? `?from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}` : ''}`,
+    token: auth?.token,
+    setter: setAttendance,
+    transform: (data) => (Array.isArray(data) ? data.map(normalise) : []),
+    dependencies: [startDate, endDate],
+  });
 
   const classStudents = useMemo(
     () => students.filter(s =>

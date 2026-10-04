@@ -11,6 +11,7 @@ import { printHTML } from "../lib/print";
 import { Pager } from "../components/Helpers";
 import { csv, pager } from "../lib/utils";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
+import { useEntitySync } from "../hooks/useEntitySync";
 
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -119,19 +120,12 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     loadClasses();
   }, [auth]);
 
-  useEffect(() => {
-    if (!auth?.token) return;
-    const ac = new AbortController();
-    apiFetch("/students", { token: auth.token, signal: ac.signal })
-      .then(data => {
-        const normalisedData = data.map(normalise);
-        setStudents(normalisedData);
-      })
-      .catch(e => { 
-        if (e?.code !== "EABORT") toast("Failed to fetch students: " + (e.message || ""), "error"); 
-      });
-    return () => ac.abort();
-  }, [auth, setStudents]);
+  useEntitySync({
+    url: "/students",
+    token: auth?.token,
+    setter: setStudents,
+    transform: (data) => (Array.isArray(data) ? data.map(normalise) : []),
+  });
 
   const expected = c => {
     const x = feeStructures.find(s => s.className === c || s.class_name === c);

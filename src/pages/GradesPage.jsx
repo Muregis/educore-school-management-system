@@ -11,6 +11,7 @@ import { C, inputStyle } from "../lib/theme";
 import { apiFetch, API_BASE } from "../lib/api";
 import { getAuthHeaders } from "../lib/auth";
 import { Pager, Msg, csv, pager } from "../components/Helpers";
+import { useEntitySync } from "../hooks/useEntitySync";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
 import { getGradeColor as getGradeHexColor, parseMark } from "../lib/grading";
 import { rankingService } from "../services/rankingService";
@@ -221,15 +222,7 @@ const classesForDropdown = useMemo(() => {
         setBulkMarks(resolved.reduce((a, s) => ({ ...a, [s.name]: "" }), {}));
       });
   }, [auth]);
-
-  useEffect(() => {
-    if (!auth?.token) return;
-    const ac = new AbortController();
-    const termQuery = currentTerm ? `?term=${encodeURIComponent(currentTerm)}` : '';
-    apiFetch(`/grades${termQuery}`, { token: auth.token, signal: ac.signal })
-      .then(data => setResults(data))
-      .catch(e => { if (e?.code !== "EABORT") toast("Failed to fetch results", "error"); });
-    return () => ac.abort();
+  useEntitySync({ url: `/grades${currentTerm ? `?term=${encodeURIComponent(currentTerm)}` : ""}`, token: auth?.token, setter: setResults, dependencies: [currentTerm] });
   }, [auth, setResults, toast, currentTerm]);
 
   const filtered = results.filter(r =>
@@ -808,3 +801,4 @@ GradesPage.propTypes = {
   feeBlocked: PropTypes.bool,
   onGoFees:   PropTypes.func,
 };
+

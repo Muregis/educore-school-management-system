@@ -257,7 +257,32 @@ export default function AdminAccountsPage({ auth, students, toast }) {
                       <Btn variant="danger" onClick={() => deleteStaff(s)}>Delete</Btn>
                     </div>,
                   ])}
-                />
+                renderMobileCard={(_row, i) => {
+                      const s = staffRows[i];
+                      if (!s) return null;
+                      return (
+                        <div key={s.id} className="ui-table-mobile-card" style={{ padding: 16, border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", background: "var(--color-bg-card)", display: "flex", flexDirection: "column", gap: 12 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                            <div>
+                              <div style={{ fontWeight: 800, fontSize: "16px", color: "var(--color-text-primary)" }}>{s.name}</div>
+                              <div style={{ fontSize: "13px", color: "var(--color-text-muted)", marginTop: 4 }}>{s.email}</div>
+                            </div>
+                            <Badge text={s.status} tone={s.status === "active" ? "success" : "danger"} />
+                          </div>
+                          <div style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>
+                            <div><strong>Phone:</strong> {s.phone || "—"}</div>
+                            <div style={{ marginTop: 4 }}><Badge text={s.role} tone={roleTone(s.role)} /></div>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)" }}>
+                            <Btn variant="ghost" onClick={() => openEditStaff(s)}>Edit</Btn>
+                            <Btn variant="ghost" onClick={() => toggleStaffStatus(s)}>
+                              {s.status === "active" ? "Deactivate" : "Activate"}
+                            </Btn>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
               </div>
               <Pager page={staffPage} pages={staffPages} setPage={setStaffPage} />
             </>
@@ -306,7 +331,33 @@ export default function AdminAccountsPage({ auth, students, toast }) {
                       <Btn variant="ghost" onClick={() => resetPortalPassword(a)}>Reset Password</Btn>
                     </div>,
                   ])}
-                />
+                renderMobileCard={(_row, i) => {
+                      const a = portalRows[i];
+                      if (!a) return null;
+                      return (
+                        <div key={a.id} className="ui-table-mobile-card" style={{ padding: 16, border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", background: "var(--color-bg-card)", display: "flex", flexDirection: "column", gap: 12 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                            <div>
+                              <div style={{ fontWeight: 800, fontSize: "16px", color: "var(--color-text-primary)" }}>{a.name}</div>
+                              <div style={{ marginTop: 4 }}><Badge text={a.role} tone={roleTone(a.role)} /></div>
+                            </div>
+                            <Badge text={a.status} tone={a.status === "active" ? "success" : "danger"} />
+                          </div>
+                          <div style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>
+                            <div><strong>Student:</strong> {a.studentName || "—"}</div>
+                            <div><strong>Class:</strong> {a.className || "—"}</div>
+                            <div><strong>Admission:</strong> {a.admission || "—"}</div>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)" }}>
+                            <Btn variant="ghost" onClick={() => togglePortalStatus(a)}>
+                              {a.status === "active" ? "Deactivate" : "Activate"}
+                            </Btn>
+                            <Btn variant="ghost" onClick={() => resetPortalPassword(a)}>Reset Password</Btn>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
               </div>
               <Pager page={portalPage} pages={portalPages} setPage={setPortalPage} />
             </>

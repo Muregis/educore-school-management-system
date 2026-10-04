@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
 import { SUBJECTS } from "../lib/constants";
 import { pager } from "../components/Helpers";
+import { useEntitySync } from "../hooks/useEntitySync";
 
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -94,24 +95,16 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
     setSubjectOptions(subjectRows || []);
   };
 
-  useEffect(() => {
-    if (!auth?.token) return;
-    setLoading(true);
-    const ac = new AbortController();
-    apiFetch("/teachers", { token: auth.token, signal: ac.signal })
-      .then(async data => {
-        setTeachers(data.map(normalise));
-        if (canAssign) await loadAssignmentData();
-        setLoading(false);
-      })
-      .catch(e => {
-        if (e?.code !== "EABORT") {
-          toast("Failed to fetch teachers", "error");
-          setLoading(false);
-        }
-      });
-    return () => { if (!isSyncingRef.current) ac.abort(); };
-  }, [auth, setTeachers, toast, canAssign]);
+  useEntitySync({
+    url: "/teachers",
+    token: auth?.token,
+    setter: async (data) => {
+      setTeachers(Array.isArray(data) ? data.map(normalise) : []);
+      if (canAssign) await loadAssignmentData();
+      setLoading(false);
+    },
+    dependencies: [canAssign],
+  });
 
   useEffect(() => {
     return () => {
