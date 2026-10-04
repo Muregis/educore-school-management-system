@@ -110,6 +110,18 @@ export function logout() {
   }
 
   clearSession();
+
+  // Drop offline IndexedDB so the next session cannot show stale lists
+  if (typeof window !== "undefined") {
+    import("../services/offlineDatabase.js")
+      .then((m) => m.default?.clearAllData?.())
+      .catch(() => {});
+    try {
+      indexedDB.deleteDatabase("educore_offline_v1");
+    } catch {
+      // ignore
+    }
+  }
   
   // Aggressive credential clearing on logout
   if (typeof window !== "undefined") {

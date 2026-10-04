@@ -79,7 +79,7 @@ import studentLifecycleRoutes     from "./routes/student-lifecycle.routes.js";
 import financeRoutes              from "./routes/finance.routes.js";
 import securityRoutes             from "./routes/security.routes.js";
 import classesRoutes              from "./routes/classes.routes.js";
-import { cacheMiddleware } from "./middleware/cache.js";
+import { cacheMiddleware, invalidateCacheOnMutation } from "./middleware/cache.js";
 // import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }         from "./middleware/error.js";
 import { authRequired }         from "./middleware/auth.js";
@@ -166,6 +166,9 @@ app.use("/api", (req, _res, next) => {
   next();
 });
 
+// Bust response cache after any successful write (school-scoped)
+app.use(invalidateCacheOnMutation);
+
 // OLD: app.use("/api",               studentsRoutes);
 app.use("/api/students",      studentsRoutes);
 app.use("/api/college",         collegeRoutes);
@@ -217,7 +220,7 @@ app.use("/api/finance", financeRoutes);
 app.use("/api/exams/v2", examsEnhancedRoutes);
 app.use("/api/library/v2", libraryEnhancedRoutes);
 app.use("/api/hr/payroll", hrPayrollRoutes);
-app.use(cacheMiddleware(300)); // Apply caching to all subsequent routes
+app.use(cacheMiddleware(30)); // short TTL; high-churn routes skipped inside middleware
 app.use("/api/security", securityRoutes);
 app.use("/api/reports", reportingRoutes);
 app.use("/api/audit", auditComplianceRoutes);

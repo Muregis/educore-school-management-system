@@ -61,7 +61,11 @@ export async function apiFetch(
   path,
   { method = "GET", body = null, token = null, timeoutMs = 45000, signal = null, retries = 1 } = {}
 ) {
-  const headers = {};
+  const headers = {
+    // Prevent intermediate/browser reuse of authenticated JSON
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
+  };
   if (body != null) {
     headers["Content-Type"] = "application/json";
   }
@@ -89,6 +93,7 @@ export async function apiFetch(
         headers,
         body: body != null ? JSON.stringify(body) : null,
         signal: controller.signal,
+        cache: "no-store",
       });
 
       clearTimeout(timeoutId);
@@ -144,6 +149,3 @@ export async function apiFetch(
     }
   }
 }
-
-
-
