@@ -317,7 +317,7 @@ export default function SubjectsPage({ auth, toast, canEdit = true }) {
           <Button onClick={save} loading={saving}>{editingId ? "Save Changes" : "Create Subject"}</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <Input 
             label="Subject Name *"
             value={form.name} 

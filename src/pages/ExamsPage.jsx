@@ -209,7 +209,7 @@ export default function ExamsPage({ auth, students, subjects, toast }) {
           <Button onClick={saveExam}>Create Exam</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <div style={{ gridColumn: "1 / -1" }}>
             <Input
               label="Exam Name *"

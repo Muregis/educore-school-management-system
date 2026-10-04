@@ -195,7 +195,7 @@ export default function StaffPage({ auth, canEdit, toast, onTeachersChanged }) {
       )}
 
       <Modal isOpen={showModal} title={editing?"Edit Staff Member":"Add Staff Member"} onClose={()=>{ setShowModal(false); setEditing(null); }} footer={<><Button variant="ghost" onClick={()=>{ setShowModal(false); setEditing(null); }}>Cancel</Button><Button onClick={save}>{editing?"Update Staff":"Add Staff"}</Button></>}>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap:"var(--space-4)" }}>
+        <div className="ec-grid-auto">
           <Input label="Full Name *" value={form.fullName} onChange={v => setForm(f => ({...f, fullName: v.target.value}))} placeholder="e.g. John Kamau" />
           <Input label="Job Title *" value={form.jobTitle} onChange={v => setForm(f => ({...f, jobTitle: v.target.value}))} placeholder="e.g. Class Teacher" />
           <Input label="Email" value={form.email} onChange={v => setForm(f => ({...f, email: v.target.value}))} type="email" placeholder="john@school.com" />

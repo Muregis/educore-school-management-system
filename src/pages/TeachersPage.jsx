@@ -325,7 +325,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
           <Button variant="primary" onClick={save}>Save</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-4)" }}>
+        <div className="ec-grid-auto">
           <Input label="First Name" value={f.firstName} onChange={e => setF({ ...f, firstName: e.target.value })} />
           <Input label="Last Name" value={f.lastName} onChange={e => setF({ ...f, lastName: e.target.value })} />
           <Input label="Email" type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} />
@@ -346,7 +346,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
           <Button variant="primary" onClick={saveAssignment}>Assign</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-4)" }}>
+        <div className="ec-grid-auto">
           <Select label="Class" value={assignmentForm.classId} onChange={e => setAssignmentForm(prev => ({ ...prev, classId: e.target.value }))}
             options={[{ value: "", label: "Select class" }, ...classOptions.map(c => ({ value: String(c.class_id ?? c.id), label: c.class_name ?? c.name ?? String(c.class_id) }))]} />
           <Select label="Subject" value={assignmentForm.subjectId} onChange={e => setAssignmentForm(prev => ({ ...prev, subjectId: e.target.value }))}

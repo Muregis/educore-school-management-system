@@ -17,6 +17,7 @@ import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Select from "../components/ui/Select";
 import Badge from "../components/ui/Badge";
+import StatCard from "../components/ui/StatCard";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
@@ -504,7 +505,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <Button variant="primary" onClick={save}>{editId ? "Update Student" : "Save Student"}</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-4)" }}>
+        <div className="ec-grid-auto">
           <Input label="First Name" value={f.firstName} onChange={e => handleChange('firstName', e.target.value)} />
           <Input label="Last Name" value={f.lastName} onChange={e => handleChange('lastName', e.target.value)} />
           <Input label="Admission Number" value={f.admission} onChange={e => handleChange('admission', e.target.value)} placeholder="Leave blank to auto-generate" />
@@ -531,7 +532,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
               <div style={{ color: "var(--color-text-muted)" }}>{profile.admission} · {profile.className}</div>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-3)" }}>
+          <div className="ec-grid-auto">
             <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Gender</div><div style={{ fontWeight: 600 }}>{profile.gender}</div></div>
             <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Status</div><div style={{ fontWeight: 600 }}>{profile.status}</div></div>
             <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Parent</div><div style={{ fontWeight: 600 }}>{profile.parentName || "—"}</div></div>

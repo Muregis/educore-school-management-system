@@ -138,7 +138,7 @@ function SchoolTab({ school, setSchool, toast, auth }) {
         </div>
       </div>
       
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+      <div className="ec-form-grid ec-form-grid-2">
         <Input label="School Name" value={form.name || ""} onChange={e => setForm(p => ({...p, name: e.target.value}))} />
         <Input label="County / Location" value={form.county || ""} onChange={e => setForm(p => ({...p, county: e.target.value}))} />
         <Input label="Phone" value={form.phone || ""} onChange={e => setForm(p => ({...p, phone: e.target.value}))} />
@@ -331,7 +331,7 @@ function UsersTab({ auth, toast }) {
       {showForm && (
         <Card style={{ padding: "var(--space-4)", background: "var(--color-bg-base)", border: "1px solid var(--color-primary-muted)" }}>
           <h3 style={{ margin: "0 0 var(--space-4) 0", fontSize: "16px", color: "var(--color-text-primary)" }}>Create New Account</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+          <div className="ec-form-grid ec-form-grid-2">
             <Input label="Full Name" value={form.full_name} onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} />
             <Input label="Email" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
             <Select 

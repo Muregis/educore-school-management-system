@@ -306,7 +306,7 @@ export default function AttendancePage({
         </>
       }>
         {editing && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-4)" }}>
+          <div className="ec-grid-auto">
             <Input label="Student" value={editing.studentName} disabled />
             <Input label="Class" value={editing.className} disabled />
             <Input label="Date" type="date" value={editing.date} onChange={e => setEditing({ ...editing, date: e.target.value })} />

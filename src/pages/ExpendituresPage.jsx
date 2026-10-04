@@ -423,7 +423,7 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
           </>
         }
       >
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <Input
             label="Expense Date"
             type="date"

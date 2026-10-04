@@ -905,7 +905,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           {bankDetails && (bankDetails.bank_name || bankDetails.bank_account_number) && (
             <Card style={{ background: "var(--color-info-muted)", borderColor: "var(--color-info-border)", marginBottom: "var(--space-4)" }}>
               <div style={{ fontWeight: 700, marginBottom: "var(--space-2)", color: "var(--color-info)" }}>🏦 Bank Deposit Instructions</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+              <div className="ec-form-grid ec-form-grid-2">
                 <div>
                   <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Bank Name</div>
                   <div style={{ fontWeight: 600, color: "var(--color-info)" }}>{bankDetails.bank_name || "Not set"}</div>
@@ -1069,7 +1069,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         <div style={{ background: "var(--color-primary-muted)", border: "1px solid var(--color-primary-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)", marginBottom: "var(--space-4)", fontSize: "13px", color: "var(--color-primary)" }}>
           💳 Payment will be processed securely via <strong>Paystack</strong> — supports card, bank transfer & mobile money.
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <Input label="Parent Email (for receipt)" value={paystackForm.email} onChange={e => setPaystackForm({ ...paystackForm, email: e.target.value })} placeholder="parent@email.com" />
           <div style={{ display: "flex", flexDirection: "column" }}>
             <Input 
@@ -1109,7 +1109,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         <div style={{ background: "var(--color-success-muted)", border: "1px solid var(--color-success-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)", marginBottom: "var(--space-4)", fontSize: "13px", color: "var(--color-success)" }}>
           📱 An STK push will be sent to the parent's phone. They will enter their M-Pesa PIN to complete payment.
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginBottom: "var(--space-3)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <Input 
             label="Phone Number"
             value={mpesaForm.phone}
@@ -1151,7 +1151,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           </Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
             <Select 
               label="Class"
@@ -1255,7 +1255,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         </>
       }>
         {editingPayment && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div className="ec-form-grid ec-form-grid-2">
             <Input label="Student" value={editingPayment.studentName} disabled />
             <Input label="Class" value={editingPayment.className} disabled />
             
@@ -1337,7 +1337,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
           <Button onClick={saveStructure}>Save Structure</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <Select 
             label="Class"
             value={structForm.className} 
@@ -1394,7 +1394,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         <div style={{ background: "var(--color-info-muted)", border: "1px solid var(--color-info-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)", marginBottom: "var(--space-4)", fontSize: "13px", color: "var(--color-info)" }}>
           📎 Attach deposit slip, receipt, or transaction confirmation. Payment will be marked as pending until approved.
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <Select 
             label="Student"
             value={bankDepositForm.studentId} 

@@ -382,7 +382,7 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
             <Button onClick={saveBook}>{editBook ? "Update Book" : "Add Book"}</Button>
           </>
         }>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div className="ec-form-grid ec-form-grid-2">
             <Input 
               label="Title / Item Name *"
               value={fb.title} 
@@ -431,7 +431,7 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
             <Button onClick={issueBorrow}>Issue Book</Button>
           </>
         }>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div className="ec-form-grid ec-form-grid-2">
             <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
               <Select 
                 label="Borrower Type"

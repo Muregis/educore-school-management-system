@@ -257,7 +257,7 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
           <Button onClick={save}>{editing ? "Update Entry" : "Add Entry"}</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+        <div className="ec-form-grid ec-form-grid-2">
           <Select label="Day" value={form.dayOfWeek} onChange={e => setForm(f => ({...f, dayOfWeek: e.target.value}))} options={DAYS.map(d => ({ value: d, label: d }))} />
           <Select label="Subject" value={form.subject} onChange={e => setForm(f => ({...f, subject: e.target.value}))} options={SUBJECTS.map(s => ({ value: s, label: s }))} />
           <Input label="Start Time" type="time" value={form.startTime} onChange={v => setForm(f => ({...f, startTime: v.target.value}))} />

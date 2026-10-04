@@ -195,7 +195,7 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
             <Button onClick={saveRoute}>Save Route</Button>
           </>
         }>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div className="ec-form-grid ec-form-grid-2">
             <Input 
               label="Route Name *"
               value={rf.routeName}
@@ -244,7 +244,7 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
             <Button onClick={saveAssignment}>Assign Student</Button>
           </>
         }>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div className="ec-form-grid ec-form-grid-2">
             <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
               <Select 
                 label="Class Filter"
