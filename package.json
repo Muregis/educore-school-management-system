@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/restore-app.mjs && vite build",
     "test": "node --test test/grading.test.js test/ranking.test.js",
     "lint": "eslint .",
     "preview": "vite preview"
