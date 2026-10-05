@@ -6,6 +6,21 @@ import Btn from "../components/Btn";
 import Modal from "../components/Modal";
 import Badge from "../components/Badge";
 import Card from "../components/ui/Card";
+import Table from "../components/ui/Table";
+import Button from "../components/ui/Button";
+import EmptyState from "../components/ui/EmptyState";
+
+
+
+const inputStyle = {
+  border: "1px solid var(--color-border)",
+  borderRadius: "var(--radius-md)",
+  background: "var(--color-bg-card)",
+  color: "var(--color-text-primary)",
+  padding: "10px 14px",
+  fontSize: 14,
+  outline: "none",
+};
 
 export default function TermManagementPage({ auth }) {
   const [loading, setLoading] = useState(true);
@@ -145,6 +160,22 @@ export default function TermManagementPage({ auth }) {
     }
   };
 
+
+  const editTerm = (term) => {
+    alert("Edit term functionality to be implemented.");
+  };
+
+  const deleteTerm = async (termId) => {
+    alert("Delete term functionality to be implemented.");
+  };
+
+  const toggleStatus = async (termId, currentStatus) => {
+    if (currentStatus === "active") {
+      alert("Please use the 'Close Current Term' button above.");
+      return;
+    }
+    activateTerm(termId);
+  };
   const activateTerm = async (termId) => {
     setSaving(true);
     setError("");
@@ -161,6 +192,7 @@ export default function TermManagementPage({ auth }) {
       setSaving(false);
     }
   };
+
 
   if (loading) {
     return <div style={{ padding: 40, textAlign: "center", color: C.textSub }}>Loading term management...</div>;
@@ -285,10 +317,19 @@ export default function TermManagementPage({ auth }) {
             <div style={{ color: C.textSub, fontSize: 12, marginTop: 2 }}>Manage and review all academic terms</div>
           </div>
         </div>
-        <div style={{ overflowX: "auto" }}>
-          <Table
-              headers={["Term", "Year", "Start", "End", "Status", "Actions"]}
-              data={terms.map(term => [
+        {terms.length === 0 ? (
+          <EmptyState
+            icon="📅"
+            title="No Terms Configured"
+            description="There are no academic terms in the system yet."
+            actionLabel="Create First Term"
+            onAction={() => setShowCreateModal(true)}
+          />
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <Table
+                headers={["Term", "Year", "Start", "End", "Status", "Actions"]}
+                data={terms.map(term => [
                 <span key="t" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{term.name}</span>,
                 <span key="y" style={{ color: "var(--color-text-secondary)" }}>{term.academic_year}</span>,
                 <span key="s" style={{ color: "var(--color-text-secondary)" }}>{new Date(term.start_date).toLocaleDateString()}</span>,
@@ -332,7 +373,8 @@ export default function TermManagementPage({ auth }) {
                 );
               }}
             />
-        </div>
+          </div>
+        )}
       </Card>
 
       <CreateTermModal
@@ -465,12 +507,3 @@ CloseTermModal.propTypes = {
   term: PropTypes.object,
 };
 
-const inputStyle = {
-  border: "1px solid var(--color-border)",
-  borderRadius: "var(--radius-md)",
-  background: "var(--color-bg-card)",
-  color: "var(--color-text-primary)",
-  padding: "10px 14px",
-  fontSize: 14,
-  outline: "none",
-};
