@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
 
+const labelStyle = { display: "flex", flexDirection: "column", gap: 6 };
+const labelTextStyle = { fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8ea3c4" };
+const fieldStyle = { width: "100%", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)", color: "#edf4ff", padding: "12px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" };
+
 const DEFAULT_BRANDING = {
   school_id: null,
   name: "EduCore",
@@ -76,6 +80,10 @@ export default function LoginView({ onLogin }) {
   const [passwordChangeReasons, setPasswordChangeReasons] = useState([]);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [schoolName, setSchoolName] = useState("");
+  const [adminName, setAdminName] = useState("");
+  const [phone, setPhone] = useState("");
   const [notice, setNotice] = useState("");
   const lastResolvedIdentifierRef = useRef("");
   const lastResolveRoleRef = useRef("");
@@ -145,6 +153,32 @@ export default function LoginView({ onLogin }) {
     color: "#edf4ff",
     fontFamily: "'DM Sans', 'Segoe UI', sans-serif",
   }), [branding.primary_color, branding.secondary_color]);
+
+  const submitSignup = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!schoolName || !adminName || !email || !password) {
+      return setError("All fields are required to create a school.");
+    }
+    setLoading(true);
+    try {
+      const data = await apiFetch("/auth/signup", {
+        method: "POST",
+        body: { schoolName, adminName, email, password, phone }
+      });
+      if (data.token) {
+        onLogin(data);
+      } else {
+        setNotice("School created successfully! You can now log in.");
+        setMode("staff");
+        setPassword("");
+      }
+    } catch (err) {
+      setError(err.message || "Failed to create school. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   async function submitStaff(event) {
     event.preventDefault();
@@ -329,8 +363,8 @@ export default function LoginView({ onLogin }) {
             </div>
 
             {!passwordChangeToken ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: 6, marginBottom: 24 }}>
-              {[{ id: "staff", label: "Staff Login" }, { id: "portal", label: "Parent / Student" }].map(tab => {
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, background: "rgba(255,255,255,0.04)", borderRadius: 14, padding: 6, marginBottom: 24 }}>
+              {[{ id: "staff", label: "Staff Login" }, { id: "portal", label: "Parent / Student" }, { id: "signup", label: "New School" }].map(tab => {
                 const active = mode === tab.id;
                 return (
                   <button key={tab.id} type="button" onClick={() => { setMode(tab.id); setError(""); }} style={{ border: "none", borderRadius: 10, padding: "10px 12px", background: active ? "linear-gradient(135deg, var(--primary-color), var(--secondary-color))" : "transparent", color: active ? "#08111f" : "#d7e4fb", fontWeight: 700, cursor: "pointer" }}>
@@ -377,9 +411,25 @@ export default function LoginView({ onLogin }) {
                   {error ? <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div> : null}
                   <SubmitButton loading={loading} text="Sign In" />
                 </form>
+              ) : mode === "signup" ? (
+                <form onSubmit={submitSignup} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
+                  <div style={{ textAlign: "center", marginBottom: 8 }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: "#ffffff" }}>Start your free trial</div>
+                    <div style={{ fontSize: 13, color: "#8ea3c4" }}>Create a new school workspace in seconds.</div>
+                  </div>
+                  <label style={labelStyle}><span style={labelTextStyle}>School Name</span><input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} type="text" placeholder="e.g. Royal Academy" style={fieldStyle} /></label>
+                  <label style={labelStyle}><span style={labelTextStyle}>Your Name (Director)</span><input value={adminName} onChange={(e) => setAdminName(e.target.value)} type="text" placeholder="e.g. Jane Doe" style={fieldStyle} /></label>
+                  <label style={labelStyle}><span style={labelTextStyle}>Email Address</span><input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@school.edu" style={fieldStyle} /></label>
+                  <label style={labelStyle}><span style={labelTextStyle}>Password</span><input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Min 8 characters" style={fieldStyle} /></label>
+                  {error ? <div style={{ borderRadius: 12, padding: "10px 12px", background: "rgba(239,68,68,0.12)", color: "#fca5a5", fontSize: 13 }}>{error}</div> : null}
+                  <SubmitButton loading={loading} text="Create School Workspace" />
+                  <div style={{ textAlign: "center", fontSize: 13, marginTop: 8, color: "#64748b" }}>
+                    Already have an account? <span style={{ color: "#3B82F6", cursor: "pointer", fontWeight: 600 }} onClick={() => setMode("staff")}>Log in</span>
+                  </div>
+                </form>
               ) : (
                 <form onSubmit={submitPortal} style={{ display: "flex", flexDirection: "column", gap: 14 }} autoComplete="off">
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                     {["parent", "student"].map(role => (
                       <button key={role} type="button" onClick={() => setPortalRole(role)} style={{ border: "none", borderRadius: 10, padding: "10px 12px", background: portalRole === role ? "linear-gradient(135deg, var(--primary-color), var(--secondary-color))" : "rgba(255,255,255,0.04)", color: portalRole === role ? "#08111f" : "#d7e4fb", fontWeight: 700, cursor: "pointer", textTransform: "capitalize" }}>{role}</button>
                     ))}
@@ -398,9 +448,7 @@ export default function LoginView({ onLogin }) {
   );
 }
 
-const labelStyle = { display: "flex", flexDirection: "column", gap: 6 };
-const labelTextStyle = { fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8ea3c4" };
-const fieldStyle = { width: "100%", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)", color: "#edf4ff", padding: "12px 14px", fontSize: 14, outline: "none", boxSizing: "border-box" };
+
 
 function SubmitButton({ loading, text }) {
   return (
