@@ -91,7 +91,8 @@ function loadPaystackScript() {
 
 export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, canViewTotals, canDeletePayments, toast, linkedStudentId, school }) {
   const { term, academicYear, startDate, endDate } = useCurrentTerm(auth);
-  const displayTerm = term || "Term 2";
+  const [selectedTerm, setSelectedTerm] = useState("current");
+  const displayTerm = selectedTerm === "current" ? (term || "Term 2") : selectedTerm;
   const [tab, setTab]                 = useState("payments");
   const [showPayment, setShowPayment] = useState(false);
   const [showStruct, setShowStruct]   = useState(false);
@@ -718,9 +719,14 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "var(--space-2)" }}>
-            <Button variant={filterDate==="all" ? "primary" : "ghost"} onClick={() => setFilterDate("all")}>All Time</Button>
-            <Button variant={filterDate==="today" ? "primary" : "ghost"} onClick={() => setFilterDate("today")}>Today</Button>
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+            <Button variant={filterDate==="today" ? "primary" : "ghost"} onClick={() => setFilterDate(filterDate === "today" ? "all" : "today")}>Today</Button>
+            <div style={{ width: "1px", background: "var(--color-border)", margin: "0 var(--space-2)" }} />
+            <Button variant={selectedTerm==="current" ? "secondary" : "ghost"} onClick={() => setSelectedTerm("current")}>Current Term</Button>
+            <Button variant={selectedTerm==="Term 1" ? "secondary" : "ghost"} onClick={() => setSelectedTerm("Term 1")}>Term 1</Button>
+            <Button variant={selectedTerm==="Term 2" ? "secondary" : "ghost"} onClick={() => setSelectedTerm("Term 2")}>Term 2</Button>
+            <Button variant={selectedTerm==="Term 3" ? "secondary" : "ghost"} onClick={() => setSelectedTerm("Term 3")}>Term 3</Button>
+            <Button variant={selectedTerm==="all" ? "secondary" : "ghost"} onClick={() => setSelectedTerm("all")}>All Time (All Terms)</Button>
           </div>
           
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginLeft: "auto" }}>

@@ -222,7 +222,9 @@ const classesForDropdown = useMemo(() => {
         setBulkMarks(resolved.reduce((a, s) => ({ ...a, [s.name]: "" }), {}));
       });
   }, [auth]);
-  useEntitySync({ url: `/grades${currentTerm ? `?term=${encodeURIComponent(currentTerm)}` : ""}`, token: auth?.token, setter: setResults, dependencies: [currentTerm] });
+  const fetchTerm = term === "all" ? null : (term || currentTerm);
+  const fetchUrl = fetchTerm ? `/grades?term=${encodeURIComponent(fetchTerm)}` : `/grades`;
+  useEntitySync({ url: fetchUrl, token: auth?.token, setter: setResults, dependencies: [fetchUrl], enabled: true });
 
   const filtered = results.filter(r =>
     (term === "all" || r.term === term) &&
