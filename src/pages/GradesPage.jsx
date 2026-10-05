@@ -223,7 +223,6 @@ const classesForDropdown = useMemo(() => {
       });
   }, [auth]);
   useEntitySync({ url: `/grades${currentTerm ? `?term=${encodeURIComponent(currentTerm)}` : ""}`, token: auth?.token, setter: setResults, dependencies: [currentTerm] });
-  }, [auth, setResults, toast, currentTerm]);
 
   const filtered = results.filter(r =>
     (term === "all" || r.term === term) &&
