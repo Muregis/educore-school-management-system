@@ -7,6 +7,7 @@ export function useEntitySync({
   setter,
   transform = (x) => x,
   enabled = true,
+  intervalMs = 5 * 60 * 1000,
   dependencies = [],
   fetcher = null,
 }) {
