@@ -444,12 +444,14 @@ const fullNav = useMemo(() => {
     error: currentTermError,
   } = useCurrentTerm(auth);
 
-  const beginTenantRefresh = useCallback(() => {
+  const beginTenantRefresh = useCallback((silent = false) => {
     tenantRequestRef.current += 1;
     setDataRefreshRequest((value) => value + 1);
-    setTenantDataLoading(true);
-    setTenantDataError(null);
-    resetClientData();
+    if (!silent) {
+      setTenantDataLoading(true);
+      setTenantDataError(null);
+      resetClientData();
+    }
   }, [resetClientData]);
 
   const hydrateTenantData = useCallback(async (loggedInAuth, term, termStartDate, termEndDate) => {
@@ -462,9 +464,12 @@ const fullNav = useMemo(() => {
       ? `?from=${encodeURIComponent(termStartDate)}&to=${encodeURIComponent(termEndDate)}`
       : "";
 
-    setTenantDataLoading(true);
-    setTenantDataError(null);
-    resetClientData();
+    const isInitialLoad = tenantRequestRef.current <= 1;
+    if (isInitialLoad) {
+      setTenantDataLoading(true);
+      setTenantDataError(null);
+      resetClientData();
+    }
 
     const [schoolRes, studentsRes, teachersRes, attendanceRes, gradesRes, paymentsRes, feeRes, timetableRes] = await Promise.allSettled([
       apiFetch("/settings/school", { token, timeoutMs: 12000, retries: 0 }),
@@ -571,14 +576,13 @@ const fullNav = useMemo(() => {
       if (refreshTimeout) clearTimeout(refreshTimeout);
       refreshTimeout = setTimeout(() => {
         if (document.visibilityState === "visible") {
-          beginTenantRefresh();
+          beginTenantRefresh(true);
         }
       }, 3000);
     };
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        reloadPayments();
         debouncedRefresh();
       }
     };
@@ -877,7 +881,7 @@ const fullNav = useMemo(() => {
           {bottomNavItems.map(n => (
             <button key={n.id} className={`ec-bottom-nav-item ${page === n.id ? "active" : ""} touch-target`} onClick={() => setPage(n.id)}>
               <span className="icon">{n.icon}</span>
-              <span>{n.label.length > 8 ? n.label.slice(0,7)+"…" : n.label}</span>
+              <span>{n.label === "Dashboard" ? "Home" : n.label === "Attendance" ? "Att." : n.label}</span>
             </button>
           ))}
           <button className="ec-bottom-nav-item touch-target" onClick={() => setDrawerOpen(true)}>

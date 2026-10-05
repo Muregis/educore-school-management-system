@@ -280,7 +280,7 @@ function UsersTab({ auth, toast }) {
   const load = () => {
     setLoading(true);
     apiFetch("/settings/users", { token: auth?.token })
-      .then(d => { setUsers(d || []); setLoading(false); })
+      .then(d => { setUsers(Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : [])); setLoading(false); })
       .catch(() => setLoading(false));
   };
 
@@ -358,7 +358,7 @@ function UsersTab({ auth, toast }) {
         <Card style={{ padding: 0, overflow: "hidden" }}>
           <Table
             headers={["Name", "Email", "Role", "Status", "Action"]}
-            data={users.map(u => [
+            data={(Array.isArray(users) ? users : []).map(u => [
               <span key="name" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{u.full_name}</span>,
               <span key="email" style={{ color: "var(--color-text-secondary)", fontSize: "13px" }}>{u.email}</span>,
               <Badge key="role" text={u.role} variant={u.role === "admin" ? "primary" : u.role === "finance" ? "warning" : u.role === "hr" ? "danger" : u.role === "librarian" ? "success" : "info"} />,

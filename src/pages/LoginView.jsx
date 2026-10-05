@@ -182,7 +182,7 @@ export default function LoginView({ onLogin }) {
         const hint = data?.message ? ` Server said: ${data.message}` : "";
         throw new Error("Login succeeded but the server response was missing session data." + hint);
       }
-      onLogin({ id: data.user.userId, name: data.user.name, email: data.user.email ?? email, role: data.user.role, schoolId: data.user.schoolId, token: data.token, sessionId: data.sessionId });
+      onLogin({ id: data.user.userId || data.user.id, name: data.user.name || data.user.full_name || data.user.first_name, email: data.user.email ?? email, role: data.user.role, schoolId: data.user.schoolId || data.user.school_id, token: data.token, sessionId: data.sessionId || data.session_id });
       setEmail("");
       setPassword("");
     } catch (err) {
@@ -196,7 +196,15 @@ export default function LoginView({ onLogin }) {
         setNotice(body.message || "Please set a new password to continue.");
         setMode("passwordChange");
       } else {
-        setError(err.message || "Login failed");
+        if (err.status === 401 || err.status === 403) {
+          setError(err.message || "Incorrect password or unauthorized.");
+        } else if (err.status === 404) {
+          setError(err.message || "User not found.");
+        } else if (err.message && (err.message.includes("timed out") || err.message.includes("Failed to fetch") || !navigator.onLine)) {
+          setError("Network error. Please check your connection and try again.");
+        } else {
+          setError(err.message || "Login failed");
+        }
       }
     } finally {
       setLoading(false);

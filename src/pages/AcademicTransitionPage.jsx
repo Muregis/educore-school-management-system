@@ -37,8 +37,8 @@ export default function AcademicTransitionPage({ auth }) {
         academicYear: yearRes?.data || yearRes || null,
         term: termRes?.data || termRes || null,
       });
-      setClasses(classesRes?.data || classesRes || []);
-      setStudents((studentsRes?.data || studentsRes || []).length);
+      const cls = classesRes?.data || classesRes; setClasses(Array.isArray(cls) ? cls : []);
+      const st = studentsRes?.data || studentsRes; setStudents(Array.isArray(st) ? st.length : 0);
 
       // Load term financials if we have a current term
       if (termRes?.data?.term_name || termRes?.term_name) {
@@ -197,7 +197,7 @@ export default function AcademicTransitionPage({ auth }) {
         <Card style={{ marginBottom: 16, border: '1px solid #22C55E', background: 'rgba(34,197,94,0.08)' }}>
           <div style={{ color: '#22C55E', fontWeight: 600 }}>Term Closed Successfully</div>
           <div style={{ color: C.textSub, fontSize: 13, marginTop: 4 }}>
-            {termResult.summary.promoted || 0} students promoted · {termResult.summary.balancesCarriedForward || 0} balances carried forward
+            {termResult.summary?.promoted || 0} students promoted · {termResult.summary?.balancesCarriedForward || 0} balances carried forward
           </div>
         </Card>
       )}
@@ -206,7 +206,7 @@ export default function AcademicTransitionPage({ auth }) {
         <Card style={{ marginBottom: 16, border: '1px solid #22C55E', background: 'rgba(34,197,94,0.08)' }}>
           <div style={{ color: '#22C55E', fontWeight: 600 }}>Academic Year Ended Successfully</div>
           <div style={{ color: C.textSub, fontSize: 13, marginTop: 4 }}>
-            {yearResult.summary.promoted || 0} students promoted · {yearResult.summary.balancesCarriedForward || 0} balances carried forward
+            {yearResult.summary?.promoted || 0} students promoted · {yearResult.summary?.balancesCarriedForward || 0} balances carried forward
           </div>
         </Card>
       )}
@@ -338,7 +338,7 @@ AcademicTransitionPage.propTypes = {
 };
 
 function TermConfirmModal({ show, onHide, onConfirm, loading, term, classes, financials }) {
-  const promotedCount = classes.filter(c => c.next_class_name).length;
+  const promotedCount = Array.isArray(classes) ? classes.filter(c => c.next_class_name).length : 0;
   const finalClasses = classes.filter(c => !c.next_class_name).length;
 
   return (
@@ -415,7 +415,7 @@ TermConfirmModal.propTypes = {
 };
 
 function YearConfirmModal({ show, onHide, onConfirm, loading, year, classes, students }) {
-  const promotedCount = classes.filter(c => c.next_class_name).length;
+  const promotedCount = Array.isArray(classes) ? classes.filter(c => c.next_class_name).length : 0;
 
   return (
     <Modal isOpen={show} onHide={onHide} title="End Academic Year">

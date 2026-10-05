@@ -28,7 +28,7 @@ export default function TermManagementPage({ auth }) {
         apiFetch("/academic/terms", { token: auth?.token }).catch(() => []),
       ]);
       setCurrentTerm(currentRes || null);
-      setTerms(Array.isArray(allRes) ? allRes : []);
+      setTerms(Array.isArray(allRes) ? allRes : (Array.isArray(allRes?.data) ? allRes.data : []));
       if (allRes?.length && !form.academic_year) {
         const year = allRes[0]?.academic_year || "";
         setForm(f => ({ ...f, academic_year: year }));
@@ -191,7 +191,7 @@ export default function TermManagementPage({ auth }) {
         <Card style={{ marginBottom: 16, border: "1px solid #22C55E", background: "rgba(34,197,94,0.08)" }}>
           <div style={{ color: "#22C55E", fontWeight: 600 }}>Term Closed Successfully</div>
           <div style={{ color: C.textSub, fontSize: 13, marginTop: 4 }}>
-            {actionResult.summary.promoted || 0} students promoted · {actionResult.summary.balancesCarriedForward || 0} balances carried forward
+            {actionResult.summary?.promoted || 0} students promoted · {actionResult.summary?.balancesCarriedForward || 0} balances carried forward
           </div>
         </Card>
       )}

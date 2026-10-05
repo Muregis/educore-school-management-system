@@ -388,7 +388,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
 
       <Card style={{ padding: "var(--space-4)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-3)", alignItems: "end" }}>
-          <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search name, admission, phone..." />
+          <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search students..." />
           <Select
             value={cls}
             onChange={e => setCls(e.target.value)}

@@ -20,7 +20,7 @@ const EPHEMERAL_KEYS = new Set([
 ]);
 
 /** One-time wipe of legacy forever-cached entity blobs. */
-const WIPE_FLAG = "educore.entityCacheCleared.v2";
+const WIPE_FLAG = "educore.entityCacheCleared.v3";
 if (typeof window !== "undefined" && !localStorage.getItem(WIPE_FLAG)) {
   try {
     EPHEMERAL_KEYS.forEach((key) => localStorage.removeItem(key));
