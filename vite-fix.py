@@ -1,4 +1,7 @@
-import { defineConfig } from 'vite'
+﻿import os
+
+fp = 'vite.config.js'
+content = '''import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
@@ -31,3 +34,7 @@ export default defineConfig(() => ({
       : undefined,
   }
 }))
+'''
+with open(fp, 'w', encoding='utf-8') as f:
+    f.write(content)
+print("Updated vite.config.js")
