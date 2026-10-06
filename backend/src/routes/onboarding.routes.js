@@ -1,19 +1,63 @@
 /**
- * Public school signup + first-run onboarding.
+ * Gated school signup + first-run onboarding.
  *
- * POST /api/onboarding/register-school  (public)
+ * POST /api/onboarding/register-school  (invite code required — not open to the public)
  * GET  /api/onboarding/status           (auth)
  * POST /api/onboarding/complete         (auth, director)
+ *
+ * Security (fail closed):
+ * - SCHOOL_SIGNUP_INVITE_CODE must be set in env; requests without a matching inviteCode are rejected.
+ * - If the env var is unset/empty, registration is disabled entirely (403).
+ * - Per-IP rate limit on register-school (5/hour).
  */
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import rateLimit from "express-rate-limit";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { env } from "../config/env.js";
 import { resolvePasswordPolicy, validatePassword } from "../middleware/passwordPolicy.js";
 
 const router = Router();
+
+const registerSchoolRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { message: "Too many school registration attempts from this network. Try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+function getRequiredInviteCode() {
+  return String(
+    process.env.SCHOOL_SIGNUP_INVITE_CODE ||
+      process.env.SIGNUP_INVITE_CODE ||
+      env.schoolSignupInviteCode ||
+      ""
+  ).trim();
+}
+
+function assertInviteAllowed(provided) {
+  const required = getRequiredInviteCode();
+  if (!required) {
+    return {
+      ok: false,
+      status: 403,
+      message:
+        "Public school registration is disabled. Contact EduCore support for an invite code.",
+    };
+  }
+  const got = String(provided || "").trim();
+  if (!got || got !== required) {
+    return {
+      ok: false,
+      status: 403,
+      message: "Invalid or missing invite code. School creation is invite-only.",
+    };
+  }
+  return { ok: true };
+}
 
 const PRIMARY_CLASSES = [
   "PP1", "PP2", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8",
@@ -77,10 +121,15 @@ function issueToken(user) {
 
 /**
  * POST /api/onboarding/register-school
- * Body: { schoolName, directorName, email, password, phone? }
+ * Body: { schoolName, directorName, email, password, phone?, inviteCode }
  */
-router.post("/register-school", async (req, res, next) => {
+router.post("/register-school", registerSchoolRateLimit, async (req, res, next) => {
   try {
+    const inviteGate = assertInviteAllowed(req.body?.inviteCode ?? req.body?.invite_code);
+    if (!inviteGate.ok) {
+      return res.status(inviteGate.status).json({ message: inviteGate.message });
+    }
+
     const schoolName = String(req.body?.schoolName || "").trim();
     const directorName = String(req.body?.directorName || "").trim();
     const email = String(req.body?.email || "").trim().toLowerCase();
@@ -204,9 +253,6 @@ router.post("/register-school", async (req, res, next) => {
   }
 });
 
-/**
- * GET /api/onboarding/status
- */
 router.get("/status", authRequired, async (req, res, next) => {
   try {
     const schoolId = req.user.schoolId || req.user.school_id;
@@ -236,15 +282,6 @@ router.get("/status", authRequired, async (req, res, next) => {
   }
 });
 
-/**
- * POST /api/onboarding/complete
- * Body: {
- *   schoolType: "primary" | "secondary" | "both",
- *   academicYear: 2026,
- *   defaultTuition: number,
- *   activeTerm?: "Term 1" | "Term 2" | "Term 3"
- * }
- */
 router.post("/complete", authRequired, async (req, res, next) => {
   try {
     const schoolId = req.user.schoolId || req.user.school_id;
@@ -295,7 +332,6 @@ router.post("/complete", authRequired, async (req, res, next) => {
       createdClasses = data || [];
     }
 
-    // Subjects (best-effort)
     try {
       const subjectRows = CORE_SUBJECTS.map((s) => ({
         school_id: schoolId,
@@ -308,7 +344,6 @@ router.post("/complete", authRequired, async (req, res, next) => {
       console.warn("[onboarding] subjects skip", e?.message);
     }
 
-    // Terms via school_settings (works even if academic_years table differs)
     const terms = kenyanTermDates(academicYear).map((t) => ({
       ...t,
       is_current: t.name === preferredActive,
@@ -322,7 +357,6 @@ router.post("/complete", authRequired, async (req, res, next) => {
     await upsertSetting(schoolId, "term_start", terms.find((t) => t.is_current)?.start || "");
     await upsertSetting(schoolId, "term_end", terms.find((t) => t.is_current)?.end || "");
 
-    // Try academic_years / terms tables if present
     try {
       const { data: yearRow } = await supabase
         .from("academic_years")
@@ -353,7 +387,6 @@ router.post("/complete", authRequired, async (req, res, next) => {
       console.warn("[onboarding] academic_years optional", e?.message);
     }
 
-    // Fee structures for each class × active term
     if (defaultTuition > 0 && createdClasses.length) {
       const feeRows = createdClasses.map((c) => ({
         school_id: schoolId,
@@ -367,7 +400,6 @@ router.post("/complete", authRequired, async (req, res, next) => {
       if (feeErr) console.warn("[onboarding] fee_structures", feeErr.message);
     }
 
-    // Update school profile fields when columns exist
     await supabase
       .from("schools")
       .update({
