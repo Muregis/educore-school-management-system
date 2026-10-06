@@ -135,6 +135,14 @@ app.use(idempotency());
 
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
+
+// FE "New School" posts to /api/auth/signup — alias to onboarding register handler
+app.post("/api/auth/signup", (req, res, next) => {
+  req.url = "/register-school";
+  req.originalUrl = "/api/onboarding/register-school";
+  return onboardingRoutes(req, res, next);
+});
+
 app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api/teacherassignments", teacherAssignmentsRoutes);
@@ -142,8 +150,15 @@ app.use("/api/teacher-assignments", teacherAssignmentsRoutes);
 app.use("/api/parent", authRequired, validateSession, parentRoutes);
 
 app.use("/api", (req, res, next) => {
-  const exemptPaths = ['/api/health', '/api/auth', '/api/onboarding', '/api/public', '/api/teacherassignments', '/api/teacher-assignments'];
-  const isExempt = exemptPaths.some(path => req.path.startsWith(path));
+  // When middleware is mounted at /api, req.path is relative (e.g. /auth/login, /onboarding/...).
+  const p = String(req.path || "");
+  const full = String(req.originalUrl || "");
+  const exemptPrefixes = [
+    "/health", "/auth", "/onboarding", "/public",
+    "/teacherassignments", "/teacher-assignments",
+    "/api/health", "/api/auth", "/api/onboarding", "/api/public",
+  ];
+  const isExempt = exemptPrefixes.some((prefix) => p.startsWith(prefix) || full.startsWith(prefix));
   if (isExempt) return next();
   return authRequired(req, res, next);
 });
