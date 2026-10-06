@@ -6,8 +6,8 @@ const API_BASE =
   "https://educore-school-management-system.onrender.com/api";
 
 /**
- * Public "Create your school" form.
- * On success: saveSession + call onSuccess({ needsOnboarding: true }).
+ * Invite-only "Create your school" form.
+ * Requires inviteCode matching server SCHOOL_SIGNUP_INVITE_CODE.
  */
 export default function SignupPage({ onSuccess, onGoLogin }) {
   const [schoolName, setSchoolName] = useState("");
@@ -15,6 +15,7 @@ export default function SignupPage({ onSuccess, onGoLogin }) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -33,6 +34,7 @@ export default function SignupPage({ onSuccess, onGoLogin }) {
           email: email.trim().toLowerCase(),
           password,
           phone: phone.trim() || undefined,
+          inviteCode: inviteCode.trim(),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -71,7 +73,7 @@ export default function SignupPage({ onSuccess, onGoLogin }) {
           <div style={styles.logo}>E</div>
           <div>
             <div style={styles.title}>Create your school</div>
-            <div style={styles.sub}>EduCore · multi-tenant school workspace</div>
+            <div style={styles.sub}>EduCore · invite-only workspace</div>
           </div>
         </div>
 
@@ -118,6 +120,17 @@ export default function SignupPage({ onSuccess, onGoLogin }) {
               placeholder="07xx…"
               style={styles.input}
               autoComplete="tel"
+            />
+          </label>
+          <label style={styles.label}>
+            Invite code
+            <input
+              required
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              placeholder="Provided by EduCore"
+              style={styles.input}
+              autoComplete="off"
             />
           </label>
           <label style={styles.label}>
