@@ -14,6 +14,7 @@ import { idempotency } from "./middleware/idempotency.js";
 import { requestLogger } from "./utils/logger.js";
 import healthRoutes        from "./routes/health.routes.js";
 import authRoutes          from "./routes/auth.routes.js";
+import onboardingRoutes    from "./routes/onboarding.routes.js";
 import studentsRoutes      from "./routes/students.routes.js";
 import collegeRoutes       from "./routes/college.routes.js";
 import teachersRoutes      from "./routes/teachers.routes.js";
@@ -54,20 +55,20 @@ import parentRoutes        from "./routes/parent.routes.js";
 import newApiRoutes       from "./routes/new_api_routes.js";
 import updateRequestsRoutes from "./routes/update_requests.js";
 import enhancedExportsRoutes from "./routes/enhanced_exports.js";
-import branchRoutes          from "./routes/branch.routes.js"; // NEW: Branch support
-import adminPermissionsRoutes from "./routes/admin-permissions.routes.js"; // NEW: Director admin permissions
-import performanceRoutes    from "./routes/performance.routes.js"; // NEW: KNEC performance sheets
-import promotionRoutes      from "./routes/promotion.routes.js";  // NEW: Student promotion chain
-import feereRemindersRoutes   from "./routes/feereminders.routes.js";  // NEW: Fee reminder automation
-import academicTermsRoutes      from "./routes/academic-terms.routes.js";  // NEW: Academic term lifecycle
-import promotionAdvancedRoutes  from "./routes/promotion-advanced.routes.js";  // NEW: Advanced promotion
-import notificationQueueRoutes  from "./routes/notification-queue.routes.js";  // NEW: Notification queue
-import discountsRoutes         from "./routes/discounts.routes.js";  // NEW: Fee discounts system
-import billingRoutes           from "./routes/billing.routes.js";    // NEW: Billing automation
+import branchRoutes          from "./routes/branch.routes.js";
+import adminPermissionsRoutes from "./routes/admin-permissions.routes.js";
+import performanceRoutes    from "./routes/performance.routes.js";
+import promotionRoutes      from "./routes/promotion.routes.js";
+import feereRemindersRoutes   from "./routes/feereminders.routes.js";
+import academicTermsRoutes      from "./routes/academic-terms.routes.js";
+import promotionAdvancedRoutes  from "./routes/promotion-advanced.routes.js";
+import notificationQueueRoutes  from "./routes/notification-queue.routes.js";
+import discountsRoutes         from "./routes/discounts.routes.js";
+import billingRoutes           from "./routes/billing.routes.js";
 import expendituresRoutes     from "./routes/expenditures.routes.js";
-import examTypesRoutes         from "./routes/exam-types.routes.js";  // NEW: Exam types management
-import compiledResultsRoutes   from "./routes/compiled-results.routes.js";  // NEW: Compiled results endpoint
-import uploadRoutes           from "./routes/upload.routes.js";  // NEW: Cloudinary upload routes
+import examTypesRoutes         from "./routes/exam-types.routes.js";
+import compiledResultsRoutes   from "./routes/compiled-results.routes.js";
+import uploadRoutes           from "./routes/upload.routes.js";
 import examsEnhancedRoutes       from "./routes/exams-enhanced.routes.js";
 import libraryEnhancedRoutes     from "./routes/library-enhanced.routes.js";
 import hrPayrollRoutes           from "./routes/hr-payroll.routes.js";
@@ -80,7 +81,6 @@ import financeRoutes              from "./routes/finance.routes.js";
 import securityRoutes             from "./routes/security.routes.js";
 import classesRoutes              from "./routes/classes.routes.js";
 import { cacheMiddleware, invalidateCacheOnMutation } from "./middleware/cache.js";
-// import { startBackupScheduler } from "./services/backup.service.js";
 import { errorHandler }         from "./middleware/error.js";
 import { authRequired }         from "./middleware/auth.js";
 import { validateSession }      from "./middleware/session.js";
@@ -89,12 +89,9 @@ import { logTenantContext }     from "./helpers/tenant-debug.logger.js";
 
 const app = express();
 
-// Configure multer for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf', 'text/csv'];
     cb(null, allowedTypes.includes(file.mimetype));
@@ -113,7 +110,6 @@ const corsOrigins = String(env.corsOrigin || "")
   .map(s => s.trim())
   .filter(Boolean);
 
-// Enterprise middleware chain - order matters
 app.use(securityHeaders);
 app.use(compressionMiddleware);
 app.use(requestId);
@@ -135,26 +131,20 @@ app.use(express.json({ limit: "10mb" }));
 app.use(morgan("dev"));
 app.use(apiRateLimit);
 app.use(requestLogger);
-app.use(idempotency()); // Apply rate limiting to all API routes
+app.use(idempotency());
 
-// NEW: Apply tenant context middleware globally (after auth, before routes)
-// Note: auth routes are excluded from global auth and handled separately
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/onboarding", onboardingRoutes);
 app.use("/api/public", publicRoutes);
 app.use("/api/teacherassignments", teacherAssignmentsRoutes);
 app.use("/api/teacher-assignments", teacherAssignmentsRoutes);
 app.use("/api/parent", authRequired, validateSession, parentRoutes);
 
-// Apply global auth middleware to all /api routes except specific exemptions
 app.use("/api", (req, res, next) => {
-  const exemptPaths = ['/api/health', '/api/auth', '/api/public', '/api/teacherassignments', '/api/teacher-assignments'];
+  const exemptPaths = ['/api/health', '/api/auth', '/api/onboarding', '/api/public', '/api/teacherassignments', '/api/teacher-assignments'];
   const isExempt = exemptPaths.some(path => req.path.startsWith(path));
-  
-  if (isExempt) {
-    return next();
-  }
-  
+  if (isExempt) return next();
   return authRequired(req, res, next);
 });
 
@@ -166,10 +156,8 @@ app.use("/api", (req, _res, next) => {
   next();
 });
 
-// Bust response cache after any successful write (school-scoped)
 app.use(invalidateCacheOnMutation);
 
-// OLD: app.use("/api",               studentsRoutes);
 app.use("/api/students",      studentsRoutes);
 app.use("/api/college",         collegeRoutes);
 app.use("/api/teachers",      teachersRoutes);
@@ -192,7 +180,6 @@ app.use("/api/reportcards",   reportcardsRoutes);
 app.use("/api/analytics",     analyticsRoutes);
 app.use("/api",             newApiRoutes);
 app.use("/api/hr",            hrRoutes);
-// OLD: app.use("/api/library",       libraryRoutes);
 app.use("/api/library",       libraryRoutes);
 app.use("/api/analysis",      analysisRoutes);
 app.use("/api/activity-logs", activityRoutes);
@@ -208,11 +195,11 @@ app.use("/api/subscription", subscriptionRoutes);
 app.use("/api/medical",         medicalRoutes);
 app.use("/api/students",        updateRequestsRoutes);
 app.use("/api",                 enhancedExportsRoutes);
-app.use("/api/branches",        branchRoutes); // NEW: Branch/campus support
-app.use("/api/admin-permissions", adminPermissionsRoutes); // NEW: Director admin permissions
-app.use("/api/performance",     performanceRoutes);  // NEW: KNEC performance sheet
-app.use("/api/students/promote", promotionRoutes);   // NEW: Promotion chain
-app.use("/api/fees",             feereRemindersRoutes);      // NEW: Fee reminders (additive, does not override /api/payments)
+app.use("/api/branches",        branchRoutes);
+app.use("/api/admin-permissions", adminPermissionsRoutes);
+app.use("/api/performance",     performanceRoutes);
+app.use("/api/students/promote", promotionRoutes);
+app.use("/api/fees",             feereRemindersRoutes);
 app.use("/api/academic/terms",    academicTermsRoutes);
 app.use("/api/academic/years",     academicYearsRoutes);
 app.use("/api/students/lifecycle", studentLifecycleRoutes);
@@ -220,31 +207,25 @@ app.use("/api/finance", financeRoutes);
 app.use("/api/exams/v2", examsEnhancedRoutes);
 app.use("/api/library/v2", libraryEnhancedRoutes);
 app.use("/api/hr/payroll", hrPayrollRoutes);
-app.use(cacheMiddleware(30)); // short TTL; high-churn routes skipped inside middleware
+app.use(cacheMiddleware(30));
 app.use("/api/security", securityRoutes);
 app.use("/api/reports", reportingRoutes);
 app.use("/api/audit", auditComplianceRoutes);
 app.use("/api/backup", backupRoutes);
-app.use("/api/promotion",         promotionAdvancedRoutes);   // NEW: Advanced promotion
-app.use("/api/notifications",     notificationQueueRoutes);   // NEW: Notification queue
-app.use("/api/discounts",         discountsRoutes);           // NEW: Fee discounts system
-app.use("/api/billing",           billingRoutes);             // NEW: Billing automation
+app.use("/api/promotion",         promotionAdvancedRoutes);
+app.use("/api/notifications",     notificationQueueRoutes);
+app.use("/api/discounts",         discountsRoutes);
+app.use("/api/billing",           billingRoutes);
 app.use("/api/expenditures",      expendituresRoutes);
-app.use("/api/exam-types",        examTypesRoutes);           // NEW: Exam types management
-app.use("/api/grades/compiled",   compiledResultsRoutes);     // NEW: Compiled results endpoint
-app.use("/api/upload",            uploadRoutes);              // NEW: Cloudinary upload routes
-app.use("/api/classes",            classesRoutes);             // NEW: Classes management
+app.use("/api/exam-types",        examTypesRoutes);
+app.use("/api/grades/compiled",   compiledResultsRoutes);
+app.use("/api/upload",            uploadRoutes);
+app.use("/api/classes",            classesRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
 
-// Sentry error handler - must be added after all routes
 Sentry.setupExpressErrorHandler(app);
-
-// Legacy error handler (kept as fallback)
 app.use(errorHandler);
-
-// ── Start backup scheduler (daily at midnight) ───────────────────────────────
-// startBackupScheduler();
 
 export default app;
 export { upload };
