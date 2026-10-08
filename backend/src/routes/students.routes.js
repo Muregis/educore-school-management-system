@@ -531,7 +531,7 @@ router.patch("/:id/fees", requireRoles("admin", "finance", "director", "superadm
   try {
     const { schoolId } = req.user;
     const {
-      outstanding_balance, transport_fee, lunch_fee, breakfast_termly_fee,
+      outstanding_balance, breakfast_termly_fee,
       opening_balance, opening_balance_type, transport_direction, transport_base_fee,
       lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type,
       breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type,
@@ -541,8 +541,6 @@ router.patch("/:id/fees", requireRoles("admin", "finance", "director", "superadm
     const updateData = { updated_at: new Date().toISOString() };
 
     if (outstanding_balance !== undefined) updateData.outstanding_balance = parseFloat(outstanding_balance) || 0;
-    if (transport_fee !== undefined) updateData.transport_fee = parseFloat(transport_fee) || 0;
-    if (lunch_fee !== undefined) updateData.lunch_fee = parseFloat(lunch_fee) || 0;
     if (breakfast_termly_fee !== undefined) updateData.breakfast_termly_fee = parseFloat(breakfast_termly_fee) || 0;
     if (opening_balance !== undefined) updateData.opening_balance = parseFloat(opening_balance) || 0;
     if (opening_balance_type !== undefined) updateData.opening_balance_type = opening_balance_type || "owing";

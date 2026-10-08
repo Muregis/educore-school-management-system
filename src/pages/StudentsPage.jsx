@@ -22,6 +22,7 @@ import StatCard from "../components/ui/StatCard";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
+import StudentFeeSettingsBlock from "../components/StudentFeeSettingsBlock";
 
 function normalise(s) {
   return {
@@ -207,10 +208,8 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
         const patchPayload = {
           opening_balance: parseFloat(f.opening_balance) || 0,
           opening_balance_type: f.opening_balance_type || "owing",
-          transport_fee: f.transport_fee === "" ? 0 : parseFloat(f.transport_fee) || 0,
           transport_direction: f.transport_direction || "none",
           transport_base_fee: parseFloat(f.transport_base_fee) || 0,
-          lunch_fee: f.lunch_fee === "" ? 0 : parseFloat(f.lunch_fee) || 0,
           lunch_enabled: Boolean(f.lunch_enabled),
           lunch_daily_rate: parseFloat(f.lunch_daily_rate) || 0,
           lunch_days: f.lunch_days ? parseInt(f.lunch_days) : null,
@@ -512,6 +511,9 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <Input label="Blood Group" value={f.bloodGroup} onChange={e => handleChange('bloodGroup', e.target.value)} />
           <Select label="Status" value={f.status} onChange={e => handleChange('status', e.target.value)} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} />
         </div>
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <StudentFeeSettingsBlock f={f} onChange={handleChange} />
+        </div>
         {err && <div style={{ color: "var(--color-danger)", background: "var(--color-danger-muted)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", marginTop: "var(--space-4)", fontSize: "14px", borderLeft: "4px solid var(--color-danger)" }}>{err}</div>}
       </Modal>
 
@@ -533,6 +535,15 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
             <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Phone</div><div style={{ fontWeight: 600 }}>{profile.parentPhone || "—"}</div></div>
             <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>DOB</div><div style={{ fontWeight: 600 }}>{profile.dob || "—"}</div></div>
             <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>NEMIS</div><div style={{ fontWeight: 600 }}>{profile.nemisNumber || "—"}</div></div>
+          </div>
+          <div style={{ marginTop: "var(--space-4)", padding: "var(--space-3)", background: "var(--color-bg-surface)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-3)" }}>Fee Settings</div>
+            <div className="ec-grid-auto">
+              <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Opening Balance</div><div style={{ fontWeight: 600 }}>{profile.opening_balance ? `KES ${Number(profile.opening_balance).toLocaleString()} (${profile.opening_balance_type || "owing"})` : "—"}</div></div>
+              <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Transport</div><div style={{ fontWeight: 600 }}>{profile.transport_direction && profile.transport_direction !== "none" ? `${profile.transport_direction === "one_way" ? "One Way" : "Two Way"} · KES ${Number(profile.transport_base_fee || 0).toLocaleString()}` : "None"}</div></div>
+              <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Lunch</div><div style={{ fontWeight: 600 }}>{profile.lunch_enabled ? `Yes · ${profile.lunch_billing_type || "daily"}` : "No"}</div></div>
+              <div><div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Breakfast</div><div style={{ fontWeight: 600 }}>{profile.breakfast_enabled ? `Yes · ${profile.breakfast_billing_type || "daily"}` : "No"}</div></div>
+            </div>
           </div>
         </Modal>
       )}
