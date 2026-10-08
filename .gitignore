@@ -1,5 +1,17 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+.next/
+out/
+
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,28 +19,35 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Environment & secrets (never commit real values)
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.*.template
+backend/.env
+backend/.env.*
+!backend/.env.example
 
-# Editor directories and files
+# Editor / OS
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+Thumbs.db
 
-# Environment
-.env
-.env.local
-.env.production
-.env.staging
-backend/.env
+# Database backups (may contain tenant data)
+backups/
+*.sql.bak
+*.sql.dump
 
-# Database backups (may contain tenant data and credentials)
-backups/*.sql
+# Local / temp
+*.local
+.cache/
+tmp/
+temp/
