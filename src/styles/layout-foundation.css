@@ -1,21 +1,131 @@
-/* layout-foundation.css — mobile-first structural rules for EduCore
- * Loaded after design-system.css. Prefer classes here over page-local hacks.
+/**
+ * layout-foundation.css
+ * ----------------------------------------------------------------------------
+ * Structural layout ONLY (ui/mobile-first-shell track).
+ *
+ * Cascade: index.css → design-system.css → mobile.css → mobile-modern.css → THIS FILE
  */
 
-/* Page shell: prevent horizontal overflow from nested grids/tables */
-.ec-page-content {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
+html {
   overflow-x: clip;
 }
 
-/* Responsive grid helper used by many pages */
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+#root {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.ec-app-shell,
+.ec-main,
+.ec-page,
+.ec-page-content,
+.ec-sidebar,
+main {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ec-page-content {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ec-app-shell {
+  overflow-x: clip;
+}
+
+.ec-table-wrap,
+.table-responsive,
+[data-table-scroll] {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ec-table-wrap table,
+.table-responsive table,
+[data-table-scroll] table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ec-table-wrap th.nowrap,
+.ec-table-wrap td.nowrap,
+[data-table-scroll] th.nowrap,
+[data-table-scroll] td.nowrap {
+  white-space: nowrap;
+}
+
+.ec-modal-panel,
+[data-modal-panel] {
+  width: 100%;
+  max-width: min(100vw - 2rem, 32rem);
+  max-height: min(100dvh - 2rem, 90vh);
+  overflow: auto;
+  box-sizing: border-box;
+}
+
+.ec-drawer {
+  width: min(280px, 85vw) !important;
+  max-width: 100%;
+}
+
+@media screen and (max-width: 767px) {
+  .ec-page-content {
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+
+  .ec-btn,
+  button.touch-target {
+    min-height: 44px;
+  }
+}
+
+.ui-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ui-modal-overlay {
+  padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
+}
+
+.ui-modal-content,
+.ui-modal-content[data-modal-panel] {
+  max-width: min(100vw - 2rem, 560px);
+}
+
+@media screen and (max-width: 767px) {
+  .ui-modal-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .ui-modal-footer > * {
+    width: 100%;
+  }
+
+  .ui-btn.touch-target,
+  button.touch-target {
+    min-height: 44px;
+  }
+}
+
 .ec-grid-responsive {
   display: grid;
   gap: var(--space-3);
   grid-template-columns: 1fr;
-  min-width: 0;
 }
 
 @media screen and (min-width: 768px) {
@@ -135,19 +245,84 @@
 }
 
 @media screen and (min-width: 640px) {
-  .ec-form-grid.ec-form-grid-2 {
-    grid-template-columns: 1fr 1fr;
+  .ec-form-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ec-form-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-/* Tables: allow horizontal scroll without breaking the page */
-.ec-table-wrap {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+/*
+ * NUCLEAR MOBILE FORM STACK (all pages — P0 + P1)
+ * Inline style={{ gridTemplateColumns: "1fr 1fr" }} beats normal CSS.
+ * !important forces single-column under 768px for every form/filter grid
+ * inside page content and modals.
+ */
+@media screen and (max-width: 767px) {
+  .ec-page-content div[style*="display: grid"],
+  .ec-page-content div[style*="display:grid"],
+  .ui-modal-content div[style*="display: grid"],
+  .ui-modal-content div[style*="display:grid"],
+  [data-modal-panel] div[style*="display: grid"],
+  [data-modal-panel] div[style*="display:grid"],
+  .ec-modal-panel div[style*="display: grid"],
+  .ec-modal-panel div[style*="display:grid"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ec-page-content [style*="minWidth"],
+  .ec-page-content [style*="min-width"] {
+    min-width: 0 !important;
+  }
+
+  .ec-page-content input,
+  .ec-page-content select,
+  .ec-page-content textarea,
+  .ui-modal-content input,
+  .ui-modal-content select,
+  .ui-modal-content textarea {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
 }
 
-.ec-table-wrap table {
-  min-width: 480px;
+/* Table cells: wrap at word boundaries only — never mid-letter */
+.ui-table td,
+.ui-table-mobile-value {
+  white-space: normal !important;
+  overflow-wrap: break-word !important;
+  word-break: normal !important;
+  text-overflow: unset !important;
+  max-width: 100%;
+  line-height: 1.4;
+}
+
+.ui-table-mobile-card {
+  padding: 16px !important;
+}
+
+.ui-table-mobile-row {
+  align-items: flex-start !important;
+  gap: 12px !important;
+  padding: 10px 0 !important;
+}
+
+.ui-table-mobile-label {
+  flex-shrink: 0;
+  min-width: 88px;
+}
+
+.ui-table-mobile-value {
+  text-align: right;
+  min-width: 0;
+  flex: 1;
+  font-weight: 600;
+}
+
+/* Student name column — comfortable, not slender */
+.ui-table td:first-child,
+.ui-table th:first-child {
+  min-width: 140px;
 }
