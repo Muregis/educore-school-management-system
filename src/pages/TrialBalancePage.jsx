@@ -55,98 +55,94 @@ export default function TrialBalancePage({ auth, toast }) {
       <html>
       <head><title>Trial Balance</title>
       <style>
-        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
-        .header { text-align: center; margin-bottom: 24px; }
-        .header h1 { margin: 0 0 4px; font-size: 22px; }
-        .header p { margin: 0; color: #666; font-size: 13px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 13px; }
-        th { background: #f5f5f5; font-weight: 700; }
-        .totals { font-weight: 700; margin-top: 12px; text-align: right; font-size: 14px; }
-        .status { margin-top: 16px; padding: 10px; border-radius: 4px; font-weight: 700; text-align: center; }
-        .balanced { background: #e6f4ea; color: #1e7e34; }
-        .unbalanced { background: #fce8e6; color: #c5221f; }
+        body { font-family: system-ui, sans-serif; padding: 24px; }
+        h1 { margin: 0 0 8px; }
+        .meta { color: #666; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 8px; font-size: 13px; }
+        th { background: #f5f5f5; text-align: left; }
+        tfoot td { font-weight: 700; }
       </style>
       </head>
       <body>
-        <div class="header">
-          <h1>Trial Balance</h1>
-          <p>As of ${asOf}</p>
-        </div>
+        <h1>Trial Balance</h1>
+        <div class="meta">As of ${asOf} · ${isBalanced ? "Balanced" : "Not balanced"}</div>
         <table>
           <thead>
-            <tr><th>Account Code</th><th>Account Name</th><th>Type</th><th style="text-align: right">Debit Balance</th><th style="text-align: right">Credit Balance</th></tr>
+            <tr>
+              <th>Account Code</th>
+              <th>Account Name</th>
+              <th>Type</th>
+              <th style="text-align:right">Debit</th>
+              <th style="text-align:right">Credit</th>
+            </tr>
           </thead>
           <tbody>${rows}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3">Totals</td>
+              <td style="text-align:right">${money(totalDebits)}</td>
+              <td style="text-align:right">${money(totalCredits)}</td>
+            </tr>
+          </tfoot>
         </table>
-        <div class="totals">
-          Total Debit: ${money(totalDebits)} | Total Credit: ${money(totalCredits)}
-        </div>
-        <div class="status ${isBalanced ? "balanced" : "unbalanced"}">${isBalanced ? "Balanced" : "Unbalanced"}</div>
       </body>
       </html>
     `;
-    printHTML(html, { title: "Trial Balance" });
+    printHTML(html, "Trial Balance");
   };
 
   const handleExport = () => {
-    const headers = ["Account Code", "Account Name", "Account Type", "Debit Balance", "Credit Balance"];
-    const rows = trialBalance.map(acc => [
-      acc.account_code || "",
-      acc.account_name,
-      acc.account_type,
-      String(acc.debit_balance || acc.debit || 0),
-      String(acc.credit_balance || acc.credit || 0),
-    ]);
-    exportCsv("trial-balance.csv", headers, rows);
+    exportCsv(
+      "trial-balance.csv",
+      ["Account Code", "Account Name", "Account Type", "Debit Balance", "Credit Balance"],
+      trialBalance.map(acc => [
+        acc.account_code || "",
+        acc.account_name || "",
+        acc.account_type || "",
+        acc.debit_balance || acc.debit || 0,
+        acc.credit_balance || acc.credit || 0,
+      ])
+    );
   };
 
   if (loading) {
-    return (
-      <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>
-        Loading trial balance...
-      </div>
-    );
+    return <div style={{ padding: "32px", textAlign: "center", color: "var(--color-text-muted)" }}>Loading trial balance…</div>;
   }
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
         <div>
-          <h2 style={{ margin: 0, color: "var(--color-text-primary)", fontSize: "24px", fontWeight: 700 }}>
-            Trial Balance
-          </h2>
-          <p style={{ margin: "var(--space-1) 0 0 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
-            Summary of all account debit and credit balances
+          <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "var(--color-text-primary)" }}>Trial Balance</h1>
+          <p style={{ margin: "4px 0 0", color: "var(--color-text-secondary)", fontSize: "13px" }}>
+            {isBalanced ? "Books are balanced" : "Books are not balanced — review journal entries"}
           </p>
         </div>
-        <div style={{ display: "flex", gap: "var(--space-2)" }}>
-          <Button onClick={handleExport} variant="secondary">📥 Export CSV</Button>
-          <Button onClick={handlePrint} variant="secondary">🖨️ Print</Button>
-          <Button onClick={loadTrialBalance} variant="secondary">
-            🔄 Refresh
-          </Button>
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+          <Button variant="secondary" onClick={handleExport}>Export CSV</Button>
+          <Button variant="secondary" onClick={handlePrint}>Print</Button>
+          <Button onClick={loadTrialBalance}>Refresh</Button>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
         <StatCard 
           title="Total Debits" 
-          value={money(totalDebits)} 
-          icon="📥"
+          value={money(totalDebits)}
+          icon="📉"
           trend={0}
         />
         <StatCard 
           title="Total Credits" 
-          value={money(totalCredits)} 
-          icon="📤"
+          value={money(totalCredits)}
+          icon="📈"
           trend={0}
         />
         <StatCard 
-          title="Balance Status" 
-          value={isBalanced ? "Balanced ✅" : "Unbalanced ❌"}
-          icon={isBalanced ? "⚖️" : "⚠️"}
+          title="Status" 
+          value={isBalanced ? "Balanced" : "Out of Balance"}
+          icon={isBalanced ? "✅" : "⚠️"}
           trend={0}
         />
         <StatCard 
@@ -157,7 +153,6 @@ export default function TrialBalancePage({ auth, toast }) {
         />
       </div>
 
-      {/* Trial Balance Table */}
       <Card>
         {trialBalance.length === 0 ? (
           <div style={{ padding: "60px var(--space-4)" }}>

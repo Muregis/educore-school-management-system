@@ -143,6 +143,20 @@ main {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 110px), 1fr));
 }
 
+/* KPI summary grids — mobile-first, never crush StatCards */
+.ec-kpi-grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+  width: 100%;
+  min-width: 0;
+}
+@media screen and (max-width: 420px) {
+  .ec-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .ec-chart-bars {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
