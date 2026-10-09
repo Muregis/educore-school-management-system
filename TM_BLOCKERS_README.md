@@ -1,44 +1,30 @@
-# TM release blockers — apply instructions
+# TM release blockers — branch status
 
-**Do not merge this branch until `students.routes.js` is restored from main and patched.**
+## Backend: SAFE (placeholders removed)
 
-## Safe path (recommended)
+- `students.routes.js` — full routes + `buildStudentFeeUpdateData` (no `lunch_fee` column writes)
+- `app.js` — `isPublicApiPath` skips session/tenant on public routes
+- `auth.routes.js` — GET `/login` → 405 `AUTH_METHOD_NOT_ALLOWED`
+- CI — backend job runs `npm test`
+
+## Frontend mobile KPI
+
+If Reports still uses local StatCard `minWidth: 160px`, run from repo root:
 
 ```bash
-git fetch origin
-git checkout main
-git pull
-git checkout -b fix/tm-blockers-v2
-
-# 1) Mobile KPI (Reports, Expenditures, finance)
 node scripts/apply-mobile-kpi-fix.mjs
-
-# 2) Backend blockers (fee util, public path session skip, GET /login 405)
-# First ensure scripts exist (on main after merging apply scripts, or copy from this branch)
-node scripts/apply-tm-backend-blockers.mjs
-
-# 3) CI tests
-git cherry-pick e0cfe2e9cac8fb2f417c54daac0eb3f41bfb399d || true
-# Or ensure .github/workflows/ci.yml has backend "Run unit tests" step
-
-git add -A
-git status
-git commit -m "fix: TM blockers — mobile KPI, fee util, auth contract, CI tests"
-git push -u origin fix/tm-blockers-v2
+git add src/pages && git commit -m "fix(mobile): KPI grids on Reports and finance pages"
 ```
 
-## Verify
+That patches Reports, Expenditures, and finance pages to use `.ec-kpi-grid`.
 
-- Reports mobile: 2-column KPI grid, readable labels
-- `grep buildStudentFeeUpdateData backend/src/routes/students.routes.js`
-- `grep isPublicApiPath backend/src/app.js` (after apply-tm-backend)
-- `grep AUTH_METHOD_NOT_ALLOWED backend/src/routes/auth.routes.js`
-- CI runs `npm test` in backend job
+## Pre-merge check
 
-## On this branch already
+```bash
+# Must be empty
+grep -r PLACEHOLDER backend/src --include='*.js' || echo OK
 
-- CI: backend unit tests step
-- `scripts/apply-tm-backend-blockers.mjs`
-- `scripts/apply-mobile-kpi-fix.mjs` (on main)
-- `auth.routes.js`: GET /login → 405
-- `app.js`: restored from main (run apply-tm-backend for isPublicApiPath)
+grep -n buildStudentFeeUpdateData backend/src/routes/students.routes.js
+grep -n isPublicApiPath backend/src/app.js
+grep -n AUTH_METHOD_NOT_ALLOWED backend/src/routes/auth.routes.js
+```
