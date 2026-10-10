@@ -160,7 +160,6 @@ main {
   width: auto !important;
   flex: none !important;
 }
-/* Tablet+: allow more columns when there is real space */
 @media screen and (min-width: 640px) {
   .ec-kpi-grid {
     gap: var(--space-3) !important;
@@ -171,6 +170,7 @@ main {
   .ec-kpi-grid {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
   }
+}
 }
 
 .ec-chart-bars {
@@ -349,4 +349,18 @@ main {
 .ui-table td:first-child,
 .ui-table th:first-child {
   min-width: 140px;
+}
+
+/* Content grids (charts, dual panels) — 1 col on phone, multi from tablet */
+.ec-stack-grid {
+  display: grid !important;
+  gap: var(--space-4);
+  grid-template-columns: 1fr !important;
+  width: 100%;
+  min-width: 0;
+}
+@media screen and (min-width: 768px) {
+  .ec-stack-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)) !important;
+  }
 }
