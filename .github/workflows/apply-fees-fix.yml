@@ -1,0 +1,34 @@
+name: Apply Fees fix
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/fees-term-filter-receipt]
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/fees-term-filter-receipt
+      - name: Apply FeesPage patches
+        run: node scripts/apply-fees-fix.mjs
+      - name: Verify markers
+        run: |
+          grep -q 'paymentsTermParam' src/pages/FeesPage.jsx
+          grep -q '+ Manual Payment' src/pages/FeesPage.jsx
+          grep -q 'Receipt' src/pages/FeesPage.jsx
+          ! grep -q '+ Record Payment' src/pages/FeesPage.jsx
+          echo OK
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/FeesPage.jsx src/lib/print.js src/components/PaymentReceipt.jsx || true
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(fees): term filter, Manual Payment only, receipt print"
+            git push origin fix/fees-term-filter-receipt
+          fi
