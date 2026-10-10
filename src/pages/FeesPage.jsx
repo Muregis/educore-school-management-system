@@ -61,6 +61,7 @@ function normalisePayment(p) {
     status:      p.status         ?? "paid",
     reference:   p.reference_number ?? p.reference ?? "",
     paidBy:      p.paid_by          ?? p.paidBy    ?? "",
+    term:        p.term             ?? "",
     admissionNumber: p.admission_number ?? p.admissionNumber ?? "",
     parentPhone: p.parent_phone ?? p.parentPhone ?? "",
     parentName:  p.parent_name ?? p.parentName ?? "",
@@ -129,6 +130,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [studentDiscounts, setStudentDiscounts] = useState({});
   const [availableClasses, setAvailableClasses] = useState([]);
 
+  useEffect(() => { setPage(1); }, [selectedTerm, filterClass, filterDate, recordSearch]);
+
   useEffect(() => {
     if (!auth?.token) return;
     apiFetch("/classes", { token: auth.token })
@@ -162,13 +165,31 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     toast(`Day closed (${today}) — KES ${Number(dayTotal).toLocaleString()} collected`, "success");
   };
 
-  const reloadPayments = useCallback(async () => {
-    if (!auth?.token || !term) return;
-    const data = await apiFetch(`/payments?term=${encodeURIComponent(term)}`, { token: auth.token });
-    setPayments((data || []).map(normalisePayment));
-  }, [auth, setPayments, term]);
+  const paymentsTermParam = selectedTerm === "all"
+    ? null
+    : (selectedTerm === "current" ? (term || null) : selectedTerm);
 
-  useEntitySync({ url: `/payments?term=${encodeURIComponent(term)}`, token: auth?.token, setter: setPayments, transform: (data) => (data || []).map(normalisePayment), dependencies: [term], enabled: !!term });
+  const reloadPayments = useCallback(async () => {
+    if (!auth?.token) return;
+    if (selectedTerm === "current" && !term) return;
+    const qs = paymentsTermParam
+      ? `?term=${encodeURIComponent(paymentsTermParam)}`
+      : "";
+    const data = await apiFetch(`/payments${qs}`, { token: auth.token });
+    setPayments((data || []).map(normalisePayment));
+  }, [auth, setPayments, term, selectedTerm, paymentsTermParam]);
+
+  const paymentsSyncUrl = paymentsTermParam
+    ? `/payments?term=${encodeURIComponent(paymentsTermParam)}`
+    : "/payments";
+  useEntitySync({
+    url: paymentsSyncUrl,
+    token: auth?.token,
+    setter: setPayments,
+    transform: (data) => (data || []).map(normalisePayment),
+    dependencies: [paymentsTermParam, selectedTerm],
+    enabled: selectedTerm !== "current" || !!term,
+  });
 
   const normalisedPayments   = payments.map(p => p.payment_id ? normalisePayment(p) : p);
   const allStructures        = feeStructures.map(f => f.fee_structure_id ? normaliseFeeStruct(f) : f);
@@ -248,20 +269,17 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     return paymentDate.startsWith(businessToday);
   };
 
-  const filteredPayments = normalisedPayments.filter(p =>
-    (filterClass === "all" || p.className === filterClass) &&
-    (filterDate === "all" || (filterDate === "today" && isTodayPayment(p))) &&
-    (!recordSearch || (
-      (p.studentName || "").toLowerCase().includes(recordSearch.toLowerCase()) ||
-      String(p.studentId).includes(recordSearch) ||
-      (p.className || "").toLowerCase().includes(recordSearch.toLowerCase()) ||
-      (p.reference || "").toLowerCase().includes(recordSearch.toLowerCase()) ||
-      (p.admissionNumber || "").toLowerCase().includes(recordSearch.toLowerCase()) ||
-      (p.parentPhone || "").includes(recordSearch) ||
-      (p.parentName || "").toLowerCase().includes(recordSearch.toLowerCase()) ||
-      String(p.id || p.payment_id || "").includes(recordSearch)
-    ))
-  );
+  const filteredPayments = normalisedPayments.filter(p => {
+    const matchClass = filterClass === "all" || p.className === filterClass;
+    const matchDate = filterDate === "all" || (filterDate === "today" && isTodayPayment(p));
+    const matchTerm = selectedTerm === "all" || !p.term || p.term === displayTerm;
+    const q = (recordSearch || "").trim().toLowerCase();
+    const matchSearch = !q || [
+      p.studentName, p.className, p.reference, p.method, p.paidBy,
+      p.admissionNumber, p.parentPhone, p.term, String(p.studentId || "")
+    ].filter(Boolean).some(v => String(v).toLowerCase().includes(q));
+    return matchClass && matchDate && matchTerm && matchSearch;
+  });
   const { pages, rows }  = pager(filteredPayments, page);
   useEffect(() => { if (page > pages) setPage(1); }, [page, pages]);
 
@@ -800,8 +818,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             }}>🖨️ Print Statement</Button>}
             {canViewTotals && tab === "balances" && <Button variant="ghost" onClick={printBalanceReport}>🖨️ Print Balances</Button>}
             {canViewTotals && tab === "structure" && <Button variant="ghost" onClick={printFeeStructureReport}>🖨️ Print Fee Structure</Button>}
-            {canEdit && tab==="payments" && <Button onClick={() => setShowPayment(true)}>+ Record Payment</Button>}
-            {canEdit && tab==="payments" && <Button variant="secondary" onClick={() => setShowRecordPaymentModal(true)}>📝 Manual Payment</Button>}
+            {canEdit && tab==="payments" && <Button onClick={() => setShowRecordPaymentModal(true)}>+ Manual Payment</Button>}
             {canEdit && tab==="structure" && <Button onClick={() => { setEditStruct(null); setStructForm({className:"Grade 7",term:displayTerm,tuition:"",activity:"",misc:""}); setShowStruct(true); }}>Set Fee Structure</Button>}
             {canEdit && <Button variant="ghost" onClick={() => setShowDayEndSettings(true)}>⚙️ Day Settings</Button>}
             {canEdit && <Button variant="primary" onClick={closeDay}>🔒 Close Day</Button>}
@@ -871,7 +888,19 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                   <span key="pb" style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>{p.paidBy || "—"}</span>,
                   <Badge key="st" text={p.status} variant={p.status==="paid" ? "success" : p.status==="pending" ? "warning" : "danger"} />,
                   <span key="ref" style={{ fontSize: "11px", color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>{p.reference || "—"}</span>,
-                  <div key="actions" style={{ display: "flex", gap: "var(--space-2)" }}>
+                  <div key="actions" style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                    <Button size="sm" variant="ghost" onClick={() => {
+                      setReceipt({
+                        studentName: p.studentName,
+                        amount: p.amount,
+                        reference: p.reference || p.id,
+                        method: p.method,
+                        date: p.date,
+                        receivedBy: p.paidBy || auth?.name || auth?.email || "—",
+                        term: p.term || displayTerm,
+                      });
+                      setShowReceipt(true);
+                    }}>🖨️ Receipt</Button>
                     {["admin", "director", "superadmin"].includes(auth?.role) && (
                       <Button size="sm" variant="secondary" onClick={() => setEditingPayment({
                         id: p.id,
@@ -890,7 +919,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                     {canDeletePayments && (
                       <Button size="sm" variant="danger" onClick={() => delPayment(p.id)}>Delete</Button>
                     )}
-                    {!["admin", "director", "superadmin"].includes(auth?.role) && !canDeletePayments && "—"}
                   </div>
                 ])}
               />
