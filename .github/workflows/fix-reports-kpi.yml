@@ -1,0 +1,49 @@
+name: Fix Reports KPI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/tm-release-blockers]
+
+jobs:
+  patch-reports:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/tm-release-blockers
+          fetch-depth: 0
+
+      - name: Restore Reports from main and apply KPI patch
+        run: |
+          git fetch origin main
+          git checkout origin/main -- src/pages/ReportsPage.jsx
+          node scripts/apply-mobile-kpi-fix.mjs
+          if grep -q PLACEHOLDER src/pages/ReportsPage.jsx; then
+            echo "Still placeholder — fail"
+            exit 1
+          fi
+          if ! grep -q 'ec-kpi-grid' src/pages/ReportsPage.jsx; then
+            echo "Missing ec-kpi-grid — fail"
+            exit 1
+          fi
+          if grep -q 'minWidth: "160px"' src/pages/ReportsPage.jsx; then
+            echo "Still has minWidth 160 — fail"
+            exit 1
+          fi
+          echo "Reports OK"
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ReportsPage.jsx src/pages/ExpendituresPage.jsx || true
+          git add src/pages/*.jsx || true
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "fix(mobile): Reports + finance KPI grids via CI (shared StatCard + ec-kpi-grid)"
+            git push origin fix/tm-release-blockers
+          fi
