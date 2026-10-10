@@ -49,7 +49,7 @@ export default function StatCard({
         className="ec-stat-value"
         style={{
           marginTop: 6,
-          fontSize: valueStr.length > 9 ? 15 : 20,
+          fontSize: valueStr.length > 12 ? 13 : valueStr.length > 8 ? 15 : 18,
           fontWeight: 800,
           color: "var(--color-text-primary)",
           lineHeight: 1.25,
