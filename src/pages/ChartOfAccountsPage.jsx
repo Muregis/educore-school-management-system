@@ -128,7 +128,7 @@ export default function ChartOfAccountsPage({ auth, toast }) {
       </div>
 
       {/* Summary Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+      <div className="ec-kpi-grid" style={{ marginBottom: "var(--space-4)" }}>
         <StatCard 
           title="Total Accounts" 
           value={totalAccounts} 
@@ -222,7 +222,7 @@ export default function ChartOfAccountsPage({ auth, toast }) {
       {accountTypes.length > 0 && (
         <div style={{ marginTop: "var(--space-6)" }}>
           <h3 style={{ color: "var(--color-text-primary)", marginBottom: "var(--space-4)", fontSize: "18px" }}>Accounts by Type</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-4)" }}>
+          <div className="ec-kpi-grid">
             {accountTypes.map(type => {
               const typeAccounts = accounts.filter(acc => acc.account_type === type);
               return (

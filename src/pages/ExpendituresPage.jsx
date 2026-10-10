@@ -231,7 +231,7 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
         <StatCard label="This Month" value={money(currentMonthTotal)} color="var(--color-success)" title="All expenses dated this month" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: "var(--space-4)" }}>
+      <div className="ec-kpi-grid">
         <Card style={{ padding: "var(--space-4)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)", gap: "var(--space-3)", flexWrap: "wrap" }}>
             <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-text-primary)" }}>Monthly Expense Trend</div>

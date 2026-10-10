@@ -202,7 +202,7 @@ export default function AttendancePage({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: "var(--space-3)" }}>
+      <div className="ec-kpi-grid">
         {[
           { label: "Present", value: normalised.filter(a => a.status === "present").length, tone: "success" },
           { label: "Absent", value: normalised.filter(a => a.status === "absent").length, tone: "danger" },
@@ -274,7 +274,7 @@ export default function AttendancePage({
           <Button variant="primary" onClick={saveBulk}>Save Class Attendance</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+        <div className="ec-kpi-grid" style={{ marginBottom: "var(--space-4)" }}>
           <Select label="Class" value={cls} onChange={e => setCls(e.target.value)} options={(availableClasses ?? []).map(c => ({ value: c, label: c }))} />
           <Input label="Date" type="date" value={date} onChange={e => setDate(e.target.value)} />
         </div>

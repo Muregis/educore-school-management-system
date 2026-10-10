@@ -85,7 +85,7 @@ export default function DiscountsReportPage({ auth, toast }) {
       </div>
 
       {/* Summary Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+      <div className="ec-kpi-grid" style={{ marginBottom: "var(--space-4)" }}>
         <StatCard 
           title="Total Students with Discounts" 
           value={totalStudents} 
@@ -173,7 +173,7 @@ export default function DiscountsReportPage({ auth, toast }) {
       {discountTypes.length > 0 && (
         <div style={{ marginTop: "var(--space-6)" }}>
           <h3 style={{ color: "var(--color-text-primary)", marginBottom: "var(--space-4)", fontSize: "18px" }}>Summary by Discount Type</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-4)" }}>
+          <div className="ec-kpi-grid">
             {discountTypes.map(type => (
               <Card
                 key={type}

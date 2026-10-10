@@ -148,7 +148,7 @@ export default function IncomeStatementPage({ auth, toast }) {
       </div>
 
       {/* Summary Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+      <div className="ec-kpi-grid" style={{ marginBottom: "var(--space-4)" }}>
         <StatCard 
           title="Total Revenue" 
           value={money(totalRevenue)} 
@@ -175,7 +175,7 @@ export default function IncomeStatementPage({ auth, toast }) {
         />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "var(--space-4)" }}>
+      <div className="ec-stack-grid" style={{ gap: "var(--space-4)" }}>
         {/* Revenue Section */}
         <Card>
           <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-4)", fontSize: "16px" }}>

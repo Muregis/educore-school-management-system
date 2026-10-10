@@ -842,7 +842,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 <div style={{ fontWeight: 700, marginBottom: "var(--space-2)", color: "var(--color-info)" }}>
                   📊 Payment Progress for {students.find(s => String(s.student_id ?? s.id) === activeStudentIdForProgress)?.first_name} {students.find(s => String(s.student_id ?? s.id) === activeStudentIdForProgress)?.last_name}
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "var(--space-3)" }}>
+                <div className="ec-kpi-grid">
                   <div>
                     <div style={{ fontSize: "12px", color: "var(--color-info)", opacity: 0.8, marginBottom: "4px" }}>Total Paid</div>
                     <div style={{ fontWeight: 600, color: "var(--color-info)" }}>
@@ -969,7 +969,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             <>
               {/* Class Summary Cards - Director/Superadmin only */}
               {["director", "superadmin"].includes(auth?.role) && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+                <div className="ec-kpi-grid" style={{ marginBottom: "var(--space-4)" }}>
                   {(availableClasses ?? []).map(cls => {
                     const classBalances = balances.filter(b => b.className === cls);
                     const classStudents = classBalances.length;

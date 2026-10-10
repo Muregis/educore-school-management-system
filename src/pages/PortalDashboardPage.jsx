@@ -134,7 +134,7 @@ export default function PortalDashboardPage({
       </Card>
 
       {/* Quick Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-3)" }}>
+      <div className="ec-kpi-grid">
         <StatCard 
           label="Attendance" 
           value={`${attendanceRate}%`} 
@@ -158,7 +158,7 @@ export default function PortalDashboardPage({
         />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "var(--space-4)" }}>
+      <div className="ec-stack-grid" style={{ gap: "var(--space-4)" }}>
         {/* Recent Grades */}
         <Card style={{ padding: "var(--space-4)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>

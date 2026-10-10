@@ -357,7 +357,7 @@ const classesForDropdown = useMemo(() => {
       </div>
 
       {/* Filters */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:8, marginBottom:10 }}>
+      <div className="ec-kpi-grid" style={{ marginBottom: 10 }}>
         <select style={inputStyle} value={term} onChange={e => setTerm(e.target.value)}>
           <option value="all">All terms</option>
           <option value="Term 1">Term 1</option>
@@ -624,7 +624,7 @@ const classesForDropdown = useMemo(() => {
             </Btn>
           </div>
           
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 12 }}>
+          <div className="ec-kpi-grid" style={{ marginBottom: 12 }}>
             <div style={{ textAlign: "center", padding: "8px 12px", background: "#1A2A42", borderRadius: 6 }}>
               <div style={{ fontSize: 20, fontWeight: 700, color: "#3B82F6" }}>{rankings.classStats.meanScore.toFixed(1)}</div>
               <div style={{ fontSize: 11, color: C.textMuted }}>Class Mean</div>

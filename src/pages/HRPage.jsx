@@ -391,7 +391,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
     <div style={{ padding:4 }}>
 
       {/* Summary cards */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))", gap:12, marginBottom:20 }}>
+      <div className="ec-kpi-grid" style={{ marginBottom: 20 }}>
         {[
           { label:"Total Staff",     value:totalStaff,         color:"#3b82f6" },
           { label:"Active",          value:activeStaff,        color:"#22c55e" },

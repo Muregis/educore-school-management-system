@@ -207,7 +207,7 @@ export default function JournalEntriesPage({ auth, toast }) {
       </div>
 
       {/* Summary Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+      <div className="ec-kpi-grid" style={{ marginBottom: "var(--space-4)" }}>
         <StatCard 
           title="Total Entries" 
           value={journalEntries.length} 
