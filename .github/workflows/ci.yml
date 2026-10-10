@@ -50,6 +50,6 @@ jobs:
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
       - name: Run unit tests
-        run: npm test -- --passWithNoTests
+        run: npm test -- --passWithNoTests --testPathPattern=unit
         env:
           NODE_OPTIONS: --experimental-vm-modules
