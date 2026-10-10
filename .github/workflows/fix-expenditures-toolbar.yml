@@ -1,0 +1,51 @@
+name: Fix Expenditures toolbar
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/tm-release-blockers]
+    paths:
+      - "scripts/patch-expenditures-toolbar.mjs"
+      - ".github/workflows/fix-expenditures-toolbar.yml"
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/tm-release-blockers
+
+      - name: Apply surgical Expenditures toolbar fix
+        run: node scripts/patch-expenditures-toolbar.mjs
+
+      - name: Verify Reports untouched and valid
+        run: |
+          test -f src/pages/ReportsPage.jsx
+          ! grep -q PLACEHOLDER src/pages/ReportsPage.jsx
+          grep -q 'ec-kpi-grid' src/pages/ReportsPage.jsx
+          grep -q 'import StatCard from' src/pages/ReportsPage.jsx
+          ! grep -q 'minWidth: "160px"' src/pages/ReportsPage.jsx
+          echo "Reports invariants OK"
+
+      - name: Verify Expenditures KPI strip only
+        run: |
+          COUNT=$(grep -c 'ec-kpi-grid' src/pages/ExpendituresPage.jsx || true)
+          echo "ec-kpi-grid count=$COUNT"
+          test "$COUNT" = "1"
+          ! grep -q PLACEHOLDER src/pages/ExpendituresPage.jsx
+          echo "Expenditures invariants OK"
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ExpendituresPage.jsx
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "fix(mobile): Expenditures filter toolbar not KPI grid"
+            git push origin fix/tm-release-blockers
+          fi
