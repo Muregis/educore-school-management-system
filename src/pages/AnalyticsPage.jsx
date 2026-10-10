@@ -328,7 +328,7 @@ Provide a structured analysis with:
         {activeTab === "overview" && (
           <div style={{ display: "grid", gap: "var(--space-4)" }}>
             {/* Key Stats */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-4)" }}>
               <StatCard title="Total Students" value={stats.totalStudents} subtitle={`${stats.activeStudents} active`} icon="🎓" trend={0} />
               <StatCard title="Teachers" value={teachers.length} subtitle="Staff members" icon="👨‍🏫" trend={0} />
               <StatCard title="Total Collected" value={money(stats.totalCollected)} subtitle="Fees this term" icon="💰" trend={0} />
@@ -362,7 +362,7 @@ Provide a structured analysis with:
         {/* Academic Tab */}
         {activeTab === "academic" && (
           <div style={{ display: "grid", gap: "var(--space-4)" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-4)" }}>
               <StatCard title="Average Marks" value={stats.avgMarks.toFixed(1)} subtitle="Out of 100" icon="📈" trend={0} />
               <StatCard title="Total Results" value={results.length} subtitle="Grades recorded" icon="📋" trend={0} />
             </div>
@@ -380,7 +380,7 @@ Provide a structured analysis with:
         {/* Financial Tab */}
         {activeTab === "financial" && (
           <div style={{ display: "grid", gap: "var(--space-4)" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-4)" }}>
               <StatCard title="Total Collected" value={money(stats.totalCollected)} icon="💵" trend={0} />
               <StatCard title="Pending Balance" value={money(stats.pendingFees)} icon="⏳" trend={0} />
               <StatCard title="Collection Rate" value={`${stats.pendingFees > 0 ? ((stats.totalCollected / (stats.totalCollected + stats.pendingFees)) * 100).toFixed(1) : 100}%`} icon="📊" trend={0} />
@@ -392,7 +392,7 @@ Provide a structured analysis with:
             {/* Class-wise Outstanding Balance */}
             <Card style={{ padding: "var(--space-4)" }}>
               <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Outstanding Balance by Class</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "var(--space-3)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 140px), 1fr))", gap: "var(--space-3)" }}>
                 {(availableClasses ?? []).map(cls => {
                   const classStudents = students.filter(s => (s.className || s.class_name) === cls);
                   if (classStudents.length === 0) return null;
@@ -433,7 +433,7 @@ Provide a structured analysis with:
         {/* Attendance Tab */}
         {activeTab === "attendance" && (
           <div style={{ display: "grid", gap: "var(--space-4)" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-4)" }}>
               <StatCard title="Attendance Rate" value={`${stats.attendanceRate.toFixed(1)}%`} subtitle="Present students" icon="✅" trend={0} />
               <StatCard title="Present Count" value={stats.presentCount} icon="🟢" trend={0} />
               <StatCard title="Absent Count" value={stats.absentCount} icon="🔴" trend={0} />
