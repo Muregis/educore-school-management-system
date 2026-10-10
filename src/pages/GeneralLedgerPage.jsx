@@ -163,7 +163,7 @@ export default function GeneralLedgerPage({ auth, toast }) {
 
       {/* Filters */}
       <Card style={{ padding: "var(--space-4)", marginBottom: "var(--space-4)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-3)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-3)" }}>
           <div>
             <label style={{ display: "block", marginBottom: "var(--space-2)", fontWeight: 600, fontSize: "13px" }}>
               Account
@@ -227,7 +227,7 @@ export default function GeneralLedgerPage({ auth, toast }) {
       </Card>
 
       {/* Summary Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
         <StatCard 
           title="Account" 
           value={selectedAccountData?.account_name || "—"} 
@@ -284,7 +284,7 @@ export default function GeneralLedgerPage({ auth, toast }) {
       {/* Account Info */}
       {selectedAccountData && (
         <Card style={{ marginTop: "var(--space-4)", padding: "var(--space-4)" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-4)" }}>
             <div>
               <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "var(--space-1)" }}>Account Code</div>
               <div style={{ fontWeight: 600 }}>{selectedAccountData.account_code}</div>

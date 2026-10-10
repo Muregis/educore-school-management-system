@@ -136,7 +136,6 @@ app.use(idempotency());
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
 
-// FE "New School" posts to /api/auth/signup — alias to onboarding register handler
 app.post("/api/auth/signup", (req, res, next) => {
   req.url = "/register-school";
   req.originalUrl = "/api/onboarding/register-school";
@@ -149,23 +148,34 @@ app.use("/api/teacherassignments", teacherAssignmentsRoutes);
 app.use("/api/teacher-assignments", teacherAssignmentsRoutes);
 app.use("/api/parent", authRequired, validateSession, parentRoutes);
 
-app.use("/api", (req, res, next) => {
-  // When middleware is mounted at /api, req.path is relative (e.g. /auth/login, /onboarding/...).
+function isPublicApiPath(req) {
   const p = String(req.path || "");
-  const full = String(req.originalUrl || "");
+  const full = String(req.originalUrl || "").split("?")[0];
   const exemptPrefixes = [
     "/health", "/auth", "/onboarding", "/public",
     "/teacherassignments", "/teacher-assignments",
     "/api/health", "/api/auth", "/api/onboarding", "/api/public",
   ];
-  const isExempt = exemptPrefixes.some((prefix) => p.startsWith(prefix) || full.startsWith(prefix));
-  if (isExempt) return next();
+  return exemptPrefixes.some((prefix) => p.startsWith(prefix) || full.startsWith(prefix));
+}
+
+app.use("/api", (req, res, next) => {
+  if (isPublicApiPath(req)) return next();
   return authRequired(req, res, next);
 });
 
-app.use("/api", validateSession);
-app.use("/api", tenantContext);
-app.use("/api", tenantSecurityCheck);
+app.use("/api", (req, res, next) => {
+  if (isPublicApiPath(req)) return next();
+  return validateSession(req, res, next);
+});
+app.use("/api", (req, res, next) => {
+  if (isPublicApiPath(req)) return next();
+  return tenantContext(req, res, next);
+});
+app.use("/api", (req, res, next) => {
+  if (isPublicApiPath(req)) return next();
+  return tenantSecurityCheck(req, res, next);
+});
 app.use("/api", (req, _res, next) => {
   logTenantContext("api.request", req, { method: req.method, path: req.path });
   next();

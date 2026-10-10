@@ -134,7 +134,7 @@ export default function PortalDashboardPage({
       </Card>
 
       {/* Quick Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-3)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-3)" }}>
         <StatCard 
           label="Attendance" 
           value={`${attendanceRate}%`} 

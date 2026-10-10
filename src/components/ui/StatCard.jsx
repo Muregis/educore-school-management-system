@@ -3,8 +3,17 @@ import Card from "./Card";
 
 /**
  * KPI metric card — mobile-first, never clips labels or currency.
+ * Accepts either `label` (Reports/Expenditures) or `title` (Analytics/finance pages).
  */
-export default function StatCard({ label, value, color, title, loading = false }) {
+export default function StatCard({
+  label,
+  value,
+  color,
+  title,
+  subtitle,
+  loading = false,
+}) {
+  const heading = label || title || "";
   const valueStr = loading ? "…" : String(value ?? "");
   return (
     <Card
@@ -18,7 +27,7 @@ export default function StatCard({ label, value, color, title, loading = false }
         padding: "12px 14px",
         borderLeft: `4px solid ${color || "var(--color-primary)"}`,
       }}
-      title={title}
+      title={subtitle || (label ? title : undefined)}
     >
       <div
         className="ec-stat-label"
@@ -34,7 +43,7 @@ export default function StatCard({ label, value, color, title, loading = false }
           wordBreak: "break-word",
         }}
       >
-        {label}
+        {heading}
       </div>
       <div
         className="ec-stat-value"
@@ -52,6 +61,18 @@ export default function StatCard({ label, value, color, title, loading = false }
       >
         {valueStr}
       </div>
+      {subtitle ? (
+        <div
+          style={{
+            marginTop: 4,
+            fontSize: 11,
+            color: "var(--color-text-muted)",
+            lineHeight: 1.3,
+          }}
+        >
+          {subtitle}
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -61,5 +82,6 @@ StatCard.propTypes = {
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   color: PropTypes.string,
   title: PropTypes.string,
+  subtitle: PropTypes.string,
   loading: PropTypes.bool,
 };

@@ -10,6 +10,7 @@ import { studentDataRateLimit } from "../middleware/rateLimit.js";
 import multer from "multer";
 import { getTeacherAssignedClasses } from "../utils/getTeacherClasses.js";
 import { getPortalStudentIds, requirePortalStudentAccess } from "../utils/portalAccess.js";
+import { buildStudentFeeUpdateData } from "../utils/studentFeeUpdate.js";
 
 // Configure multer for photo uploads
 const upload = multer({
@@ -76,14 +77,11 @@ router.get("/", async (req, res, next) => {
       .eq('school_id', schoolId)
       .eq('is_deleted', false);
 
-    // Teachers only see assigned classes
     if (role === 'teacher') {
       const assignedClasses = await getTeacherAssignedClasses(schoolId, userId);
-      
       if (assignedClasses.length === 0) {
         return res.json([]);
       }
-
       query = query.in('class_name', assignedClasses);
     }
 
@@ -93,7 +91,6 @@ router.get("/", async (req, res, next) => {
       query = query.in("student_id", portalStudentIds);
     }
 
-    // Execute query
     const { data: rows, error } = await query
       .order('class_name')
       .order('first_name');
@@ -106,7 +103,7 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-// ─── GET /promotion-eligible - Get promotion-eligible students ─────────────────
+// ─── GET /promotion-eligible ─────────────────────────────────────────────────
 router.get("/promotion-eligible", authorize("promotion.view"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
@@ -164,7 +161,7 @@ router.get("/promotion-eligible", authorize("promotion.view"), async (req, res, 
   }
 });
 
-// ─── POST /bulk-promote - Bulk promote students ───────────────────────────────
+// ─── POST /bulk-promote ───────────────────────────────────────────────────────
 router.post("/bulk-promote", authorize("promotion.approve"), async (req, res, next) => {
   try {
     const { studentIds, toClassId, reason } = req.body;
@@ -515,13 +512,6 @@ router.post("/upload-photo", requireRoles("admin", "teacher", "director", "super
       .eq('student_id', studentId)
       .eq('school_id', schoolId);
 
-    logActivity(req, {
-      action: "student.photo_uploaded",
-      entity: "student",
-      entityId: studentId,
-      description: `Photo uploaded for student ${student.first_name} ${student.last_name}`
-    });
-
     res.json({ photoUrl: publicUrl, filename });
   } catch (err) { next(err); }
 });
@@ -530,33 +520,8 @@ router.post("/upload-photo", requireRoles("admin", "teacher", "director", "super
 router.patch("/:id/fees", requireRoles("admin", "finance", "director", "superadmin"), async (req, res, next) => {
   try {
     const { schoolId } = req.user;
-    const {
-      outstanding_balance, breakfast_termly_fee,
-      opening_balance, opening_balance_type, transport_direction, transport_base_fee,
-      lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type,
-      breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type,
-      discount_type, discount_value, discount_is_percentage,
-    } = req.body;
 
-    const updateData = { updated_at: new Date().toISOString() };
-
-    if (outstanding_balance !== undefined) updateData.outstanding_balance = parseFloat(outstanding_balance) || 0;
-    if (breakfast_termly_fee !== undefined) updateData.breakfast_termly_fee = parseFloat(breakfast_termly_fee) || 0;
-    if (opening_balance !== undefined) updateData.opening_balance = parseFloat(opening_balance) || 0;
-    if (opening_balance_type !== undefined) updateData.opening_balance_type = opening_balance_type || "owing";
-    if (transport_direction !== undefined) updateData.transport_direction = transport_direction || "none";
-    if (transport_base_fee !== undefined) updateData.transport_base_fee = parseFloat(transport_base_fee) || 0;
-    if (lunch_enabled !== undefined) updateData.lunch_enabled = Boolean(lunch_enabled);
-    if (lunch_daily_rate !== undefined) updateData.lunch_daily_rate = parseFloat(lunch_daily_rate) || 0;
-    if (lunch_days !== undefined) updateData.lunch_days = parseInt(lunch_days, 10) || 0;
-    if (lunch_billing_type !== undefined) updateData.lunch_billing_type = lunch_billing_type || "daily";
-    if (breakfast_enabled !== undefined) updateData.breakfast_enabled = Boolean(breakfast_enabled);
-    if (breakfast_daily_rate !== undefined) updateData.breakfast_daily_rate = parseFloat(breakfast_daily_rate) || 0;
-    if (breakfast_days !== undefined) updateData.breakfast_days = parseInt(breakfast_days, 10) || 0;
-    if (breakfast_billing_type !== undefined) updateData.breakfast_billing_type = breakfast_billing_type || "daily";
-    if (discount_type !== undefined) updateData.discount_type = discount_type || null;
-    if (discount_value !== undefined) updateData.discount_value = parseFloat(discount_value) || 0;
-    if (discount_is_percentage !== undefined) updateData.discount_is_percentage = Boolean(discount_is_percentage);
+    const updateData = buildStudentFeeUpdateData(req.body);
 
     const { data, error } = await supabase
       .from("students")
@@ -591,92 +556,26 @@ router.get("/:studentId/ledger", studentDataRateLimit, requireRoles("director", 
       .eq('is_deleted', false)
       .single();
 
-    if (studentError || !student) return res.status(404).json({ message: "Student not found" });
+    if (studentError || !student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
 
     let query = supabase
-      .from('student_ledger')
+      .from('fee_ledger')
       .select('*')
       .eq('school_id', schoolId)
       .eq('student_id', studentId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(Number(offset), Number(offset) + Number(limit) - 1);
 
     if (term) query = query.eq('term', term);
     if (academic_year) query = query.eq('academic_year', academic_year);
 
-    const { data: ledger, error: ledgerError } = await query
-      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+    const { data: entries, error } = await query;
+    if (error) throw error;
 
-    if (ledgerError) throw ledgerError;
-
-    res.json({
-      student: {
-        student_id: student.student_id,
-        name: `${student.first_name} ${student.last_name}`,
-        admission_number: student.admission_number
-      },
-      ledger: ledger || [],
-      pagination: {
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        hasMore: (ledger || []).length === parseInt(limit)
-      }
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// ─── GET /:studentId/invoices ─────────────────────────────────────────────────
-router.get("/:studentId/invoices", studentDataRateLimit, requireRoles("director", "admin", "finance", "staff", "parent", "student"), async (req, res, next) => {
-  try {
-    const { schoolId } = req.user;
-    const { studentId } = req.params;
-    const canAccess = await requirePortalStudentAccess(req, supabase, studentId);
-    if (!canAccess) return res.status(403).json({ message: "Forbidden" });
-    const { limit = 50, offset = 0, term, academic_year } = req.query;
-
-    const { data: student, error: studentError } = await supabase
-      .from('students')
-      .select('student_id, first_name, last_name, admission_number')
-      .eq('student_id', studentId)
-      .eq('school_id', schoolId)
-      .eq('is_deleted', false)
-      .single();
-
-    if (studentError || !student) return res.status(404).json({ message: "Student not found" });
-
-    let query = supabase
-      .from('invoices')
-      .select('*')
-      .eq('school_id', schoolId)
-      .eq('student_id', studentId)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false });
-
-    if (term) query = query.eq('term', term);
-    if (academic_year) query = query.eq('academic_year', academic_year);
-
-    const { data: invoices, error: invoicesError } = await query
-      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
-
-    if (invoicesError) throw invoicesError;
-
-    res.json({
-      student: {
-        student_id: student.student_id,
-        name: `${student.first_name} ${student.last_name}`,
-        admission_number: student.admission_number
-      },
-      invoices: invoices || [],
-      pagination: {
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        hasMore: (invoices || []).length === parseInt(limit)
-      }
-    });
-  } catch (err) {
-    next(err);
-  }
+    res.json({ student, entries: entries || [] });
+  } catch (err) { next(err); }
 });
 
 export default router;
