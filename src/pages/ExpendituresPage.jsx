@@ -290,7 +290,7 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
           <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-text-primary)" }}>
             Manual Expense Records
           </div>
-          <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+          <div className="ec-kpi-grid">
             <div style={{ minWidth: "min(100%, 220px)", flex: "1 1 180px" }}>
               <Input
                 placeholder="Search item, payee, released by..."
