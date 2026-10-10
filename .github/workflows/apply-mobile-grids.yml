@@ -1,0 +1,37 @@
+name: Apply mobile grids
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/mobile-grids-all-pages]
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/mobile-grids-all-pages
+      - name: Ensure KPI CSS
+        run: node scripts/ensure-kpi-css.mjs
+      - name: Apply grid class conversions
+        run: node scripts/apply-mobile-grids.mjs
+      - name: Verify
+        run: |
+          grep -q 'repeat(2, minmax(0, 1fr))' src/styles/layout-foundation.css
+          grep -q 'ec-stack-grid' src/styles/layout-foundation.css
+          grep -q 'ec-kpi-grid' src/pages/AnalyticsPage.jsx
+          echo "Analytics KPI lines:"
+          grep -c 'ec-kpi-grid' src/pages/AnalyticsPage.jsx || true
+          echo OK
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/*.jsx src/styles/layout-foundation.css
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(mobile): Analytics/Accounts/finance grids use shared 2-col KPI + stack layout"
+            git push origin fix/mobile-grids-all-pages
+          fi

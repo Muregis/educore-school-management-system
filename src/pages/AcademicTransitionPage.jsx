@@ -257,7 +257,7 @@ export default function AcademicTransitionPage({ auth }) {
         </Card>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+      <div className="ec-stack-grid" style={{ gap: 16 }}>
         <Card style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
             <h3 style={{ margin: '0 0 6px', color: C.text, fontSize: 18, fontWeight: 700 }}>Close Current Term</h3>

@@ -176,7 +176,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     ];
     return (
       <div className="stagger-in" style={{ display: "grid", gap: "var(--space-4)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 158px), 1fr))", gap: "var(--space-3)" }}>
+        <div className="ec-kpi-grid">
           {cards.map(([label, value, accentColor, title]) => (
             <StatCard key={label} label={label} value={value} color={accentColor} title={title} />
           ))}
@@ -283,7 +283,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
           </div>
         </Card>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 158px), 1fr))", gap: "var(--space-3)" }}>
+      <div className="ec-kpi-grid">
         {cards.map(([label, value, accentColor, title]) => (
           <StatCard key={label} label={label} value={value} color={accentColor} title={title} />
         ))}

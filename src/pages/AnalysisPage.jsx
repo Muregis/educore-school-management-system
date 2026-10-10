@@ -465,7 +465,7 @@ Keep the tone professional but simple enough for a school administrator to act o
                       <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-3)", fontSize: "15px" }}>
                         {activeStream} — Subject Breakdown
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "var(--space-2)" }}>
+                      <div className="ec-stack-grid" style={{ gap: "var(--space-2)" }}>
                         {subjects.map(sub => {
                           const g = gradeInfo(sub.avg_score);
                           return (
@@ -647,7 +647,7 @@ Keep the tone professional but simple enough for a school administrator to act o
                 Comprehensive class performance metrics including mean, median, and subject breakdowns.
               </p>
               
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-3)", marginBottom: "var(--space-4)" }}>
+              <div className="ec-kpi-grid" style={{ marginBottom: "var(--space-4)" }}>
                 {[
                   ["Mean", `${classStats.overall.mean}%`, "Average score across all students"],
                   ["Median", `${classStats.overall.median}%`, "Middle score when ranked"],
@@ -689,7 +689,7 @@ Keep the tone professional but simple enough for a school administrator to act o
                     {Object.entries(classStats.by_class).map(([clsName, subjects]) => (
                       <div key={clsName} style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-3)" }}>
                         <div style={{ fontWeight: 700, color: "var(--color-primary)", marginBottom: "var(--space-2)" }}>{clsName}</div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "var(--space-2)" }}>
+                        <div className="ec-kpi-grid">
                           {Object.entries(subjects).map(([subj, stats]) => {
                             const g = gradeInfo(stats.mean);
                             return (

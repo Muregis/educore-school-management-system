@@ -119,7 +119,7 @@ export default function MpesaReconciliationPage({ auth, students, toast }) {
   return (
     <div>
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 16 }}>
+      <div className="ec-kpi-grid" style={{ marginBottom: 16 }}>
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
           <div style={{ fontSize: 12, color: C.textSub, textTransform: "uppercase" }}>Unmatched Payments</div>
           <div style={{ fontSize: 28, fontWeight: 800, color: "#F59E0B" }}>{stats.totalUnmatched}</div>
