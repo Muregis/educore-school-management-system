@@ -143,17 +143,33 @@ main {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 110px), 1fr));
 }
 
-/* KPI summary grids — mobile-first, never crush StatCards */
+/* KPI summary grids — phones ALWAYS 2 columns (never 7 skinny pills) */
 .ec-kpi-grid {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
-  width: 100%;
-  min-width: 0;
+  display: grid !important;
+  gap: 10px !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  align-items: stretch;
 }
-@media screen and (max-width: 420px) {
+.ec-kpi-grid > * {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: auto !important;
+  flex: none !important;
+}
+/* Tablet+: allow more columns when there is real space */
+@media screen and (min-width: 640px) {
   .ec-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3) !important;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important;
+  }
+}
+@media screen and (min-width: 1024px) {
+  .ec-kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
   }
 }
 
@@ -223,9 +239,19 @@ main {
   text-overflow: unset !important;
 }
 
-@media screen and (max-width: 420px) {
+@media screen and (max-width: 639px) {
   .ec-stat-card {
-    padding: 12px !important;
+    padding: 12px 10px !important;
+    min-height: 68px !important;
+  }
+  .ec-stat-label {
+    font-size: 10px !important;
+    line-height: 1.25 !important;
+    letter-spacing: 0.02em !important;
+  }
+  .ec-stat-value {
+    font-size: 15px !important;
+    line-height: 1.2 !important;
   }
 }
 
@@ -254,14 +280,12 @@ main {
 }
 
 /*
- * NUCLEAR MOBILE FORM STACK (all pages — P0 + P1)
- * Inline style={{ gridTemplateColumns: "1fr 1fr" }} beats normal CSS.
- * !important forces single-column under 768px for every form/filter grid
- * inside page content and modals.
+ * NUCLEAR MOBILE FORM STACK — do NOT target .ec-kpi-grid
+ * Only force single-column for inline-styled form/filter grids.
  */
 @media screen and (max-width: 767px) {
-  .ec-page-content div[style*="display: grid"],
-  .ec-page-content div[style*="display:grid"],
+  .ec-page-content div[style*="display: grid"]:not(.ec-kpi-grid),
+  .ec-page-content div[style*="display:grid"]:not(.ec-kpi-grid),
   .ui-modal-content div[style*="display: grid"],
   .ui-modal-content div[style*="display:grid"],
   [data-modal-panel] div[style*="display: grid"],
