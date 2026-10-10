@@ -5,6 +5,7 @@ import { money } from "../lib/utils";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 import Card from "../components/ui/Card";
+import StatCard from "../components/ui/StatCard";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import Select from "../components/ui/Select";
@@ -54,39 +55,6 @@ function toneForCategory(category) {
   return "success";
 }
 
-function StatCard({ label, value, tone = "default", hint }) {
-  const colors = {
-    success: "var(--color-success)",
-    warning: "var(--color-warning)",
-    danger: "var(--color-danger)",
-    info: "var(--color-info)",
-    default: "var(--color-primary)",
-  };
-
-  return (
-    <Card style={{ padding: "var(--space-4)", minWidth: "180px", flex: 1 }}>
-      <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-2)" }}>
-        {label}
-      </div>
-      <div style={{ fontSize: "26px", fontWeight: 800, color: colors[tone] || colors.default }}>
-        {value}
-      </div>
-      {hint && (
-        <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "var(--space-2)" }}>
-          {hint}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-StatCard.propTypes = {
-  label: PropTypes.string.isRequired,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-  tone: PropTypes.string,
-  hint: PropTypes.string,
-};
-
 export default function ExpendituresPage({ auth, canEdit, toast }) {
   const { startDate } = useCurrentTerm(auth);
   const [expenses, setExpenses] = useState([]);
@@ -99,7 +67,6 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(blankForm(startDate));
 
-  // Update default expense date when term changes (only when modal is closed)
   useEffect(() => {
     if (!showModal && !editingExpense) {
       setForm(prev => ({ ...prev, expenseDate: startDate || new Date().toISOString().slice(0, 10) }));
@@ -257,14 +224,14 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
         )}
       </div>
 
-      <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
-        <StatCard label="Total Expenses" value={money(summary?.totals?.total || 0)} tone="danger" hint="Manual expenses plus paid payroll" />
-        <StatCard label="Payroll Costs" value={money(summary?.totals?.payroll || 0)} tone="warning" hint={`${summary?.totals?.payrollEntries || 0} paid payslips`} />
-        <StatCard label="Manual Expenses" value={money(summary?.totals?.manual || 0)} tone="info" hint={`${summary?.totals?.transactions || 0} recorded items`} />
-        <StatCard label="This Month" value={money(currentMonthTotal)} tone="success" hint="All expenses dated this month" />
+      <div className="ec-kpi-grid">
+        <StatCard label="Total Expenses" value={money(summary?.totals?.total || 0)} color="var(--color-danger)" title="Manual expenses plus paid payroll" />
+        <StatCard label="Payroll Costs" value={money(summary?.totals?.payroll || 0)} color="var(--color-warning)" title={`${summary?.totals?.payrollEntries || 0} paid payslips`} />
+        <StatCard label="Manual Expenses" value={money(summary?.totals?.manual || 0)} color="var(--color-info)" title={`${summary?.totals?.transactions || 0} recorded items`} />
+        <StatCard label="This Month" value={money(currentMonthTotal)} color="var(--color-success)" title="All expenses dated this month" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(320px, 1fr)", gap: "var(--space-4)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)", gap: "var(--space-4)" }}>
         <Card style={{ padding: "var(--space-4)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)", gap: "var(--space-3)", flexWrap: "wrap" }}>
             <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-text-primary)" }}>Monthly Expense Trend</div>
@@ -424,88 +391,17 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
         }
       >
         <div className="ec-form-grid ec-form-grid-2">
-          <Input
-            label="Expense Date"
-            type="date"
-            value={form.expenseDate}
-            onChange={(event) => setForm((current) => ({ ...current, expenseDate: event.target.value }))}
-          />
-          <Select
-            label="Category"
-            value={form.category}
-            onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
-            options={EXPENSE_CATEGORIES.map((category) => ({ value: category, label: category }))}
-          />
-          <Input
-            label="Item Name"
-            value={form.itemName}
-            onChange={(event) => setForm((current) => ({ ...current, itemName: event.target.value }))}
-            placeholder="e.g. May rent, Chalk supply, Generator fuel"
-          />
-          <Input
-            label="Amount (KES)"
-            type="number"
-            value={form.amount}
-            onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))}
-            placeholder="0"
-          />
-          <Select
-            label="Payment Method"
-            value={form.paymentMethod}
-            onChange={(event) => setForm((current) => ({ ...current, paymentMethod: event.target.value }))}
-            options={PAYMENT_METHODS.map((method) => ({ value: method, label: method }))}
-          />
-          <Input
-            label="Vendor / Payee"
-            value={form.vendorName}
-            onChange={(event) => setForm((current) => ({ ...current, vendorName: event.target.value }))}
-            placeholder="e.g. Landlord, KPLC, Supplier name"
-          />
-          <Input
-            label="Paid To"
-            value={form.paidToName}
-            onChange={(event) => setForm((current) => ({ ...current, paidToName: event.target.value }))}
-            placeholder="Person or organisation receiving funds"
-          />
-          <Input
-            label="Purpose"
-            value={form.purpose}
-            onChange={(event) => setForm((current) => ({ ...current, purpose: event.target.value }))}
-            placeholder="What the money was released for"
-          />
-          <Input
-            label="Reference Number"
-            value={form.referenceNumber}
-            onChange={(event) => setForm((current) => ({ ...current, referenceNumber: event.target.value }))}
-            placeholder="Receipt, transaction, or cheque number"
-          />
-          <Input
-            label="Description"
-            value={form.description}
-            onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-            placeholder="Short explanation of the expense"
-          />
-          <div style={{ gridColumn: "1 / -1", display: "grid", gap: "var(--space-2)" }}>
-            <label style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Notes
-            </label>
-            <textarea
-              value={form.notes}
-              onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-              placeholder="Optional internal notes"
-              style={{
-                width: "100%",
-                minHeight: "96px",
-                background: "var(--color-bg-card)",
-                border: "1px solid var(--color-border)",
-                borderRadius: "var(--radius-md)",
-                padding: "var(--space-3)",
-                color: "var(--color-text-primary)",
-                fontSize: "14px",
-                resize: "vertical",
-              }}
-            />
-          </div>
+          <Input label="Date" type="date" value={form.expenseDate} onChange={(e) => setForm({ ...form, expenseDate: e.target.value })} />
+          <Select label="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={EXPENSE_CATEGORIES.map((c) => ({ value: c, label: c }))} />
+          <Input label="Item name" value={form.itemName} onChange={(e) => setForm({ ...form, itemName: e.target.value })} />
+          <Input label="Amount" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+          <Select label="Payment method" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} options={PAYMENT_METHODS.map((m) => ({ value: m, label: m }))} />
+          <Input label="Vendor" value={form.vendorName} onChange={(e) => setForm({ ...form, vendorName: e.target.value })} />
+          <Input label="Paid to" value={form.paidToName} onChange={(e) => setForm({ ...form, paidToName: e.target.value })} />
+          <Input label="Reference" value={form.referenceNumber} onChange={(e) => setForm({ ...form, referenceNumber: e.target.value })} />
+          <Input label="Purpose" value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} />
+          <Input label="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <Input label="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
         </div>
       </Modal>
     </div>
@@ -513,7 +409,7 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
 }
 
 ExpendituresPage.propTypes = {
-  auth: PropTypes.object,
+  auth: PropTypes.object.isRequired,
   canEdit: PropTypes.bool,
-  toast: PropTypes.func.isRequired,
+  toast: PropTypes.func,
 };
