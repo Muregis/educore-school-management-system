@@ -231,7 +231,7 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
         <StatCard label="This Month" value={money(currentMonthTotal)} color="var(--color-success)" title="All expenses dated this month" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)", gap: "var(--space-4)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: "var(--space-4)" }}>
         <Card style={{ padding: "var(--space-4)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)", gap: "var(--space-3)", flexWrap: "wrap" }}>
             <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-text-primary)" }}>Monthly Expense Trend</div>
@@ -290,15 +290,15 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
           <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-text-primary)" }}>
             Manual Expense Records
           </div>
-          <div className="ec-kpi-grid">
-            <div style={{ minWidth: "220px" }}>
+          <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+            <div style={{ minWidth: "min(100%, 220px)", flex: "1 1 180px" }}>
               <Input
                 placeholder="Search item, payee, released by..."
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
             </div>
-            <div style={{ minWidth: "200px" }}>
+            <div style={{ minWidth: "min(100%, 200px)", flex: "1 1 160px" }}>
               <Select
                 value={categoryFilter}
                 onChange={(event) => setCategoryFilter(event.target.value)}
