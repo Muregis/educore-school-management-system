@@ -1,52 +1,53 @@
 /**
- * Unit Tests for Academic Year Service
+ * Unit tests for AcademicYearService — no live DB.
  */
+import { describe, it, expect, beforeEach } from "@jest/globals";
+import { AcademicYearService } from "../../../src/core/services/AcademicYearService.js";
 
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { AcademicYearService } from '../../../src/core/services/AcademicYearService.js';
-
-describe('AcademicYearService', () => {
+describe("AcademicYearService", () => {
   let service;
 
   beforeEach(() => {
     service = new AcademicYearService();
   });
 
-  it('should create service instance', () => {
+  it("creates a service instance", () => {
     expect(service).toBeDefined();
   });
 
-  it('should have createAcademicYear method', () => {
-    expect(typeof service.createAcademicYear).toBe('function');
+  it("exposes createAcademicYear", () => {
+    expect(typeof service.createAcademicYear).toBe("function");
   });
 
-  it('should validate date range - end date before start date', async () => {
+  it("rejects end date before start date before any DB call", async () => {
     const data = {
       school_id: 1,
-      name: '2024-2025',
-      start_date: '2025-01-01',
-      end_date: '2024-12-31'
+      name: "2024-2025",
+      start_date: "2025-01-01",
+      end_date: "2024-12-31",
     };
-
-    await expect(service.createAcademicYear(data)).rejects.toThrow('End date must be after start date');
+    await expect(service.createAcademicYear(data)).rejects.toThrow(
+      "End date must be after start date"
+    );
   });
 
-  it('should validate date range - end date equals start date', async () => {
+  it("rejects end date equal to start date before any DB call", async () => {
     const data = {
       school_id: 1,
-      name: '2024-2025',
-      start_date: '2025-01-01',
-      end_date: '2025-01-01'
+      name: "2024-2025",
+      start_date: "2025-01-01",
+      end_date: "2025-01-01",
     };
-
-    await expect(service.createAcademicYear(data)).rejects.toThrow('End date must be after start date');
+    await expect(service.createAcademicYear(data)).rejects.toThrow(
+      "End date must be after start date"
+    );
   });
 
-  it('should have getCurrent method', () => {
-    expect(typeof service.getCurrent).toBe('function');
+  it("exposes getCurrent", () => {
+    expect(typeof service.getCurrent).toBe("function");
   });
 
-  it('should have getAcademicYearWithTerms method', () => {
-    expect(typeof service.getAcademicYearWithTerms).toBe('function');
+  it("exposes getAcademicYearWithTerms", () => {
+    expect(typeof service.getAcademicYearWithTerms).toBe("function");
   });
 });
