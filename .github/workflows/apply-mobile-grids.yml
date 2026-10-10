@@ -1,0 +1,33 @@
+name: Apply mobile grids
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/mobile-grids-all-pages]
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/mobile-grids-all-pages
+      - name: Apply grid class conversions
+        run: node scripts/apply-mobile-grids.mjs
+      - name: Verify Analytics uses ec-kpi-grid
+        run: |
+          grep -q 'ec-kpi-grid' src/pages/AnalyticsPage.jsx
+          ! grep -q 'minmax(min(100%, 140px)' src/pages/AnalyticsPage.jsx || true
+          grep -q 'repeat(2, minmax(0, 1fr))' src/styles/layout-foundation.css
+          echo OK
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/*.jsx src/styles/layout-foundation.css
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(mobile): convert inline KPI/content grids to ec-kpi-grid / ec-stack-grid"
+            git push origin fix/mobile-grids-all-pages
+          fi
