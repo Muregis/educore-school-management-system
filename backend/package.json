@@ -10,8 +10,8 @@
     "dev": "node --import ./instrument.mjs --watch src/server.js",
     "build": "echo 'No build step required'",
     "start": "node --import ./instrument.mjs src/server.js",
-    "test": "jest",
-    "test:watch": "jest --watch",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:coverage": "jest --coverage"
   },
   "dependencies": {

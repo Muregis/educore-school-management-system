@@ -19,16 +19,44 @@ const PRIMARY_CLASSES = [
   "PP1", "PP2", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8",
 ];
 const SECONDARY_CLASSES = ["Form 1", "Form 2", "Form 3", "Form 4"];
-const CORE_SUBJECTS = [
+
+const PRIMARY_SUBJECTS = [
+  { name: "Mathematics", code: "MATH" },
+  { name: "English Language", code: "ENG" },
+  { name: "Kiswahili", code: "KIS" },
+  { name: "Science & Technology", code: "SCI" },
+  { name: "Social Studies", code: "SST" },
+  { name: "Religious Education (CRE/IRE)", code: "RE" },
+  { name: "Creative Arts & Sports", code: "ART" },
+  { name: "Agriculture & Nutrition", code: "AGR" },
+];
+
+const SECONDARY_SUBJECTS = [
   { name: "Mathematics", code: "MATH" },
   { name: "English", code: "ENG" },
   { name: "Kiswahili", code: "KIS" },
-  { name: "Science", code: "SCI" },
-  { name: "Social Studies", code: "SST" },
-  { name: "Religious Education", code: "RE" },
-  { name: "Creative Arts", code: "ART" },
-  { name: "Physical Education", code: "PE" },
+  { name: "Biology", code: "BIO" },
+  { name: "Chemistry", code: "CHEM" },
+  { name: "Physics", code: "PHY" },
+  { name: "History & Government", code: "HIST" },
+  { name: "Geography", code: "GEO" },
+  { name: "Business Studies", code: "BST" },
+  { name: "Agriculture", code: "AGR" },
+  { name: "Christian Religious Education", code: "CRE" },
+  { name: "Computer Studies", code: "CS" },
 ];
+
+function subjectsForType(schoolType) {
+  const t = String(schoolType || "primary").toLowerCase();
+  if (t === "secondary") return SECONDARY_SUBJECTS;
+  if (t === "both" || t === "mixed") {
+    const map = new Map();
+    [...PRIMARY_SUBJECTS, ...SECONDARY_SUBJECTS].forEach((s) => map.set(s.code, s));
+    return Array.from(map.values());
+  }
+  return PRIMARY_SUBJECTS;
+}
+
 
 function slugify(name) {
   const base = String(name || "school")
@@ -82,7 +110,7 @@ function issueToken(user) {
 router.post("/register-school", async (req, res, next) => {
   try {
     const schoolName = String(req.body?.schoolName || "").trim();
-    const directorName = String(req.body?.directorName || "").trim();
+    const directorName = String(req.body?.directorName || req.body?.adminName || "").trim();
     const email = String(req.body?.email || "").trim().toLowerCase();
     const password = String(req.body?.password || "");
     const phone = String(req.body?.phone || "").trim() || null;
@@ -297,7 +325,7 @@ router.post("/complete", authRequired, async (req, res, next) => {
 
     // Subjects (best-effort)
     try {
-      const subjectRows = CORE_SUBJECTS.map((s) => ({
+      const subjectRows = subjectsForType(schoolType).map((s) => ({
         school_id: schoolId,
         name: s.name,
         code: s.code,

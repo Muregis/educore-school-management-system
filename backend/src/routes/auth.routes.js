@@ -170,6 +170,22 @@ router.post("/login", async (req, res, next) => {
     const isParentOrStudent = user.role === "parent" || user.role === "student";
     const branchInfo = isParentOrStudent ? false : (schoolData?.is_branch || false);
 
+    // Check onboarding status for staff/admin/directors
+    let onboardingCompleted = true;
+    if (!isParentOrStudent) {
+      try {
+        const { data: obData } = await supabase
+          .from("school_settings")
+          .select("setting_value")
+          .eq("school_id", user.school_id)
+          .eq("setting_key", "onboarding_completed")
+          .maybeSingle();
+        onboardingCompleted = obData ? obData.setting_value === "true" : false;
+      } catch {
+        onboardingCompleted = true;
+      }
+    }
+
     res.json({
       token,
       user: {
@@ -182,6 +198,7 @@ router.post("/login", async (req, res, next) => {
         isBranch: isParentOrStudent ? false : branchInfo,
         parentSchoolId: isParentOrStudent ? null : (schoolData?.parent_school_id || null),
         branchCode: isParentOrStudent ? null : (schoolData?.branch_code || null),
+        onboardingCompleted,
       },
     });
   } catch (err) {

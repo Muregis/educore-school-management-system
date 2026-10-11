@@ -176,7 +176,8 @@ router.post("/reset-opening-balances",
                 opening_balance_type: correctType,
                 updated_at: new Date(),
               })
-              .eq('student_id', student.student_id);
+              .eq('student_id', student.student_id)
+              .eq('school_id', schoolId);
             fixed++;
           }
         } catch (err) {

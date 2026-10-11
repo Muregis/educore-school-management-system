@@ -479,7 +479,7 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
   return (
     <div>
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         <button
           onClick={() => setActiveTab("import")}
           style={{
@@ -616,7 +616,7 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
                 )}
               </div>
 
-              <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
+              <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <Btn variant="ghost" onClick={() => { setPreview([]); setCsvContent(""); }}>
                   Clear
                 </Btn>

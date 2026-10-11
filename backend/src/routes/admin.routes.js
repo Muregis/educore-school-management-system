@@ -2,7 +2,16 @@ import { Router } from "express";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { adminActionRateLimit, passwordResetRateLimit } from "../middleware/rateLimit.js";
-import { runBackup, listBackups, downloadBackup, deleteBackup, BACKUP_FILENAME_RE } from "../services/backup.service.js";
+import { 
+  runBackup, 
+  listBackups, 
+  downloadBackup, 
+  deleteBackup, 
+  emailBackupToDirector, 
+  BACKUP_FILENAME_RE 
+} from "../services/backup.service.js";
+import { getHeartbeatStatus } from "../services/heartbeat.service.js";
+import { getRenderKeepAliveStatus } from "../services/renderAntiSleep.service.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import { rejectWeakPassword } from "../helpers/password-policy.helper.js";
 import { AdminService } from "../services/admin.service.js";
@@ -35,15 +44,28 @@ function backupContext(req, res) {
   return { schoolId, filename };
 }
 
+// ── GET /api/admin/supabase-status ───────────────────────────────────────────
+router.get("/supabase-status", async (req, res) => {
+  const supabaseStatus = getHeartbeatStatus();
+  const renderStatus = getRenderKeepAliveStatus();
+  res.json({
+    ...supabaseStatus,
+    supabase: supabaseStatus,
+    render: renderStatus,
+  });
+});
+
 // ── GET /api/admin/backups ────────────────────────────────────────────────────
 router.get("/backups", async (req, res, next) => {
   try {
     const ctx = backupContext(req, res);
     if (!ctx) return;
     const backups = (await listBackups(ctx.schoolId)).map(b => ({
-      filename:  b.filename,
-      sizeKb:    Math.round(b.size / 1024),
-      createdAt: b.createdAt,
+      filename:     b.filename,
+      sizeKb:       b.sizeKb || Math.round(b.size / 1024),
+      createdAt:    b.createdAt,
+      isCompressed: b.isCompressed,
+      storage:      b.storage,
     }));
     res.json({ backups, count: backups.length });
   } catch (err) { next(err); }
@@ -55,17 +77,19 @@ router.post("/backups", async (req, res, next) => {
     const ctx = backupContext(req, res);
     if (!ctx) return;
     const result = await runBackup(ctx.schoolId);
-    if (!result.success) return res.status(500).json({ message: "Backup failed" });
+    if (!result.success) return res.status(500).json({ message: result.error || "Backup failed" });
     logActivity(req, {
       action: "admin.backup.create",
       entity: "backup",
       entityId: result.filename,
-      description: `Backup created for school ${ctx.schoolId}`,
+      description: `Backup created for school ${ctx.schoolId} (${result.storage})`,
     });
     res.status(201).json({
-      message:  "Backup created successfully",
-      filename: result.filename,
-      sizeKb:   Math.round(result.size / 1024),
+      message:      "Backup created successfully",
+      filename:     result.filename,
+      sizeKb:       result.sizeKb,
+      recordCount:  result.recordCount,
+      storage:      result.storage,
     });
   } catch (err) { next(err); }
 });
@@ -75,21 +99,43 @@ router.get("/backups/:filename/download", async (req, res, next) => {
   try {
     const ctx = backupContext(req, res);
     if (!ctx) return;
-    const blob = await downloadBackup(ctx.schoolId, ctx.filename);
-    const buffer = Buffer.from(await blob.arrayBuffer());
+    const { buffer, filename, isGzip } = await downloadBackup(ctx.schoolId, ctx.filename);
     logActivity(req, {
       action: "admin.backup.download",
       entity: "backup",
       entityId: ctx.filename,
       description: `Backup downloaded for school ${ctx.schoolId}`,
     });
-    res.setHeader("Content-Type", "application/sql");
-    res.setHeader("Content-Disposition", `attachment; filename="${ctx.filename}"`);
+    res.setHeader("Content-Type", isGzip ? "application/gzip" : "application/sql");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", buffer.length);
     res.send(buffer);
   } catch (err) {
     if (err.message.includes("not found") || err.message.includes("404")) {
       return res.status(404).json({ message: "Backup not found" });
     }
+    next(err);
+  }
+});
+
+// ── POST /api/admin/backups/:filename/email ───────────────────────────────────
+router.post("/backups/:filename/email", async (req, res, next) => {
+  try {
+    const ctx = backupContext(req, res);
+    if (!ctx) return;
+    const recipient = String(req.body?.email || req.user?.email || "").trim();
+    if (!recipient || !recipient.includes("@")) {
+      return res.status(400).json({ message: "A valid email address is required" });
+    }
+    const result = await emailBackupToDirector(ctx.schoolId, ctx.filename, recipient);
+    logActivity(req, {
+      action: "admin.backup.email",
+      entity: "backup",
+      entityId: ctx.filename,
+      description: `Backup dispatched to ${recipient}`,
+    });
+    res.json(result);
+  } catch (err) {
     next(err);
   }
 });

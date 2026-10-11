@@ -6,31 +6,13 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { BillingService } from '../../../src/services/BillingService.js';
 
 describe('BillingService', () => {
-  let service;
-
   beforeEach(() => {
-    service = new BillingService();
     jest.clearAllMocks();
   });
 
   describe('selectBillingContext', () => {
-    it('should select current academic year and term', async () => {
-      const mockYear = { academic_year_id: 1, year_label: '2025/2026', is_current: true };
-      const mockTerm = { term_id: 1, term_name: 'Term 1', start_date: '2025-01-01', end_date: '2025-03-31' };
-
-      const supabaseMock = {
-        from: jest.fn(() => ({
-          select: jest.fn(() => ({
-            eq: jest.fn(() => ({
-              single: jest.fn(() => Promise.resolve({ data: mockYear, error: null }))
-            }))
-          }))
-        }))
-      };
-
-      // This test would require proper mocking of supabase
-      // Placeholder for actual implementation
-      expect(service.selectBillingContext).toBeDefined();
+    it('should have selectBillingContext method defined', () => {
+      expect(BillingService.selectBillingContext).toBeDefined();
     });
   });
 
@@ -63,7 +45,7 @@ describe('BillingService', () => {
       const settings = { lunch_daily_rate: 100, lunch_days: 0 };
 
       // Mock getFeeStructure to return a structure
-      jest.spyOn(service, 'getFeeStructure').mockResolvedValue({
+      jest.spyOn(BillingService, 'getFeeStructure').mockResolvedValue({
         fee_structure_id: 1,
         school_id: 1,
         class_name: 'Class 1',
@@ -74,12 +56,12 @@ describe('BillingService', () => {
       });
 
       // Mock getActiveStudentServices to return empty
-      jest.spyOn(service, 'getActiveStudentServices').mockResolvedValue([]);
+      jest.spyOn(BillingService, 'getActiveStudentServices').mockResolvedValue([]);
 
       // Mock getStudentDiscounts to return empty
-      jest.spyOn(service, 'getStudentDiscounts').mockResolvedValue([]);
+      jest.spyOn(BillingService, 'getStudentDiscounts').mockResolvedValue([]);
 
-      const result = await service.computeStudentBilling(schoolId, student, term, academicYear, settings);
+      const result = await BillingService.computeStudentBilling(schoolId, student, term, academicYear, settings);
 
       expect(result).toBeDefined();
       expect(result.components.tuition_charge).toBe(1000);
@@ -117,7 +99,7 @@ describe('BillingService', () => {
       const academicYear = { academic_year_id: 1, year_label: '2025/2026' };
       const settings = { lunch_daily_rate: 100, lunch_days: 0 };
 
-      jest.spyOn(service, 'getFeeStructure').mockResolvedValue({
+      jest.spyOn(BillingService, 'getFeeStructure').mockResolvedValue({
         fee_structure_id: 1,
         school_id: 1,
         class_name: 'Class 1',
@@ -127,9 +109,9 @@ describe('BillingService', () => {
         misc: 100,
       });
 
-      jest.spyOn(service, 'getActiveStudentServices').mockResolvedValue([]);
+      jest.spyOn(BillingService, 'getActiveStudentServices').mockResolvedValue([]);
 
-      jest.spyOn(service, 'getStudentDiscounts').mockResolvedValue([
+      jest.spyOn(BillingService, 'getStudentDiscounts').mockResolvedValue([
         {
           discount_id: 1,
           school_id: 1,
@@ -138,11 +120,11 @@ describe('BillingService', () => {
           discount_value: 10,
           discount_value_type: 'percentage',
           is_active: true,
-          expires_at: '2025-12-31',
+          expires_at: '2030-12-31',
         }
       ]);
 
-      const result = await service.computeStudentBilling(schoolId, student, term, academicYear, settings);
+      const result = await BillingService.computeStudentBilling(schoolId, student, term, academicYear, settings);
 
       expect(result.discount_amount).toBe(100); // 10% of 1000 tuition
       expect(result.total_charge).toBe(1200); // 1300 - 100
@@ -177,7 +159,7 @@ describe('BillingService', () => {
       const academicYear = { academic_year_id: 1, year_label: '2025/2026' };
       const settings = { lunch_daily_rate: 100, lunch_days: 0 };
 
-      jest.spyOn(service, 'getFeeStructure').mockResolvedValue({
+      jest.spyOn(BillingService, 'getFeeStructure').mockResolvedValue({
         fee_structure_id: 1,
         school_id: 1,
         class_name: 'Class 1',
@@ -187,10 +169,10 @@ describe('BillingService', () => {
         misc: 100,
       });
 
-      jest.spyOn(service, 'getActiveStudentServices').mockResolvedValue([]);
-      jest.spyOn(service, 'getStudentDiscounts').mockResolvedValue([]);
+      jest.spyOn(BillingService, 'getActiveStudentServices').mockResolvedValue([]);
+      jest.spyOn(BillingService, 'getStudentDiscounts').mockResolvedValue([]);
 
-      const result = await service.computeStudentBilling(schoolId, student, term, academicYear, settings);
+      const result = await BillingService.computeStudentBilling(schoolId, student, term, academicYear, settings);
 
       expect(result.carry_forward).toBe(500);
       expect(result.total_charge).toBe(1800); // 1300 + 500
@@ -200,17 +182,14 @@ describe('BillingService', () => {
   });
 
   describe('idempotency', () => {
-    it('should not create duplicate ledger entries on re-run', async () => {
-      // This test requires a database or comprehensive mocking
-      // Placeholder for actual implementation
-      expect(service.runBillingForStudent).toBeDefined();
+    it('should define runBillingForStudent method', () => {
+      expect(BillingService.runBillingForStudent).toBeDefined();
     });
   });
 
   describe('dryRunBilling', () => {
-    it('should return computed charges without writing to ledger', async () => {
-      // Placeholder for actual implementation
-      expect(service.dryRunBilling).toBeDefined();
+    it('should define dryRunBilling method', () => {
+      expect(BillingService.dryRunBilling).toBeDefined();
     });
   });
 });

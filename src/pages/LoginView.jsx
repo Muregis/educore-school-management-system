@@ -164,10 +164,20 @@ export default function LoginView({ onLogin }) {
     try {
       const data = await apiFetch("/auth/signup", {
         method: "POST",
-        body: { schoolName, adminName, email, password, phone }
+        body: { schoolName, directorName: adminName, adminName, email, password, phone }
       });
-      if (data.token) {
-        onLogin(data);
+      if (data?.token && data?.user) {
+        onLogin({
+          id: data.user.userId || data.user.id,
+          name: data.user.name || data.user.full_name,
+          email: data.user.email || email,
+          role: data.user.role || "director",
+          schoolId: data.user.schoolId || data.user.school_id,
+          token: data.token,
+          sessionId: data.sessionId || data.session_id,
+          onboardingCompleted: Boolean(data.user.onboardingCompleted),
+          needsOnboarding: true,
+        });
       } else {
         setNotice("School created successfully! You can now log in.");
         setMode("staff");
@@ -216,7 +226,16 @@ export default function LoginView({ onLogin }) {
         const hint = data?.message ? ` Server said: ${data.message}` : "";
         throw new Error("Login succeeded but the server response was missing session data." + hint);
       }
-      onLogin({ id: data.user.userId || data.user.id, name: data.user.name || data.user.full_name || data.user.first_name, email: data.user.email ?? email, role: data.user.role, schoolId: data.user.schoolId || data.user.school_id, token: data.token, sessionId: data.sessionId || data.session_id });
+      onLogin({
+        id: data.user.userId || data.user.id,
+        name: data.user.name || data.user.full_name || data.user.first_name,
+        email: data.user.email ?? email,
+        role: data.user.role,
+        schoolId: data.user.schoolId || data.user.school_id,
+        token: data.token,
+        sessionId: data.sessionId || data.session_id,
+        onboardingCompleted: data.user.onboardingCompleted,
+      });
       setEmail("");
       setPassword("");
     } catch (err) {

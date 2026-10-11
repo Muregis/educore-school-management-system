@@ -893,6 +893,47 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                     {!["admin", "director", "superadmin"].includes(auth?.role) && !canDeletePayments && "—"}
                   </div>
                 ])}
+                renderMobileCard={(_row, i) => {
+                  const p = rows[i];
+                  if (!p) return null;
+                  return (
+                    <div key={p.id} className="ui-table-mobile-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: "15px", color: "var(--color-text-primary)" }}>{p.studentName}</div>
+                          <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: 2 }}>{p.className} · {p.date}</div>
+                        </div>
+                        <Badge text={p.status} variant={p.status==="paid" ? "success" : p.status==="pending" ? "warning" : "danger"} />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <span style={{ fontSize: "16px", fontWeight: 800, color: "var(--color-success)" }}>{money(p.amount)}</span>
+                          <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginLeft: 6 }}>({p.method})</span>
+                        </div>
+                        {p.reference && (
+                          <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--color-text-muted)" }}>{p.reference}</span>
+                        )}
+                      </div>
+                      {p.paidBy && (
+                        <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Paid by: {p.paidBy}</div>
+                      )}
+                      {(["admin", "director", "superadmin"].includes(auth?.role) || canDeletePayments) && (
+                        <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end", marginTop: 4, paddingTop: 8, borderTop: "1px solid var(--color-border)" }}>
+                          {["admin", "director", "superadmin"].includes(auth?.role) && (
+                            <Button size="sm" variant="secondary" onClick={() => setEditingPayment({
+                              id: p.id, studentId: p.studentId, studentName: p.studentName, className: p.className,
+                              amount: p.amount, feeType: p.feeType, method: p.method, date: p.date, status: p.status,
+                              reference: p.reference, paidBy: p.paidBy
+                            })}>Edit</Button>
+                          )}
+                          {canDeletePayments && (
+                            <Button size="sm" variant="danger" onClick={() => delPayment(p.id)}>Delete</Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }}
               />
               <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
                 <Pager page={page} pages={pages} setPage={setPage} />
@@ -1015,6 +1056,70 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                       </div>
                     ) : "—"
                   ])}
+                  renderMobileCard={(row, idx) => {
+                    const b = filteredBalances[idx];
+                    if (!b) return null;
+                    return (
+                      <div key={b.studentId || idx} style={{ padding: "var(--space-3)", display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--color-text-primary)" }}>{b.name}</div>
+                            <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>{b.className}</div>
+                          </div>
+                          <div>
+                            {b.expected === 0 ? (
+                              <Badge text="No Structure" variant="neutral" />
+                            ) : (
+                              <Badge text={b.isOverpaid ? "Credit" : b.balance > 0 ? "Pending" : "Cleared"} variant={b.isOverpaid ? "success" : b.balance > 0 ? "warning" : "success"} />
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", fontSize: "12px", background: "var(--color-bg-subtle, rgba(0,0,0,0.02))", padding: "8px", borderRadius: "var(--radius-sm)" }}>
+                          <div>
+                            <span style={{ color: "var(--color-text-muted)" }}>Base: </span>
+                            <span>{money(b.baseFee)}</span>
+                          </div>
+                          {canViewTotals && (
+                            <div>
+                              <span style={{ color: "var(--color-text-muted)" }}>Paid: </span>
+                              <span style={{ color: "var(--color-success)", fontWeight: 600 }}>{money(b.paid)}</span>
+                            </div>
+                          )}
+                          {b.openingBalance !== 0 && (
+                            <div>
+                              <span style={{ color: "var(--color-text-muted)" }}>Opening: </span>
+                              <span style={{ color: b.openingBalance > 0 ? 'var(--color-warning)' : 'var(--color-success)' }}>
+                                {money(Math.abs(b.openingBalance))} {b.openingBalance > 0 ? '(owes)' : '(cr)'}
+                              </span>
+                            </div>
+                          )}
+                          {b.hasDiscount && (
+                            <div>
+                              <span style={{ color: "var(--color-text-muted)" }}>Discount: </span>
+                              <span style={{ color: "var(--color-success)" }}>{b.discountPercent}% ({b.discountLabel})</span>
+                            </div>
+                          )}
+                          <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "space-between", paddingTop: "4px", borderTop: "1px dashed var(--color-border-subtle)" }}>
+                            <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>Net Balance:</span>
+                            <span style={{ fontWeight: 800, fontSize: "14px", color: b.isOverpaid ? 'var(--color-success)' : b.balance > 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+                              {b.isOverpaid ? `-${money(b.overpaymentAmount)}` : money(b.balance)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {b.expected > 0 && b.balance > 0 && (
+                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
+                            <Button size="sm" onClick={() => openPaystack(b)}>💳 Paystack</Button>
+                            <Button variant="secondary" size="sm" onClick={() => openMpesa(b)}>📱 Mpesa</Button>
+                            {canEdit && (
+                              <Button variant="ghost" size="sm" onClick={() => openBankDeposit(b)}>🏦 Bank</Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }}
                 />
               </Card>
 
@@ -1049,6 +1154,34 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                 <strong key="total">{money(Number(f.tuition) + Number(f.activity) + Number(f.misc))}</strong>,
                 canEdit ? <Button key="ed" size="sm" variant="secondary" onClick={() => { setEditStruct(f); setStructForm({ className: f.className, term: f.term || displayTerm, tuition: String(f.tuition), activity: String(f.activity), misc: String(f.misc) }); setShowStruct(true); }}>Edit</Button> : "—"
               ])}
+              renderMobileCard={(row, idx) => {
+                const f = normalisedStructures[idx];
+                if (!f) return null;
+                const total = Number(f.tuition) + Number(f.activity) + Number(f.misc);
+                return (
+                  <div key={f.id || idx} style={{ padding: "var(--space-3)", display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--color-text-primary)" }}>{f.className}</div>
+                        <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Term: {f.term || "—"}</div>
+                      </div>
+                      <div style={{ fontWeight: 800, fontSize: "15px", color: "var(--color-primary)" }}>
+                        {money(total)}
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "4px", fontSize: "12px", color: "var(--color-text-secondary)" }}>
+                      <div>Tuition: <strong>{money(f.tuition)}</strong></div>
+                      <div>Activity: <strong>{money(f.activity)}</strong></div>
+                      <div>Misc: <strong>{money(f.misc)}</strong></div>
+                    </div>
+                    {canEdit && (
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "4px" }}>
+                        <Button size="sm" variant="secondary" onClick={() => { setEditStruct(f); setStructForm({ className: f.className, term: f.term || displayTerm, tuition: String(f.tuition), activity: String(f.activity), misc: String(f.misc) }); setShowStruct(true); }}>Edit Structure</Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }}
             />
           </Card>
         )

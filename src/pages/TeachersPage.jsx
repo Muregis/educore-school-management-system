@@ -305,6 +305,43 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
                 {canEdit && <Button size="sm" variant="danger" onClick={() => del(t.id)}>Delete</Button>}
               </div>
             ])}
+            renderMobileCard={(_row, i) => {
+              const t = rows[i];
+              if (!t) return null;
+              const teacherClasses = assignmentsForTeacher(t).length ? assignmentsForTeacher(t).map(a => a.class_name).filter(Boolean).join(", ") : (t.classes||[]).join(", ") || "-";
+              const teacherSubjects = assignmentsForTeacher(t).length ? assignmentsForTeacher(t).map(a => a.subject_name).filter(Boolean).join(", ") || "General" : (t.subjects||[]).join(", ") || "-";
+
+              return (
+                <div key={t.id} className="ui-table-mobile-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: "15px", color: "var(--color-text-primary)" }}>{t.firstName} {t.lastName}</div>
+                      <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: 2 }}>
+                        {t.staffNumber ? `Staff #${t.staffNumber}` : ""} {t.tscStaffId ? `· TSC: ${t.tscStaffId}` : ""}
+                      </div>
+                    </div>
+                    <Badge text={t.status} variant={t.status === "active" ? "success" : "danger"} />
+                  </div>
+                  <div style={{ fontSize: "13px", color: "var(--color-text-secondary)", display: "flex", flexDirection: "column", gap: 3 }}>
+                    <div>Email: <span style={{ color: "var(--color-text-primary)" }}>{t.email || "—"}</span></div>
+                    {t.phone && <div>Phone: <span style={{ color: "var(--color-text-primary)" }}>{t.phone}</span></div>}
+                    <div>Classes: <span style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>{teacherClasses}</span></div>
+                    <div>Subjects: <span style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>{teacherSubjects}</span></div>
+                  </div>
+                  <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end", flexWrap: "wrap", marginTop: 4, paddingTop: 8, borderTop: "1px solid var(--color-border)" }}>
+                    {canEdit && (
+                      <Button size="sm" variant="ghost" onClick={() => {
+                        setEditId(t.id);
+                        setF({ firstName: t.firstName, lastName: t.lastName, email: t.email, phone: t.phone, staffNumber: t.staffNumber, tscStaffId: t.tscStaffId, gender: t.gender, status: t.status, classes: t.classes || [], subjects: t.subjects || [], timetable: t.timetable || "" });
+                        setShow(true);
+                      }}>Edit</Button>
+                    )}
+                    {canAssign && <Button size="sm" variant="secondary" onClick={() => openAssign(t)}>Assign</Button>}
+                    {canEdit && <Button size="sm" variant="danger" onClick={() => del(t.id)}>Delete</Button>}
+                  </div>
+                </div>
+              );
+            }}
           />
           <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
             <Pager page={page} pages={pages} setPage={setPage} />

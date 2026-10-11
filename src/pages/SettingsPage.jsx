@@ -202,7 +202,7 @@ function SchoolTab({ school, setSchool, toast, auth }) {
         
         <div style={{ gridColumn: "1 / -1" }}>
           <label style={{ display: "block", fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: "var(--space-2)", textTransform: "uppercase", letterSpacing: "0.05em" }}>School Logo</label>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
             <label style={{ 
               display: "flex", 
               alignItems: "center", 
@@ -419,13 +419,21 @@ export default function SettingsPage({ auth, school, setSchool, users, setUsers,
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Tab bar */}
-      <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", paddingBottom: "var(--space-3)", borderBottom: "1px solid var(--color-border)" }}>
+      <div style={{ 
+        display: "flex", 
+        gap: "var(--space-2)", 
+        overflowX: "auto", 
+        WebkitOverflowScrolling: "touch", 
+        paddingBottom: "var(--space-3)", 
+        borderBottom: "1px solid var(--color-border)",
+        scrollbarWidth: "none"
+      }}>
         {TABS.map(t => (
           <Button 
             key={t.id} 
             variant={tab === t.id ? "primary" : "secondary"} 
             onClick={() => setTab(t.id)}
-            style={{ fontWeight: 600 }}
+            style={{ fontWeight: 600, flexShrink: 0, whiteSpace: "nowrap" }}
           >
             {t.label}
           </Button>

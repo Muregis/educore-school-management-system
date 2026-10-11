@@ -194,7 +194,7 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
 
       <Card style={{ padding: "var(--space-3)" }}>
         <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "center", flexWrap: "wrap" }}>
-          <div style={{ minWidth: "200px" }}>
+          <div style={{ flex: "1 1 200px" }}>
             <Select 
               value={filterClass} 
               onChange={e => setFilterClass(e.target.value)}
@@ -203,7 +203,7 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
           </div>
           <div style={{ flex: 1 }} />
           {canEdit && (
-            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
               <Button variant="secondary" onClick={() => setShowUpload(true)}>
                 📂 Upload CSV
               </Button>
@@ -286,7 +286,7 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
           {csvPreview.length > 0 && (
             <div style={{ marginTop: "var(--space-2)" }}>
               <div style={{ fontWeight: 600, color: "var(--color-text-primary)", marginBottom: "var(--space-2)" }}>Preview — {csvPreview.length} entries found</div>
-              <div style={{ maxHeight: "200px", overflowY: "auto", border: `1px solid var(--color-border)`, borderRadius: "var(--radius-md)" }}>
+              <div style={{ maxHeight: "200px", overflowY: "auto", overflowX: "auto", border: `1px solid var(--color-border)`, borderRadius: "var(--radius-md)" }}>
                 <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse" }}>
                   <thead style={{ position: "sticky", top: 0, background: "var(--color-bg-surface)", zIndex: 1 }}>
                     <tr>{["Day","Subject","Start","End","Period","Class"].map(h => (<th key={h} style={{ padding: "8px 10px", textAlign: "left", color: "var(--color-text-secondary)", borderBottom: `1px solid var(--color-border)`, fontWeight: 600 }}>{h}</th>))}</tr>

@@ -4,6 +4,7 @@ import Btn from "../components/Btn";
 import Field from "../components/Field";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
+import Table from "../components/ui/Table";
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
 import { printHTML } from "../lib/print";
@@ -177,8 +178,44 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
         {canEdit && <Btn onClick={() => setShowBulk(true)}>📋 Bulk Generate</Btn>}
       </div>
 
-      {loading ? <div style={{ color: C.textMuted, padding: 24 }}>Loading...</div> : (
-        <div style={{ overflowX: "auto" }}>
+      <Table
+        loading={loading}
+        headers={["Invoice #", "Student", "Class", "Term", "Total", "Status", "Due", "Actions"]}
+        data={filtered.map(inv => [
+          <span key="num" style={{ fontSize: 11, color: C.textMuted }}>{inv.invoice_number}</span>,
+          <span key="stu" style={{ color: C.text, fontWeight: 600 }}>{inv.student_name}</span>,
+          <span key="cls" style={{ color: C.textSub }}>{inv.class_name}</span>,
+          <span key="trm" style={{ color: C.textMuted }}>{inv.term}</span>,
+          <span key="tot" style={{ color: C.text, fontWeight: 600 }}>{money(inv.total)}</span>,
+          <Badge key="st" text={inv.status} tone={inv.status === "paid" ? "success" : inv.status === "partial" ? "warning" : "danger"} />,
+          <span key="due" style={{ color: C.textMuted, fontSize: 12 }}>{inv.due_date?.slice(0, 10) || "—"}</span>,
+          <Btn key="act" variant="ghost" onClick={() => printInvoice(inv)}>🖨 Print</Btn>
+        ])}
+        renderMobileCard={(_row, i) => {
+          const inv = filtered[i];
+          if (!inv) return null;
+          return (
+            <div key={inv.invoice_id} className="ui-table-mobile-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "15px", color: C.text }}>{inv.student_name}</div>
+                  <div style={{ fontSize: "12px", color: C.textMuted, marginTop: 2 }}>{inv.invoice_number} · {inv.class_name} ({inv.term})</div>
+                </div>
+                <Badge text={inv.status} tone={inv.status === "paid" ? "success" : inv.status === "partial" ? "warning" : "danger"} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "16px", fontWeight: 800, color: C.text }}>{money(inv.total)}</span>
+                <span style={{ fontSize: "12px", color: C.textMuted }}>Due: {inv.due_date?.slice(0, 10) || "—"}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+                <Btn variant="ghost" size="sm" onClick={() => printInvoice(inv)}>🖨 Print Invoice</Btn>
+              </div>
+            </div>
+          );
+        }}
+      />
+
+        {false ? (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>{["Invoice #","Student","Class","Term","Total","Status","Due","Actions"].map(h =>
@@ -200,12 +237,12 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
               ))}
             </tbody>
           </table>
-        </div>
-      )}
+
+      ) : null}
 
       {showSingle && (
         <Modal title="Create Invoice" onClose={() => setShowSingle(false)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
             <Field label="Class" style={{ gridColumn: "1 / -1" }}>
               <select style={inputStyle} value={singleFormClass} onChange={e => { setSingleFormClass(e.target.value); setSingleForm({ ...singleForm, studentId: "" }); }}>
                 <option value="">-- Select class first --</option>
@@ -238,7 +275,7 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
           <div style={{ color: C.textSub, fontSize: 13, marginBottom: 12 }}>
             Generates invoices for all students in a class using the existing fee structure.
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
             <Field label="Class"><select style={inputStyle} value={bulkForm.className} onChange={e => setBulkForm({ ...bulkForm, className: e.target.value })}>{(availableClasses ?? []).map(c => <option key={c}>{c}</option>)}</select></Field>
             <Field label="Term"><select style={inputStyle} value={bulkForm.term} onChange={e => setBulkForm({ ...bulkForm, term: e.target.value })}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></Field>
             <Field label="Academic Year"><input style={inputStyle} value={bulkForm.academicYear} onChange={e => setBulkForm({ ...bulkForm, academicYear: e.target.value })} /></Field>

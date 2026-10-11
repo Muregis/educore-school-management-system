@@ -177,6 +177,37 @@ export default function StaffPage({ auth, canEdit, toast, onTeachersChanged }) {
                 {canEdit ? (<><Button size="sm" variant="secondary" onClick={()=>{ setEditing(s); setForm({ fullName:s.full_name, email:s.email||"", phone:s.phone||"", nationalId:s.national_id||"", department:s.department||"Academic", jobTitle:s.job_title||"", contractType:s.contract_type||"Permanent", startDate:s.start_date?.slice(0,10)||"", salary:s.salary||"", status:s.status||"active", notes:s.notes||"" }); setShowModal(true); }}>Edit</Button><Button size="sm" variant="danger" onClick={()=>remove(s.staff_id)}>Remove</Button></>) : (<span style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>View Only</span>)}
               </div>
             ])}
+            renderMobileCard={(_row, i) => {
+              const s = filtered[i];
+              if (!s) return null;
+              return (
+                <div key={s.staff_id} className="ui-table-mobile-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: "15px", color: "var(--color-text-primary)" }}>{s.full_name}</div>
+                      <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: 2 }}>{s.job_title || "Staff Member"}</div>
+                    </div>
+                    <Badge variant={s.status==="active"?"success":s.status==="on-leave"?"warning":"danger"} text={s.status} />
+                  </div>
+                  <div style={{ fontSize: "13px", color: "var(--color-text-secondary)", display: "flex", flexDirection: "column", gap: 3 }}>
+                    <div>Dept: <span style={{ padding: "2px 8px", borderRadius: "10px", fontSize: "11px", background: (DEPT_COLORS[s.department] || "var(--color-text-muted)") + "22", color: DEPT_COLORS[s.department] || "var(--color-text-secondary)", fontWeight: 600 }}>{s.department}</span></div>
+                    {s.email && <div>Email: <span style={{ color: "var(--color-text-primary)" }}>{s.email}</span></div>}
+                    <div>Contract: <span style={{ color: "var(--color-text-primary)" }}>{s.contract_type || "—"}</span></div>
+                    <div>Salary: <strong style={{ color: "var(--color-success)" }}>{money(s.salary)}</strong></div>
+                  </div>
+                  <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end", flexWrap: "wrap", marginTop: 4, paddingTop: 8, borderTop: "1px solid var(--color-border)" }}>
+                    {canEdit ? (
+                      <>
+                        <Button size="sm" variant="secondary" onClick={()=>{ setEditing(s); setForm({ fullName:s.full_name, email:s.email||"", phone:s.phone||"", nationalId:s.national_id||"", department:s.department||"Academic", jobTitle:s.job_title||"", contractType:s.contract_type||"Permanent", startDate:s.start_date?.slice(0,10)||"", salary:s.salary||"", status:s.status||"active", notes:s.notes||"" }); setShowModal(true); }}>Edit</Button>
+                        <Button size="sm" variant="danger" onClick={()=>remove(s.staff_id)}>Remove</Button>
+                      </>
+                    ) : (
+                      <span style={{ color: "var(--color-text-muted)", fontSize: "12px" }}>View Only</span>
+                    )}
+                  </div>
+                </div>
+              );
+            }}
           />
         </Card>
       )}

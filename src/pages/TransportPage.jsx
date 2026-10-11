@@ -145,6 +145,29 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
                     <Button key="action" size="sm" variant="secondary" onClick={() => setViewRouteStudents(r)}>View Students</Button>,
                   ];
                 })}
+                renderMobileCard={(_row, i) => {
+                  const r = routes[i];
+                  if (!r) return null;
+                  const routeAssignments = assignments.filter(a => a.transport_id === r.transport_id && a.status === "active");
+                  return (
+                    <div key={r.transport_id} className="ui-table-mobile-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: "15px", color: "var(--color-text-primary)" }}>{r.route_name}</div>
+                          <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: 2 }}>{r.vehicle_number || "No vehicle"} · {r.driver_name || "No driver"}</div>
+                        </div>
+                        <Badge text={r.status} variant={r.status === "active" ? "success" : "danger"} />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--color-text-primary)" }}>KES {Number(r.fee || 0).toLocaleString()}</span>
+                        <Badge text={`${routeAssignments.length} students`} variant="info" />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+                        <Button size="sm" variant="secondary" onClick={() => setViewRouteStudents(r)}>View Students</Button>
+                      </div>
+                    </div>
+                  );
+                }}
               />
             </div>
           )}
@@ -182,6 +205,32 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
                     <Badge key="s" text={a.status} variant={a.status === "active" ? "success" : "danger"} />,
                   ];
                 })}
+                renderMobileCard={(_row, i) => {
+                  const a = assignments[i];
+                  if (!a) return null;
+                  const student = a.student || {};
+                  const route = a.route || {};
+                  return (
+                    <div key={a.id} className="ui-table-mobile-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: "15px", color: "var(--color-text-primary)" }}>
+                            {student.first_name || student.firstName || "Unknown"} {student.last_name || student.lastName || ""}
+                          </div>
+                          <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: 2 }}>
+                            {student.class_name || student.className || "No class"} · Adm: {student.admission_number || student.admission || "-"}
+                          </div>
+                        </div>
+                        <Badge text={a.status} variant={a.status === "active" ? "success" : "danger"} />
+                      </div>
+                      <div style={{ fontSize: "13px", color: "var(--color-text-secondary)", display: "flex", flexDirection: "column", gap: 3 }}>
+                        <div>Route: <strong style={{ color: "var(--color-text-primary)" }}>{route.route_name || "-"}</strong></div>
+                        <div>Fee: <span style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>KES {Number(route.fee || 0).toLocaleString()}</span></div>
+                        <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Period: {a.start_date?.slice(0, 10) || "-"} to {a.end_date?.slice(0, 10) || "ongoing"}</div>
+                      </div>
+                    </div>
+                  );
+                }}
               />
             </div>
           )}

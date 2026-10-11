@@ -4,6 +4,7 @@ import Btn from "../components/Btn";
 import Field from "../components/Field";
 import Badge from "../components/Badge";
 import Modal from "../components/Modal";
+import Table from "../components/ui/Table";
 
 import { C, inputStyle } from "../lib/theme";
 import { apiFetch } from "../lib/api";
@@ -183,36 +184,40 @@ setForm({
       </div>
 
       {/* Table */}
-      {loading ? (
-        <div style={{ color: C.textMuted, padding: 24 }}>Loading...</div>
-      ) : filtered.length === 0 ? (
-        <div style={{ color: C.textMuted, padding: 24 }}>No applications found.</div>
-      ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>{["Date","Name","Class","Parent","Phone","Status","Actions"].map(h =>
-                <th key={h} style={{ textAlign: "left", padding: "8px 10px", borderBottom: `1px solid ${C.border}`, color: C.textMuted, fontSize: 12 }}>{h}</th>
-              )}</tr>
-            </thead>
-            <tbody>
-              {filtered.map(a => (
-                <tr key={a.admission_id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                  <td style={{ padding: "8px 10px", color: C.textMuted, fontSize: 12 }}>{a.created_at?.slice(0,10)}</td>
-                  <td style={{ padding: "8px 10px", color: C.text, fontWeight: 600 }}>{a.full_name}</td>
-                  <td style={{ padding: "8px 10px", color: C.textSub }}>{a.applying_class}</td>
-                  <td style={{ padding: "8px 10px", color: C.textSub }}>{a.parent_name || "—"}</td>
-                  <td style={{ padding: "8px 10px", color: C.textMuted, fontSize: 12 }}>{a.parent_phone || "—"}</td>
-                  <td style={{ padding: "8px 10px" }}><Badge text={a.status} tone={STATUS_TONE[a.status]} /></td>
-                  <td style={{ padding: "8px 10px" }}>
-                    <Btn variant="ghost" onClick={() => setShowDetail(a)}>View</Btn>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <Table
+        loading={loading}
+        headers={["Date", "Name", "Class", "Parent", "Phone", "Status", "Actions"]}
+        data={filtered.map(a => [
+          <span key="date" style={{ color: C.textMuted, fontSize: 12 }}>{a.created_at?.slice(0, 10)}</span>,
+          <span key="name" style={{ color: C.text, fontWeight: 600 }}>{a.full_name}</span>,
+          <span key="class" style={{ color: C.textSub }}>{a.applying_class}</span>,
+          <span key="parent" style={{ color: C.textSub }}>{a.parent_name || "—"}</span>,
+          <span key="phone" style={{ color: C.textMuted, fontSize: 12 }}>{a.parent_phone || "—"}</span>,
+          <Badge key="status" text={a.status} tone={STATUS_TONE[a.status]} />,
+          <Btn key="action" variant="ghost" onClick={() => setShowDetail(a)}>View</Btn>
+        ])}
+        renderMobileCard={(_row, i) => {
+          const a = filtered[i];
+          if (!a) return null;
+          return (
+            <div key={a.admission_id} className="ui-table-mobile-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "15px", color: C.text }}>{a.full_name}</div>
+                  <div style={{ fontSize: "12px", color: C.textMuted, marginTop: 2 }}>{a.applying_class} · Applied {a.created_at?.slice(0, 10)}</div>
+                </div>
+                <Badge text={a.status} tone={STATUS_TONE[a.status]} />
+              </div>
+              <div style={{ fontSize: "13px", color: C.textSub }}>
+                <div>Parent: <strong>{a.parent_name || "—"}</strong> ({a.parent_phone || "—"})</div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+                <Btn variant="ghost" size="sm" onClick={() => setShowDetail(a)}>View Details</Btn>
+              </div>
+            </div>
+          );
+        }}
+      />
 
       {/* New Application Modal */}
       {showModal && (
@@ -226,7 +231,7 @@ setForm({
               <div>â¢ Check for existing applications before submitting</div>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
             <Field label="Full Name *" style={{ gridColumn: "1 / -1" }}>
               <input 
                 style={inputStyle} 
@@ -282,7 +287,11 @@ setForm({
             </Field>
             <Field label="Parent Email">
               <input 
-                 laceholder="parent@example.com"
+                type="email"
+                style={inputStyle}
+                value={form.parentEmail}
+                onChange={e => setForm({ ...form, parentEmail: e.target.value })}
+                placeholder="parent@example.com"
               />
             </Field>
             <Field label="Previous School">
@@ -311,7 +320,7 @@ setForm({
       {/* Detail Modal */}
       {showDetail && (
         <Modal title="Application Details" onClose={() => setShowDetail(null)}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 16 }}>
             {[
               ["Full Name", showDetail.full_name],
               ["Applying For", showDetail.applying_class],
@@ -348,7 +357,7 @@ setForm({
             </div>
           )}
           {canEdit && showDetail.status === "pending" && (
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
               <Btn variant="ghost" onClick={() => updateStatus(showDetail.admission_id, "reviewed")}>Mark Reviewed</Btn>
               <Btn variant="ghost" onClick={() => updateStatus(showDetail.admission_id, "rejected")} style={{ color: "#ef4444" }}>Reject</Btn>
               <Btn onClick={() => updateStatus(showDetail.admission_id, "accepted")}>✓ Accept Only</Btn>
@@ -356,7 +365,7 @@ setForm({
             </div>
           )}
           {canEdit && showDetail.status === "reviewed" && (
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
               <Btn variant="ghost" onClick={() => updateStatus(showDetail.admission_id, "rejected")} style={{ color: "#ef4444" }}>Reject</Btn>
               <Btn onClick={() => updateStatus(showDetail.admission_id, "accepted")}>✓ Accept Only</Btn>
               <Btn onClick={() => enrollAdmission(showDetail.admission_id)}>🎓 Accept & Enroll</Btn>

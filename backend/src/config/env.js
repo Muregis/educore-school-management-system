@@ -21,6 +21,7 @@ export const env = {
   fetTimetableJwtExpiresIn: process.env.FET_TIMETABLE_JWT_EXPIRES_IN || "5m",
   supabaseJwtSecret:    clean(process.env.SUPABASE_JWT_SECRET),
   corsOrigin:           process.env.CORS_ORIGIN  || "https://educore-school-management-system-pi.vercel.app",
+  renderExternalUrl:    clean(process.env.RENDER_EXTERNAL_URL) || clean(process.env.BACKEND_PUBLIC_URL) || clean(process.env.APP_URL),
   groqApiKey:           clean(process.env.GROQ_API_KEY),
 
   // Mpesa Daraja

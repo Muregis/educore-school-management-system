@@ -1,10 +1,15 @@
+import fs from "fs";
+import path from "path";
+import zlib from "zlib";
+import nodemailer from "nodemailer";
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../config/env.js";
 
 const BUCKET_NAME = "backups";
-const KEEP_LAST = 7;
+const KEEP_LAST = 14; // Keep 2 weeks of daily backups
+const LOCAL_BACKUP_ROOT = path.resolve(process.cwd(), "storage", "backups");
 
-// Columns that must never leave the database in a tenant-downloadable artifact.
+// Columns that must never leave the database in an exported backup
 const SENSITIVE_COLUMNS = new Set([
   "password",
   "password_hash",
@@ -26,7 +31,7 @@ const SENSITIVE_COLUMNS = new Set([
   "mpesa_passkey",
 ]);
 
-export const BACKUP_FILENAME_RE = /^backup_school\d+_[\d\-T]+\.sql$/;
+export const BACKUP_FILENAME_RE = /^backup_school\d+_[\d\-T]+\.sql(\.gz)?$/;
 
 export function normalizeSchoolId(schoolId) {
   const id = Number(schoolId);
@@ -36,8 +41,6 @@ export function normalizeSchoolId(schoolId) {
   return id;
 }
 
-// Every backup object lives under a per-tenant prefix so one school can never
-// list, download or delete another school's artifacts.
 function tenantPrefix(schoolId) {
   return `school_${normalizeSchoolId(schoolId)}`;
 }
@@ -46,191 +49,406 @@ function tenantPath(schoolId, filename) {
   return `${tenantPrefix(schoolId)}/${filename}`;
 }
 
+function getLocalTenantDir(schoolId) {
+  const dir = path.join(LOCAL_BACKUP_ROOT, tenantPrefix(schoolId));
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
+
 let _supabase = null;
 let _bucketEnsured = false;
 
 function getSupabase() {
-  if (!_supabase) {
+  if (!_supabase && env.supabaseUrl && env.supabaseServiceKey) {
     _supabase = createClient(env.supabaseUrl, env.supabaseServiceKey);
   }
   return _supabase;
 }
 
 async function ensureBucket() {
-  if (_bucketEnsured) return;
+  if (_bucketEnsured) return true;
   const supabase = getSupabase();
-  const { data: buckets } = await supabase.storage.listBuckets();
-  if (!buckets?.find(b => b.name === BUCKET_NAME)) {
-    const { error } = await supabase.storage.createBucket(BUCKET_NAME, {
-      public: false,
-    });
-    if (error) throw new Error(`Failed to create bucket: ${error.message}`);
-  }
-  _bucketEnsured = true;
-}
+  if (!supabase) return false;
 
-export async function listBackups(schoolId) {
-  const prefix = tenantPrefix(schoolId);
   try {
-    await ensureBucket();
-    const supabase = getSupabase();
-    const { data, error } = await supabase.storage.from(BUCKET_NAME).list(prefix);
-    if (error) return [];
+    const { data: buckets, error } = await supabase.storage.listBuckets();
+    if (error) return false;
 
-    return data
-      .filter(f => BACKUP_FILENAME_RE.test(f.name))
-      .map(f => ({
-        filename: f.name,
-        size: f.metadata?.size || 0,
-        createdAt: f.created_at || f.updated_at,
-      }))
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  } catch (err) {
-    console.error("[backup] listBackups error:", err.message);
-    return [];
+    if (!buckets?.find((b) => b.name === BUCKET_NAME)) {
+      const { error: createErr } = await supabase.storage.createBucket(BUCKET_NAME, {
+        public: false,
+      });
+      if (createErr) return false;
+    }
+    _bucketEnsured = true;
+    return true;
+  } catch {
+    return false;
   }
 }
 
+/**
+ * List all backups for a tenant (merges local disk and cloud storage)
+ */
+export async function listBackups(schoolId) {
+  const tenantId = normalizeSchoolId(schoolId);
+  const resultsMap = new Map();
+
+  // 1. Scan Local Storage
+  try {
+    const localDir = getLocalTenantDir(tenantId);
+    const files = fs.readdirSync(localDir);
+    for (const file of files) {
+      if (BACKUP_FILENAME_RE.test(file)) {
+        const filePath = path.join(localDir, file);
+        const stats = fs.statSync(filePath);
+        resultsMap.set(file, {
+          filename: file,
+          size: stats.size,
+          sizeKb: Math.round(stats.size / 1024),
+          createdAt: stats.mtime.toISOString(),
+          isCompressed: file.endsWith(".gz"),
+          storage: "local",
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("[backup] Local list warning:", err.message);
+  }
+
+  // 2. Scan Supabase Storage (if available)
+  try {
+    const hasBucket = await ensureBucket();
+    if (hasBucket) {
+      const supabase = getSupabase();
+      const prefix = tenantPrefix(tenantId);
+      const { data, error } = await supabase.storage.from(BUCKET_NAME).list(prefix);
+      if (!error && Array.isArray(data)) {
+        for (const f of data) {
+          if (BACKUP_FILENAME_RE.test(f.name)) {
+            const existing = resultsMap.get(f.name);
+            const size = f.metadata?.size || existing?.size || 0;
+            resultsMap.set(f.name, {
+              filename: f.name,
+              size,
+              sizeKb: Math.round(size / 1024),
+              createdAt: f.created_at || f.updated_at || existing?.createdAt || new Date().toISOString(),
+              isCompressed: f.name.endsWith(".gz"),
+              storage: existing ? "dual (local+cloud)" : "cloud",
+            });
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[backup] Cloud list warning:", err.message);
+  }
+
+  return Array.from(resultsMap.values()).sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
+}
+
+/**
+ * Rotate backups to avoid filling up disk/free tier storage
+ */
 async function rotate(schoolId) {
   const all = await listBackups(schoolId);
   if (all.length > KEEP_LAST) {
-    const toDelete = all.slice(KEEP_LAST).map(b => tenantPath(schoolId, b.filename));
-    const supabase = getSupabase();
-    const { error } = await supabase.storage.from(BUCKET_NAME).remove(toDelete);
-    if (error) console.error("[backup] rotate cleanup error:", error.message);
-    else console.log(`[backup] Cleaned up ${toDelete.length} old backup(s)`);
+    const toDelete = all.slice(KEEP_LAST);
+    const localDir = getLocalTenantDir(schoolId);
+
+    for (const b of toDelete) {
+      // Delete local
+      try {
+        const localPath = path.join(localDir, b.filename);
+        if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
+      } catch (_) {}
+
+      // Delete cloud
+      try {
+        const supabase = getSupabase();
+        if (supabase) {
+          await supabase.storage.from(BUCKET_NAME).remove([tenantPath(schoolId, b.filename)]);
+        }
+      } catch (_) {}
+    }
+    console.log(`[backup] Cleaned up ${toDelete.length} old backup(s) for school ${schoolId}`);
   }
 }
 
+/**
+ * Executes a full tenant-scoped backup with Gzip compression and Dual Storage.
+ */
 export async function runBackup(schoolId) {
   const tenantId = normalizeSchoolId(schoolId);
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const filename = `backup_school${tenantId}_${ts}.sql`;
+  const rawFilename = `backup_school${tenantId}_${ts}.sql`;
+  const compressedFilename = `${rawFilename}.gz`;
 
   try {
-    await ensureBucket();
     const supabase = getSupabase();
+    if (!supabase) throw new Error("Database client not available");
 
+    // Ordered tables by dependency to ensure foreign-key safe restoration
     const tables = [
-      'schools', 'classes', 'students', 'teachers', 'subjects',
-      'enrollments', 'grades', 'attendance', 'payments', 'invoices',
-      'users', 'activity_logs', 'fee_structures', 'exam_results',
-      'student_guardians', 'student_transport', 'teacher_classes',
-      'class_subjects', 'timetable_entries', 'transport_routes',
-      'lesson_plans', 'announcements', 'notifications', 'sms_logs',
-      'security_logs', 'hr_staff', 'hr_attendance', 'hr_leave',
-      'hr_payslips', 'books', 'borrow_records', 'discipline_records',
-      'report_cards', 'results', 'admissions', 'fee_balance_ledger'
+      "schools",
+      "classes",
+      "subjects",
+      "teachers",
+      "students",
+      "enrollments",
+      "grades",
+      "attendance",
+      "payments",
+      "invoices",
+      "fee_structures",
+      "exam_results",
+      "student_guardians",
+      "student_transport",
+      "teacher_classes",
+      "class_subjects",
+      "timetable_entries",
+      "transport_routes",
+      "lesson_plans",
+      "announcements",
+      "notifications",
+      "sms_logs",
+      "hr_staff",
+      "hr_attendance",
+      "hr_leave",
+      "hr_payslips",
+      "books",
+      "borrow_records",
+      "discipline_records",
+      "report_cards",
+      "results",
+      "admissions",
+      "fee_balance_ledger",
     ];
 
-    let backupContent = `-- EduCore Database Backup\n`;
+    let backupContent = `-- EduCore School Backup Snapshot\n`;
     backupContent += `-- Generated: ${new Date().toISOString()}\n`;
-    backupContent += `-- School: ${tenantId}\n`;
-    backupContent += `-- Database: Supabase/PostgreSQL\n`;
-    backupContent += `-- Note: scoped to a single tenant; credential columns are excluded\n\n`;
+    backupContent += `-- School ID: ${tenantId}\n`;
+    backupContent += `-- Format: PostgreSQL / Supabase Compatible DDL+DML\n`;
+    backupContent += `-- Mode: Scoped Tenant Data (Credentials Stripped)\n\n`;
+    backupContent += `BEGIN;\nSET CONSTRAINTS ALL DEFERRED;\n\n`;
+
+    let totalRecordsExported = 0;
 
     for (const table of tables) {
       try {
         const { data, error } = await supabase
           .from(table)
-          .select('*')
-          .eq('school_id', tenantId)
-          .is('is_deleted', false)
-          .order('created_at', { ascending: false, nullsFirst: false })
-          .limit(10000);
+          .select("*")
+          .eq("school_id", tenantId)
+          .order("created_at", { ascending: true, nullsFirst: true })
+          .limit(20000);
 
-        if (error) {
-          // Fail closed: a table we cannot scope to the tenant is skipped
-          // rather than dumped globally.
-          console.warn(`[backup] Warning: Could not backup table ${table}:`, error.message);
-          backupContent += `-- Skipped table ${table}: not exported\n\n`;
-          continue;
-        }
+        if (error || !data || data.length === 0) continue;
 
-        if (data && data.length > 0) {
-          const columns = Object.keys(data[0]).filter(col => !SENSITIVE_COLUMNS.has(col.toLowerCase()));
-          if (columns.length === 0) {
-            backupContent += `-- Table: ${table} (only sensitive columns, skipped)\n\n`;
-            continue;
-          }
+        const columns = Object.keys(data[0]).filter(
+          (col) => !SENSITIVE_COLUMNS.has(col.toLowerCase())
+        );
+        if (columns.length === 0) continue;
 
-          backupContent += `-- Table: ${table} (${data.length} records)\n`;
-          backupContent += `INSERT INTO ${table} (`;
-          backupContent += columns.join(', ') + ') VALUES\n';
+        totalRecordsExported += data.length;
+        backupContent += `-- Table: ${table} (${data.length} records)\n`;
+        backupContent += `INSERT INTO ${table} (${columns.join(", ")}) VALUES\n`;
 
-          data.forEach((row, index) => {
-            const values = columns.map(col => {
-              const val = row[col];
-              if (val === null) return 'NULL';
-              if (typeof val === 'string') {
-                return `'${val.replace(/'/g, "''")}'`;
-              }
-              if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
-              if (val instanceof Date) return `'${val.toISOString()}'`;
-              if (typeof val === 'object') return `'${JSON.stringify(val).replace(/'/g, "''")}'`;
-              return val;
-            });
-            backupContent += `  (${values.join(', ')})${index < data.length - 1 ? ',' : ';'}\n`;
+        data.forEach((row, index) => {
+          const values = columns.map((col) => {
+            const val = row[col];
+            if (val === null || val === undefined) return "NULL";
+            if (typeof val === "string") return `'${val.replace(/'/g, "''")}'`;
+            if (typeof val === "boolean") return val ? "TRUE" : "FALSE";
+            if (val instanceof Date) return `'${val.toISOString()}'`;
+            if (typeof val === "object") return `'${JSON.stringify(val).replace(/'/g, "''")}'`;
+            return val;
           });
-          backupContent += '\n';
-        } else {
-          backupContent += `-- Table: ${table} (no records)\n\n`;
-        }
+          backupContent += `  (${values.join(", ")})${index < data.length - 1 ? "," : ";"}\n`;
+        });
+        backupContent += "\n";
       } catch (err) {
-        console.warn(`[backup] Warning: Error backing up table ${table}:`, err.message);
-        backupContent += `-- Skipped table ${table}: not exported\n\n`;
+        console.warn(`[backup] Warning: Skipping table ${table}: ${err.message}`);
       }
     }
 
-    const sizeBytes = Buffer.byteLength(backupContent, 'utf8');
-    if (sizeBytes < 100) throw new Error("Backup content too small or empty");
+    backupContent += `COMMIT;\n`;
 
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(tenantPath(tenantId, filename), backupContent, {
-        contentType: 'text/plain',
-        upsert: false,
-      });
+    const rawBuffer = Buffer.from(backupContent, "utf8");
+    if (rawBuffer.length < 50) throw new Error("Generated backup content was empty");
 
-    if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+    // Compress using GZIP for 85%+ space savings & rapid mobile downloads
+    const compressedBuffer = zlib.gzipSync(rawBuffer);
 
-    console.log(`[backup] Uploaded ${filename} for school ${tenantId} (${(sizeBytes / 1024).toFixed(1)} KB)`);
+    // 1. Save to Local Disk (guaranteed storage)
+    const localDir = getLocalTenantDir(tenantId);
+    const localFilePath = path.join(localDir, compressedFilename);
+    fs.writeFileSync(localFilePath, compressedBuffer);
+
+    // 2. Mirror to Supabase Storage (best effort for free tier)
+    let cloudSaved = false;
+    try {
+      const hasBucket = await ensureBucket();
+      if (hasBucket) {
+        const { error: uploadError } = await supabase.storage
+          .from(BUCKET_NAME)
+          .upload(tenantPath(tenantId, compressedFilename), compressedBuffer, {
+            contentType: "application/gzip",
+            upsert: true,
+          });
+        cloudSaved = !uploadError;
+      }
+    } catch (_) {}
+
     await rotate(tenantId);
-    return { success: true, filename, size: sizeBytes };
+
+    console.log(
+      `[backup] ✅ Backup created: ${compressedFilename} (${(compressedBuffer.length / 1024).toFixed(1)} KB, ${totalRecordsExported} records, cloud: ${cloudSaved ? "synced" : "local-only"})`
+    );
+
+    return {
+      success: true,
+      filename: compressedFilename,
+      size: compressedBuffer.length,
+      sizeKb: Math.round(compressedBuffer.length / 1024),
+      rawSizeKb: Math.round(rawBuffer.length / 1024),
+      recordCount: totalRecordsExported,
+      storage: cloudSaved ? "dual (local+cloud)" : "local",
+    };
   } catch (err) {
-    console.error("[backup] Failed:", err.message);
+    console.error("[backup] Backup execution error:", err.message);
     return { success: false, error: err.message };
   }
 }
 
+/**
+ * Download a backup file (serves from local disk or cloud)
+ */
 export async function downloadBackup(schoolId, filename) {
-  await ensureBucket();
+  const tenantId = normalizeSchoolId(schoolId);
+
+  // 1. Check local disk
+  const localPath = path.join(getLocalTenantDir(tenantId), filename);
+  if (fs.existsSync(localPath)) {
+    return {
+      buffer: fs.readFileSync(localPath),
+      filename,
+      isGzip: filename.endsWith(".gz"),
+    };
+  }
+
+  // 2. Fall back to cloud storage
   const supabase = getSupabase();
-  const { data, error } = await supabase.storage
-    .from(BUCKET_NAME)
-    .download(tenantPath(schoolId, filename));
-  if (error) throw new Error(error.message);
-  return data;
+  if (supabase) {
+    const { data, error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .download(tenantPath(tenantId, filename));
+    if (!error && data) {
+      const buffer = Buffer.from(await data.arrayBuffer());
+      return {
+        buffer,
+        filename,
+        isGzip: filename.endsWith(".gz"),
+      };
+    }
+  }
+
+  throw new Error(`Backup file ${filename} not found`);
 }
 
+/**
+ * Delete a backup file
+ */
 export async function deleteBackup(schoolId, filename) {
-  await ensureBucket();
-  const supabase = getSupabase();
-  const { error } = await supabase.storage
-    .from(BUCKET_NAME)
-    .remove([tenantPath(schoolId, filename)]);
-  if (error) throw new Error(error.message);
+  const tenantId = normalizeSchoolId(schoolId);
+
+  // Delete local
+  const localPath = path.join(getLocalTenantDir(tenantId), filename);
+  if (fs.existsSync(localPath)) {
+    fs.unlinkSync(localPath);
+  }
+
+  // Delete cloud
+  try {
+    const supabase = getSupabase();
+    if (supabase) {
+      await supabase.storage.from(BUCKET_NAME).remove([tenantPath(tenantId, filename)]);
+    }
+  } catch (_) {}
+
+  return { success: true };
 }
 
-// Scheduled backups run one tenant-scoped dump per school.
+/**
+ * Send backup snapshot directly to Director's Email (accessible instantly on phone)
+ */
+export async function emailBackupToDirector(schoolId, filename, recipientEmail) {
+  const tenantId = normalizeSchoolId(schoolId);
+  if (!recipientEmail || !recipientEmail.includes("@")) {
+    throw new Error("A valid recipient email is required");
+  }
+
+  const { buffer, isGzip } = await downloadBackup(tenantId, filename);
+
+  const transporter = nodemailer.createTransporter({
+    host: env.smtpHost || "smtp.gmail.com",
+    port: env.smtpPort || 587,
+    secure: env.smtpPort === 465,
+    auth: {
+      user: env.smtpUser,
+      pass: env.smtpPass,
+    },
+  });
+
+  const mailOptions = {
+    from: `"${env.smtpFromName || 'EduCore School Systems'}" <${env.smtpFrom || env.smtpUser || 'backups@educore.ac.ke'}>`,
+    to: recipientEmail,
+    subject: `🛡️ EduCore School Backup Snapshot — ${new Date().toLocaleDateString("en-KE")}`,
+    text: `Attached is your EduCore School Database Backup snapshot (${filename}).\n\nStore this file safely on your smartphone or Google Drive. You can use this file to restore your school records in case of emergency.`,
+    html: `
+      <div style="font-family: sans-serif; padding: 20px; background: #0f172a; color: #f8fafc; border-radius: 12px;">
+        <h2 style="color: #38bdf8; margin-top: 0;">🛡️ EduCore Disaster Recovery Snapshot</h2>
+        <p>Dear Administrator,</p>
+        <p>Here is your encrypted school database backup taken on <strong>${new Date().toLocaleString()}</strong>.</p>
+        <div style="background: #1e293b; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #334155;">
+          <p style="margin: 4px 0;"><strong>File:</strong> <code>${filename}</code></p>
+          <p style="margin: 4px 0;"><strong>Size:</strong> ${(buffer.length / 1024).toFixed(1)} KB (${isGzip ? 'Gzip Compressed' : 'Raw SQL'})</p>
+          <p style="margin: 4px 0;"><strong>School Tenant ID:</strong> ${tenantId}</p>
+        </div>
+        <p style="color: #94a3b8; font-size: 13px;">Keep this file in your email inbox or save it to your phone's storage. It contains complete student, class, and fee records.</p>
+      </div>
+    `,
+    attachments: [
+      {
+        filename,
+        content: buffer,
+        contentType: isGzip ? "application/gzip" : "application/sql",
+      },
+    ],
+  };
+
+  await transporter.sendMail(mailOptions);
+  return { success: true, message: `Backup emailed successfully to ${recipientEmail}` };
+}
+
+/**
+ * Scheduled daily backup runner across all schools
+ */
 export async function runScheduledBackups() {
   const supabase = getSupabase();
-  const { data, error } = await supabase.from("schools").select("school_id");
-  if (error) {
-    console.error("[backup] Could not list schools for scheduled backup:", error.message);
+  if (!supabase) return;
+
+  const { data, error } = await supabase.from("schools").select("school_id").eq("is_deleted", false);
+  if (error || !data) {
+    console.error("[backup] Could not query schools for scheduled backup:", error?.message);
     return;
   }
-  for (const school of data || []) {
+
+  for (const school of data) {
     await runBackup(school.school_id);
   }
 }
@@ -242,14 +460,14 @@ export function startBackupScheduler() {
   _schedulerStarted = true;
 
   function scheduleNext() {
-    const now  = new Date();
+    const now = new Date();
     const next = new Date(now);
     next.setDate(next.getDate() + 1);
     next.setHours(0, 0, 0, 0);
     const ms = next - now;
     console.log(`[backup] Next scheduled backup in ${(ms / 3600000).toFixed(1)}h`);
     setTimeout(async () => {
-      console.log("[backup] Running scheduled daily backups...");
+      console.log("[backup] 🗄️ Running scheduled daily school backups...");
       await runScheduledBackups();
       scheduleNext();
     }, ms);

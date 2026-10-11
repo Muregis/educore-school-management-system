@@ -313,7 +313,7 @@ export class BillingService {
       },
       discount_amount: round2(discountAmount),
       carry_forward: round2(carryForward),
-      total_charge,
+      total_charge: totalCharge,
       source_items: sourceItems,
     };
   }

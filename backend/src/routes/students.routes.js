@@ -135,10 +135,10 @@ router.get("/promotion-eligible", authorize("promotion.view"), async (req, res, 
 
     const [studentsResult, classesResult] = await Promise.all([
       studentIds.length
-        ? supabase.from('students').select('student_id, first_name, last_name, admission_number, class_name').in('student_id', studentIds)
+        ? supabase.from('students').select('student_id, first_name, last_name, admission_number, class_name').eq('school_id', schoolId).in('student_id', studentIds)
         : { data: [] },
       classIds.length
-        ? supabase.from('classes').select('class_id, class_name').in('class_id', classIds)
+        ? supabase.from('classes').select('class_id, class_name').eq('school_id', schoolId).in('class_id', classIds)
         : { data: [] }
     ]);
 

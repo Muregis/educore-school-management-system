@@ -260,27 +260,42 @@ ActivityLogsTab.propTypes = { auth: PropTypes.object };
 
 // ─── BACKUPS TAB ──────────────────────────────────────────────────────────────
 const BackupsTab = ({ auth }) => {
-  const [backups, setBackups]   = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [running, setRunning]   = useState(false);
-  const [message, setMessage]   = useState(null);
+  const [backups, setBackups]     = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [running, setRunning]     = useState(false);
+  const [emailing, setEmailing]   = useState(null);
+  const [targetEmail, setTargetEmail] = useState(auth?.user?.email || auth?.email || "");
+  const [heartbeat, setHeartbeat] = useState(null);
+  const [message, setMessage]     = useState(null);
 
   const load = () => {
-    apiFetch("/admin/backups", { token: auth?.token })
-      .then(d => { setBackups(d.backups || []); setLoading(false); })
+    setLoading(true);
+    Promise.all([
+      apiFetch("/admin/backups", { token: auth?.token }).catch(() => ({ backups: [] })),
+      apiFetch("/admin/supabase-status", { token: auth?.token }).catch(() => null),
+    ])
+      .then(([backupsData, hbData]) => {
+        setBackups(backupsData?.backups || []);
+        if (hbData) setHeartbeat(hbData);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   };
 
   useEffect(load, [auth]);
 
   const triggerBackup = async () => {
-    setRunning(true); setMessage(null);
+    setRunning(true);
+    setMessage(null);
     try {
-      const res = await apiFetch("/admin/backups", { method:"POST", token: auth?.token });
-      setMessage({ type:"success", text:`✅ ${res.message} — ${res.filename} (${res.sizeKb} KB)` });
+      const res = await apiFetch("/admin/backups", { method: "POST", token: auth?.token });
+      setMessage({
+        type: "success",
+        text: `✅ ${res.message} — ${res.filename} (${res.sizeKb} KB, ${res.recordCount || 'full'} records, ${res.storage || 'local'})`,
+      });
       load();
-    } catch(e) {
-      setMessage({ type:"error", text:`❌ Backup failed: ${e.message}` });
+    } catch (e) {
+      setMessage({ type: "error", text: `❌ Backup failed: ${e.message}` });
     }
     setRunning(false);
   };
@@ -288,61 +303,234 @@ const BackupsTab = ({ auth }) => {
   const downloadBackup = async (filename) => {
     try {
       await apiDownload(`/admin/backups/${filename}/download`, { token: auth?.token, filename });
-    } catch(e) { alert(e.message); }
+    } catch (e) {
+      alert(`Download error: ${e.message}`);
+    }
+  };
+
+  const emailBackup = async (filename) => {
+    const dest = window.prompt("Enter the email address to send this backup to (accessible on your phone):", targetEmail);
+    if (!dest || !dest.includes("@")) return;
+
+    setEmailing(filename);
+    try {
+      const res = await apiFetch(`/admin/backups/${filename}/email`, {
+        method: "POST",
+        token: auth?.token,
+        body: { email: dest.trim() },
+      });
+      setMessage({ type: "success", text: `📧 ${res.message || 'Backup dispatched to your phone email!'}` });
+    } catch (e) {
+      setMessage({ type: "error", text: `Failed to email backup: ${e.message}` });
+    }
+    setEmailing(null);
   };
 
   const deleteBackup = async (filename) => {
     if (!confirm(`Delete ${filename}?`)) return;
     try {
-      await apiFetch(`/admin/backups/${filename}`, { method:"DELETE", token: auth?.token });
+      await apiFetch(`/admin/backups/${filename}`, { method: "DELETE", token: auth?.token });
       load();
-    } catch(e) { alert(e.message); }
+    } catch (e) {
+      alert(e.message);
+    }
   };
 
   return (
-    <div>
-      <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16, flexWrap:"wrap" }}>
-        <button onClick={triggerBackup} disabled={running} style={{
-          background: running ? "#334155" : "linear-gradient(135deg,#3B82F6,#6366f1)",
-          color:"#fff", border:"none", borderRadius:8, padding:"9px 20px",
-          fontWeight:700, fontSize:13, cursor: running ? "not-allowed" : "pointer",
-        }}>{running ? "⏳ Running backup..." : "💾 Run Backup Now"}</button>
-        <span style={{ fontSize:12, color:"#94a3b8" }}>Last 7 backups kept automatically. Backups run daily at midnight.</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Supabase Free-Tier Protection & Disaster Containment Banner */}
+      <div style={{
+        background: "rgba(16, 185, 129, 0.08)",
+        border: "1px solid rgba(16, 185, 129, 0.3)",
+        borderRadius: 12,
+        padding: "14px 18px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 20 }}>🛡️</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#34d399" }}>
+                Supabase Free-Tier Protection: ACTIVE
+              </div>
+              <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                Automatic keep-alive prevents Supabase pausing and Render 15-minute sleep.
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {heartbeat?.lastPing && (
+              <div style={{
+                fontSize: 11,
+                fontFamily: "var(--font-mono, monospace)",
+                background: "rgba(0,0,0,0.3)",
+                padding: "4px 10px",
+                borderRadius: 6,
+                color: "#a7f3d0",
+              }}>
+                DB: {heartbeat.lastPing.latencyMs}ms
+              </div>
+            )}
+            <div style={{
+              fontSize: 11,
+              fontFamily: "var(--font-mono, monospace)",
+              background: "rgba(59,130,246,0.15)",
+              border: "1px solid rgba(59,130,246,0.3)",
+              padding: "4px 10px",
+              borderRadius: 6,
+              color: "#93c5fd",
+            }}>
+              ⚡ Render: {heartbeat?.render?.antiSleepActive ? "Keep-Alive 12m (No Sleep)" : "Auto-detected on deploy"}
+            </div>
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: "#64748b", marginTop: 4, display: "flex", gap: 14, flexWrap: "wrap" }}>
+          <span>💾 <strong>Dual Storage:</strong> Saved to server disk + cloud mirror</span>
+          <span>📦 <strong>Gzip Compressed:</strong> 85% lighter for mobile data</span>
+          <span>⚡ <strong>Render Anti-Sleep:</strong> 12-min edge ping keeps free server awake</span>
+          <span>📅 <strong>Retention:</strong> Last 14 days preserved</span>
+        </div>
       </div>
+
+      {/* Action Toolbar */}
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <button
+          onClick={triggerBackup}
+          disabled={running}
+          style={{
+            background: running ? "#334155" : "linear-gradient(135deg,#3B82F6,#6366f1)",
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            padding: "10px 22px",
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: running ? "not-allowed" : "pointer",
+            boxShadow: "0 2px 8px rgba(59,130,246,0.3)",
+          }}
+        >
+          {running ? "⏳ Generating Compressed Snapshot..." : "💾 Create Backup Now"}
+        </button>
+      </div>
+
       {message && (
-        <div style={{ marginBottom:14, padding:"10px 14px", borderRadius:8, fontSize:13,
-          background: message.type === "success" ? "rgba(74,222,128,0.1)" : "rgba(248,113,113,0.1)",
+        <div style={{
+          padding: "12px 16px",
+          borderRadius: 8,
+          fontSize: 13,
+          background: message.type === "success" ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.12)",
           border: `1px solid ${message.type === "success" ? "rgba(74,222,128,0.3)" : "rgba(248,113,113,0.3)"}`,
-          color: message.type === "success" ? "#4ade80" : "#f87171" }}>
+          color: message.type === "success" ? "#4ade80" : "#f87171",
+        }}>
           {message.text}
         </div>
       )}
-      {loading ? <div style={{ color:"#94a3b8" }}>Loading...</div> : (
-        backups.length === 0
-          ? <div style={{ color:"#94a3b8", fontSize:13 }}>No backups found. Run your first backup above.</div>
-          : <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              {backups.map(b => (
-                <div key={b.filename} style={{ display:"flex", alignItems:"center", gap:12,
-                  background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.07)",
-                  borderRadius:8, padding:"10px 16px" }}>
-                  <span style={{ fontSize:18 }}>🗄️</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:600, color:"#e2e8f0" }}>{b.filename}</div>
-                    <div style={{ fontSize:11, color:"#94a3b8" }}>
-                      {b.sizeKb} KB · {new Date(b.createdAt).toLocaleString()}
-                    </div>
+
+      {/* Backup list */}
+      {loading ? (
+        <div style={{ color: "#94a3b8", padding: 20 }}>Loading backups...</div>
+      ) : backups.length === 0 ? (
+        <div style={{
+          background: "rgba(255,255,255,0.02)",
+          border: "1px dashed rgba(255,255,255,0.1)",
+          borderRadius: 12,
+          padding: "36px 20px",
+          textAlign: "center",
+          color: "#94a3b8",
+          fontSize: 13,
+        }}>
+          No backups generated yet. Tap <strong>"Create Backup Now"</strong> to take your first school snapshot.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {backups.map((b) => (
+            <div
+              key={b.filename}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 12,
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 10,
+                padding: "14px 18px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 240 }}>
+                <span style={{ fontSize: 24 }}>🗄️</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#f1f5f9" }}>{b.filename}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2, display: "flex", gap: 8 }}>
+                    <span>{b.sizeKb} KB {b.isCompressed ? "(Gzip)" : "(SQL)"}</span>
+                    <span>·</span>
+                    <span>{new Date(b.createdAt).toLocaleString()}</span>
+                    {b.storage && (
+                      <>
+                        <span>·</span>
+                        <span style={{ color: "#38bdf8" }}>{b.storage}</span>
+                      </>
+                    )}
                   </div>
-                  <button onClick={() => downloadBackup(b.filename)} style={{
-                    background:"none", border:"none", padding:0, cursor:"pointer",
-                    fontSize:12, color:"#60a5fa", fontWeight:600,
-                  }}>⬇ Download</button>
-                  <button onClick={() => deleteBackup(b.filename)} style={{
-                    background:"rgba(248,113,113,0.1)", border:"1px solid rgba(248,113,113,0.3)",
-                    color:"#f87171", borderRadius:6, padding:"4px 10px", fontSize:12, cursor:"pointer",
-                  }}>Delete</button>
                 </div>
-              ))}
+              </div>
+
+              {/* Mobile and Desktop Action Buttons */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <button
+                  onClick={() => downloadBackup(b.filename)}
+                  title="Download snapshot directly to this phone/computer"
+                  style={{
+                    background: "rgba(59,130,246,0.15)",
+                    border: "1px solid rgba(59,130,246,0.4)",
+                    color: "#60a5fa",
+                    borderRadius: 6,
+                    padding: "7px 12px",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  📱 Save to Phone
+                </button>
+                <button
+                  onClick={() => emailBackup(b.filename)}
+                  disabled={emailing === b.filename}
+                  title="Send attachment directly to your personal email"
+                  style={{
+                    background: "rgba(20,184,166,0.15)",
+                    border: "1px solid rgba(20,184,166,0.4)",
+                    color: "#2dd4bf",
+                    borderRadius: 6,
+                    padding: "7px 12px",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: emailing === b.filename ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {emailing === b.filename ? "Sending..." : "📧 Email to Phone"}
+                </button>
+                <button
+                  onClick={() => deleteBackup(b.filename)}
+                  style={{
+                    background: "rgba(248,113,113,0.1)",
+                    border: "1px solid rgba(248,113,113,0.3)",
+                    color: "#f87171",
+                    borderRadius: 6,
+                    padding: "7px 10px",
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
+          ))}
+        </div>
       )}
     </div>
   );

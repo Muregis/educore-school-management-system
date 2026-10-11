@@ -407,7 +407,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       </div>
 
       {/* Tabs */}
-      <div style={{ display:"flex", gap:4, marginBottom:16, background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:4, width:"fit-content", flexWrap:"wrap" }}>
+      <div style={{ display:"flex", gap:4, marginBottom:16, background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:4, maxWidth:"100%", overflowX:"auto", flexWrap:"wrap" }}>
         {tabBtn("staff",      "👥 Staff")}
         {tabBtn("leave",      `🏖️ Leave${pendingLeave>0?" ("+pendingLeave+")":""}`)}
         {tabBtn("attendance", "📅 Attendance")}
@@ -671,7 +671,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       {/* ── LEAVE MODAL ── */}
       {showLeave && (
         <Modal title="Add Leave Request" onClose={()=>setShowLeave(false)}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))", gap:10 }}>
             <Field label="Staff Member">
               <select style={inputStyle} value={leaveForm.staffId} onChange={e=>setLeaveForm(f=>({...f,staffId:e.target.value}))}>
                 <option value="">-- Select staff --</option>

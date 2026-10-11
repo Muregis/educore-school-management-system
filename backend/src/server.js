@@ -8,6 +8,9 @@ import { testDbConnection, applyDatabaseMigrations } from "./config/db.js";
 console.log('[Server] DB module imported');
 import { cleanupExpiredSessions } from "./middleware/session.js";
 import { setupGracefulShutdown } from "./utils/gracefulShutdown.js";
+import { startSupabaseHeartbeatWorker } from "./services/heartbeat.service.js";
+import { startBackupScheduler } from "./services/backup.service.js";
+import { startRenderAntiSleepWorker } from "./services/renderAntiSleep.service.js";
 
 // Debug: Log all registered routes
 function logRoutes() {
@@ -72,6 +75,12 @@ async function start() {
       setInterval(() => {
         cleanupExpiredSessions().catch(err => console.error("[session] Cleanup failed:", err.message));
       }, 60 * 60 * 1000);
+
+      // Start Supabase Free-Tier Anti-Pause Keeper & Backup Scheduler
+      startSupabaseHeartbeatWorker();
+      startBackupScheduler();
+      startRenderAntiSleepWorker();
+
       // Log registered routes after startup
       setTimeout(logRoutes, 1000);
     });

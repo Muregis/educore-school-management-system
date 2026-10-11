@@ -62,6 +62,7 @@ import TermManagementPage from "./pages/TermManagementPage";
 import AcademicTransitionPage from "./pages/AcademicTransitionPage";
 import { clearSession, getSession, logout, saveSession } from "./lib/auth";
 import { clearCurrentTermCache } from "./hooks/useCurrentTerm";
+import OnboardingWizard from "./components/OnboardingWizard";
 
 // Mobile portal imports
 import ParentPortalMobile from "./pages/ParentPortalMobile";
@@ -195,7 +196,29 @@ export default function App() {
       return getSession()?.user?.schoolId || null;
     }
   });
+  const [needsOnboarding, setNeedsOnboarding] = useState(() => {
+    const session = getSession();
+    const u = session?.user;
+    if (!u) return false;
+    const isDirectorOrAdmin = ["director", "admin", "superadmin"].includes(u.role);
+    return isDirectorOrAdmin && (u.needsOnboarding === true || u.onboardingCompleted === false);
+  });
   const isMobile = useIsMobile();
+
+  useEffect(() => {
+    if (!auth?.token || !["director", "admin", "superadmin"].includes(auth?.role)) {
+      return;
+    }
+    let cancelled = false;
+    apiFetch("/onboarding/status", { token: auth.token, timeoutMs: 8000, retries: 0 })
+      .then((status) => {
+        if (!cancelled && status && typeof status.needsOnboarding === "boolean") {
+          setNeedsOnboarding(status.needsOnboarding);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [auth?.token, auth?.role, activeSchoolId]);
 
   const setPage = useCallback((targetPage) => {
     _setPage(targetPage);
@@ -634,8 +657,26 @@ const fullNav = useMemo(() => {
     resetClientData();
     setAuth(null);
     setActiveChildId(null);
+    setNeedsOnboarding(false);
     setPage("dashboard");
   }, [resetClientData]);
+
+  const handleOnboardingComplete = useCallback(async (_result) => {
+    setNeedsOnboarding(false);
+    if (auth) {
+      const updatedUser = {
+        ...auth,
+        onboardingCompleted: true,
+        needsOnboarding: false,
+      };
+      saveSession({ token: auth.token, sessionId: auth.sessionId, user: updatedUser });
+      setAuth(updatedUser);
+    }
+    clearCurrentTermCache();
+    beginTenantRefresh();
+    toast("School setup completed successfully! Welcome to your dashboard.", "success");
+    setPage("dashboard");
+  }, [auth, beginTenantRefresh, toast, setPage]);
 
   const handleLogin = useCallback(async (u) => {
     clearTenantLocalState();
@@ -646,6 +687,9 @@ const fullNav = useMemo(() => {
 
     setAuth(u);
     setActiveChildId(null);
+    const isDirectorOrAdmin = ["director", "admin", "superadmin"].includes(u.role);
+    const requiresOnboarding = isDirectorOrAdmin && (u.needsOnboarding === true || u.onboardingCompleted === false);
+    setNeedsOnboarding(requiresOnboarding);
     setPage("dashboard");
     beginTenantRefresh();
     toast(`Welcome, ${u.name}`, "success");
@@ -703,6 +747,15 @@ const fullNav = useMemo(() => {
   if (!auth) return (
     <LoginView onLogin={handleLogin} />
   );
+
+  if (needsOnboarding) {
+    return (
+      <div className="school-theme-primary" style={{ minHeight: "100vh", display: "flex", background: C.bg, color: C.text, fontFamily: "var(--font-body)" }}>
+        <OnboardingWizard auth={auth} onComplete={handleOnboardingComplete} />
+        <Toasts items={toasts} remove={id => setToasts(prev => prev.filter(t => t.id !== id))} />
+      </div>
+    );
+  }
 
   const pageExists = fullNav.some(n => n.id === page);
   const allowed    = perms?.pages.includes(page);

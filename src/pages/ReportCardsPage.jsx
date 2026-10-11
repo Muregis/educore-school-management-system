@@ -250,7 +250,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
         </div>
       </Card>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "var(--space-4)", alignItems: "start" }}>
         {/* Students list grouped by class */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           <div style={{ fontWeight: 700, color: "var(--color-text-primary)", fontSize: "16px" }}>Students by Class</div>
@@ -364,26 +364,28 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
                 ))}
               </div>
               
-              <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "var(--space-4)" }}>
-                <thead>
-                  <tr>
-                    {["Subject","Score","Grade"].map(h => (
-                      <th key={h} style={{ textAlign: "left", padding: "8px 10px", borderBottom: `2px solid var(--color-border)`, fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 600 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {fullData.results.map((r, i) => (
-                    <tr key={i} style={{ borderBottom: `1px solid var(--color-border)` }}>
-                      <td style={{ padding: "10px", color: "var(--color-text-primary)", fontSize: "13px" }}>{r.subject}</td>
-                      <td style={{ padding: "10px", color: "var(--color-text-primary)", fontWeight: 600 }}>{r.marks}</td>
-                      <td style={{ padding: "10px" }}>
-                        <Badge text={r.grade} variant={r.grade==="A" ? "success" : r.grade==="B" ? "info" : r.grade==="C" ? "warning" : "danger"} />
-                      </td>
+              <div style={{ overflowX: "auto", marginBottom: "var(--space-4)" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      {["Subject","Score","Grade"].map(h => (
+                        <th key={h} style={{ textAlign: "left", padding: "8px 10px", borderBottom: `2px solid var(--color-border)`, fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 600 }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {fullData.results.map((r, i) => (
+                      <tr key={i} style={{ borderBottom: `1px solid var(--color-border)` }}>
+                        <td style={{ padding: "10px", color: "var(--color-text-primary)", fontSize: "13px" }}>{r.subject}</td>
+                        <td style={{ padding: "10px", color: "var(--color-text-primary)", fontWeight: 600 }}>{r.marks}</td>
+                        <td style={{ padding: "10px" }}>
+                          <Badge text={r.grade} variant={r.grade==="A" ? "success" : r.grade==="B" ? "info" : r.grade==="C" ? "warning" : "danger"} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               
               {fullData.reportCard?.class_teacher_comment && (
                 <div style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "12px 16px", marginBottom: "var(--space-2)" }}>
@@ -409,7 +411,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
         </>
       }>
         <div className="ec-form-grid ec-form-grid-2">
-          <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
+          <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
             <Select 
               label="Class"
               value={formClass} 
