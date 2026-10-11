@@ -64,7 +64,7 @@ function StatCard({ label, value, tone = "default", hint }) {
   };
 
   return (
-    <Card style={{ padding: "var(--space-4)", minWidth: "180px", flex: 1 }}>
+    <Card style={{ padding: "var(--space-4)", minWidth: "min(100%, 150px)", flex: "1 1 min(100%, 150px)" }}>
       <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-2)" }}>
         {label}
       </div>
@@ -264,7 +264,7 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
         <StatCard label="This Month" value={money(currentMonthTotal)} tone="success" hint="All expenses dated this month" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(320px, 1fr)", gap: "var(--space-4)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: "var(--space-4)" }}>
         <Card style={{ padding: "var(--space-4)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)", gap: "var(--space-3)", flexWrap: "wrap" }}>
             <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-text-primary)" }}>Monthly Expense Trend</div>
@@ -279,14 +279,14 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
                 const max = Math.max(...summary.monthlyTrend.map((item) => Number(item.total || 0)), 1);
                 const width = (Number(month.total || 0) / max) * 100;
                 return (
-                  <div key={month.month} style={{ display: "grid", gridTemplateColumns: "90px 1fr 120px", gap: "var(--space-3)", alignItems: "center" }}>
-                    <div style={{ color: "var(--color-text-secondary)", fontSize: "13px", fontWeight: 600 }}>
+                  <div key={month.month} className="ec-preserve-grid" style={{ display: "grid", gridTemplateColumns: "minmax(60px, 80px) 1fr minmax(70px, 100px)", gap: "var(--space-2)", alignItems: "center" }}>
+                    <div style={{ color: "var(--color-text-secondary)", fontSize: "12px", fontWeight: 600 }}>
                       {month.label}
                     </div>
-                    <div style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "999px", height: "18px", overflow: "hidden" }}>
+                    <div style={{ background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "999px", height: "16px", overflow: "hidden" }}>
                       <div style={{ width: `${width}%`, height: "100%", background: "linear-gradient(90deg, var(--color-danger), var(--color-warning))", borderRadius: "999px" }} />
                     </div>
-                    <div style={{ textAlign: "right", color: "var(--color-text-primary)", fontWeight: 700 }}>
+                    <div style={{ textAlign: "right", color: "var(--color-text-primary)", fontWeight: 700, fontSize: "12px" }}>
                       {money(month.total)}
                     </div>
                   </div>
@@ -323,15 +323,15 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
           <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-text-primary)" }}>
             Manual Expense Records
           </div>
-          <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
-            <div style={{ minWidth: "220px" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", flex: "1 1 280px" }}>
+            <div style={{ flex: "1 1 160px", minWidth: 0 }}>
               <Input
                 placeholder="Search item, payee, released by..."
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
             </div>
-            <div style={{ minWidth: "200px" }}>
+            <div style={{ flex: "1 1 140px", minWidth: 0 }}>
               <Select
                 value={categoryFilter}
                 onChange={(event) => setCategoryFilter(event.target.value)}
@@ -380,6 +380,48 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
               "View only"
             ),
           ])}
+          renderMobileCard={(row, idx) => {
+            const expense = filteredExpenses[idx];
+            if (!expense) return null;
+            return (
+              <div key={expense.expenditure_id || idx} style={{ padding: "var(--space-3)", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--color-text-primary)" }}>
+                      {expense.purpose || expense.item_name}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: 2 }}>
+                      {expense.paid_to_name || expense.vendor_name || "—"} · {expense.expense_date}
+                    </div>
+                  </div>
+                  <Badge text={expense.category} tone={toneForCategory(expense.category)} />
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--color-bg-base)", padding: "8px 12px", borderRadius: "var(--radius-sm)" }}>
+                  <div style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>
+                    {expense.payment_method || "Cash"}
+                    {expense.reference_number ? ` · ${expense.reference_number}` : ""}
+                  </div>
+                  <div style={{ fontWeight: 800, fontSize: "15px", color: "var(--color-danger)" }}>
+                    {money(expense.amount)}
+                  </div>
+                </div>
+
+                {expense.description && (
+                  <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
+                    {expense.description}
+                  </div>
+                )}
+
+                {canEdit && (
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4, paddingTop: 6, borderTop: "1px solid var(--color-border)" }}>
+                    <Button size="sm" variant="secondary" onClick={() => openEdit(expense)}>Edit</Button>
+                    <Button size="sm" variant="danger" onClick={() => deleteExpense(expense)}>Delete</Button>
+                  </div>
+                )}
+              </div>
+            );
+          }}
           emptyState={<EmptyState title="No manual expenses found" description="Record rent, utility bills, classroom supplies, and other school running costs here with clear accountability." />}
         />
       </Card>
@@ -407,6 +449,32 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
             <span key="amount" style={{ color: "var(--color-danger)", fontWeight: 800 }}>{money(item.amount)}</span>,
             <span key="method" style={{ color: "var(--color-text-secondary)" }}>{item.payment_method || "-"}</span>,
           ])}
+          renderMobileCard={(row, idx) => {
+            const item = (summary?.recent || [])[idx];
+            if (!item) return null;
+            return (
+              <div key={item.id || idx} style={{ padding: "var(--space-3)", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--color-text-primary)" }}>
+                      {item.purpose || item.item_name}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: 2 }}>
+                      {item.paid_to_name || item.vendor_name || "—"} · {item.expense_date}
+                    </div>
+                  </div>
+                  <Badge text={item.category} tone={toneForCategory(item.category)} />
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <Badge text={item.source_label} tone={item.source_type === "payroll" ? "warning" : "info"} />
+                  <div style={{ fontWeight: 800, fontSize: "15px", color: "var(--color-danger)" }}>
+                    {money(item.amount)}
+                  </div>
+                </div>
+              </div>
+            );
+          }}
           emptyState={<EmptyState title="No expense activity yet" description="Paid payroll and recorded expenses will appear here." />}
         />
       </Card>

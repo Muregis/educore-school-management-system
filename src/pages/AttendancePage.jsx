@@ -261,6 +261,27 @@ export default function AttendancePage({
                 {canEdit && (<Button size="sm" variant="danger" onClick={() => del(a.id)}>Delete</Button>)}
               </div>
             ])}
+            renderMobileCard={(_row, idx) => {
+              const a = rows[idx];
+              if (!a) return null;
+              return (
+                <div key={a.id || idx} className="ui-table-mobile-card" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: "15px", color: "var(--color-text-primary)" }}>{a.studentName}</div>
+                      <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: 2 }}>{a.className} · {a.date}</div>
+                    </div>
+                    <Badge text={a.status} variant={a.status === "present" ? "success" : a.status === "late" ? "warning" : "danger"} />
+                  </div>
+                  {canEdit && (
+                    <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end", borderTop: "1px solid var(--color-border)", paddingTop: 8 }}>
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(a)}>Edit</Button>
+                      <Button size="sm" variant="danger" onClick={() => del(a.id)}>Delete</Button>
+                    </div>
+                  )}
+                </div>
+              );
+            }}
           />
           <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
             <Pager page={page} pages={pages} setPage={setPage} />

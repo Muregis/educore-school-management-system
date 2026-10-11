@@ -486,7 +486,7 @@ textarea:focus-visible,
   }
 
   button,
-  input,
+  input:not([type="checkbox"]):not([type="radio"]),
   select,
   textarea,
   .touch-target {

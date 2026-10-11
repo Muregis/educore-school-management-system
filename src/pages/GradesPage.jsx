@@ -606,6 +606,59 @@ const classesForDropdown = useMemo(() => {
                   ))}
                 </div>,
               ])}
+              renderMobileCard={(row, index) => {
+                const studentGroup = rows[index];
+                if (!studentGroup) return null;
+                const studentResults = studentGroup.results || [];
+                return (
+                  <div key={studentGroup.studentId || index} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15, color: C.text, overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {studentGroup.studentName}
+                        </div>
+                        <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{studentGroup.className}</div>
+                      </div>
+                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: "rgba(59,130,246,0.12)", color: "#3B82F6", fontWeight: 600, flexShrink: 0 }}>
+                        {studentResults.length} Subject{studentResults.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+
+                    {studentResults.length === 0 ? (
+                      <div style={{ fontSize: 12, color: C.textMuted, fontStyle: "italic" }}>No grades entered for this student.</div>
+                    ) : (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: 6 }}>
+                        {studentResults.map(result => (
+                          <div key={result.id || result.subject} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 6, padding: "6px 8px" }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {result.subject}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4, gap: 4 }}>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{displayMark(result.marks, result.total)}</span>
+                              {result.marks !== "na" && result.marks !== "absent" && result.marks !== "cheat" && (
+                                <Badge tone={gradeColor(result.grade)}>{result.grade}</Badge>
+                              )}
+                            </div>
+                            <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>{result.term} • {result.examType}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {canEdit && studentResults.length > 0 && (
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4, paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
+                        {studentResults.map(result => (
+                          <div key={`btn-${result.id}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.04)", borderRadius: 6, padding: "2px 6px" }}>
+                            <span style={{ fontSize: 11, color: C.textMuted }}>{result.subject}:</span>
+                            <Btn size="sm" variant="ghost" onClick={() => setEditing(result)}>Edit</Btn>
+                            <Btn size="sm" variant="danger" onClick={() => del(result.id)}>Del</Btn>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }}
             />
           </div>
           <Pager page={page} pages={pages} setPage={setPage} />
@@ -654,6 +707,27 @@ const classesForDropdown = useMemo(() => {
                   <Badge key="grade" tone={getGradeHexColor(s.overallGrade)}>{s.overallGrade}</Badge>,
                   <span key="pos" style={{ fontSize: 12, color: C.textMuted }}>Position {s.rank} of {rankings.students.length}</span>
                 ])}
+                renderMobileCard={(row, idx) => {
+                  const s = rankings.students[idx];
+                  if (!s) return null;
+                  return (
+                    <div key={s.studentId || idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                        <span style={{ fontWeight: 800, fontSize: 18, color: idx < 3 ? '#f59e0b' : C.text, flexShrink: 0 }}>
+                          {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${s.rank}`}
+                        </span>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.studentName}</div>
+                          <div style={{ fontSize: 12, color: C.textMuted }}>{s.examType} • {s.totalMarks}/{s.maxPossible}</div>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, flexShrink: 0 }}>
+                        <span style={{ fontWeight: 700, color: '#3B82F6', fontSize: 14 }}>{s.meanScore.toFixed(1)}%</span>
+                        <Badge tone={getGradeHexColor(s.overallGrade)}>{s.overallGrade}</Badge>
+                      </div>
+                    </div>
+                  );
+                }}
               />
             </div>
           )}
@@ -669,7 +743,7 @@ const classesForDropdown = useMemo(() => {
           setSelectedSubject("");
           setBulkMarks(subjects.reduce((a, sub) => ({ ...a, [sub]: "" }), {}));
         }}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap:10 }}>
             <Field label="Class">
               <select style={inputStyle} value={bulkClass} onChange={e => { setBulkClass(e.target.value); setStudentId(""); }}>
                 <option value="">Select class...</option>
@@ -749,7 +823,7 @@ const classesForDropdown = useMemo(() => {
       {/* Edit Modal */}
       {editing && (
         <Modal title="Edit Result" onClose={() => setEditing(null)}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap:10 }}>
             <Field label="Student">
               <input style={inputStyle} value={editing.studentName} disabled />
             </Field>

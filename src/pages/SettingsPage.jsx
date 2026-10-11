@@ -123,17 +123,17 @@ function SchoolTab({ school, setSchool, toast, auth }) {
   return (
     <Card style={{ padding: "var(--space-4)" }}>
       <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", borderRadius: "var(--radius-lg)", background: `color-mix(in srgb, ${form.primary_color || "var(--color-primary)"} 15%, transparent)`, border: `1px solid var(--color-border)` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
           {form.logo_url ? (
-            <img src={form.logo_url} alt="School logo" style={{ width: 64, height: 64, borderRadius: "var(--radius-md)", objectFit: "cover", border: `1px solid var(--color-border)`, background: "var(--color-bg-surface)" }} />
+            <img src={form.logo_url} alt="School logo" style={{ width: 64, height: 64, borderRadius: "var(--radius-md)", objectFit: "cover", border: `1px solid var(--color-border)`, background: "var(--color-bg-surface)", flexShrink: 0 }} />
           ) : (
-            <div style={{ width: 64, height: 64, borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${normalizeColor(form.primary_color, "var(--color-primary)")}, ${normalizeColor(form.secondary_color, "var(--color-info)")})`, color: "#fff", fontWeight: 800, fontSize: "28px" }}>
+            <div style={{ width: 64, height: 64, borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${normalizeColor(form.primary_color, "var(--color-primary)")}, ${normalizeColor(form.secondary_color, "var(--color-info)")})`, color: "#fff", fontWeight: 800, fontSize: "28px", flexShrink: 0 }}>
               {String(form.name || "E").charAt(0).toUpperCase()}
             </div>
           )}
-          <div>
-            <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--color-text-primary)", marginBottom: "4px" }}>{form.name || "Your school"}</div>
-            <div style={{ fontSize: "14px", color: "var(--color-text-secondary)" }}>{form.tagline || form.motto || "Personalized school experience"}</div>
+          <div style={{ flex: "1 1 180px", minWidth: 0 }}>
+            <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--color-text-primary)", marginBottom: "4px", wordBreak: "break-word" }}>{form.name || "Your school"}</div>
+            <div style={{ fontSize: "14px", color: "var(--color-text-secondary)", wordBreak: "break-word" }}>{form.tagline || form.motto || "Personalized school experience"}</div>
           </div>
         </div>
       </div>
@@ -230,7 +230,7 @@ function SchoolTab({ school, setSchool, toast, auth }) {
                 style={{ display: "none" }}
               />
             </label>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: "1 1 180px", minWidth: 0 }}>
               <input 
                 type="file" 
                 accept="image/*" 

@@ -121,16 +121,17 @@ const Toast = ({ msg, type, onDone }) => {
   const color = colors[type] || C.accent;
   return (
     <div style={{
-      position: "fixed", bottom: 28, right: 28, zIndex: 2000,
+      position: "fixed", bottom: "clamp(16px, 3vw, 28px)", right: "clamp(12px, 3vw, 28px)", zIndex: 2000,
+      maxWidth: "calc(100vw - 24px)", boxSizing: "border-box",
       background: C.card, border: `1px solid ${color}44`,
       borderLeft: `4px solid ${color}`, borderRadius: 12,
-      padding: "14px 20px", display: "flex", alignItems: "center", gap: 12,
+      padding: "14px 18px", display: "flex", alignItems: "center", gap: 12,
       boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
       animation: "slideIn 0.3s ease",
     }}>
       <Icon name={type === "success" ? "check" : type === "error" ? "x" : "bell"} size={16} color={color} />
-      <span style={{ fontSize: 13, color: C.text, fontWeight: 500 }}>{msg}</span>
-      <button onClick={onDone} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", marginLeft: 8 }}>
+      <span style={{ fontSize: 13, color: C.text, fontWeight: 500, wordBreak: "break-word" }}>{msg}</span>
+      <button onClick={onDone} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", marginLeft: "auto", flexShrink: 0 }}>
         <Icon name="x" size={14} />
       </button>
       <style>{`@keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
@@ -142,7 +143,7 @@ Toast.propTypes = { msg: PropTypes.string, type: PropTypes.string, onDone: PropT
 
 // Toggle switch
 const Toggle = ({ value, onChange, label, description }) => (
-  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: `1px solid ${C.border}` }}>
+  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px 0", borderBottom: `1px solid ${C.border}` }}>
     <div>
       <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{label}</div>
       {description && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{description}</div>}
@@ -166,16 +167,16 @@ Toggle.propTypes = { value: PropTypes.bool.isRequired, onChange: PropTypes.func.
 // Section card wrapper
 const Section = ({ title, subtitle, icon, color = C.accent, dim = C.accentGlow, children }) => (
   <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, overflow: "hidden", marginBottom: 20 }}>
-    <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12 }}>
-      <div style={{ background: dim, borderRadius: 10, padding: 9 }}>
+    <div style={{ padding: "clamp(12px, 2.5vw, 18px) clamp(14px, 3.5vw, 24px)", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ background: dim, borderRadius: 10, padding: 9, flexShrink: 0 }}>
         <Icon name={icon} size={16} color={color} />
       </div>
-      <div>
+      <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{title}</div>
         {subtitle && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 1 }}>{subtitle}</div>}
       </div>
     </div>
-    <div style={{ padding: 24 }}>{children}</div>
+    <div style={{ padding: "clamp(14px, 3.5vw, 24px)" }}>{children}</div>
   </div>
 );
 
@@ -460,11 +461,11 @@ const BackupsTab = ({ auth }) => {
                 padding: "14px 18px",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 240 }}>
-                <span style={{ fontSize: 24 }}>🗄️</span>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#f1f5f9" }}>{b.filename}</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2, display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flex: "1 1 200px", minWidth: 0 }}>
+                <span style={{ fontSize: 24, flexShrink: 0 }}>🗄️</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#f1f5f9", wordBreak: "break-all" }}>{b.filename}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2, display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <span>{b.sizeKb} KB {b.isCompressed ? "(Gzip)" : "(SQL)"}</span>
                     <span>·</span>
                     <span>{new Date(b.createdAt).toLocaleString()}</span>
@@ -589,7 +590,7 @@ const PromotionChainTab = ({ auth }) => {
         Set which class students will be promoted to when the term ends. Students will automatically move to their next class when you close the term.
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%, 280px),1fr))", gap: 12 }}>
         {classes.map(cls => (
           <div key={cls.class_id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
             <div style={{ fontWeight: 600, marginBottom: 8, color: C.text }}>{cls.class_name}</div>
@@ -743,7 +744,7 @@ const SubjectsTab = ({ auth }) => {
       {/* Add New Subject */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 12 }}>Add New Subject</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "end" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 12, alignItems: "end" }}>
           <div>
             <label style={{ fontSize: 11, color: C.textMuted, marginBottom: 4, display: "block" }}>Subject Name *</label>
             <input
@@ -764,14 +765,16 @@ const SubjectsTab = ({ auth }) => {
               style={{ ...inputStyle, width: "100%", fontFamily: "monospace" }}
             />
           </div>
-          <Btn onClick={addSubject} disabled={saving || !newSubjectName.trim()} icon="plus">
-            {saving ? "Adding..." : "Add"}
-          </Btn>
+          <div style={{ display: "flex" }}>
+            <Btn onClick={addSubject} disabled={saving || !newSubjectName.trim()} icon="plus">
+              {saving ? "Adding..." : "Add Subject"}
+            </Btn>
+          </div>
         </div>
       </div>
 
       {/* Load Defaults Button */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Current Subjects ({subjects.length})</div>
         <Btn variant="ghost" onClick={loadDefaultSubjects} disabled={saving}>
           ⚡ Load Default CBC Subjects
@@ -794,6 +797,8 @@ const SubjectsTab = ({ auth }) => {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 12,
                 background: C.surface,
                 border: `1px solid ${C.border}`,
                 borderRadius: 10,
@@ -1023,7 +1028,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
   return (
     <div>
       {/* School identity */}
-      <div style={{ background: C.accentGlow, border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: 20, marginBottom: 24, display: "flex", alignItems: "center", gap: 18 }}>
+      <div style={{ background: C.accentGlow, border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: "clamp(14px, 3vw, 20px)", marginBottom: 24, display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
         <div style={{ width: 64, height: 64, borderRadius: 16, background: `linear-gradient(135deg, ${C.accent}, #6366F1)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0, overflow: 'hidden' }}>
           {form.logo_url ? (
             <img src={form.logo_url} alt="School logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -1031,7 +1036,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
             "🏫"
           )}
         </div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ fontSize: 17, fontWeight: 800, color: C.text }}>{form.name}</div>
           <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{form.motto}</div>
           <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>
@@ -1044,18 +1049,18 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
       {/* School Branding / Logo Upload */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>School Branding</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 20 }}>
           <div>
             <label style={{ fontSize: 12, color: C.textMuted, marginBottom: 8, display: 'block' }}>School Logo</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 80, height: 80, borderRadius: 12, background: C.surface, display: "flex", alignItems: "center", justifyContent: "center", overflow: 'hidden', border: `2px dashed ${C.border}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ width: 80, height: 80, borderRadius: 12, background: C.surface, display: "flex", alignItems: "center", justifyContent: "center", overflow: 'hidden', border: `2px dashed ${C.border}`, flexShrink: 0 }}>
                 {logoPreview || form.logo_url ? (
                   <img src={logoPreview || form.logo_url} alt="Logo preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <span style={{ fontSize: 32 }}>🏫</span>
                 )}
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: "1 1 180px", minWidth: 0 }}>
                 <input
                   type="file"
                   accept="image/*"
@@ -1068,7 +1073,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
                       reader.readAsDataURL(file);
                     }
                   }}
-                  style={{ marginBottom: 8 }}
+                  style={{ marginBottom: 8, maxWidth: "100%" }}
                 />
                 <div style={{ fontSize: 11, color: C.textMuted }}>Recommended: 200x200px PNG/JPG</div>
               </div>
@@ -1077,7 +1082,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
           
           <div>
             <label style={{ fontSize: 12, color: C.textMuted, marginBottom: 8, display: 'block' }}>Brand Colors</label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: 12 }}>
               <div>
                 <label style={{ fontSize: 11, color: C.textMuted, marginBottom: 4, display: 'block' }}>Primary</label>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1085,13 +1090,13 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
                     type="color"
                     value={form.primary_color}
                     onChange={f("primary_color")}
-                    style={{ width: 40, height: 40, border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                    style={{ width: 40, height: 40, border: 'none', borderRadius: 6, cursor: 'pointer', flexShrink: 0 }}
                   />
                   <input
                     type="text"
                     value={form.primary_color}
                     onChange={f("primary_color")}
-                    style={{ ...inputStyle, flex: 1, fontFamily: 'monospace' }}
+                    style={{ ...inputStyle, flex: 1, minWidth: 0, fontFamily: 'monospace' }}
                     placeholder="#3B82F6"
                   />
                 </div>
@@ -1103,13 +1108,13 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
                     type="color"
                     value={form.secondary_color}
                     onChange={f("secondary_color")}
-                    style={{ width: 40, height: 40, border: 'none', borderRadius: 6, cursor: 'pointer' }}
+                    style={{ width: 40, height: 40, border: 'none', borderRadius: 6, cursor: 'pointer', flexShrink: 0 }}
                   />
                   <input
                     type="text"
                     value={form.secondary_color}
                     onChange={f("secondary_color")}
-                    style={{ ...inputStyle, flex: 1, fontFamily: 'monospace' }}
+                    style={{ ...inputStyle, flex: 1, minWidth: 0, fontFamily: 'monospace' }}
                     placeholder="#1A2A42"
                   />
                 </div>
@@ -1120,7 +1125,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
       </div>
 
       <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
         <Inp label="School Name" value={form.name} onChange={f("name")} placeholder="e.g. Sunrise Academy" />
         <Inp label="School Motto" value={form.motto} onChange={f("motto")} placeholder="e.g. Excellence in Every Child" />
         <Sel label="School Type" value={form.type} onChange={f("type")} options={[{value:"private",label:"Private"},{value:"public",label:"Public"},{value:"international",label:"International"}]} />
@@ -1129,7 +1134,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
 
       <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
       <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Contact & Location</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
         <Inp label="School Email" type="email" value={form.email} onChange={f("email")} placeholder="admin@school.ac.ke" />
         <Inp label="Phone Number" value={form.phone} onChange={f("phone")} placeholder="+254 7XX XXX XXX" />
         <Inp label="Physical Address" value={form.address} onChange={f("address")} placeholder="Street, Town" />
@@ -1173,7 +1178,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
 
       <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
       <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Current Academic Term</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0 24px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: "0 20px" }}>
         <Sel label="Term" value={form.term} onChange={f("term")} options={["Term 1","Term 2","Term 3"].map(t=>({value:t,label:t}))} />
         <Inp label="Academic Year" value={form.academic_year} onChange={f("academic_year")} placeholder="e.g. 2025" />
         <Inp label="Term Start" type="date" value={form.term_start} onChange={f("term_start")} />
@@ -1182,7 +1187,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
 
       <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
       <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Administrator</div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 24px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
         <Inp label="Admin Name" value={form.admin_name} onChange={f("admin_name")} placeholder="e.g. Jane Doe" />
         <Inp label="Admin Title / Role" value={form.admin_title} onChange={f("admin_title")} placeholder="e.g. School Principal" />
       </div>
@@ -1344,7 +1349,7 @@ const UsersTab = ({ onSave, auth }) => {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
         <div style={{ fontSize: 13, color: C.textSub }}>{users.length} accounts · {users.filter(u => u.status === "active").length} active</div>
         <Btn icon="plus" onClick={() => { setShowAdd(true); setEditId(null); setForm({ name: "", email: "", role: "teacher", password: "" }); }}>Add User</Btn>
       </div>
@@ -1365,13 +1370,13 @@ const UsersTab = ({ onSave, auth }) => {
 
       {/* Add / Edit form */}
       {showAdd && (
-        <div style={{ background: C.surface, border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: 20, marginBottom: 20 }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: "clamp(14px, 3vw, 20px)", marginBottom: 20 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 16 }}>{editId ? "Edit User" : "New User Account"}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
             <Inp label="Full Name" value={form.name} onChange={f("name")} placeholder="e.g. Grace Akinyi" />
             <Inp label="Email Address" type="email" value={form.email} onChange={f("email")} placeholder="user@school.ac.ke" />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
             <Sel label="Role" value={form.role} onChange={f("role")} options={[{value:"admin",label:"Admin — Full access"},{value:"teacher",label:"Teacher — Limited access"},{value:"viewer",label:"Viewer — Read only"}]} />
             <Field label="Password" hint={editId ? "Leave blank to keep current password" : ""}>
               <div style={{ position: "relative" }}>
@@ -1382,7 +1387,7 @@ const UsersTab = ({ onSave, auth }) => {
               </div>
             </Field>
           </div>
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
             <Btn variant="ghost" onClick={() => { setShowAdd(false); setEditId(null); }}>Cancel</Btn>
             <Btn icon="save" onClick={addUser}>{editId ? "Save Changes" : "Create Account"}</Btn>
           </div>
@@ -1394,22 +1399,22 @@ const UsersTab = ({ onSave, auth }) => {
         {users.map(u => {
           const role = getRoleMeta(u.role);
           return (
-            <div key={u.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14 }}>
+            <div key={u.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
               {/* Avatar */}
               <div style={{ width: 42, height: 42, borderRadius: "50%", background: `linear-gradient(135deg, ${u.color[0]}, ${u.color[1]})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: "#fff", flexShrink: 0 }}>
                 {u.initials}
               </div>
               {/* Info */}
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{u.name}</span>
+              <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.text, wordBreak: "break-word" }}>{u.name}</span>
                   <span style={{ background: role.dim, color: role.color, borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 700, letterSpacing: "0.04em" }}>{role.label}</span>
                   {u.status === "inactive" && <span style={{ background: C.roseDim, color: C.rose, borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 700 }}>Inactive</span>}
                 </div>
-                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{u.email}</div>
+                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2, wordBreak: "break-all" }}>{u.email}</div>
               </div>
               {/* Actions */}
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginLeft: "auto" }}>
                 <button onClick={() => toggleStatus(u.id)} disabled={loading} title={u.status === "active" ? "Deactivate" : "Activate"}
                   style={{ background: u.status === "active" ? C.greenDim : C.roseDim, border: "none", borderRadius: 8, padding: "6px 10px", cursor: loading ? "not-allowed" : "pointer", color: u.status === "active" ? C.green : C.rose, fontSize: 11, fontWeight: 700, opacity: loading ? 0.6 : 1 }}>
                   {u.status === "active" ? "Active" : "Inactive"}
@@ -1709,15 +1714,15 @@ const IntegrationsTab = ({ auth }) => {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {/* M-Pesa section */}
-      <div style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.15)", borderRadius: 16, padding: 24 }}>
+      <div style={{ background: "rgba(34,197,94,0.05)", border: "1px solid rgba(34,197,94,0.15)", borderRadius: 16, padding: "clamp(14px, 3.5vw, 24px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#22C55E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>💸</div>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#22C55E", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>💸</div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>M-Pesa (Daraja API)</div>
             <div style={{ fontSize: 11, color: C.textMuted }}>Accept mobile money payments via STK Push</div>
           </div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
           <Inp label="Shortcode" value={config.mpesaShortcode || ""} onChange={e => setConfig({ ...config, mpesaShortcode: e.target.value })} placeholder="e.g. 174379" />
           <Inp label="Passkey" value={config.mpesaPasskey || ""} onChange={e => setConfig({ ...config, mpesaPasskey: e.target.value })} placeholder="Lipa Na M-Pesa Passkey" />
         </div>
@@ -1726,9 +1731,9 @@ const IntegrationsTab = ({ auth }) => {
       </div>
 
       {/* Paystack section */}
-      <div style={{ background: "rgba(59,130,246,0.05)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: 16, padding: 24 }}>
+      <div style={{ background: "rgba(59,130,246,0.05)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: 16, padding: "clamp(14px, 3.5vw, 24px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#3B82F6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>💳</div>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#3B82F6", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>💳</div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>Paystack</div>
             <div style={{ fontSize: 11, color: C.textMuted }}>Accept Card, Bank Transfer, and Apple Pay</div>
@@ -1739,9 +1744,9 @@ const IntegrationsTab = ({ auth }) => {
       </div>
 
       {/* WhatsApp section */}
-      <div style={{ background: "rgba(37,211,102,0.05)", border: "1px solid rgba(37,211,102,0.15)", borderRadius: 16, padding: 24 }}>
+      <div style={{ background: "rgba(37,211,102,0.05)", border: "1px solid rgba(37,211,102,0.15)", borderRadius: 16, padding: "clamp(14px, 3.5vw, 24px)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#25D366", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>📱</div>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "#25D366", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>📱</div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>WhatsApp Business API</div>
             <div style={{ fontSize: 11, color: C.textMuted }}>Send payment receipts and notifications via WhatsApp</div>
@@ -1762,7 +1767,7 @@ const IntegrationsTab = ({ auth }) => {
 
         {config.whatsappEnabled && (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
               <Inp 
                 label="Phone Number ID" 
                 value={config.whatsappPhoneNumberId || ""} 
@@ -1807,7 +1812,7 @@ const IntegrationsTab = ({ auth }) => {
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", flexWrap: "wrap" }}>
         <Btn icon="save" onClick={save} disabled={saving}>{saving ? "Saving..." : "Save Integrations"}</Btn>
       </div>
     </div>
@@ -1911,12 +1916,27 @@ export default function AdminSettings({ auth, initialTab, onPermissionsSaved, on
   return (
     <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", color: C.text }}>
       {/* Tab bar */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 24, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 6 }}>
+      <div style={{
+        display: "flex",
+        gap: 6,
+        marginBottom: 24,
+        background: C.card,
+        border: `1px solid ${C.border}`,
+        borderRadius: 14,
+        padding: 6,
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+        maxWidth: "100%",
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+      }}>
         {TABS.map(tab => {
           const active = activeTab === tab.id;
           return (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-              flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              flex: "0 0 auto",
+              whiteSpace: "nowrap",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
               padding: "9px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontSize: 13, fontWeight: active ? 700 : 500,
               background: active ? C.accentGlow : "transparent",
               color: active ? C.accent : C.textSub,

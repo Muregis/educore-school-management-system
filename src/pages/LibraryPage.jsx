@@ -312,6 +312,32 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
                     ) : <span key="none"></span>,
                   ];
                 })}
+                renderMobileCard={(_row, index) => {
+                  const b = bkRows[index];
+                  if (!b) return null;
+                  const out = Number(b.quantity_total) - Number(b.quantity_available);
+                  return (
+                    <div key={b.book_id || index} style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-primary)" }}>{b.title}</div>
+                          <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>{b.author}</div>
+                        </div>
+                        <Badge text={b.category} variant="info" />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, background: "var(--color-bg-surface)", padding: "6px 10px", borderRadius: "var(--radius-md)" }}>
+                        <span>Available: <strong style={{ color: Number(b.quantity_available) > 0 ? "var(--color-success)" : "var(--color-danger)" }}>{b.quantity_available}</strong> / {b.quantity_total}</span>
+                        {out > 0 && <span style={{ color: "var(--color-warning)" }}>{out} checked out</span>}
+                      </div>
+                      {isLibrarian && (
+                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 2, paddingTop: 6, borderTop: "1px solid var(--color-border)" }}>
+                          <Button size="sm" variant="secondary" onClick={() => { setEditBook(b); setFb({ title: b.title, author: b.author, category: b.category, isbn: b.isbn || "", quantityTotal: b.quantity_total }); setErr(""); setShowBook(true); }}>Edit</Button>
+                          <Button size="sm" onClick={() => { setFw({ ...BLANK_BORROW, bookId: String(b.book_id) }); setErr(""); setShowBorrow(true); }} disabled={Number(b.quantity_available) < 1}>Issue</Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }}
               />
               <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
                 <Pager page={page} pages={bkPages} setPage={setPage} />
@@ -341,6 +367,32 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
                     isLibrarian ? <Button key="r" size="sm" variant="secondary" onClick={() => returnBook(b.borrow_id)}>Return ✓</Button> : <span key="none"></span>,
                   ];
                 })}
+                renderMobileCard={(_row, index) => {
+                  const activeList = brRows.filter(b => b.status === "borrowed");
+                  const b = activeList[index];
+                  if (!b) return null;
+                  const isOverdue = b.due_date < today();
+                  return (
+                    <div key={b.borrow_id || index} style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-primary)" }}>{b.book_title}</div>
+                          <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>{borrowerName(b)} ({b.borrower_type})</div>
+                        </div>
+                        <Badge text={isOverdue ? "OVERDUE" : "Active"} variant={isOverdue ? "danger" : "success"} />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "var(--color-text-secondary)", background: "var(--color-bg-surface)", padding: "6px 10px", borderRadius: "var(--radius-md)" }}>
+                        <span>Due: <strong style={{ color: isOverdue ? "var(--color-danger)" : "var(--color-text-primary)" }}>{b.due_date?.slice(0, 10)}</strong></span>
+                        <span>Days out: {daysOut(b.borrow_date)}</span>
+                      </div>
+                      {isLibrarian && (
+                        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 2, paddingTop: 6, borderTop: "1px solid var(--color-border)" }}>
+                          <Button size="sm" variant="secondary" onClick={() => returnBook(b.borrow_id)}>Return ✓</Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }}
               />
               <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
                 <Pager page={bPage} pages={brPages} setPage={setBPage} />
@@ -368,6 +420,31 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
                     isLibrarian ? <Button key="r" size="sm" variant="secondary" onClick={() => returnBook(b.borrow_id)}>Return ✓</Button> : <span key="none"></span>,
                   ];
                 })}
+                renderMobileCard={(_row, index) => {
+                  const overdueList = borrows.filter(b => b.status === "borrowed" && b.due_date < today());
+                  const b = overdueList[index];
+                  if (!b) return null;
+                  const daysLate = Math.floor((new Date() - new Date(b.due_date)) / 86400000);
+                  return (
+                    <div key={b.borrow_id || index} style={{ display: "flex", flexDirection: "column", gap: 8, padding: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-primary)" }}>{b.book_title}</div>
+                          <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginTop: 2 }}>{borrowerName(b)} ({b.borrower_type})</div>
+                        </div>
+                        <Badge text={`${daysLate}d Late`} variant="danger" />
+                      </div>
+                      <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                        Due Date: <strong style={{ color: "var(--color-danger)" }}>{b.due_date?.slice(0, 10)}</strong>
+                      </div>
+                      {isLibrarian && (
+                        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 2, paddingTop: 6, borderTop: "1px solid var(--color-border)" }}>
+                          <Button size="sm" variant="secondary" onClick={() => returnBook(b.borrow_id)}>Return ✓</Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }}
               />
             </Card>
           )}

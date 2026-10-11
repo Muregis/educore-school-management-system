@@ -382,6 +382,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
     <button key={id} onClick={() => setTab(id)} style={{
       padding:"8px 16px", borderRadius:8, border:"none", cursor:"pointer", fontSize:13, fontWeight:600,
       background: tab===id ? C.accent : "transparent", color: tab===id ? "#fff" : C.textSub,
+      flex: "0 0 auto", whiteSpace: "nowrap"
     }}>{label}</button>
   );
 
@@ -407,7 +408,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       </div>
 
       {/* Tabs */}
-      <div style={{ display:"flex", gap:4, marginBottom:16, background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:4, maxWidth:"100%", overflowX:"auto", flexWrap:"wrap" }}>
+      <div style={{ display:"flex", gap:6, marginBottom:16, background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:6, maxWidth:"100%", overflowX:"auto", flexWrap:"nowrap", WebkitOverflowScrolling:"touch" }}>
         {tabBtn("staff",      "👥 Staff")}
         {tabBtn("leave",      `🏖️ Leave${pendingLeave>0?" ("+pendingLeave+")":""}`)}
         {tabBtn("attendance", "📅 Attendance")}
@@ -449,6 +450,37 @@ export default function HRPage({ auth, canEdit, toast, school }) {
                       </div>
                     ):null,
                   ])}
+                  renderMobileCard={(row, index) => {
+                    const s = sRows[index];
+                    if (!s) return null;
+                    return (
+                      <div key={s.staff_id || index} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{s.full_name}</div>
+                            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{s.job_title} · {s.department}</div>
+                            {(s.email || s.phone) && (
+                              <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{s.email || "—"} · {s.phone || "—"}</div>
+                            )}
+                          </div>
+                          <Badge text={s.status} tone={STATUS_TONE[s.status] || "info"} />
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: C.textSub, background: "rgba(255,255,255,0.02)", padding: "6px 8px", borderRadius: 6 }}>
+                          <span>Contract: {s.contract_type}</span>
+                          <span style={{ fontWeight: 700, color: "#22c55e", fontSize: 13 }}>{money(s.salary)}</span>
+                        </div>
+                        {canEdit && (
+                          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 2, paddingTop: 6, borderTop: `1px solid ${C.border}` }}>
+                            {isDirector && (
+                              <Btn size="xs" tone="secondary" onClick={() => { setTStaff(s); setDestBranch(""); setShowTransfer(true); }}>Transfer</Btn>
+                            )}
+                            <Btn size="xs" variant="ghost" onClick={()=>{ setEditStaff(s); setStaffForm({ fullName:s.full_name, email:s.email||"", phone:s.phone||"", department:s.department, jobTitle:s.job_title, contractType:s.contract_type, startDate:s.start_date?.slice(0,10)||"", salary:s.salary||"", status:s.status, nationalId:s.national_id||"", notes:s.notes||"" }); setErr(""); setShowStaff(true); }}>Edit</Btn>
+                            <Btn size="xs" variant="danger" onClick={()=>deleteStaff(s.staff_id)}>Remove</Btn>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }}
                 />
               </div>
               <Pager page={sPage} pages={sPages} setPage={setSPage} />
@@ -487,6 +519,32 @@ export default function HRPage({ auth, canEdit, toast, school }) {
                       ):null,
                     ];
                   })}
+                  renderMobileCard={(row, index) => {
+                    const l = lRows[index];
+                    if (!l) return null;
+                    const days = l.from_date && l.to_date ? Math.ceil((new Date(l.to_date)-new Date(l.from_date))/86400000)+1 : "—";
+                    return (
+                      <div key={l.leave_id || index} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{l.staff_name}</div>
+                            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{l.department} · {l.leave_type}</div>
+                          </div>
+                          <Badge text={l.status} tone={l.status==="approved"?"success":l.status==="rejected"?"danger":"warning"} />
+                        </div>
+                        <div style={{ fontSize: 12, color: C.textSub, background: "rgba(255,255,255,0.02)", padding: "6px 8px", borderRadius: 6 }}>
+                          <div>{l.from_date?.slice(0,10)} to {l.to_date?.slice(0,10)} ({days} days)</div>
+                          {l.reason && <div style={{ fontStyle: "italic", marginTop: 2, color: C.textMuted }}>{l.reason}</div>}
+                        </div>
+                        {canEdit && l.status === "pending" && (
+                          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 2, paddingTop: 6, borderTop: `1px solid ${C.border}` }}>
+                            <Btn size="xs" onClick={()=>updateLeave(l.leave_id,"approved")}>Approve</Btn>
+                            <Btn size="xs" variant="danger" onClick={()=>updateLeave(l.leave_id,"rejected")}>Reject</Btn>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }}
                 />
               </div>
               <Pager page={lPage} pages={lPages} setPage={setLPage} />
@@ -619,6 +677,28 @@ export default function HRPage({ auth, canEdit, toast, school }) {
                     <Badge key="s" text={p.status} tone={p.status==="paid"?"success":p.status==="approved"?"info":"warning"} />,
                     <Btn key="pr" size="xs" variant="ghost" onClick={()=>printPayslip(p)}>🖨 Print</Btn>,
                   ])}
+                  renderMobileCard={(row, index) => {
+                    const p = pRows[index];
+                    if (!p) return null;
+                    return (
+                      <div key={p.payslip_id || index} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>{p.staff_name}</div>
+                            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{p.job_title} · {p.department}</div>
+                          </div>
+                          <Badge text={p.status} tone={p.status==="paid"?"success":p.status==="approved"?"info":"warning"} />
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13, background: "rgba(255,255,255,0.02)", padding: "6px 8px", borderRadius: 6 }}>
+                          <span style={{ color: C.textMuted }}>Net Pay</span>
+                          <span style={{ fontWeight: 800, color: "#22c55e", fontSize: 15 }}>{money(p.net_pay)}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 2 }}>
+                          <Btn size="xs" variant="ghost" onClick={()=>printPayslip(p)}>🖨 Print Payslip</Btn>
+                        </div>
+                      </div>
+                    );
+                  }}
                 />
               </div>
               <Pager page={pPage} pages={pPages} setPage={setPPage} />
@@ -630,7 +710,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       {/* ── STAFF MODAL ── */}
       {showStaff && (
         <Modal title={editStaff?"Edit Staff Member":"Add Staff Member"} onClose={()=>{ setShowStaff(false); setEditStaff(null); }}>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap:10 }}>
             <Field label="Full Name *"><input style={inputStyle} value={staffForm.fullName} onChange={e=>setStaffForm(f=>({...f,fullName:e.target.value}))} /></Field>
             <Field label="Job Title *"><input style={inputStyle} value={staffForm.jobTitle} onChange={e=>setStaffForm(f=>({...f,jobTitle:e.target.value}))} /></Field>
             <Field label="Email"><input style={inputStyle} value={staffForm.email} onChange={e=>setStaffForm(f=>({...f,email:e.target.value}))} /></Field>

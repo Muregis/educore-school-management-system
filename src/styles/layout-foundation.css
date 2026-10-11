@@ -246,14 +246,14 @@ main {
  * inside page content and modals.
  */
 @media screen and (max-width: 767px) {
-  .ec-page-content div[style*="display: grid"],
-  .ec-page-content div[style*="display:grid"],
-  .ui-modal-content div[style*="display: grid"],
-  .ui-modal-content div[style*="display:grid"],
-  [data-modal-panel] div[style*="display: grid"],
-  [data-modal-panel] div[style*="display:grid"],
-  .ec-modal-panel div[style*="display: grid"],
-  .ec-modal-panel div[style*="display:grid"] {
+  .ec-page-content div[style*="display: grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
+  .ec-page-content div[style*="display:grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
+  .ui-modal-content div[style*="display: grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
+  .ui-modal-content div[style*="display:grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
+  [data-modal-panel] div[style*="display: grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
+  [data-modal-panel] div[style*="display:grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
+  .ec-modal-panel div[style*="display: grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
+  .ec-modal-panel div[style*="display:grid"]:not(.ec-preserve-grid):not([data-preserve-grid]) {
     grid-template-columns: 1fr !important;
   }
 
@@ -262,10 +262,10 @@ main {
     min-width: 0 !important;
   }
 
-  .ec-page-content input,
+  .ec-page-content input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
   .ec-page-content select,
   .ec-page-content textarea,
-  .ui-modal-content input,
+  .ui-modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
   .ui-modal-content select,
   .ui-modal-content textarea {
     width: 100% !important;

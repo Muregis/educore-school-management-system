@@ -687,25 +687,29 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       <Card style={{ padding: "var(--space-3)" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", alignItems: "end" }}>
           
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-            <Select 
-              value={tab} 
-              onChange={e => setTab(e.target.value)}
-              options={[
-                { value: "payments", label: "Payments" },
-                { value: "balances", label: "Balances" },
-                { value: "structure", label: "Fee Structure" }
-              ]}
-            />
-            <Select 
-              value={filterClass} 
-              onChange={e => setFilterClass(e.target.value)}
-              options={[
-                { value: "all", label: "All classes" },
-                ...(availableClasses ?? []).map(c => ({ value: c, label: c }))
-              ]}
-            />
-            <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flex: "1 1 320px", minWidth: "280px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap", width: "100%" }}>
+            <div style={{ flex: "1 1 140px", minWidth: 0 }}>
+              <Select 
+                value={tab} 
+                onChange={e => setTab(e.target.value)}
+                options={[
+                  { value: "payments", label: "Payments" },
+                  { value: "balances", label: "Balances" },
+                  { value: "structure", label: "Fee Structure" }
+                ]}
+              />
+            </div>
+            <div style={{ flex: "1 1 140px", minWidth: 0 }}>
+              <Select 
+                value={filterClass} 
+                onChange={e => setFilterClass(e.target.value)}
+                options={[
+                  { value: "all", label: "All classes" },
+                  ...(availableClasses ?? []).map(c => ({ value: c, label: c }))
+                ]}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flex: "1 1 240px", minWidth: 0, width: "100%" }}>
               <Input
                 placeholder="Search by name, admission, receipt, phone, class, transaction ID..."
                 value={recordSearch}
@@ -713,9 +717,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                   setRecordSearch(e.target.value);
                   if (e.target.value) setFilterStudent("all");
                 }}
-                style={{ flex: 1, minWidth: "240px" }}
+                style={{ flex: 1, minWidth: 0 }}
               />
-              {/* Removed limiting filterStudent Select in favor of live searchable input */}
             </div>
           </div>
 
@@ -1169,7 +1172,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
                         {money(total)}
                       </div>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "4px", fontSize: "12px", color: "var(--color-text-secondary)" }}>
+                    <div className="ec-preserve-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "4px", fontSize: "12px", color: "var(--color-text-secondary)" }}>
                       <div>Tuition: <strong>{money(f.tuition)}</strong></div>
                       <div>Activity: <strong>{money(f.activity)}</strong></div>
                       <div>Misc: <strong>{money(f.misc)}</strong></div>
