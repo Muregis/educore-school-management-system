@@ -813,3 +813,32 @@ body.dropdown-open {
     flex-direction: row;
   }
 }
+
+/* ==== Mobile UI fixes (added) ==== */
+
+/* Global button/tappable element fixes */
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure tables are scrollable on small screens */
+table {
+  width: 100%;
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent iOS zoom on inputs inside modals */
+.modal-content input,
+.modal-content select,
+.modal-content textarea {
+  font-size: 16px !important;
+}

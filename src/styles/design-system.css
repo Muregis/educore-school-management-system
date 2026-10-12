@@ -588,3 +588,16 @@ textarea:focus-visible,
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* ==== Mobile table enhancements ==== */
+@media (max-width: 768px) {
+  /* Allow tables to shrink and wrap content */
+  .ui-table {
+    min-width: 0 !important;
+  }
+  .ui-table th,
+  .ui-table td {
+    white-space: normal !important;
+    word-break: break-word !important;
+  }
+}
