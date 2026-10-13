@@ -1,0 +1,41 @@
+name: Apply SaaS solid-8 hardening
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/saas-solid-8]
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/saas-solid-8
+      - run: node scripts/apply-saas-solid-8.mjs
+      - name: Verify
+        run: |
+          grep -q 'process.exit(1)' backend/src/config/env.js
+          grep -q 'ALLOW_INSECURE_BOOT' backend/src/config/env.js
+          grep -q 'AUTH_DEBUG_ENABLED' backend/src/middleware/roles.js
+          grep -q 'Internal server error' backend/src/middleware/error.js
+          test -f backend/tests/unit/services/feeBalanceCalculator.test.js
+          echo OK
+      - name: Backend unit tests
+        working-directory: backend
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npm test -- --testPathPattern=feeBalanceCalculator --passWithNoTests
+        env:
+          NODE_ENV: test
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "feat(saas): fail-closed prod env, quiet logs, fee unit tests, CI unit gate"
+            git push origin fix/saas-solid-8
+          fi

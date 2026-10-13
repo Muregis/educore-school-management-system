@@ -7,7 +7,11 @@ export default {
     '!src/**/*.spec.js'
   ],
   testMatch: [
-    '**/tests/**/*.test.js'
+    '**/tests/unit/**/*.test.js'
+  ],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/tests/integration/'
   ],
   setupFiles: ['./tests/setup.js'],
   moduleNameMapper: {
