@@ -117,11 +117,7 @@ export default function QRVerificationPage({ studentId }) {
         </div>
 
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: 16
-          }}
+          className="ec-kpi-grid"
         >
           <InfoCard label="Student ID" value={student.studentId} />
           <InfoCard label="Admission Number" value={student.admissionNumber} />

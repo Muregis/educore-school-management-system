@@ -187,34 +187,6 @@ main {
   height: auto;
 }
 
-.ec-stat-card.ui-card,
-.ec-stat-card.premium-card,
-.ui-card.ec-stat-card,
-.premium-card.ec-stat-card,
-.ec-stat-card {
-  min-width: 0 !important;
-  max-width: 100%;
-  overflow: visible !important;
-  contain: none !important;
-  text-overflow: unset !important;
-  white-space: normal !important;
-}
-
-.ec-stat-card * {
-  max-width: 100%;
-  overflow: visible !important;
-  overflow-wrap: break-word !important;
-  word-break: normal !important;
-  white-space: normal !important;
-  text-overflow: unset !important;
-}
-
-@media screen and (max-width: 420px) {
-  .ec-stat-card {
-    padding: 12px !important;
-  }
-}
-
 /* NUCLEAR: design-system contain:paint clips all card text on mobile KPIs */
 .ui-card,
 .premium-card {
@@ -246,14 +218,14 @@ main {
  * inside page content and modals.
  */
 @media screen and (max-width: 767px) {
-  .ec-page-content div[style*="display: grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
-  .ec-page-content div[style*="display:grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
-  .ui-modal-content div[style*="display: grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
-  .ui-modal-content div[style*="display:grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
-  [data-modal-panel] div[style*="display: grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
-  [data-modal-panel] div[style*="display:grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
-  .ec-modal-panel div[style*="display: grid"]:not(.ec-preserve-grid):not([data-preserve-grid]),
-  .ec-modal-panel div[style*="display:grid"]:not(.ec-preserve-grid):not([data-preserve-grid]) {
+  .ec-page-content div[style*="display: grid"]:not(.ec-kpi-grid):not(.ec-stack-grid),
+  .ec-page-content div[style*="display:grid"]:not(.ec-kpi-grid):not(.ec-stack-grid),
+  .ui-modal-content div[style*="display: grid"],
+  .ui-modal-content div[style*="display:grid"],
+  [data-modal-panel] div[style*="display: grid"],
+  [data-modal-panel] div[style*="display:grid"],
+  .ec-modal-panel div[style*="display: grid"],
+  .ec-modal-panel div[style*="display:grid"] {
     grid-template-columns: 1fr !important;
   }
 
@@ -262,10 +234,10 @@ main {
     min-width: 0 !important;
   }
 
-  .ec-page-content input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  .ec-page-content input,
   .ec-page-content select,
   .ec-page-content textarea,
-  .ui-modal-content input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  .ui-modal-content input,
   .ui-modal-content select,
   .ui-modal-content textarea {
     width: 100% !important;
@@ -311,4 +283,101 @@ main {
 .ui-table td:first-child,
 .ui-table th:first-child {
   min-width: 140px;
+}
+
+/* ==========================================================================
+ * MOBILE GRID SYSTEM (SaaS-wide)
+ * Phones: KPI = 2 cols, large panels = 1 col. Never 7 skinny pills.
+ * ========================================================================== */
+.ec-kpi-grid {
+  display: grid !important;
+  gap: 10px !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  align-items: stretch;
+}
+.ec-kpi-grid > * {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: auto !important;
+  flex: none !important;
+}
+@media screen and (min-width: 640px) {
+  .ec-kpi-grid {
+    gap: var(--space-3) !important;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important;
+  }
+}
+@media screen and (min-width: 1024px) {
+  .ec-kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  }
+}
+
+.ec-stack-grid {
+  display: grid !important;
+  gap: var(--space-4);
+  grid-template-columns: 1fr !important;
+  width: 100%;
+  min-width: 0;
+}
+@media screen and (min-width: 768px) {
+  .ec-stack-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)) !important;
+  }
+}
+
+/* Catch-all: leftover INLINE grids on phones (DOM style uses kebab-case) */
+@media screen and (max-width: 767px) {
+  .ec-page-content [style*="minmax(120px"],
+  .ec-page-content [style*="minmax(130px"],
+  .ec-page-content [style*="minmax(140px"],
+  .ec-page-content [style*="minmax(150px"],
+  .ec-page-content [style*="minmax(158px"],
+  .ec-page-content [style*="minmax(160px"],
+  .ec-page-content [style*="minmax(180px"],
+  .ec-page-content [style*="minmax(200px"],
+  .ec-page-content [style*="minmax(210px"],
+  .ec-page-content [style*="minmax(220px"],
+  .ec-page-content [style*="minmax(240px"],
+  .ec-page-content [style*="minmax(min(100%"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .ec-page-content [style*="minmax(260px"],
+  .ec-page-content [style*="minmax(280px"],
+  .ec-page-content [style*="minmax(300px"],
+  .ec-page-content [style*="minmax(320px"],
+  .ec-page-content [style*="minmax(400px"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.ec-stat-card.ui-card,
+.ec-stat-card.premium-card,
+.ui-card.ec-stat-card,
+.premium-card.ec-stat-card,
+.ec-stat-card {
+  min-width: 0 !important;
+  max-width: 100%;
+  overflow: visible !important;
+  contain: none !important;
+}
+.ec-stat-card * {
+  max-width: 100%;
+  overflow: visible !important;
+  overflow-wrap: break-word !important;
+  word-break: normal !important;
+  white-space: normal !important;
+}
+@media screen and (max-width: 639px) {
+  .ec-stat-card {
+    padding: 12px 10px !important;
+    min-height: 68px !important;
+  }
+  .ec-stat-label { font-size: 10px !important; line-height: 1.25 !important; }
+  .ec-stat-value { font-size: 15px !important; line-height: 1.2 !important; }
 }

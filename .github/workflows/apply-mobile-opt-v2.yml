@@ -1,0 +1,42 @@
+name: Apply mobile opt v2
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/mobile-opt-all-pages-v2]
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/mobile-opt-all-pages-v2
+      - name: Ensure mobile CSS present
+        run: |
+          if ! grep -q 'repeat(2, minmax(0, 1fr)) !important' src/styles/layout-foundation.css; then
+            echo "CSS missing nuclear KPI — fail"
+            exit 1
+          fi
+          echo CSS OK
+      - name: Convert page grids
+        run: node scripts/apply-mobile-grids-v2.mjs
+      - name: Verify
+        run: |
+          grep -q 'ec-kpi-grid' src/pages/AnalyticsPage.jsx
+          grep -q 'ec-kpi-grid' src/pages/ReportsPage.jsx
+          grep -q 'ec-kpi-grid' src/pages/DashboardPage.jsx
+          LEFT=$(grep -rn 'gridTemplateColumns:.*auto-fit\|gridTemplateColumns:.*auto-fill' src/pages --include='*.jsx' | wc -l)
+          echo "remaining auto-fit/fill: $LEFT"
+          echo OK
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/*.jsx src/styles/layout-foundation.css
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(mobile): convert all page grids to ec-kpi-grid / ec-stack-grid"
+            git push origin fix/mobile-opt-all-pages-v2
+          fi

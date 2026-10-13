@@ -590,7 +590,7 @@ const PromotionChainTab = ({ auth }) => {
         Set which class students will be promoted to when the term ends. Students will automatically move to their next class when you close the term.
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%, 280px),1fr))", gap: 12 }}>
+      <div className="ec-stack-grid" style={{ gap: 12 }}>
         {classes.map(cls => (
           <div key={cls.class_id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
             <div style={{ fontWeight: 600, marginBottom: 8, color: C.text }}>{cls.class_name}</div>
@@ -744,7 +744,7 @@ const SubjectsTab = ({ auth }) => {
       {/* Add New Subject */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 12 }}>Add New Subject</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: 12, alignItems: "end" }}>
+        <div className="ec-kpi-grid">
           <div>
             <label style={{ fontSize: 11, color: C.textMuted, marginBottom: 4, display: "block" }}>Subject Name *</label>
             <input
@@ -1049,7 +1049,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
       {/* School Branding / Logo Upload */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>School Branding</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 20 }}>
+        <div className="ec-stack-grid" style={{ gap: 20 }}>
           <div>
             <label style={{ fontSize: 12, color: C.textMuted, marginBottom: 8, display: 'block' }}>School Logo</label>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -1082,7 +1082,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
           
           <div>
             <label style={{ fontSize: 12, color: C.textMuted, marginBottom: 8, display: 'block' }}>Brand Colors</label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: 12 }}>
+            <div className="ec-kpi-grid">
               <div>
                 <label style={{ fontSize: 11, color: C.textMuted, marginBottom: 4, display: 'block' }}>Primary</label>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1125,7 +1125,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
       </div>
 
       <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
+      <div className="ec-kpi-grid">
         <Inp label="School Name" value={form.name} onChange={f("name")} placeholder="e.g. Sunrise Academy" />
         <Inp label="School Motto" value={form.motto} onChange={f("motto")} placeholder="e.g. Excellence in Every Child" />
         <Sel label="School Type" value={form.type} onChange={f("type")} options={[{value:"private",label:"Private"},{value:"public",label:"Public"},{value:"international",label:"International"}]} />
@@ -1134,7 +1134,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
 
       <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
       <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Contact & Location</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
+      <div className="ec-kpi-grid">
         <Inp label="School Email" type="email" value={form.email} onChange={f("email")} placeholder="admin@school.ac.ke" />
         <Inp label="Phone Number" value={form.phone} onChange={f("phone")} placeholder="+254 7XX XXX XXX" />
         <Inp label="Physical Address" value={form.address} onChange={f("address")} placeholder="Street, Town" />
@@ -1178,7 +1178,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
 
       <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
       <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Current Academic Term</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: "0 20px" }}>
+      <div className="ec-kpi-grid">
         <Sel label="Term" value={form.term} onChange={f("term")} options={["Term 1","Term 2","Term 3"].map(t=>({value:t,label:t}))} />
         <Inp label="Academic Year" value={form.academic_year} onChange={f("academic_year")} placeholder="e.g. 2025" />
         <Inp label="Term Start" type="date" value={form.term_start} onChange={f("term_start")} />
@@ -1187,7 +1187,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
 
       <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />
       <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Administrator</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
+      <div className="ec-kpi-grid">
         <Inp label="Admin Name" value={form.admin_name} onChange={f("admin_name")} placeholder="e.g. Jane Doe" />
         <Inp label="Admin Title / Role" value={form.admin_title} onChange={f("admin_title")} placeholder="e.g. School Principal" />
       </div>
@@ -1372,11 +1372,11 @@ const UsersTab = ({ onSave, auth }) => {
       {showAdd && (
         <div style={{ background: C.surface, border: `1px solid ${C.accentDim}`, borderRadius: 14, padding: "clamp(14px, 3vw, 20px)", marginBottom: 20 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 16 }}>{editId ? "Edit User" : "New User Account"}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
+          <div className="ec-kpi-grid">
             <Inp label="Full Name" value={form.name} onChange={f("name")} placeholder="e.g. Grace Akinyi" />
             <Inp label="Email Address" type="email" value={form.email} onChange={f("email")} placeholder="user@school.ac.ke" />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
+          <div className="ec-kpi-grid">
             <Sel label="Role" value={form.role} onChange={f("role")} options={[{value:"admin",label:"Admin — Full access"},{value:"teacher",label:"Teacher — Limited access"},{value:"viewer",label:"Viewer — Read only"}]} />
             <Field label="Password" hint={editId ? "Leave blank to keep current password" : ""}>
               <div style={{ position: "relative" }}>
@@ -1543,7 +1543,7 @@ const PermissionsTab = ({ auth, onSave, onPermissionsSaved }) => {
                 <Toggle value={Boolean(rolePermissions.edit)} onChange={value => updateRole(role, { edit: value })}
                   label="Can edit" description="Allow this role to create and modify records" />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 }}>
+              <div className="ec-kpi-grid">
                 {allPages.map(page => {
                   const enabled = (rolePermissions.pages || []).includes(page.id);
                   return (
@@ -1722,7 +1722,7 @@ const IntegrationsTab = ({ auth }) => {
             <div style={{ fontSize: 11, color: C.textMuted }}>Accept mobile money payments via STK Push</div>
           </div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
+        <div className="ec-kpi-grid">
           <Inp label="Shortcode" value={config.mpesaShortcode || ""} onChange={e => setConfig({ ...config, mpesaShortcode: e.target.value })} placeholder="e.g. 174379" />
           <Inp label="Passkey" value={config.mpesaPasskey || ""} onChange={e => setConfig({ ...config, mpesaPasskey: e.target.value })} placeholder="Lipa Na M-Pesa Passkey" />
         </div>
@@ -1767,7 +1767,7 @@ const IntegrationsTab = ({ auth }) => {
 
         {config.whatsappEnabled && (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "0 20px" }}>
+            <div className="ec-kpi-grid">
               <Inp 
                 label="Phone Number ID" 
                 value={config.whatsappPhoneNumberId || ""} 

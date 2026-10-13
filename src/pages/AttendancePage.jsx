@@ -202,7 +202,7 @@ export default function AttendancePage({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: "var(--space-3)" }}>
+      <div className="ec-kpi-grid">
         {[
           { label: "Present", value: normalised.filter(a => a.status === "present").length, tone: "success" },
           { label: "Absent", value: normalised.filter(a => a.status === "absent").length, tone: "danger" },
@@ -217,12 +217,7 @@ export default function AttendancePage({
       </div>
 
       <Card style={{ padding: "var(--space-4)", background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 96%, transparent) 0%, var(--color-bg-card) 100%)", boxShadow: "var(--shadow-sm)" }}>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
-          gap: "var(--space-3)",
-          alignItems: "end"
-        }}>
+        <div className="ec-kpi-grid">
           <Select
             value={filterClass}
             onChange={e => setFilterClass(e.target.value)}
@@ -295,7 +290,7 @@ export default function AttendancePage({
           <Button variant="primary" onClick={saveBulk}>Save Class Attendance</Button>
         </>
       }>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+        <div className="ec-kpi-grid" style={{ marginBottom: "var(--space-4)" }}>
           <Select label="Class" value={cls} onChange={e => setCls(e.target.value)} options={(availableClasses ?? []).map(c => ({ value: c, label: c }))} />
           <Input label="Date" type="date" value={date} onChange={e => setDate(e.target.value)} />
         </div>
@@ -309,7 +304,7 @@ export default function AttendancePage({
               const val = idx >= 0 ? bulk[idx].status : "present";
               const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
               return (
-                <div key={sid} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-3)", alignItems: "center", borderBottom: "1px solid var(--color-border)", padding: "var(--space-2)" }}>
+                <div key={sid} className="ec-kpi-grid">
                   <div style={{ color: "var(--color-text-primary)", fontWeight: 500, fontSize: "14px" }}>{name}</div>
                   <Select value={val} onChange={e => setBulk(prev => prev.map(x => x.studentId === sid ? { ...x, status: e.target.value } : x))} options={[{ value: "present", label: "Present" }, { value: "absent", label: "Absent" }, { value: "late", label: "Late" }]} />
                 </div>

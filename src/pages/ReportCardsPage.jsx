@@ -250,7 +250,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
         </div>
       </Card>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "var(--space-4)", alignItems: "start" }}>
+      <div className="ec-stack-grid" style={{ gap: "var(--space-4)", alignItems: "start" }}>
         {/* Students list grouped by class */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           <div style={{ fontWeight: 700, color: "var(--color-text-primary)", fontSize: "16px" }}>Students by Class</div>
@@ -411,7 +411,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
         </>
       }>
         <div className="ec-form-grid ec-form-grid-2">
-          <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)" }}>
+          <div className="ec-kpi-grid">
             <Select 
               label="Class"
               value={formClass} 

@@ -129,7 +129,7 @@ export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId =
 
       {show && (
         <Modal title="Log Discipline Incident" onClose={() => setShow(false)}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: 10 }}>
+          <div className="ec-kpi-grid">
             <Field label="Class">
               <select style={inputStyle} value={f.studentClass} onChange={e => { setF({ ...f, studentClass: e.target.value, studentId: "" }); }}>
                 <option value="">All Classes</option>
