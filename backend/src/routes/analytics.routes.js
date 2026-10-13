@@ -7,11 +7,34 @@ import { getExpenditureSummary } from "../services/expenditure.service.js";
 const router = Router();
 router.use(authRequired);
 
+async function resolveCurrentTermName(schoolId) {
+  try {
+    const { data: current, error } = await supabase
+      .from('terms')
+      .select('term_name')
+      .eq('school_id', schoolId)
+      .eq('status', 'active')
+      .limit(1)
+      .maybeSingle();
+    if (!error && current?.term_name) return current.term_name;
+    const { data: anyTerm } = await supabase
+      .from('terms')
+      .select('term_name')
+      .eq('school_id', schoolId)
+      .limit(1)
+      .maybeSingle();
+    return anyTerm?.term_name || null;
+  } catch {
+    return null;
+  }
+}
+
+
 router.get("/", async (req, res, next) => {
   try {
     const { schoolId, role } = req.user;
     const { term } = req.query; // Allow term filtering via query param
-    const currentTerm = term || 'Term 2'; // Default to Term 2 if not specified
+    const currentTerm = term || await resolveCurrentTermName(schoolId);
 
     // Individual counts using Supabase
     const { count: totalStudents, error: stuErr } = await supabase
@@ -199,24 +222,26 @@ router.get("/", async (req, res, next) => {
       if (stuListErr) throw stuListErr;
 
       // Get fee structures (filter by term)
-      const { data: feeStructures, error: feeErr } = await supabase
+      let feeQ = supabase
         .from('fee_structures')
         .select('class_name, tuition, activity, misc')
         .eq('school_id', schoolId)
-        .eq('term', currentTerm)
         .eq('is_deleted', false);
+      if (currentTerm) feeQ = feeQ.eq('term', currentTerm);
+      const { data: feeStructures, error: feeErr } = await feeQ;
       if (feeErr) throw feeErr;
 
       const studentIds = allStudents?.map(s => s.student_id) || [];
       if (studentIds.length > 0) {
-        const { data: allPayments, error: payListErr } = await supabase
+        let payQ = supabase
           .from('payments')
           .select('student_id, amount, term')
           .eq('school_id', schoolId)
           .in('status', ['paid', 'completed', 'success'])
-          .eq('term', currentTerm)
           .eq('is_deleted', false)
           .in('student_id', studentIds);
+        if (currentTerm) payQ = payQ.eq('term', currentTerm);
+        const { data: allPayments, error: payListErr } = await payQ;
         if (payListErr) throw payListErr;
 
         // Count students with an outstanding balance using the canonical

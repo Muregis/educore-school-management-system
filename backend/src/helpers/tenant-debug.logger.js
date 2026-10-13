@@ -1,4 +1,4 @@
-const isDebugEnabled = (process.env.TENANT_DEBUG || "true").toLowerCase() !== "false";
+const isDebugEnabled = (process.env.TENANT_DEBUG || "false").toLowerCase() === "true";
 
 function maskSensitive(payload = {}) {
   if (!payload || typeof payload !== "object") return payload;

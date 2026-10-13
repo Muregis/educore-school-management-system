@@ -1,6 +1,6 @@
 export const formatMoney = v => {
   if (v == null) return "";
-  return `KSh ${Number(v).toLocaleString()}`;
+  return `KES ${Number(v).toLocaleString()}`;
 };
 
 export const formatDate = d => {
