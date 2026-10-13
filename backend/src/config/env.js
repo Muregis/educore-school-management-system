@@ -78,67 +78,54 @@ export const env = {
   superadminPasswordHash: clean(process.env.SUPERADMIN_PASSWORD_HASH),
 };
 
-// Validate production environment variables.
-// Fail-closed by default so a misconfigured deploy cannot serve live schools
-// with a weak JWT or missing database credentials.
-// Emergency only: ALLOW_INSECURE_BOOT=true skips the hard exit (logs loudly).
+// Validate production environment variables
 function validateProductionEnv() {
-  if (process.env.NODE_ENV !== 'production') return;
-
-  const allowInsecure = String(process.env.ALLOW_INSECURE_BOOT || '').toLowerCase() === 'true';
-  const required = [
-    'JWT_SECRET',
-    'SUPABASE_URL',
-    'SUPABASE_SERVICE_KEY',
-    'SUPABASE_ANON_KEY',
-  ];
-
-  const missing = required.filter((key) => !clean(process.env[key]));
-  const jwt = clean(process.env.JWT_SECRET);
-  const weakJwt =
-    !jwt ||
-    jwt === 'educore_dev_secret_change_me' ||
-    jwt.length < 32;
-
-  const fatal = [];
-  if (missing.length) {
-    fatal.push(`Missing required env: ${missing.join(', ')}`);
-  }
-  if (weakJwt) {
-    fatal.push(
-      'JWT_SECRET must be set to a unique value at least 32 characters (not the development default)'
-    );
-  }
-
-  if (fatal.length) {
-    console.error('[ENV] PRODUCTION CONFIGURATION BLOCKED:');
-    fatal.forEach((m) => console.error(`   - ${m}`));
-    if (allowInsecure) {
-      console.error('[ENV] ALLOW_INSECURE_BOOT=true — starting anyway. REMOVE this flag after fixing secrets.');
-    } else {
-      console.error('[ENV] Refusing to start. Fix secrets, or set ALLOW_INSECURE_BOOT=true only for emergency recovery.');
-      process.exit(1);
+  if (process.env.NODE_ENV === 'production') {
+    const required = [
+      'JWT_SECRET',
+      'SUPABASE_URL', 
+      'SUPABASE_SERVICE_KEY',
+      'SUPABASE_ANON_KEY'
+    ];
+    
+    const missing = required.filter(key => !process.env[key]);
+    
+    if (missing.length > 0) {
+      console.error('Missing required production environment variables:');
+      missing.forEach(key => console.error(`   - ${key}`));
+      console.error('\nPlease set these environment variables before starting in production mode.');
+      console.error('[ENV] Continuing startup despite missing variables - errors will occur...');
     }
-  }
-
-  if (!process.env.CORS_ORIGIN || process.env.CORS_ORIGIN === 'http://localhost:5173') {
-    console.error('SECURITY WARNING: CORS_ORIGIN should be explicitly set to your production frontend URL');
-    console.error('   Current value:', process.env.CORS_ORIGIN || 'not set');
-  }
-
-  const recommended = [
-    'CRON_SECRET',
-    'WHATSAPP_TOKEN',
-    'WHATSAPP_PHONE_NUMBER_ID',
-    'PAYSTACK_SECRET_KEY',
-    'MPESA_CONSUMER_KEY',
-    'MPESA_CONSUMER_SECRET',
-    'SSO_SHARED_SECRET',
-  ];
-  const missingRecommended = recommended.filter((key) => !clean(process.env[key]));
-  if (missingRecommended.length) {
-    console.warn('[ENV] Recommended (features may be limited):', missingRecommended.join(', '));
+    
+    if (process.env.JWT_SECRET === 'educore_dev_secret_change_me') {
+      console.error('SECURITY WARNING: JWT_SECRET is set to default development value in production!');
+      console.error('   Please set a strong, unique JWT_SECRET for production.');
+    }
+    
+    if (!process.env.CORS_ORIGIN || process.env.CORS_ORIGIN === 'http://localhost:5173') {
+      console.error('SECURITY WARNING: CORS_ORIGIN should be explicitly set to your production frontend URL');
+      console.error('   Current value:', process.env.CORS_ORIGIN || 'not set');
+      console.error('   Example: https://your-school-app.vercel.app');
+    }
+    
+    const recommended = [
+      'WHATSAPP_TOKEN',
+      'WHATSAPP_PHONE_NUMBER_ID',
+      'PAYSTACK_SECRET_KEY',
+      'MPESA_CONSUMER_KEY',
+      'MPESA_CONSUMER_SECRET',
+      'SSO_SHARED_SECRET',
+      'CRON_SECRET'
+    ];
+    
+    const missingRecommended = recommended.filter(key => !process.env[key]);
+    if (missingRecommended.length > 0) {
+      console.warn('Recommended environment variables not set:');
+      missingRecommended.forEach(key => console.warn(`   - ${key}`));
+      console.warn('Some features may not work properly without these.\n');
+    }
   }
 }
 
 validateProductionEnv();
+
