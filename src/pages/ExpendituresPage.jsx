@@ -12,6 +12,7 @@ import Modal from "../components/ui/Modal";
 import Table from "../components/ui/Table";
 import EmptyState from "../components/ui/EmptyState";
 import Badge from "../components/ui/Badge";
+import StatCard from "../components/ui/StatCard";
 
 const EXPENSE_CATEGORIES = [
   "Teachers Salary",
@@ -54,38 +55,6 @@ function toneForCategory(category) {
   return "success";
 }
 
-function StatCard({ label, value, tone = "default", hint }) {
-  const colors = {
-    success: "var(--color-success)",
-    warning: "var(--color-warning)",
-    danger: "var(--color-danger)",
-    info: "var(--color-info)",
-    default: "var(--color-primary)",
-  };
-
-  return (
-    <Card style={{ padding: "var(--space-4)", minWidth: "min(100%, 150px)", flex: "1 1 min(100%, 150px)" }}>
-      <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-2)" }}>
-        {label}
-      </div>
-      <div style={{ fontSize: "26px", fontWeight: 800, color: colors[tone] || colors.default }}>
-        {value}
-      </div>
-      {hint && (
-        <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "var(--space-2)" }}>
-          {hint}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-StatCard.propTypes = {
-  label: PropTypes.string.isRequired,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-  tone: PropTypes.string,
-  hint: PropTypes.string,
-};
 
 export default function ExpendituresPage({ auth, canEdit, toast }) {
   const { startDate } = useCurrentTerm(auth);
@@ -257,7 +226,7 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
         )}
       </div>
 
-      <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+      <div className="ec-kpi-grid">
         <StatCard label="Total Expenses" value={money(summary?.totals?.total || 0)} tone="danger" hint="Manual expenses plus paid payroll" />
         <StatCard label="Payroll Costs" value={money(summary?.totals?.payroll || 0)} tone="warning" hint={`${summary?.totals?.payrollEntries || 0} paid payslips`} />
         <StatCard label="Manual Expenses" value={money(summary?.totals?.manual || 0)} tone="info" hint={`${summary?.totals?.transactions || 0} recorded items`} />

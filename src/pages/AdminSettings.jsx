@@ -1036,7 +1036,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
             "🏫"
           )}
         </div>
-        <div style={{ flex: 1, minWidth: 200 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 17, fontWeight: 800, color: C.text }}>{form.name}</div>
           <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{form.motto}</div>
           <div style={{ fontSize: 11, color: C.textSub, marginTop: 4 }}>

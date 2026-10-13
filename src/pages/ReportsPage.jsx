@@ -11,6 +11,7 @@ import Select from "../components/ui/Select";
 import Badge from "../components/ui/Badge";
 import Table from "../components/ui/Table";
 import EmptyState from "../components/ui/EmptyState";
+import StatCard from "../components/ui/StatCard";
 
 // Use shared grading utility instead of local definition
 const gradeInfo = (score) => {
@@ -33,21 +34,6 @@ const ScoreBar = ({ score, color }) => (
   </div>
 );
 
-const StatCard = ({ label, value, tone = "default" }) => {
-  const colors = { 
-    success: "var(--color-success)", 
-    warning: "var(--color-warning)", 
-    danger: "var(--color-danger)", 
-    info: "var(--color-info)", 
-    default: "var(--color-primary)" 
-  };
-  return (
-    <Card style={{ padding: "var(--space-3)", flex: 1, minWidth: "160px" }}>
-      <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginBottom: "var(--space-1)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
-      <div style={{ fontSize: "24px", fontWeight: 800, color: colors[tone] }}>{value}</div>
-    </Card>
-  );
-};
 
 // ─── Intervention generator ────────────────────────────────────────────────
 function buildInterventions(subjectRankings, streamAverages) {
@@ -1046,7 +1032,7 @@ export default function ReportsPage({ auth }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Summary cards */}
       {summary && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)" }}>
+        <div className="ec-kpi-grid">
           <StatCard label="Active Students"  value={summary.students}               tone="info" />
           <StatCard label="Active Teachers"  value={summary.teachers}               tone="info" />
           <StatCard label="Fees Collected"   value={money(summary.feesCollected)}   tone="success" />

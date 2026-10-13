@@ -249,7 +249,7 @@ export default function UpdateRequestsPage({ auth, students, pendingUpdates, set
 
       <Card style={{ padding: "var(--space-3)" }}>
         <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: "200px" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <Input
               placeholder="Search requests..."
               value={q}

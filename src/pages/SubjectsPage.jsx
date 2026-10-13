@@ -257,14 +257,14 @@ export default function SubjectsPage({ auth, toast, canEdit = true }) {
       <Card style={{ padding: "var(--space-3)" }}>
         <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "end" }}>
           <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", flex: 1 }}>
-            <div style={{ minWidth: "200px" }}>
+            <div style={{ minWidth: 0 }}>
               <Input 
                 placeholder="Search subjects..." 
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-            <div style={{ minWidth: "180px" }}>
+            <div style={{ minWidth: 0 }}>
               <Select 
                 value={filterCategory} 
                 onChange={e => setFilterCategory(e.target.value)}

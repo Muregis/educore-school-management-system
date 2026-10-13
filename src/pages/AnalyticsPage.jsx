@@ -83,7 +83,7 @@ function PieChart({ data, size = 150 }) {
           );
         })}
       </svg>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", minWidth: 180 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", minWidth: 0 }}>
         {data.map((d, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-2)", background: "var(--color-bg-base)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "8px 10px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>

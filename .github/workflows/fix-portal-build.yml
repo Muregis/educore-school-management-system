@@ -1,0 +1,33 @@
+name: Fix Portal build break
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/mobile-audit-4fixes]
+    paths:
+      - scripts/fix-portal-statcard-junk.mjs
+      - .github/workflows/fix-portal-build.yml
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/mobile-audit-4fixes
+      - run: node scripts/fix-portal-statcard-junk.mjs
+      - name: Vite build smoke
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Commit if needed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/PortalDashboardPage.jsx
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(build): remove PortalDashboard leftover StatCard fragment"
+            git push origin fix/mobile-audit-4fixes
+          fi
