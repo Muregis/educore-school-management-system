@@ -36,7 +36,7 @@ function ScoreRing({ score }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center",
       background: bg, border: `2px solid ${color}`, borderRadius: 16,
-      padding: "20px 28px", minWidth: 120 }}>
+      padding: "20px 28px", minWidth: 0 }}>
       <div style={{ fontSize: 38, fontWeight: 900, color, lineHeight: 1 }}>{score}%</div>
       <div style={{ fontSize: 11, color, fontWeight: 700, marginTop: 4,
         textTransform: "uppercase", letterSpacing: "0.05em" }}>CBC Score</div>
@@ -323,7 +323,7 @@ function AdminPlanReview({ auth, planSummary, toast, onBack, onDecision }) {
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
               <ScoreRing score={analysis.score} />
 
-              <div style={{ flex: 1, minWidth: 280 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 {/* Missing sections */}
                 {analysis.missing_sections?.length > 0 && (
                   <div style={{ background: "#1c0505", border: "1px solid #991b1b",

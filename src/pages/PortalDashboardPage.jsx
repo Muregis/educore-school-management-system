@@ -6,6 +6,7 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import EmptyState from "../components/ui/EmptyState";
+import StatCard from "../components/ui/StatCard";
 import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
@@ -216,8 +217,7 @@ export default function PortalDashboardPage({
     </div>
   );
 }
-
-function StatCard({ label, value, subtext, color, onClick }) {
+) {
   return (
     <Card 
       onClick={onClick}

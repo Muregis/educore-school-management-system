@@ -268,10 +268,10 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
           <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "center" }}>
             {tab === "books" && (
               <>
-                <div style={{ flex: 2, minWidth: "200px" }}>
+                <div style={{ flex: 2, minWidth: 0 }}>
                   <Input placeholder="Search title, author, ISBN..." value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
-                <div style={{ flex: 1, minWidth: "150px" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <Select value={catFilter} onChange={e => setCatFilter(e.target.value)} options={[{value: "all", label: "All Categories"}, ...CATEGORIES.map(c => ({value: c, label: c}))]} />
                 </div>
               </>

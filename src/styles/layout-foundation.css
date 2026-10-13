@@ -381,3 +381,53 @@ main {
   .ec-stat-label { font-size: 10px !important; line-height: 1.25 !important; }
   .ec-stat-value { font-size: 15px !important; line-height: 1.2 !important; }
 }
+
+
+/* ==========================================================================
+ * FIX 3 — Raw tables on mobile: always scroll horizontally, never overflow page
+ * FIX 4 — Soft min-width: never force 160px+ tracks on phones
+ * ========================================================================== */
+@media screen and (max-width: 767px) {
+  .ec-page-content table:not(.ui-table),
+  .ec-page-content .ui-table {
+    max-width: 100%;
+  }
+
+  .ec-page-content table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-collapse: collapse;
+  }
+
+  .ec-page-content thead,
+  .ec-page-content tbody,
+  .ec-page-content tr {
+    display: table;
+    width: 100%;
+    table-layout: auto;
+  }
+
+  .ui-table-wrap .ui-table-scroll {
+    display: none !important;
+  }
+  .ui-table-wrap .ui-table-mobile {
+    display: block !important;
+  }
+
+  .ec-page-content [style*="min-width: 1"],
+  .ec-page-content [style*="min-width:2"],
+  .ec-page-content [style*="minWidth"] {
+    min-width: 0 !important;
+  }
+}
+
+@media screen and (min-width: 768px) {
+  .ui-table-wrap .ui-table-scroll {
+    display: block;
+  }
+  .ui-table-wrap .ui-table-mobile {
+    display: none !important;
+  }
+}
