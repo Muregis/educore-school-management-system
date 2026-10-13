@@ -285,7 +285,7 @@ function PlanEditor({ auth, toast, editPlan, type: initType, onBack, onSaved }) 
 
       {/* Form fields */}
       <Card style={{ padding: "var(--space-4)", marginBottom: "var(--space-4)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-3)" }}>
+        <div className="ec-kpi-grid">
           <div>
             <Select 
               label="Subject *" 

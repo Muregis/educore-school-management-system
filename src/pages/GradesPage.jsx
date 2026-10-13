@@ -357,7 +357,7 @@ const classesForDropdown = useMemo(() => {
       </div>
 
       {/* Filters */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:8, marginBottom:10 }}>
+      <div className="ec-kpi-grid" style={{ marginBottom: 10 }}>
         <select style={inputStyle} value={term} onChange={e => setTerm(e.target.value)}>
           <option value="all">All terms</option>
           <option value="Term 1">Term 1</option>
@@ -627,7 +627,7 @@ const classesForDropdown = useMemo(() => {
                     {studentResults.length === 0 ? (
                       <div style={{ fontSize: 12, color: C.textMuted, fontStyle: "italic" }}>No grades entered for this student.</div>
                     ) : (
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 130px), 1fr))", gap: 6 }}>
+                      <div className="ec-kpi-grid">
                         {studentResults.map(result => (
                           <div key={result.id || result.subject} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, borderRadius: 6, padding: "6px 8px" }}>
                             <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -677,7 +677,7 @@ const classesForDropdown = useMemo(() => {
             </Btn>
           </div>
           
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 12 }}>
+          <div className="ec-kpi-grid" style={{ marginBottom: 12 }}>
             <div style={{ textAlign: "center", padding: "8px 12px", background: "#1A2A42", borderRadius: 6 }}>
               <div style={{ fontSize: 20, fontWeight: 700, color: "#3B82F6" }}>{rankings.classStats.meanScore.toFixed(1)}</div>
               <div style={{ fontSize: 11, color: C.textMuted }}>Class Mean</div>
@@ -743,7 +743,7 @@ const classesForDropdown = useMemo(() => {
           setSelectedSubject("");
           setBulkMarks(subjects.reduce((a, sub) => ({ ...a, [sub]: "" }), {}));
         }}>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap:10 }}>
+          <div className="ec-kpi-grid">
             <Field label="Class">
               <select style={inputStyle} value={bulkClass} onChange={e => { setBulkClass(e.target.value); setStudentId(""); }}>
                 <option value="">Select class...</option>
@@ -823,7 +823,7 @@ const classesForDropdown = useMemo(() => {
       {/* Edit Modal */}
       {editing && (
         <Modal title="Edit Result" onClose={() => setEditing(null)}>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap:10 }}>
+          <div className="ec-kpi-grid">
             <Field label="Student">
               <input style={inputStyle} value={editing.studentName} disabled />
             </Field>

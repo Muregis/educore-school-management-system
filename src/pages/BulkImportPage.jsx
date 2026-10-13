@@ -811,7 +811,7 @@ export default function BulkImportPage({ auth, students, setStudents, toast, pay
           {/* Export Fields Info */}
           <div style={{ marginTop: 20, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
             <h4 style={{ margin: "0 0 12px", color: C.text }}>Exported Fields</h4>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 8, fontSize: 13, color: C.textSub }}>
+            <div className="ec-kpi-grid">
               <div>• first_name</div>
               <div>• last_name</div>
               <div>• gender</div>

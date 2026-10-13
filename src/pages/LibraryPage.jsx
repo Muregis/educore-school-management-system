@@ -236,7 +236,7 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Stats bar */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "var(--space-3)" }}>
+      <div className="ec-kpi-grid">
         {[
           { label: "Total Items", value: totalBooks, color: "var(--color-info)" },
           { label: "Available",   value: totalAvailable, color: "var(--color-success)" },

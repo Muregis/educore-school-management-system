@@ -130,7 +130,7 @@ export default function TrialBalancePage({ auth, toast }) {
       </div>
 
       {/* Summary Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+      <div className="ec-kpi-grid" style={{ marginBottom: "var(--space-4)" }}>
         <StatCard 
           title="Total Debits" 
           value={money(totalDebits)} 

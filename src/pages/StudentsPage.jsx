@@ -386,7 +386,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       </div>
 
       <Card style={{ padding: "var(--space-4)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 160px), 1fr))", gap: "var(--space-3)", alignItems: "end" }}>
+        <div className="ec-kpi-grid">
           <Input value={q} onChange={e => setQ(e.target.value)} placeholder="Search students..." />
           <Select
             value={cls}

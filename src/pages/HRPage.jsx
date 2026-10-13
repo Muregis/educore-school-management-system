@@ -392,7 +392,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
     <div style={{ padding:4 }}>
 
       {/* Summary cards */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))", gap:12, marginBottom:20 }}>
+      <div className="ec-kpi-grid" style={{ marginBottom: 20 }}>
         {[
           { label:"Total Staff",     value:totalStaff,         color:"#3b82f6" },
           { label:"Active",          value:activeStaff,        color:"#22c55e" },
@@ -710,7 +710,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       {/* ── STAFF MODAL ── */}
       {showStaff && (
         <Modal title={editStaff?"Edit Staff Member":"Add Staff Member"} onClose={()=>{ setShowStaff(false); setEditStaff(null); }}>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap:10 }}>
+          <div className="ec-kpi-grid">
             <Field label="Full Name *"><input style={inputStyle} value={staffForm.fullName} onChange={e=>setStaffForm(f=>({...f,fullName:e.target.value}))} /></Field>
             <Field label="Job Title *"><input style={inputStyle} value={staffForm.jobTitle} onChange={e=>setStaffForm(f=>({...f,jobTitle:e.target.value}))} /></Field>
             <Field label="Email"><input style={inputStyle} value={staffForm.email} onChange={e=>setStaffForm(f=>({...f,email:e.target.value}))} /></Field>
@@ -751,7 +751,7 @@ export default function HRPage({ auth, canEdit, toast, school }) {
       {/* ── LEAVE MODAL ── */}
       {showLeave && (
         <Modal title="Add Leave Request" onClose={()=>setShowLeave(false)}>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(180px, 1fr))", gap:10 }}>
+          <div className="ec-kpi-grid">
             <Field label="Staff Member">
               <select style={inputStyle} value={leaveForm.staffId} onChange={e=>setLeaveForm(f=>({...f,staffId:e.target.value}))}>
                 <option value="">-- Select staff --</option>

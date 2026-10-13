@@ -144,7 +144,7 @@ function BalanceSheet({ auth }) {
         </div>
       </Card>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "var(--space-4)" }}>
+      <div className="ec-stack-grid" style={{ gap: "var(--space-4)" }}>
         {/* Assets */}
         <Card style={{ padding: "var(--space-4)" }}>
           <h4 style={{ margin: "0 0 var(--space-3) 0", color: ACCOUNT_TYPES.asset.color, fontSize: "16px", fontWeight: 700 }}>Assets</h4>
@@ -336,7 +336,7 @@ function IncomeStatement({ auth }) {
         </div>
       </Card>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "var(--space-4)" }}>
+      <div className="ec-stack-grid" style={{ gap: "var(--space-4)" }}>
         {/* Revenue */}
         <Card style={{ padding: "var(--space-4)" }}>
           <h4 style={{ margin: "0 0 var(--space-3) 0", color: ACCOUNT_TYPES.revenue.color, fontSize: "16px", fontWeight: 700 }}>Revenue</h4>

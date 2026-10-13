@@ -231,7 +231,7 @@ setForm({
               <div>â¢ Check for existing applications before submitting</div>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
+          <div className="ec-kpi-grid">
             <Field label="Full Name *" style={{ gridColumn: "1 / -1" }}>
               <input 
                 style={inputStyle} 
@@ -320,7 +320,7 @@ setForm({
       {/* Detail Modal */}
       {showDetail && (
         <Modal title="Application Details" onClose={() => setShowDetail(null)}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 16 }}>
+          <div className="ec-kpi-grid" style={{ marginBottom: 16 }}>
             {[
               ["Full Name", showDetail.full_name],
               ["Applying For", showDetail.applying_class],

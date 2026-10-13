@@ -142,7 +142,7 @@ export default function ExamsPage({ auth, students, subjects, toast }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "var(--space-3)" }}>
+      <div className="ec-kpi-grid">
         <Card style={{ padding: "var(--space-3)" }}>
           <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginBottom: "4px", fontWeight: 600 }}>Total Exams</div>
           <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-text-primary)" }}>{exams.length}</div>

@@ -222,7 +222,7 @@ export default function TimetablePage({ auth, teachers, canEdit, toast, school }
           description="Add individual entries or upload a CSV to build the schedule." 
         />
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "var(--space-3)", alignItems: "start" }}>
+        <div className="ec-kpi-grid">
           {byDay.filter(d => d.items.length > 0).map(({ day, items }) => (
             <div key={day} style={{ background: "var(--color-bg-surface)", border: `1px solid var(--color-border)`, borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
               <div style={{ background: "var(--color-primary)", padding: "10px 14px", fontWeight: 700, fontSize: "14px", color: "#ffffff", letterSpacing: "0.02em" }}>

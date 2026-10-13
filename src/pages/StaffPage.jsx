@@ -124,7 +124,7 @@ export default function StaffPage({ auth, canEdit, toast, onTeachersChanged }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-      <div style={{ display:"grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))", gap: "var(--space-3)" }}>
+      <div className="ec-kpi-grid">
         {[
           { label:"Total Staff", value:staff.length, color:"var(--color-info)" },
           { label:"Active", value:staff.filter(s=>s.status==="active").length, color:"var(--color-success)" },
