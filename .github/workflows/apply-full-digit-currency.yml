@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [fix/full-digit-currency]
-    paths:
-      - .github/workflows/apply-full-digit-currency.yml
 
 jobs:
   apply:
@@ -16,53 +14,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: fix/full-digit-currency
-      - name: Replace compact K/M with full digits
+      - run: node scripts/apply-full-digit-currency.mjs
+      - name: Verify no M/K abbreviation logic remains
         run: |
-          python3 << 'PY'
-          from pathlib import Path
-          p = Path('src/lib/expenditure.utils.js')
-          t = p.read_text()
-          old = '''export function formatCurrencyCompact(amount) {
-  const num = Number(amount || 0);
-  if (isNaN(num) || num === 0) return "KES 0";
-  const abs = Math.abs(num);
-  const sign = num < 0 ? "-" : "";
-  if (abs >= 1_000_000) {
-    const m = abs / 1_000_000;
-    const body = m >= 10 ? m.toFixed(0) : m.toFixed(1).replace(/\.0$/, "");
-    return `${sign}KES ${body}M`;
-  }
-  if (abs >= 1_000) {
-    const k = abs / 1_000;
-    const body = k >= 100 ? k.toFixed(0) : k.toFixed(1).replace(/\.0$/, "");
-    return `${sign}KES ${body}K`;
-  }
-  return `${sign}KES ${Math.round(abs)}`;
-}'''
-          neu = '''/**\n * Full-digit currency for financial accountability.\n * (Previously abbreviated to K/M — schools need every digit visible.)\n * Kept as an alias so existing imports keep working.\n */\nexport function formatCurrencyCompact(amount) {\n  return formatCurrency(amount);\n}'''
-          if old not in t:
-              if 'return formatCurrency(amount)' in t:
-                  print('already applied')
-              else:
-                  raise SystemExit('pattern not found')
-          else:
-              t = t.replace(old, neu)
-              p.write_text(t)
-              print('formatCurrencyCompact updated')
-
-          # Dashboard: use formatCurrency for KPI display values
-          d = Path('src/pages/DashboardPage.jsx')
-          dt = d.read_text()
-          dt2 = dt.replace('formatCurrencyCompact(', 'formatCurrency(')
-          if 'formatCurrencyCompact' not in dt2:
-              dt2 = dt2.replace(
-                  'import { formatCurrency, formatCurrencyCompact } from "../lib/expenditure.utils";',
-                  'import { formatCurrency } from "../lib/expenditure.utils";',
-              )
-          d.write_text(dt2)
-          print('Dashboard updated')
-          PY
-      - name: Build check
+          ! grep -q 'body}M' src/lib/expenditure.utils.js
+          grep -q 'return formatCurrency(amount)' src/lib/expenditure.utils.js
+          echo OK
+      - name: Frontend build
         run: |
           npm install --no-audit --no-fund
           npm run build
@@ -70,8 +28,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src/lib/expenditure.utils.js src/pages/DashboardPage.jsx
+          git add src/lib/expenditure.utils.js src/pages/DashboardPage.jsx scripts/apply-full-digit-currency.mjs
           if git diff --staged --quiet; then echo No changes; else
-            git commit -m "fix(ui): full-digit currency (no 2.4M / 450K abbreviations)"
+            git commit -m "fix(ui): full-digit currency — no 2.4M / 450K abbreviations"
             git push origin fix/full-digit-currency
           fi
