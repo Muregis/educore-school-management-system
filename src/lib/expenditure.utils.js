@@ -17,6 +17,11 @@ export function formatCurrency(amount) {
  * (Previously abbreviated to K/M — schools need every digit visible.)
  * Kept as an alias so existing imports keep working.
  */
+/**
+ * Full-digit currency for financial accountability.
+ * (Previously abbreviated to K/M — schools need every digit visible.)
+ * Kept as an alias so existing imports keep working.
+ */
 export function formatCurrencyCompact(amount) {
   return formatCurrency(amount);
 }
