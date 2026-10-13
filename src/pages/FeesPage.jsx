@@ -92,7 +92,21 @@ function loadPaystackScript() {
 export default function FeesPage({ auth, students, feeStructures, setFeeStructures, payments, setPayments, canEdit, canViewTotals, canDeletePayments, toast, linkedStudentId, school }) {
   const { term, academicYear, startDate, endDate } = useCurrentTerm(auth);
   const [selectedTerm, setSelectedTerm] = useState("current");
-  const displayTerm = selectedTerm === "current" ? (term || "Term 2") : selectedTerm;
+  const [availableTerms, setAvailableTerms] = useState([]);
+  const displayTerm = selectedTerm === "current" ? (term || availableTerms[0] || "Term 1") : selectedTerm;
+  useEffect(() => {
+    if (!auth?.token) return;
+    let ignore = false;
+    apiFetch("/academic/terms", { token: auth.token })
+      .then((data) => {
+        if (ignore) return;
+        const list = Array.isArray(data) ? data : (data?.data || data?.terms || []);
+        const names = [...new Set(list.map((x) => x.term_name || x.name || x.term).filter(Boolean))];
+        setAvailableTerms(names);
+      })
+      .catch(() => { if (!ignore) setAvailableTerms([]); });
+    return () => { ignore = true; };
+  }, [auth?.token]);
   const [tab, setTab]                 = useState("payments");
   const [showPayment, setShowPayment] = useState(false);
   const [showStruct, setShowStruct]   = useState(false);
@@ -726,9 +740,9 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             <Button variant={filterDate==="today" ? "primary" : "ghost"} onClick={() => setFilterDate(filterDate === "today" ? "all" : "today")}>Today</Button>
             <div style={{ width: "1px", background: "var(--color-border)", margin: "0 var(--space-2)" }} />
             <Button variant={selectedTerm==="current" ? "secondary" : "ghost"} onClick={() => setSelectedTerm("current")}>Current Term</Button>
-            <Button variant={selectedTerm==="Term 1" ? "secondary" : "ghost"} onClick={() => setSelectedTerm("Term 1")}>Term 1</Button>
-            <Button variant={selectedTerm==="Term 2" ? "secondary" : "ghost"} onClick={() => setSelectedTerm("Term 2")}>Term 2</Button>
-            <Button variant={selectedTerm==="Term 3" ? "secondary" : "ghost"} onClick={() => setSelectedTerm("Term 3")}>Term 3</Button>
+            {(availableTerms.length ? availableTerms : ["Term 1", "Term 2", "Term 3"]).map((tn) => (
+              <Button key={tn} variant={selectedTerm===tn ? "secondary" : "ghost"} onClick={() => setSelectedTerm(tn)}>{tn}</Button>
+            ))}
             <Button variant={selectedTerm==="all" ? "secondary" : "ghost"} onClick={() => setSelectedTerm("all")}>All Time (All Terms)</Button>
           </div>
           
@@ -1489,9 +1503,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             value={structForm.term || "Term 1"} 
             onChange={e => setStructForm({ ...structForm, term: e.target.value })}
             options={[
-              { value: "Term 1", label: "Term 1" },
-              { value: "Term 2", label: "Term 2" },
-              { value: "Term 3", label: "Term 3" }
+              ...(availableTerms.length ? availableTerms : ["Term 1", "Term 2", "Term 3"]).map((tn) => ({ value: tn, label: tn }))
             ]}
           />
           <Input 

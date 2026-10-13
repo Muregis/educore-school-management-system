@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
+const AUTH_DEBUG_ENABLED = (process.env.AUTH_DEBUG || process.env.TENANT_DEBUG || "false").toLowerCase() === "true";
 
 function generateRequestId() {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -52,7 +53,7 @@ export function authRequired(req, res, next) {
   try {
     const payload = jwt.verify(token, env.jwtSecret);
 
-    console.log('[AUTH DEBUG] Token payload:', {
+    AUTH_DEBUG_ENABLED && console.log('[AUTH DEBUG] Token payload:', {
       role: payload.role,
       user_id: payload.user_id || payload.userId,
       school_id: payload.school_id || payload.schoolId,
@@ -86,7 +87,7 @@ export function authRequired(req, res, next) {
     const isSuperadminToken = (payload.email === SUPERADMIN_EMAIL) || (payloadRole === 'superadmin');
     const isDirectorToken = payloadRole === 'director';
 
-    console.log('[AUTH DEBUG] Role detection:', {
+    AUTH_DEBUG_ENABLED && console.log('[AUTH DEBUG] Role detection:', {
       isSuperadminToken,
       isDirectorToken,
       payloadRole: payload.role,
@@ -116,7 +117,7 @@ export function authRequired(req, res, next) {
       };
 
       if (headerSchoolId) {
-        console.log(`[AUTH DEBUG] Superadmin context switch: ${effectiveSchoolId}`);
+        AUTH_DEBUG_ENABLED && console.log(`[AUTH DEBUG] Superadmin context switch: ${effectiveSchoolId}`);
       }
 
       return next();
@@ -147,7 +148,7 @@ export function authRequired(req, res, next) {
         tokenRole: payload.role
       };
 
-      console.log(`[AUTH DEBUG] Director context: school=${effectiveSchoolId} email=${payload.email} header=${headerSchoolId}`);
+      AUTH_DEBUG_ENABLED && console.log(`[AUTH DEBUG] Director context: school=${effectiveSchoolId} email=${payload.email} header=${headerSchoolId}`);
       return next();
     }
 

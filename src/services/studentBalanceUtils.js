@@ -4,6 +4,20 @@ import { ledgerBalanceService } from "./ledgerBalanceService.js";
 const PAID_STATUSES = ["paid", "completed", "success"];
 const isPaidStatus = (status) => PAID_STATUSES.includes(String(status || "paid").toLowerCase());
 
+function normalizeClassName(name) {
+  return String(name ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function classNamesMatch(a, b) {
+  return normalizeClassName(a) === normalizeClassName(b) && normalizeClassName(a) !== "";
+}
+
+function findFeeStructureForClass(feeStructures = [], className) {
+  return (feeStructures || []).find(
+    (f) => classNamesMatch(f?.className ?? f?.class_name, className)
+  );
+}
+
 function toNumber(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : 0;
@@ -14,7 +28,7 @@ export function getStudentId(student) {
 }
 
 export function getStudentClassName(student) {
-  return student?.className ?? student?.class_name ?? "";
+  return String(student?.className ?? student?.class_name ?? "").trim().replace(/\s+/g, " ");
 }
 
 export function getOpeningBalanceImpact(student) {
@@ -24,7 +38,7 @@ export function getOpeningBalanceImpact(student) {
 
 export function getStudentBaseFee(student, feeStructures = []) {
   const className = getStudentClassName(student);
-  const structure = feeStructures.find(f => (f?.className ?? f?.class_name) === className);
+  const structure = findFeeStructureForClass(feeStructures, className);
   if (!structure) {
     return 0;
   }
@@ -33,7 +47,7 @@ export function getStudentBaseFee(student, feeStructures = []) {
 
 export function hasFeeStructureForClass(student, feeStructures = []) {
   const className = getStudentClassName(student);
-  return feeStructures.some(f => (f?.className ?? f?.class_name) === className);
+  return feeStructures.some(f => classNamesMatch(f?.className ?? f?.class_name, className));
 }
 
 // ── Agreed-amount overrides ────────────────────────────────────────────────────
@@ -235,7 +249,7 @@ export function calculateStudentBalanceLocal({
   }
 
   const baseFee = getStudentBaseFee(student, feeStructures);
-  const structure = feeStructures.find(f => (f?.className ?? f?.class_name) === className);
+  const structure = findFeeStructureForClass(feeStructures, className);
   const tuition = structure ? toNumber(structure.tuition) : 0;
   const transportFee = getStudentTransportFee(student, schoolSettings);
   const lunchFee = getStudentLunchFee(student, schoolSettings);

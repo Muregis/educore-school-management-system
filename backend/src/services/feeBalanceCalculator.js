@@ -27,6 +27,20 @@
  * negative balance is a credit/overpayment.
  */
 
+function normalizeClassName(name) {
+  return String(name ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function classNamesMatch(a, b) {
+  return normalizeClassName(a) === normalizeClassName(b) && normalizeClassName(a) !== "";
+}
+
+function findFeeStructureForClass(feeStructures = [], className) {
+  return (feeStructures || []).find(
+    (f) => classNamesMatch(f?.className ?? f?.class_name, className)
+  );
+}
+
 function toNumber(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : 0;
@@ -48,9 +62,7 @@ export function getOpeningBalanceImpact(student) {
 // ── Current term charges from the fee structure ────────────────────────────────
 export function getStudentBaseFee(student, feeStructures = []) {
   const className = student?.className ?? student?.class_name ?? "";
-  const structure = feeStructures.find(
-    (f) => (f?.className ?? f?.class_name) === className
-  );
+  const structure = findFeeStructureForClass(feeStructures, className);
   if (!structure) return 0;
   return toNumber(structure.tuition) + toNumber(structure.activity) + toNumber(structure.misc);
 }
@@ -262,9 +274,7 @@ export function calculateStudentFeeBalance({
   const className = student?.className ?? student?.class_name ?? "";
 
   const baseFee = getStudentBaseFee(student, feeStructures);
-  const structure = feeStructures.find(
-    (f) => (f?.className ?? f?.class_name) === className
-  );
+  const structure = findFeeStructureForClass(feeStructures, className);
   const tuition = structure ? toNumber(structure.tuition) : 0;
 
   const transportFee = getStudentTransportFee(student);

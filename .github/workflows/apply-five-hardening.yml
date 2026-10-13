@@ -1,0 +1,40 @@
+name: Apply five hardening fixes
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/five-hardening-fixes]
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/five-hardening-fixes
+      - run: node scripts/apply-five-hardening-fixes.mjs
+      - name: Verify
+        run: |
+          grep -q 'normalizeClassName' backend/src/services/feeBalanceCalculator.js
+          grep -q 'normalizeClassName' src/services/studentBalanceUtils.js
+          grep -q 'resolveCurrentTermName' backend/src/routes/analytics.routes.js
+          grep -q '=== "true"' backend/src/helpers/tenant-debug.logger.js
+          grep -q 'AUTH_DEBUG_ENABLED' backend/src/middleware/auth.js
+          grep -q 'KES' src/lib/utils.js
+          grep -q 'availableTerms' src/pages/FeesPage.jsx
+          echo OK
+      - name: Frontend build
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix: class-name match, analytics term, debug off, KES, dynamic fee terms"
+            git push origin fix/five-hardening-fixes
+          fi
