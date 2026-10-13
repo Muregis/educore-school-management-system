@@ -25,7 +25,7 @@ router.get("/summary", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { term } = req.query; // Allow term filtering via query param
-    const currentTerm = term; // No default - require term parameter
+    const currentTerm = term || await resolveCurrentTermName(schoolId);
     const expenditureSummary = await getExpenditureSummary(schoolId);
     
     // Get student counts by gender
@@ -95,12 +95,13 @@ router.get("/summary", async (req, res, next) => {
     const totalPending = pendingPayments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
 
     // Calculate outstanding balance (expected fees - paid)
-    const { data: feeStructures, error: feeErr } = await supabase
+    const feeQuery = supabase
       .from('fee_structures')
       .select('class_name, tuition, activity, misc')
       .eq('school_id', schoolId)
-      .eq('term', currentTerm)
       .eq('is_deleted', false);
+    if (currentTerm) feeQuery.eq('term', currentTerm);
+    const { data: feeStructures, error: feeErr } = await feeQuery;
     if (feeErr) throw feeErr;
 
     // Calculate outstanding using the canonical fee-balance formula
@@ -395,7 +396,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
   try {
     const { schoolId } = req.user;
     const { term } = req.query; // Allow term filtering via query param
-    const currentTerm = term; // No default - require term parameter
+    const currentTerm = term || await resolveCurrentTermName(schoolId);
     
     // Get all students
     const { data: allStudents, error: stuErr } = await supabase
@@ -406,23 +407,25 @@ router.get("/class-fee-summary", async (req, res, next) => {
       .eq('status', 'active');
     if (stuErr) throw stuErr;
     
-    // Get fee structures (filter by term)
-    const { data: feeStructures, error: feeErr } = await supabase
+    // Get fee structures (filter by term when known)
+    const feeQuery = supabase
       .from('fee_structures')
       .select('class_name, tuition, activity, misc')
       .eq('school_id', schoolId)
-      .eq('term', currentTerm)
       .eq('is_deleted', false);
+    if (currentTerm) feeQuery.eq('term', currentTerm);
+    const { data: feeStructures, error: feeErr } = await feeQuery;
     if (feeErr) throw feeErr;
     
-    // Get all paid payments (filter by term)
-    const { data: payments, error: payErr } = await supabase
+    // Get all paid payments (filter by term when known)
+    const payQuery = supabase
       .from('payments')
       .select('student_id, amount')
       .eq('school_id', schoolId)
       .in('status', ['paid', 'completed', 'success'])
-      .eq('term', currentTerm)
       .eq('is_deleted', false);
+    if (currentTerm) payQuery.eq('term', currentTerm);
+    const { data: payments, error: payErr } = await payQuery;
     if (payErr) throw payErr;
 
     // Calculate per-class summary using the canonical fee-balance formula

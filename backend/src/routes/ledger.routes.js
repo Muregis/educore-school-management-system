@@ -42,20 +42,22 @@ router.get("/all/balances", async (req, res, next) => {
     const { schoolId } = req.user;
     const { term } = req.query;
 
-    // Fetch all students
+    // Fetch all students with fee-related fields (opening balance, transport, meals, discounts)
     const { data: students, error: stuErr } = await supabase
       .from('students')
-      .select('student_id, first_name, last_name, class_name')
+      .select('student_id, first_name, last_name, class_name, opening_balance, opening_balance_type, transport_direction, transport_base_fee, transport_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, lunch_fee, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, breakfast_termly_fee, discount_type, discount_value, discount_is_percentage')
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
       .eq('status', 'active');
     if (stuErr) throw stuErr;
 
-    const { data: feeStructures } = await supabase
+    const feeQuery = supabase
       .from('fee_structures')
       .select('*')
       .eq('school_id', schoolId)
       .eq('is_deleted', false);
+    if (term) feeQuery.eq('term', term);
+    const { data: feeStructures } = await feeQuery;
 
     let query = supabase
       .from('payments')

@@ -1,6 +1,9 @@
 import discountService from "./discountService.js";
 import { ledgerBalanceService } from "./ledgerBalanceService.js";
 
+const PAID_STATUSES = ["paid", "completed", "success"];
+const isPaidStatus = (status) => PAID_STATUSES.includes(String(status || "paid").toLowerCase());
+
 function toNumber(value) {
   const num = Number(value);
   return Number.isFinite(num) ? num : 0;
@@ -179,7 +182,7 @@ export function calculateStudentBalanceLocal({
   if (requireFeeStructure && !hasStructure) {
     const openingBalance = getOpeningBalanceImpact(student);
     const paid = payments
-      .filter(p => String(p?.studentId ?? p?.student_id) === String(studentId) && (p?.status ?? "paid") === "paid")
+      .filter(p => String(p?.studentId ?? p?.student_id) === String(studentId) && isPaidStatus(p?.status))
       .reduce((sum, p) => sum + toNumber(p.amount), 0);
     if (openingBalance === 0) {
       return {
@@ -251,7 +254,7 @@ export function calculateStudentBalanceLocal({
   });
 
   const paid = payments
-    .filter(p => String(p?.studentId ?? p?.student_id) === String(studentId) && (p?.status ?? "paid") === "paid")
+    .filter(p => String(p?.studentId ?? p?.student_id) === String(studentId) && isPaidStatus(p?.status))
     .reduce((sum, p) => sum + toNumber(p.amount), 0);
 
   const rawBalance = discountCalc.netAmount - paid;
