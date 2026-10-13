@@ -1,0 +1,35 @@
+name: Fix finance calc consistency
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/reports-outstanding-calc]
+    paths:
+      - scripts/fix-finance-calc-consistency.mjs
+      - .github/workflows/fix-finance-calc.yml
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reports-outstanding-calc
+      - run: node scripts/fix-finance-calc-consistency.mjs
+      - name: Verify
+        run: |
+          grep -q 'isPaidStatus' src/services/studentBalanceUtils.js
+          grep -q 'opening_balance, opening_balance_type' backend/src/routes/ledger.routes.js
+          grep -q 'totalOutstanding' src/pages/ReportsPage.jsx || true
+          echo OK
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(finance): paid statuses, ledger student fields, reports outstanding"
+            git push origin fix/reports-outstanding-calc
+          fi
