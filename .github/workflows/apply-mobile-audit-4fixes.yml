@@ -1,0 +1,37 @@
+name: Apply mobile audit 4 fixes
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/mobile-audit-4fixes]
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/mobile-audit-4fixes
+      - name: Apply fixes
+        run: node scripts/apply-mobile-audit-4fixes.mjs
+      - name: Verify
+        run: |
+          grep -q 'ec-kpi-grid' src/pages/ReportsPage.jsx
+          ! grep -q 'const StatCard' src/pages/ReportsPage.jsx
+          grep -q 'from "../components/ui/StatCard"' src/pages/ReportsPage.jsx
+          grep -q 'from "../components/ui/StatCard"' src/pages/ExpendituresPage.jsx
+          ! grep -q 'function StatCard' src/pages/ExpendituresPage.jsx
+          ! grep -q 'function StatCard' src/pages/PortalDashboardPage.jsx
+          grep -q 'FIX 3 — Raw tables' src/styles/layout-foundation.css
+          echo OK
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(mobile): apply audit 4 fixes (StatCard, Reports KPI, tables, minWidth)"
+            git push origin fix/mobile-audit-4fixes
+          fi
