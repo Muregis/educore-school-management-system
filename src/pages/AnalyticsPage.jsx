@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import PropTypes from "prop-types";
-import { money, countBy } from "../lib/utils";
+import { money, countBy, isPaidStatus } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 
@@ -138,7 +138,7 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
 
     // Fee stats - use proper balance calculations that include opening balance
     const totalCollected = payments
-      .filter(p => (p.status ?? "paid") === "paid")
+      .filter(p => isPaidStatus(p.status))
       .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
     const totalExpenses = Number(expenditureSummary?.totals?.total || 0);
     const payrollExpenses = Number(expenditureSummary?.totals?.payroll || 0);

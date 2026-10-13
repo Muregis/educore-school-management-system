@@ -964,7 +964,10 @@ export default function ReportsPage({ auth }) {
         students:       s.totalStudents  ?? s.students       ?? 0,
         teachers:       s.totalTeachers  ?? s.teachers       ?? 0,
         feesCollected:  s.totalCollected ?? s.feesCollected  ?? 0,
-        feesPending:    s.totalPending   ?? s.feesPending    ?? 0,
+        // Outstanding balances owed (NOT payment rows with status=pending)
+        feesPending:    s.totalOutstanding ?? s.feesPending ?? s.totalPending ?? 0,
+        totalOutstanding: s.totalOutstanding ?? 0,
+        pendingPayments: s.totalPending ?? 0,
         totalExpenses:  s.totalExpenses  ?? 0,
         payrollExpenses:s.payrollExpenses ?? 0,
         manualExpenses: s.manualExpenses ?? 0,
@@ -1036,7 +1039,7 @@ export default function ReportsPage({ auth }) {
           <StatCard label="Active Students"  value={summary.students}               tone="info" />
           <StatCard label="Active Teachers"  value={summary.teachers}               tone="info" />
           <StatCard label="Fees Collected"   value={money(summary.feesCollected)}   tone="success" />
-          <StatCard label="Fees Pending"     value={money(summary.feesPending)}     tone="warning" />
+          <StatCard label="Outstanding Fees" value={money(summary.feesPending)}     tone="warning" />
           <StatCard label="Total Expenses"   value={money(summary.totalExpenses)}   tone="danger" />
           <StatCard label="Net Cashflow"     value={money(summary.netCashflow)}     tone={summary.netCashflow >= 0 ? "success" : "danger"} />
           <StatCard label="Open Discipline"  value={summary.openDiscipline}         tone="danger" />

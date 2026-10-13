@@ -1,0 +1,115 @@
+name: Apply finance source fixes
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/reports-outstanding-calc]
+    paths:
+      - .github/workflows/apply-finance-source-fixes.yml
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reports-outstanding-calc
+
+      - name: Apply source patches
+        run: |
+          python3 << 'PY'
+          from pathlib import Path
+
+          # studentBalanceUtils
+          p = Path('src/services/studentBalanceUtils.js')
+          t = p.read_text()
+          if 'const PAID_STATUSES' not in t:
+              t = t.replace(
+                  'function toNumber(value) {',
+                  'const PAID_STATUSES = ["paid", "completed", "success"];\nconst isPaidStatus = (status) => PAID_STATUSES.includes(String(status || "paid").toLowerCase());\n\nfunction toNumber(value) {',
+                  1,
+              )
+          old = '.filter(p => String(p?.studentId ?? p?.student_id) === String(studentId) && (p?.status ?? "paid") === "paid")'
+          neu = '.filter(p => String(p?.studentId ?? p?.student_id) === String(studentId) && isPaidStatus(p?.status))'
+          t = t.replace(old, neu)
+          p.write_text(t)
+          print('studentBalanceUtils', 'isPaidStatus' in t)
+
+          # AnalyticsPage
+          p = Path('src/pages/AnalyticsPage.jsx')
+          t = p.read_text()
+          t = t.replace(
+              'import { money, countBy } from "../lib/utils";',
+              'import { money, countBy, isPaidStatus } from "../lib/utils";',
+          )
+          t = t.replace('.filter(p => (p.status ?? "paid") === "paid")', '.filter(p => isPaidStatus(p.status))')
+          p.write_text(t)
+          print('Analytics', 'isPaidStatus' in t)
+
+          # Reports FE
+          p = Path('src/pages/ReportsPage.jsx')
+          t = p.read_text()
+          t = t.replace(
+              'feesPending:    s.totalPending   ?? s.feesPending    ?? 0,',
+              '''// Outstanding balances owed (NOT payment rows with status=pending)\n        feesPending:    s.totalOutstanding ?? s.feesPending ?? s.totalPending ?? 0,\n        totalOutstanding: s.totalOutstanding ?? 0,\n        pendingPayments: s.totalPending ?? 0,''',
+          )
+          t = t.replace(
+              '<StatCard label="Fees Pending"     value={money(summary.feesPending)}     tone="warning" />',
+              '<StatCard label="Outstanding Fees" value={money(summary.feesPending)}     tone="warning" />',
+          )
+          p.write_text(t)
+          print('Reports', 'totalOutstanding' in t)
+
+          # ledger
+          p = Path('backend/src/routes/ledger.routes.js')
+          t = p.read_text()
+          old = """    // Fetch all students\n    const { data: students, error: stuErr } = await supabase\n      .from('students')\n      .select('student_id, first_name, last_name, class_name')\n      .eq('school_id', schoolId)\n      .eq('is_deleted', false)\n      .eq('status', 'active');\n    if (stuErr) throw stuErr;\n\n    const { data: feeStructures } = await supabase\n      .from('fee_structures')\n      .select('*')\n      .eq('school_id', schoolId)\n      .eq('is_deleted', false);\n\n    let query = supabase\n      .from('payments')\n      .select('student_id, amount, status')\n      .eq('school_id', schoolId)\n      .eq('is_deleted', false)\n      .in('status', ['paid', 'completed', 'success']);\n    if (term) query = query.eq('term', term);\n    const { data: payments } = await query;\n\n    const studentBalances = (students || []).map(s => {\n      const balanceInfo = calculateStudentFeeBalance({ student: s, feeStructures: feeStructures || [], payments: payments || [] });"""
+          neu = """    // Fetch all students with fee-related fields (opening balance, transport, meals, discounts)\n    const { data: students, error: stuErr } = await supabase\n      .from('students')\n      .select('student_id, first_name, last_name, class_name, opening_balance, opening_balance_type, transport_direction, transport_base_fee, transport_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, lunch_fee, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, breakfast_termly_fee, discount_type, discount_value, discount_is_percentage')\n      .eq('school_id', schoolId)\n      .eq('is_deleted', false)\n      .eq('status', 'active');\n    if (stuErr) throw stuErr;\n\n    const feeQuery = supabase\n      .from('fee_structures')\n      .select('*')\n      .eq('school_id', schoolId)\n      .eq('is_deleted', false);\n    if (term) feeQuery.eq('term', term);\n    const { data: feeStructures } = await feeQuery;\n\n    let query = supabase\n      .from('payments')\n      .select('student_id, amount, status')\n      .eq('school_id', schoolId)\n      .eq('is_deleted', false)\n      .in('status', ['paid', 'completed', 'success']);\n    if (term) query = query.eq('term', term);\n    const { data: payments } = await query;\n\n    const studentBalances = (students || []).map(s => {\n      const balanceInfo = calculateStudentFeeBalance({ student: s, feeStructures: feeStructures || [], payments: payments || [] });"""
+          if old in t:
+              t = t.replace(old, neu)
+              print('ledger fixed')
+          else:
+              print('ledger already fixed or pattern miss', 'opening_balance, opening_balance_type, transport_direction' in t)
+          p.write_text(t)
+
+          # reports routes
+          p = Path('backend/src/routes/reports.routes.js')
+          t = p.read_text()
+          t = t.replace(
+              'const currentTerm = term; // No default - require term parameter',
+              'const currentTerm = term || await resolveCurrentTermName(schoolId);',
+          )
+          old = """    // Calculate outstanding balance (expected fees - paid)\n    const { data: feeStructures, error: feeErr } = await supabase\n      .from('fee_structures')\n      .select('class_name, tuition, activity, misc')\n      .eq('school_id', schoolId)\n      .eq('term', currentTerm)\n      .eq('is_deleted', false);\n    if (feeErr) throw feeErr;"""
+          neu = """    // Calculate outstanding balance (expected fees - paid)\n    const feeQuery = supabase\n      .from('fee_structures')\n      .select('class_name, tuition, activity, misc')\n      .eq('school_id', schoolId)\n      .eq('is_deleted', false);\n    if (currentTerm) feeQuery.eq('term', currentTerm);\n    const { data: feeStructures, error: feeErr } = await feeQuery;\n    if (feeErr) throw feeErr;"""
+          if old in t:
+              t = t.replace(old, neu)
+          old2 = """    // Get fee structures (filter by term)\n    const { data: feeStructures, error: feeErr } = await supabase\n      .from('fee_structures')\n      .select('class_name, tuition, activity, misc')\n      .eq('school_id', schoolId)\n      .eq('term', currentTerm)\n      .eq('is_deleted', false);\n    if (feeErr) throw feeErr;\n    \n    // Get all paid payments (filter by term)\n    const { data: payments, error: payErr } = await supabase\n      .from('payments')\n      .select('student_id, amount')\n      .eq('school_id', schoolId)\n      .in('status', ['paid', 'completed', 'success'])\n      .eq('term', currentTerm)\n      .eq('is_deleted', false);\n    if (payErr) throw payErr;"""
+          neu2 = """    // Get fee structures (filter by term when known)\n    const feeQuery = supabase\n      .from('fee_structures')\n      .select('class_name, tuition, activity, misc')\n      .eq('school_id', schoolId)\n      .eq('is_deleted', false);\n    if (currentTerm) feeQuery.eq('term', currentTerm);\n    const { data: feeStructures, error: feeErr } = await feeQuery;\n    if (feeErr) throw feeErr;\n    \n    // Get all paid payments (filter by term when known)\n    const payQuery = supabase\n      .from('payments')\n      .select('student_id, amount')\n      .eq('school_id', schoolId)\n      .in('status', ['paid', 'completed', 'success'])\n      .eq('is_deleted', false);\n    if (currentTerm) payQuery.eq('term', currentTerm);\n    const { data: payments, error: payErr } = await payQuery;\n    if (payErr) throw payErr;"""
+          if old2 in t:
+              t = t.replace(old2, neu2)
+          p.write_text(t)
+          print('reports resolve', t.count('term || await resolveCurrentTermName(schoolId)'))
+          print('DONE')
+          PY
+
+      - name: Frontend build check
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Backend install check
+        working-directory: backend
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Commit fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/services/studentBalanceUtils.js src/pages/AnalyticsPage.jsx src/pages/ReportsPage.jsx backend/src/routes/ledger.routes.js backend/src/routes/reports.routes.js
+          if git diff --staged --quiet; then echo No source changes; else
+            git commit -m "fix(finance): outstanding KPI, paid statuses, ledger fields, term resolution"
+            git push origin fix/reports-outstanding-calc
+          fi

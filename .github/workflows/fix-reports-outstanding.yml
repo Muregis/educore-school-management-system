@@ -1,0 +1,32 @@
+name: Fix reports outstanding calc
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/reports-outstanding-calc]
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reports-outstanding-calc
+      - run: node scripts/fix-reports-outstanding.mjs
+      - name: Verify
+        run: |
+          grep -q 'totalOutstanding' src/pages/ReportsPage.jsx
+          grep -q 'Outstanding Fees' src/pages/ReportsPage.jsx
+          grep -q 'term || await resolveCurrentTermName' backend/src/routes/reports.routes.js
+          echo OK
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ReportsPage.jsx backend/src/routes/reports.routes.js
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(reports): map Outstanding Fees to totalOutstanding; resolve term for class balances"
+            git push origin fix/reports-outstanding-calc
+          fi
