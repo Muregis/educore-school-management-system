@@ -1,0 +1,29 @@
+name: Restore soft JWT env
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/saas-solid-8]
+    paths:
+      - scripts/restore-soft-jwt-env.mjs
+      - .github/workflows/restore-soft-jwt.yml
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/saas-solid-8
+      - run: node scripts/restore-soft-jwt-env.mjs
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backend/src/config/env.js
+          if git diff --staged --quiet; then echo Already soft; else
+            git commit -m "revert: soft JWT/env validation (warn only, no process.exit)"
+            git push origin fix/saas-solid-8
+          fi
