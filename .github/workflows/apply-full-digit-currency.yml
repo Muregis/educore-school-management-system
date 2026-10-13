@@ -1,0 +1,35 @@
+name: Apply full-digit currency
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/full-digit-currency]
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/full-digit-currency
+      - run: node scripts/apply-full-digit-currency.mjs
+      - name: Verify no M/K abbreviation logic remains
+        run: |
+          ! grep -q 'body}M' src/lib/expenditure.utils.js
+          grep -q 'return formatCurrency(amount)' src/lib/expenditure.utils.js
+          echo OK
+      - name: Frontend build
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/lib/expenditure.utils.js src/pages/DashboardPage.jsx scripts/apply-full-digit-currency.mjs
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(ui): full-digit currency — no 2.4M / 450K abbreviations"
+            git push origin fix/full-digit-currency
+          fi

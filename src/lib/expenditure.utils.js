@@ -12,22 +12,18 @@ export function formatCurrency(amount) {
   }).format(num);
 }
 
+/**
+ * Full-digit currency for financial accountability.
+ * (Previously abbreviated to K/M — schools need every digit visible.)
+ * Kept as an alias so existing imports keep working.
+ */
+/**
+ * Full-digit currency for financial accountability.
+ * (Previously abbreviated to K/M — schools need every digit visible.)
+ * Kept as an alias so existing imports keep working.
+ */
 export function formatCurrencyCompact(amount) {
-  const num = Number(amount || 0);
-  if (isNaN(num) || num === 0) return "KES 0";
-  const abs = Math.abs(num);
-  const sign = num < 0 ? "-" : "";
-  if (abs >= 1_000_000) {
-    const m = abs / 1_000_000;
-    const body = m >= 10 ? m.toFixed(0) : m.toFixed(1).replace(/\.0$/, "");
-    return `${sign}KES ${body}M`;
-  }
-  if (abs >= 1_000) {
-    const k = abs / 1_000;
-    const body = k >= 100 ? k.toFixed(0) : k.toFixed(1).replace(/\.0$/, "");
-    return `${sign}KES ${body}K`;
-  }
-  return `${sign}KES ${Math.round(abs)}`;
+  return formatCurrency(amount);
 }
 
 

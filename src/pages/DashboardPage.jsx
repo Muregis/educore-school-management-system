@@ -169,9 +169,9 @@ export default function DashboardPage({ auth, school, students, teachers, attend
       ["Total Students", totalStudents, "var(--color-success)"],
       ["Teachers", teachers.length, "var(--color-warning)"],
       ["Present Records", present, "var(--color-sky)"],
-      ["Today's Collection", formatCurrencyCompact(todayCollection), "var(--color-green)", formatCurrency(todayCollection)],
-      ["Total Collection", formatCurrencyCompact(totalPaid), "var(--color-primary)", formatCurrency(totalPaid)],
-      ["Outstanding", formatCurrencyCompact(outstanding), "var(--color-danger)", formatCurrency(outstanding)],
+      ["Today's Collection", formatCurrency(todayCollection), "var(--color-green)", formatCurrency(todayCollection)],
+      ["Total Collection", formatCurrency(totalPaid), "var(--color-primary)", formatCurrency(totalPaid)],
+      ["Outstanding", formatCurrency(outstanding), "var(--color-danger)", formatCurrency(outstanding)],
       ["Pending Plans", pendingPlans, "var(--color-text-muted)"],
     ];
     return (
@@ -249,9 +249,9 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     ["Total Students", totalStudents, "var(--color-success)"],
     ["Teachers", teachers.length, "var(--color-warning)"],
     ["Present Records", present, "var(--color-sky)"],
-    ["Today's Collection", formatCurrencyCompact(todayCollection), "var(--color-green)", formatCurrency(todayCollection)],
-    ["Total Collection", formatCurrencyCompact(totalPaid), "var(--color-primary)", formatCurrency(totalPaid)],
-    ["Outstanding", formatCurrencyCompact(outstanding), "var(--color-danger)", formatCurrency(outstanding)],
+    ["Today's Collection", formatCurrency(todayCollection), "var(--color-green)", formatCurrency(todayCollection)],
+    ["Total Collection", formatCurrency(totalPaid), "var(--color-primary)", formatCurrency(totalPaid)],
+    ["Outstanding", formatCurrency(outstanding), "var(--color-danger)", formatCurrency(outstanding)],
   ];
 
   const isEmptyTenant = (auth?.role === "director" || auth?.role === "superadmin") && totalStudents === 0 && teachers.length === 0 && feeStructures.length === 0;
