@@ -139,21 +139,21 @@ export default function PortalDashboardPage({
         <StatCard 
           label="Attendance" 
           value={`${attendanceRate}%`} 
-          subtext={`${presentCount} present / ${absentCount} absent`}
+          subtitle={`${presentCount} present / ${absentCount} absent`}
           color={attendanceRate >= 80 ? "var(--color-success)" : attendanceRate >= 60 ? "var(--color-warning)" : "var(--color-danger)"}
           onClick={onViewAttendance}
         />
         <StatCard 
           label="Average Grade" 
           value={avgGrade > 0 ? `${avgGrade}%` : "-"} 
-          subtext={`${studentResults.length} subjects`}
+          subtitle={`${studentResults.length} subjects`}
           color={avgGrade >= 75 ? "var(--color-success)" : avgGrade >= 50 ? "var(--color-warning)" : "var(--color-danger)"}
           onClick={onViewGrades}
         />
         <StatCard 
           label="Fees Balance" 
           value={money(balance)} 
-          subtext={`Paid: ${money(totalPaid)}`}
+          subtitle={`Paid: ${money(totalPaid)}`}
           color={balance <= 0 ? "var(--color-success)" : balance <= classFee * 0.3 ? "var(--color-warning)" : "var(--color-danger)"}
           onClick={onViewFees}
         />
@@ -215,25 +215,6 @@ export default function PortalDashboardPage({
         </Card>
       </div>
     </div>
-  );
-}
-) {
-  return (
-    <Card 
-      onClick={onClick}
-      style={{ 
-        padding: "var(--space-4)",
-        cursor: onClick ? "pointer" : "default",
-        borderLeft: `4px solid ${color}`,
-        position: "relative",
-        overflow: "hidden"
-      }}
-    >
-      {onClick && <div style={{ position: "absolute", top: "var(--space-2)", right: "var(--space-3)", color: "var(--color-text-muted)", opacity: 0.5 }}>→</div>}
-      <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-1)" }}>{label}</div>
-      <div style={{ fontSize: "32px", fontWeight: 800, color, marginBottom: "var(--space-1)", letterSpacing: "-0.02em" }}>{value}</div>
-      <div style={{ fontSize: "13px", color: "var(--color-text-muted)", fontWeight: 500 }}>{subtext}</div>
-    </Card>
   );
 }
 
