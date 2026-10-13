@@ -1,5 +1,6 @@
 import { supabase } from "../config/supabaseClient.js";
 import { getAccessibleSchoolIds } from "../services/branch.service.js";
+const AUTH_DEBUG_ENABLED = (process.env.AUTH_DEBUG || process.env.TENANT_DEBUG || "false").toLowerCase() === "true";
 
 export function requireRoles(...allowed) {
   return async (req, res, next) => {
@@ -28,15 +29,15 @@ export function requireRoles(...allowed) {
         // Get the director's original school from token (fallback to current if not available)
         const originalSchoolId = req.user?.originalSchoolId || userSchoolId;
         
-        console.log(`[DEBUG] Director access check: userId=${userId}, userSchoolId=${userSchoolId}, originalSchoolId=${originalSchoolId}, targetSchoolId=${targetSchoolId}`);
-        console.log(`[DEBUG] Request headers:`, Object.keys(req.headers).filter(h => h.toLowerCase().includes('school')).map(h => `${h}=${req.headers[h]}`));
+        AUTH_DEBUG_ENABLED && console.log(`[DEBUG] Director access check: userId=${userId}, userSchoolId=${userSchoolId}, originalSchoolId=${originalSchoolId}, targetSchoolId=${targetSchoolId}`);
+        AUTH_DEBUG_ENABLED && console.log(`[DEBUG] Request headers:`, Object.keys(req.headers).filter(h => h.toLowerCase().includes('school')).map(h => `${h}=${req.headers[h]}`));
         
         // If no specific target school, use the director's original school
         if (!targetSchoolId) {
           const fallbackSchoolId = originalSchoolId || userSchoolId;
           req.targetSchoolId = Number(fallbackSchoolId);
           req.accessibleSchools = [Number(fallbackSchoolId)];
-          console.log(`[DEBUG] Director access: no target school, using fallback school ${fallbackSchoolId}`);
+          AUTH_DEBUG_ENABLED && console.log(`[DEBUG] Director access: no target school, using fallback school ${fallbackSchoolId}`);
           return next();
         }
         
@@ -48,14 +49,14 @@ export function requireRoles(...allowed) {
         // 3. Allow access if they have any valid school ID (permissive fallback)
         
         if (targetSchoolIdNum === Number(originalSchoolId)) {
-          console.log(`[DEBUG] Director access GRANTED: accessing original school ${targetSchoolIdNum}`);
+          AUTH_DEBUG_ENABLED && console.log(`[DEBUG] Director access GRANTED: accessing original school ${targetSchoolIdNum}`);
           req.accessibleSchools = [Number(originalSchoolId), targetSchoolIdNum];
           req.targetSchoolId = targetSchoolIdNum;
           return next();
         }
         
         if (targetSchoolIdNum === Number(userSchoolId)) {
-          console.log(`[DEBUG] Director access GRANTED: accessing current school context ${targetSchoolIdNum}`);
+          AUTH_DEBUG_ENABLED && console.log(`[DEBUG] Director access GRANTED: accessing current school context ${targetSchoolIdNum}`);
           req.accessibleSchools = [Number(userSchoolId), targetSchoolIdNum];
           req.targetSchoolId = targetSchoolIdNum;
           return next();
@@ -64,14 +65,14 @@ export function requireRoles(...allowed) {
         // Permissive fallback: if director has any valid school context, allow access
         if (originalSchoolId || userSchoolId) {
           const baseSchool = originalSchoolId || userSchoolId;
-          console.log(`[DEBUG] Director access GRANTED (fallback): userId=${userId}, baseSchool=${baseSchool}, target=${targetSchoolIdNum}`);
+          AUTH_DEBUG_ENABLED && console.log(`[DEBUG] Director access GRANTED (fallback): userId=${userId}, baseSchool=${baseSchool}, target=${targetSchoolIdNum}`);
           req.accessibleSchools = [Number(baseSchool), targetSchoolIdNum];
           req.targetSchoolId = targetSchoolIdNum;
           return next();
         }
         
         // If we get here, there's no school context at all
-        console.log(`[DEBUG] Director access DENIED: no school context - originalSchoolId=${originalSchoolId}, userSchoolId=${userSchoolId}`);
+        AUTH_DEBUG_ENABLED && console.log(`[DEBUG] Director access DENIED: no school context - originalSchoolId=${originalSchoolId}, userSchoolId=${userSchoolId}`);
         return res.status(403).json({ 
           message: "Access denied. Directors can only access their own school and authorized branches." 
         });
@@ -124,7 +125,7 @@ export function requireDirector() {
       
       const targetSchoolIdNum = Number(targetSchoolId);
       
-      console.log(`[DEBUG] Director access check (requireDirector): userId=${userId}, userSchoolId=${userSchoolId}, originalSchoolId=${originalSchoolId}, targetSchoolId=${targetSchoolIdNum}`);
+      AUTH_DEBUG_ENABLED && console.log(`[DEBUG] Director access check (requireDirector): userId=${userId}, userSchoolId=${userSchoolId}, originalSchoolId=${originalSchoolId}, targetSchoolId=${targetSchoolIdNum}`);
       
       // DIRECTOR ACCESS RULES:
       // 1. Always allow access to their original school
@@ -132,14 +133,14 @@ export function requireDirector() {
       // 3. Allow access if they have any valid school ID (permissive fallback)
       
       if (targetSchoolIdNum === Number(originalSchoolId)) {
-        console.log(`[DEBUG] Director access GRANTED (requireDirector): accessing original school ${targetSchoolIdNum}`);
+        AUTH_DEBUG_ENABLED && console.log(`[DEBUG] Director access GRANTED (requireDirector): accessing original school ${targetSchoolIdNum}`);
         req.accessibleSchools = [Number(originalSchoolId), targetSchoolIdNum];
         req.targetSchoolId = targetSchoolIdNum;
         return next();
       }
       
       if (targetSchoolIdNum === Number(userSchoolId)) {
-        console.log(`[DEBUG] Director access GRANTED (requireDirector): accessing current school context ${targetSchoolIdNum}`);
+        AUTH_DEBUG_ENABLED && console.log(`[DEBUG] Director access GRANTED (requireDirector): accessing current school context ${targetSchoolIdNum}`);
         req.accessibleSchools = [Number(userSchoolId), targetSchoolIdNum];
         req.targetSchoolId = targetSchoolIdNum;
         return next();
@@ -148,14 +149,14 @@ export function requireDirector() {
       // Permissive fallback: if director has any valid school context, allow access
       if (originalSchoolId || userSchoolId) {
         const baseSchool = originalSchoolId || userSchoolId;
-        console.log(`[DEBUG] Director access GRANTED (requireDirector fallback): userId=${userId}, baseSchool=${baseSchool}, target=${targetSchoolIdNum}`);
+        AUTH_DEBUG_ENABLED && console.log(`[DEBUG] Director access GRANTED (requireDirector fallback): userId=${userId}, baseSchool=${baseSchool}, target=${targetSchoolIdNum}`);
         req.accessibleSchools = [Number(baseSchool), targetSchoolIdNum];
         req.targetSchoolId = targetSchoolIdNum;
         return next();
       }
       
       // If we get here, there's no school context at all
-      console.log(`[DEBUG] Director access DENIED (requireDirector): no school context - originalSchoolId=${originalSchoolId}, userSchoolId=${userSchoolId}`);
+      AUTH_DEBUG_ENABLED && console.log(`[DEBUG] Director access DENIED (requireDirector): no school context - originalSchoolId=${originalSchoolId}, userSchoolId=${userSchoolId}`);
       return res.status(403).json({ 
         message: "Access denied. Directors can only access their own school and authorized branches." 
       });
