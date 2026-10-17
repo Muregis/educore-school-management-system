@@ -1,36 +1,27 @@
-name: Apply flexible grading and streams
+name: Check flexible grading branch
 on:
   workflow_dispatch:
   push:
     branches: [fix/flexible-grading-and-streams]
 jobs:
-  apply:
+  check:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          ref: fix/flexible-grading-and-streams
-      - run: node scripts/unpack-flexible-grading.mjs
-      - run: |
+          node-version: "20"
+      - name: Syntax check
+        run: |
           node --check backend/src/utils/gradingBands.js
+          node --check backend/src/utils/knecGrading.js
           node --check backend/src/routes/classes.routes.js
           node --check backend/src/routes/analysis.routes.js
           node --check backend/src/routes/grades.routes.js
           node --check backend/src/routes/settings.routes.js
+          test -f database/scripts/demo_grade2_streams.sql
+          grep -q router.post backend/src/routes/classes.routes.js
+          grep -q loadSchoolGradingBands backend/src/utils/gradingBands.js
           grep -q loadSchoolGradingBands backend/src/routes/analysis.routes.js
-          grep -q 'POST /api/classes' backend/src/routes/classes.routes.js
           grep -q grading-bands backend/src/routes/settings.routes.js
           echo OK
-      - run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add backend/src/utils/gradingBands.js backend/src/utils/knecGrading.js \
-            backend/src/routes/classes.routes.js backend/src/routes/analysis.routes.js \
-            backend/src/routes/grades.routes.js backend/src/routes/settings.routes.js \
-            database/scripts/demo_grade2_streams.sql
-          if git diff --staged --quiet; then echo No changes; else
-            git commit -m "fix: flexible school grading bands, streams API, analysis/import alignment"
-            git push origin HEAD:fix/flexible-grading-and-streams
-          fi
