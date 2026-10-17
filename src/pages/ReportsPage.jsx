@@ -179,7 +179,7 @@ function AnalysisTab({ auth }) {
       setData({ streamAverages: [], subjectRankings: [], streamVsSubject: { streams: [], subjects: [], data: {} }, terms: [], classes: [] });
     }
     setLoading(false);
-  }  }, [auth, term, className]);
+  }, [auth, term, className]);
 
   useEffect(() => { load(); }, [load]);
 
