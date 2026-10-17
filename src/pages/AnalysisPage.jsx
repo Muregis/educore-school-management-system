@@ -9,13 +9,21 @@ import Select from "../components/ui/Select";
 import Badge from "../components/ui/Badge";
 import Table from "../components/ui/Table";
 import EmptyState from "../components/ui/EmptyState";
+import { calculateCbcSubLevel, calculateGrade } from "../lib/grading";
 
 // Use shared grading utility
 const gradeInfo = (score) => {
-  if (score >= 80) return { label: "EE", color: "var(--color-success)", bg: "color-mix(in srgb, var(--color-success) 15%, transparent)", text: "Exceeds Expectations" };
-  if (score >= 60) return { label: "ME", color: "var(--color-info)", bg: "color-mix(in srgb, var(--color-info) 15%, transparent)", text: "Meets Expectations" };
-  if (score >= 40) return { label: "AE", color: "var(--color-warning)", bg: "color-mix(in srgb, var(--color-warning) 15%, transparent)", text: "Approaching Expectations" };
-  return              { label: "BE", color: "var(--color-danger)", bg: "color-mix(in srgb, var(--color-danger) 15%, transparent)", text: "Below Expectations" };
+  const parent = calculateGrade(score, "cbc");
+  const sub = calculateCbcSubLevel(score);
+  const color = sub.color || parent.color || "var(--color-text-muted)";
+  return {
+    label: sub.grade || parent.grade || "-",
+    parent: parent.grade || "-",
+    sub_level: sub.grade || "-",
+    color,
+    bg: "color-mix(in srgb, " + color + " 15%, transparent)",
+    text: sub.label || parent.label || "",
+  };
 };
 
 const ScoreBar = ({ score, color }) => (
@@ -649,7 +657,7 @@ Keep the tone professional but simple enough for a school administrator to act o
               
               <div className="ec-kpi-grid" style={{ marginBottom: "var(--space-4)" }}>
                 {[
-                  ["Mean", `${classStats.overall.mean}%`, "Average score across all students"],
+                  ["Class mean", `${classStats.overall.mean}%`, gradeInfo(classStats.overall.mean).sub_level + " · average across learners"],
                   ["Median", `${classStats.overall.median}%`, "Middle score when ranked"],
                   ["Highest", `${classStats.overall.highest}%`, "Best student average"],
                   ["Lowest", `${classStats.overall.lowest}%`, "Lowest student average"],
@@ -666,7 +674,7 @@ Keep the tone professional but simple enough for a school administrator to act o
               {/* Grade Distribution */}
               {Object.keys(classStats.overall.grade_distribution || {}).length > 0 && (
                 <div style={{ marginBottom: "var(--space-4)" }}>
-                  <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-2)", fontSize: "15px" }}>Grade Distribution</div>
+                  <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-2)", fontSize: "15px" }}>Grade Distribution (CBC EE1–BE2)</div>
                   <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
                     {Object.entries(classStats.overall.grade_distribution).map(([grade, count]) => {
                       const g = gradeInfo(grade === "EE" ? 85 : grade === "ME" ? 65 : grade === "AE" ? 45 : 25);
