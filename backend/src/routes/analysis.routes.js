@@ -93,7 +93,7 @@ router.get("/streams", authRequired, async (req, res, next) => {
         streamAgg.set(key, {
           class_name: c.class_name,
           stream: c.section,
-          stream_label: `${c.class_name} ${c.section}`,
+          stream_label: (c.section ? `${c.class_name} ${String(c.section).trim()}` : String(c.class_name || "")),
           class_id: c.class_id,
           studentIds: new Set(),
           sum: 0,
@@ -159,7 +159,7 @@ const classOrderIndex = (name) => {
       if (!subject) continue;
       const p = pct(r);
       if (p == null) continue;
-      const streamLabel = `${c.class_name} ${c.section}`;
+      const streamLabel = c.section ? `${c.class_name} ${String(c.section).trim()}` : String(c.class_name || "");
       if (!matrixAgg.has(streamLabel)) matrixAgg.set(streamLabel, new Map());
       if (!streamMeta.has(streamLabel)) streamMeta.set(streamLabel, { class_name: c.class_name, stream: c.section });
       const bySubj = matrixAgg.get(streamLabel);
