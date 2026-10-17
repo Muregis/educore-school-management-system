@@ -674,11 +674,23 @@ router.get("/class-stats", authRequired, async (req, res, next) => {
       const key = c.class_name;
       if (!subjectByClass.has(key)) subjectByClass.set(key, new Map());
       const bySubj = subjectByClass.get(key);
-      if (!bySubj.has(subject)) bySubj.set(subject, { sum: 0, count: 0, grades: [] });
+      if (!bySubj.has(subject)) bySubj.set(subject, { sum: 0, count: 0, grades: [], subs: [] });
       const a = bySubj.get(subject);
       a.sum += p;
       a.count += 1;
-      if (r.grade) a.grades.push(r.grade);
+      const pBand = (v) => {
+        if (v >= 90) return { sub: "EE1", parent: "EE" };
+        if (v >= 80) return { sub: "EE2", parent: "EE" };
+        if (v >= 70) return { sub: "ME1", parent: "ME" };
+        if (v >= 65) return { sub: "ME2", parent: "ME" };
+        if (v >= 55) return { sub: "AE1", parent: "AE" };
+        if (v >= 50) return { sub: "AE2", parent: "AE" };
+        if (v >= 40) return { sub: "BE1", parent: "BE" };
+        return { sub: "BE2", parent: "BE" };
+      };
+      const band = pBand(p);
+      a.grades.push(band.parent);
+      a.subs.push(band.sub);
     }
 
     const subjectStats = {};
@@ -686,33 +698,52 @@ router.get("/class-stats", authRequired, async (req, res, next) => {
       subjectStats[className] = {};
       for (const [subject, data] of bySubj.entries()) {
         const gradeCounts = {};
-        data.grades.forEach(g => {
-          gradeCounts[g] = (gradeCounts[g] || 0) + 1;
-        });
+        const subCounts = {};
+        (data.grades || []).forEach(g => { gradeCounts[g] = (gradeCounts[g] || 0) + 1; });
+        (data.subs || []).forEach(g => { subCounts[g] = (subCounts[g] || 0) + 1; });
+        const subMean = Number((data.sum / data.count).toFixed(1));
+        const pBand = (v) => v >= 90 ? "EE1" : v >= 80 ? "EE2" : v >= 70 ? "ME1" : v >= 65 ? "ME2" : v >= 55 ? "AE1" : v >= 50 ? "AE2" : v >= 40 ? "BE1" : "BE2";
         subjectStats[className][subject] = {
-          mean: Number((data.sum / data.count).toFixed(1)),
+          mean: subMean,
+          mean_sub_level: pBand(subMean),
           entries: data.count,
           grade_distribution: gradeCounts,
+          sub_level_distribution: subCounts,
         };
       }
     }
 
-    // Grade distribution overall
     const gradeCounts = {};
+    const subLevelCounts = {};
+    const pBandFull = (v) => {
+      if (v >= 90) return { sub: "EE1", parent: "EE" };
+      if (v >= 80) return { sub: "EE2", parent: "EE" };
+      if (v >= 70) return { sub: "ME1", parent: "ME" };
+      if (v >= 65) return { sub: "ME2", parent: "ME" };
+      if (v >= 55) return { sub: "AE1", parent: "AE" };
+      if (v >= 50) return { sub: "AE2", parent: "AE" };
+      if (v >= 40) return { sub: "BE1", parent: "BE" };
+      return { sub: "BE2", parent: "BE" };
+    };
     cleanRows.forEach(r => {
-      if (r.grade) {
-        gradeCounts[r.grade] = (gradeCounts[r.grade] || 0) + 1;
-      }
+      const p = pct(r);
+      if (p == null) return;
+      const b = pBandFull(p);
+      gradeCounts[b.parent] = (gradeCounts[b.parent] || 0) + 1;
+      subLevelCounts[b.sub] = (subLevelCounts[b.sub] || 0) + 1;
     });
+    const meanSub = mean > 0 ? pBandFull(mean).sub : "-";
 
     res.json({
       overall: {
         mean,
+        mean_sub_level: meanSub,
         median,
         highest,
         lowest,
         student_count: studentScores.length,
         grade_distribution: gradeCounts,
+        sub_level_distribution: subLevelCounts,
       },
       by_class: subjectStats,
       meta: { term, class_name: className },
