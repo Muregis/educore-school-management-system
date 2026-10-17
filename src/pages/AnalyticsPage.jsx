@@ -133,7 +133,11 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
   const stats = useMemo(() => {
     const totalStudents = students.length;
     const activeStudents = students.filter(s => s.status === "active" || s.status === "Active").length;
-    const byClass = countBy(students, "className");
+    const byClass = students.reduce((acc, s) => {
+      const name = String(s?.className ?? s?.class_name ?? "").trim() || "Unassigned";
+      acc[name] = (acc[name] || 0) + 1;
+      return acc;
+    }, {});
     const byGender = countBy(students, "gender");
 
     // Fee stats - use proper balance calculations that include opening balance
@@ -228,11 +232,14 @@ Provide a structured analysis with:
 
   // Chart data
   const classChartData = useMemo(() => {
-    return Object.entries(stats.byClass).map(([name, value]) => ({
-      label: name,
-      value,
-      color: "var(--color-primary)",
-    }));
+    return Object.entries(stats.byClass)
+      .filter(([name, value]) => name && name !== "undefined" && name !== "null" && Number(value) > 0)
+      .map(([name, value]) => ({
+        label: name,
+        value: Number(value) || 0,
+        color: "var(--color-primary)",
+      }))
+      .sort((a, b) => b.value - a.value);
   }, [stats.byClass]);
 
   const genderChartData = useMemo(() => {
@@ -277,7 +284,7 @@ Provide a structured analysis with:
     { id: "academic", label: "Academic" },
     { id: "financial", label: "Financial" },
     { id: "attendance", label: "Attendance" },
-    { id: "ai-analysis", label: "🤖 AI Analysis" },
+    { id: "ai-analysis", label: "AI" },
   ];
 
   return (

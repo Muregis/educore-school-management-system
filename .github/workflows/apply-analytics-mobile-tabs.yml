@@ -1,0 +1,28 @@
+name: Apply analytics mobile tabs fix
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/analytics-mobile-tabs-undefined]
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/analytics-mobile-tabs-undefined
+      - run: node scripts/apply-analytics-mobile-tabs.mjs
+      - run: |
+          grep -q class_name src/pages/AnalyticsPage.jsx
+          grep -q Unassigned src/pages/AnalyticsPage.jsx
+          grep -q flexShrink src/components/ui/Tabs.jsx || grep -q '0 0 auto' src/components/ui/Tabs.jsx
+          echo OK
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/AnalyticsPage.jsx src/components/ui/Tabs.jsx
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(analytics): mobile tabs + class labels"
+            git push origin HEAD:fix/analytics-mobile-tabs-undefined
+          fi

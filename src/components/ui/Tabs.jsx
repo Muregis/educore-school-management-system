@@ -4,15 +4,20 @@ export default function Tabs({ tabs = [], activeTab, onChange }) {
   return (
     <div
       role="tablist"
+      className="ec-tabs-scroll"
       style={{
         display: "flex",
-        gap: "var(--space-2)",
+        gap: 8,
         overflowX: "auto",
-        padding: "var(--space-1)",
+        overflowY: "hidden",
+        WebkitOverflowScrolling: "touch",
+        scrollbarWidth: "thin",
+        padding: 6,
         background: "var(--color-bg-card)",
         border: "1px solid var(--color-border)",
         borderRadius: "var(--radius-lg)",
-        boxShadow: "var(--shadow-xs)"
+        boxShadow: "var(--shadow-xs)",
+        maxWidth: "100%",
       }}
     >
       {tabs.map((tab) => {
@@ -20,20 +25,24 @@ export default function Tabs({ tabs = [], activeTab, onChange }) {
         return (
           <button
             key={tab.id}
+            type="button"
             role="tab"
             aria-selected={active}
             onClick={() => onChange?.(tab.id)}
             style={{
+              flex: "0 0 auto",
+              flexShrink: 0,
               minHeight: 40,
               border: "1px solid transparent",
               borderRadius: "var(--radius-md)",
               background: active ? "var(--color-primary)" : "transparent",
               color: active ? "var(--color-text-inverse)" : "var(--color-text-secondary)",
-              padding: "0 var(--space-4)",
+              padding: "8px 14px",
               cursor: "pointer",
-              fontWeight: 800,
+              fontWeight: 700,
+              fontSize: 13,
               whiteSpace: "nowrap",
-              transition: "all var(--transition-fast)"
+              transition: "all var(--transition-fast)",
             }}
           >
             {tab.label}
