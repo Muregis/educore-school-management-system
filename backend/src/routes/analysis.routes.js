@@ -224,27 +224,54 @@ router.post("/ai-report", async (req, res, next) => {
       return res.status(400).json({ error: "prompt required", body: req.body });
     }
 
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type":  "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model:       "llama-3.1-8b-instant",
-        max_tokens:  1800,
-        temperature: 0.4,
-        messages:    [{ role: "user", content: prompt }],
-      }),
-    });
+    // Prefer self-serve models (llama-3.1-8b-instant is enterprise-only on many keys)
+    const modelCandidates = [
+      process.env.GROQ_MODEL,
+      "openai/gpt-oss-20b",
+      "openai/gpt-oss-120b",
+      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant",
+    ].filter(Boolean);
 
-    const data = await response.json();
-    if (!response.ok) {
-      console.error("[ai-report] Groq error:", data);
-      return res.status(response.status).json(data);
+    let data = null;
+    let lastStatus = 500;
+    let lastError = null;
+    for (const model of modelCandidates) {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 1800,
+          temperature: 0.4,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      lastStatus = response.status;
+      data = await response.json();
+      if (response.ok) break;
+      lastError = data;
+      console.error("[ai-report] Groq error model=", model, data);
+      const code = data?.error?.code || data?.code;
+      if (code !== "model_not_found" && response.status !== 404) break;
     }
 
-    const text = data.choices?.[0]?.message?.content || "";
+    if (!data?.choices?.[0]?.message?.content) {
+      const msg =
+        lastError?.error?.message ||
+        lastError?.message ||
+        "AI provider failed";
+      return res.status(lastStatus >= 400 ? lastStatus : 502).json({
+        error: msg,
+        message: msg,
+        details: lastError,
+      });
+    }
+
+    const text = data.choices[0].message.content;
     res.json({ text });
   } catch (err) {
     console.error("[ai-report] error:", err);
