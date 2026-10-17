@@ -1,0 +1,17 @@
+name: Apply printable merit CBE style
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/printable-merit-cbe-style]
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify MeritListPage already present
+        run: |
+          test -s src/pages/MeritListPage.jsx
+          grep -q Overall src/pages/MeritListPage.jsx
+          grep -q Print src/pages/MeritListPage.jsx
+          grep -q Class src/pages/MeritListPage.jsx
+          echo "MeritListPage OK — no apply needed"
