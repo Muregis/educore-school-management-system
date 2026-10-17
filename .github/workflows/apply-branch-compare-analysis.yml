@@ -1,0 +1,24 @@
+name: Apply branch-compare analysis
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/branch-compare-analysis]
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/branch-compare-analysis
+      - run: node scripts/apply-branch-compare-analysis.mjs
+      - run: grep -q 'GET /api/analysis/branch-compare' backend/src/routes/analysis.routes.js
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backend/src/routes/analysis.routes.js
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "feat(analysis): parent vs branch campus comparison"
+            git push origin HEAD:feature/branch-compare-analysis
+          fi
