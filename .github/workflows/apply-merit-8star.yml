@@ -12,13 +12,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: fix/merit-8star
+          token: ${{ secrets.GITHUB_TOKEN }}
       - run: node scripts/apply-merit-8star.mjs
-      - run: grep -q 'Class mean' src/pages/MeritListPage.jsx && echo OK
+      - run: |
+          if ! grep -q 'CLASS MEAN' src/pages/MeritListPage.jsx; then echo FAIL; exit 1; fi
+          echo OK
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add src/pages/MeritListPage.jsx
           if git diff --staged --quiet; then echo No changes; else
             git commit -m "feat(merit): class KPI strip (mean, top, EE/ME/AE/BE)"
-            git push origin fix/merit-8star
+            git push origin HEAD:fix/merit-8star
           fi
