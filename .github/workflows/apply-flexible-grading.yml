@@ -12,20 +12,25 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: fix/flexible-grading-and-streams
-      - run: node scripts/assemble-flexible-grading.mjs
+      - run: node scripts/unpack-flexible-grading.mjs
       - run: |
+          node --check backend/src/utils/gradingBands.js
+          node --check backend/src/routes/classes.routes.js
           node --check backend/src/routes/analysis.routes.js
           node --check backend/src/routes/grades.routes.js
           node --check backend/src/routes/settings.routes.js
-          node --check backend/src/utils/gradingBands.js
           grep -q loadSchoolGradingBands backend/src/routes/analysis.routes.js
-          grep -q 'POST /api/classes' backend/src/routes/classes.routes.js || true
+          grep -q 'POST /api/classes' backend/src/routes/classes.routes.js
+          grep -q grading-bands backend/src/routes/settings.routes.js
           echo OK
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add backend/src/routes/analysis.routes.js backend/src/routes/grades.routes.js backend/src/routes/settings.routes.js
-          if git diff --staged --quiet; then echo No route changes; else
-            git commit -m "fix: wire flexible grading into analysis, grades, settings"
+          git add backend/src/utils/gradingBands.js backend/src/utils/knecGrading.js \
+            backend/src/routes/classes.routes.js backend/src/routes/analysis.routes.js \
+            backend/src/routes/grades.routes.js backend/src/routes/settings.routes.js \
+            database/scripts/demo_grade2_streams.sql
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix: flexible school grading bands, streams API, analysis/import alignment"
             git push origin HEAD:fix/flexible-grading-and-streams
           fi
