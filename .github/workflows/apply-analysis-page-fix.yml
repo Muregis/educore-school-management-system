@@ -1,0 +1,28 @@
+name: Apply analysis page fix
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/analysis-page-ee1-streams]
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/analysis-page-ee1-streams
+      - run: node scripts/apply-analysis-page-fix.mjs
+      - run: |
+          grep -q 'function streamLabel' src/pages/AnalysisPage.jsx
+          grep -q 'Sub-levels (EE1' src/pages/AnalysisPage.jsx
+          grep -q Band src/pages/AnalysisPage.jsx
+          echo OK
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/AnalysisPage.jsx backend/src/routes/analysis.routes.js
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(analysis): no null streams, EE1-BE2 distribution, ranking Band, mobile scroll"
+            git push origin HEAD:fix/analysis-page-ee1-streams
+          fi
