@@ -10,6 +10,16 @@ import Badge from "../components/ui/Badge";
 import Table from "../components/ui/Table";
 import EmptyState from "../components/ui/EmptyState";
 import { calculateCbcSubLevel, calculateGrade } from "../lib/grading";
+function streamLabel(s) {
+  if (!s) return "—";
+  if (typeof s === "string") return s.replace(/\s+null$/i, "").replace(/\s+undefined$/i, "").trim() || "—";
+  const sec = s.stream ?? s.section;
+  if (sec != null && String(sec).trim() && String(sec).toLowerCase() !== "null")
+    return `${s.class_name || ""} ${String(sec).trim()}`.trim();
+  if (s.stream_label) return String(s.stream_label).replace(/\s+null$/i, "").replace(/\s+undefined$/i, "").trim();
+  return String(s.class_name || "—");
+}
+
 
 // Use shared grading utility
 const gradeInfo = (score) => {
@@ -153,7 +163,7 @@ export default function AnalysisTabNew({ auth }) {
     lines.push("");
     lines.push("STREAM AVERAGES:");
     data.streamAverages.forEach(s =>
-      lines.push(`  ${s.stream_label}: ${s.avg_score}% (${s.student_count} students)`)
+      lines.push(`  ${streamLabel(s)}: ${s.avg_score}% (${s.student_count} students)`)
     );
     lines.push("");
     lines.push("SUBJECT RANKINGS (highest to lowest):");
@@ -185,7 +195,7 @@ export default function AnalysisTabNew({ auth }) {
       lines.push("");
       lines.push("TOP 5 STUDENTS (overall):");
       topStudents.overall.slice(0,5).forEach((s,i) =>
-        lines.push(`  ${i+1}. ${s.first_name} ${s.last_name} (${s.stream_label}): ${s.avg_score}%`)
+        lines.push(`  ${i+1}. ${s.first_name} ${s.last_name} (${streamLabel(s)}): ${s.avg_score}%`)
       );
     }
     return lines.join("\n");
@@ -434,10 +444,10 @@ Keep the tone professional but simple enough for a school administrator to act o
                 <div className="ec-kpi-grid">
                   {streams.map(s => {
                     const g = gradeInfo(s.avg_score);
-                    const isActive = activeStream === s.stream_label;
+                    const isActive = activeStream === streamLabel(s);
                     return (
-                      <div key={s.stream_label}
-                        onClick={() => setActiveStream(isActive ? null : s.stream_label)}
+                      <div key={streamLabel(s)}
+                        onClick={() => setActiveStream(isActive ? null : streamLabel(s))}
                         style={{ 
                           background: isActive ? g.bg : "var(--color-bg-surface)",
                           border: `2px solid ${isActive ? g.color : "var(--color-border)"}`,
@@ -461,7 +471,7 @@ Keep the tone professional but simple enough for a school administrator to act o
                   })}
                 </div>
                 {/* Stream drilldown */}
-                {activeStream && streams.some(s => s.stream_label === activeStream) && (() => {
+                {activeStream && streams.some(s => streamLabel(s) === activeStream) && (() => {
                   const sd = data.streamVsSubject.data[activeStream];
                   const subjects = sd ? data.streamVsSubject.subjects
                     .map(s => ({ subject:s, avg_score: sd[s] ?? null }))
@@ -501,7 +511,7 @@ Keep the tone professional but simple enough for a school administrator to act o
             <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
               Subjects ranked highest to lowest. Identifies strong and weak curriculum areas.
             </p>
-            <div style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
+            <div className="analysis-table-scroll" style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <Table 
                 headers={["Rank", "Subject", "Average", "Highest", "Lowest", "Entries", "Grade"]}
                 data={data.subjectRankings.map((s, i) => {
@@ -516,7 +526,7 @@ Keep the tone professional but simple enough for a school administrator to act o
                     <span key="high" style={{ color: "var(--color-success)", fontWeight: 600 }}>{s.highest}%</span>,
                     <span key="low" style={{ color: "var(--color-danger)", fontWeight: 600 }}>{s.lowest}%</span>,
                     <span key="entries" style={{ color: "var(--color-text-secondary)" }}>{s.entries}</span>,
-                    <Badge key="grade" text={g.label} style={{ background: g.bg, color: g.color, borderColor: g.color }} />
+                    <Badge key="grade" text={g.sub_level || g.label} style={{ background: g.bg, color: g.color, borderColor: g.color }} />
                   ];
                 })}
               />
@@ -620,18 +630,20 @@ Keep the tone professional but simple enough for a school administrator to act o
               
               <div className="analysis-rank-table-wrap">
                 <Table 
-                  headers={["Position", "Student", "Admission No.", "Class", "Average", "Total Marks", "Subjects"]}
+                  headers={["Pos", "Student", "Adm No.", "Class / Stream", "Avg", "Band", "Marks", "Subs"]}
                   data={studentRankings.all_students.slice(0, 50).map((s, i) => {
                     const g = gradeInfo(s.avg_score);
+                    const band = s.overall_sub_level || g.sub_level || g.label;
                     return [
                       <span key="pos" style={{ fontWeight: 800, color: s.position <= 3 ? "var(--color-primary)" : "var(--color-text-secondary)" }}>#{s.position}</span>,
                       <span key="name" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{s.first_name} {s.last_name}</span>,
                       <span key="adm" style={{ color: "var(--color-text-secondary)" }}>{s.admission_number || "—"}</span>,
                       <span key="cls" style={{ color: "var(--color-text-secondary)" }}>{s.stream_label || s.class_name || "—"}</span>,
-                      <div key="avg" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <div key="avg" style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 90 }}>
                         <ScoreBar score={s.avg_score} color={g.color} />
-                        <span style={{ fontWeight: 800, color: g.color, minWidth: "42px", textAlign: "right" }}>{s.avg_score}%</span>
+                        <span style={{ fontWeight: 800, color: g.color, minWidth: "40px", textAlign: "right" }}>{s.avg_score}%</span>
                       </div>,
+                      <Badge key="band" text={band} style={{ background: g.bg, color: g.color, borderColor: "transparent", fontWeight: 700 }} />,
                       <span key="total" style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{s.total_marks}</span>,
                       <span key="subjs" style={{ color: "var(--color-text-secondary)" }}>{s.subjects_sat}</span>,
                     ];
@@ -672,14 +684,36 @@ Keep the tone professional but simple enough for a school administrator to act o
               </div>
 
               {/* Grade Distribution */}
-              {Object.keys(classStats.overall.grade_distribution || {}).length > 0 && (
+              {(Object.keys(classStats.overall?.grade_distribution || {}).length > 0 ||
+                Object.keys(classStats.overall?.sub_level_distribution || {}).length > 0) && (
                 <div style={{ marginBottom: "var(--space-4)" }}>
-                  <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-2)", fontSize: "15px" }}>Grade Distribution (CBC EE1–BE2)</div>
-                  <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
-                    {Object.entries(classStats.overall.grade_distribution).map(([grade, count]) => {
-                      const g = gradeInfo(grade === "EE" ? 85 : grade === "ME" ? 65 : grade === "AE" ? 45 : 25);
+                  <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 15 }}>
+                    Grade Distribution
+                    {classStats.overall.mean_sub_level ? (
+                      <span style={{ fontWeight: 600, fontSize: 13, marginLeft: 8, color: "var(--color-text-secondary)" }}>
+                        mean {classStats.overall.mean}% · {classStats.overall.mean_sub_level}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                    {Object.entries(classStats.overall.grade_distribution || {}).map(([grade, count]) => {
+                      const g = gradeInfo(grade === "EE" ? 85 : grade === "ME" ? 70 : grade === "AE" ? 55 : 30);
                       return (
-                        <div key={grade} style={{ background: g.bg, border: `1px solid ${g.color}`, borderRadius: "var(--radius-md)", padding: "8px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div key={grade} style={{ background: g.bg, border: `1px solid ${g.color}`, borderRadius: 8, padding: "6px 12px", display: "flex", gap: 8, alignItems: "center" }}>
+                          <Badge text={grade} style={{ background: g.color, color: "#fff", borderColor: "transparent" }} />
+                          <span style={{ fontWeight: 700, color: g.color }}>{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 6 }}>Sub-levels (EE1 – BE2)</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {["EE1","EE2","ME1","ME2","AE1","AE2","BE1","BE2"].filter(k => (classStats.overall.sub_level_distribution || {})[k]).map((grade) => {
+                      const count = classStats.overall.sub_level_distribution[grade];
+                      const sample = { EE1:95, EE2:85, ME1:75, ME2:67, AE1:58, AE2:52, BE1:45, BE2:25 }[grade];
+                      const g = gradeInfo(sample);
+                      return (
+                        <div key={grade} style={{ background: g.bg, border: `1px solid ${g.color}`, borderRadius: 8, padding: "6px 12px", display: "flex", gap: 8, alignItems: "center" }}>
                           <Badge text={grade} style={{ background: g.color, color: "#fff", borderColor: "transparent" }} />
                           <span style={{ fontWeight: 700, color: g.color }}>{count}</span>
                         </div>
@@ -810,7 +844,7 @@ Keep the tone professional but simple enough for a school administrator to act o
               </div>
 
               {/* Leaderboard */}
-              <div style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
+              <div className="analysis-table-scroll" style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                 {(topClass
                   ? topStudents.byClass.filter(s => s.class_name === topClass)
                   : topStudents.overall
@@ -845,7 +879,7 @@ Keep the tone professional but simple enough for a school administrator to act o
                           {s.first_name} {s.last_name}
                         </div>
                         <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: "2px" }}>
-                          {s.stream_label} · <span style={{ fontFamily: "var(--font-mono)" }}>{s.admission_number}</span>
+                          {streamLabel(s)} · <span style={{ fontFamily: "var(--font-mono)" }}>{s.admission_number}</span>
                         </div>
                       </div>
                       {/* Score bar */}
