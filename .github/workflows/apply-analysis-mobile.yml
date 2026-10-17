@@ -1,0 +1,27 @@
+name: Apply analysis mobile layout
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/analysis-mobile-layout]
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/analysis-mobile-layout
+      - run: node scripts/apply-analysis-mobile-min.mjs
+      - run: |
+          grep -q analysis-page src/pages/AnalysisPage.jsx
+          grep -q 'ANALYSIS PAGE MOBILE' src/styles/layout-foundation.css
+          echo OK
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/AnalysisPage.jsx src/styles/layout-foundation.css
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(analysis): mobile layout - no fixed widths, responsive filters"
+            git push origin HEAD:fix/analysis-mobile-layout
+          fi

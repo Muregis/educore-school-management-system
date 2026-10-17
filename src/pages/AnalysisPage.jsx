@@ -307,16 +307,16 @@ Keep the tone professional but simple enough for a school administrator to act o
   );
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)" }}>
-        <h1 style={{ margin: 0, fontSize: "24px", fontWeight: 700, color: "var(--color-text-primary)" }}>Academic Analysis</h1>
+    <div className="analysis-page">
+      <div className="analysis-page-header">
+        <h1>Academic Analysis</h1>
       </div>
 
       {/* ── Filters + mode toggle ── */}
       <Card style={{ padding: "var(--space-3)", marginBottom: "var(--space-4)" }}>
         <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div style={{ width: "150px" }}>
+            <div className="analysis-filter-field">
               <Select 
                 label="Term"
                 value={term} 
@@ -324,7 +324,7 @@ Keep the tone professional but simple enough for a school administrator to act o
                 options={availTerms.map(t => ({ value: t, label: t }))}
               />
             </div>
-            <div style={{ width: "150px" }}>
+            <div className="analysis-filter-field">
               <Select 
                 label="Class (optional)"
                 value={className} 
@@ -478,10 +478,10 @@ Keep the tone professional but simple enough for a school administrator to act o
                           const g = gradeInfo(sub.avg_score);
                           return (
                             <div key={sub.subject} style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", background: "var(--color-bg-base)", padding: "var(--space-2)", borderRadius: "var(--radius-md)" }}>
-                              <div style={{ width: 120, fontSize: "13px", color: "var(--color-text-primary)", fontWeight: 500 }}>{sub.subject}</div>
+                              <div style={{ flex: "1 1 100%", minWidth: 0, fontSize: "13px", color: "var(--color-text-primary)", fontWeight: 500 }}>{sub.subject}</div>
                               <ScoreBar score={sub.avg_score} color={g.color} />
-                              <div style={{ width: 40, fontWeight: 700, color: g.color, fontSize: "14px", textAlign: "right" }}>{sub.avg_score}%</div>
-                              <div style={{ width: 30, textAlign: "center" }}>
+                              <div style={{ flexShrink: 0, fontWeight: 700, color: g.color, fontSize: "14px", textAlign: "right" }}>{sub.avg_score}%</div>
+                              <div style={{ flexShrink: 0, textAlign: "center" }}>
                                 <Badge text={g.label} style={{ background: g.bg, color: g.color, borderColor: "transparent", padding: "2px 6px" }} />
                               </div>
                             </div>
@@ -618,7 +618,7 @@ Keep the tone professional but simple enough for a school administrator to act o
                 Students ranked by average score with position, total marks, and subject breakdown.
               </p>
               
-              <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
+              <div className="analysis-rank-table-wrap">
                 <Table 
                   headers={["Position", "Student", "Admission No.", "Class", "Average", "Total Marks", "Subjects"]}
                   data={studentRankings.all_students.slice(0, 50).map((s, i) => {
