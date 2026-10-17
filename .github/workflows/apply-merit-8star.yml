@@ -13,9 +13,7 @@ jobs:
         with:
           ref: fix/merit-8star
       - run: node scripts/apply-merit-8star.mjs
-      - run: |
-          grep -q 'Class mean' src/pages/MeritListPage.jsx
-          echo OK
+      - run: grep -q 'Class mean' src/pages/MeritListPage.jsx && echo OK
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
