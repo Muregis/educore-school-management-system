@@ -22,6 +22,7 @@ import ReportsPage from "./pages/ReportsPage";
 import ExpendituresPage from "./pages/ExpendituresPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import AnalysisPage from "./pages/AnalysisPage";
+import MeritListPage from "./pages/MeritListPage";
 import TimetablePage from "./pages/TimetablePage";
 import AdmissionsPage from "./pages/AdmissionsPage";
 import InvoicesPage from "./pages/InvoicesPage";
@@ -282,6 +283,7 @@ export default function App() {
     reports:           { title: "Reports",            desc: "Generate comprehensive school reports and data exports." },
     "financial-reports": { title: "Financial Reports", desc: "Generate financial statements and accounting reports." },
     analysis:          { title: "Analysis",           desc: "Analyze academic performance, trends, and statistical data." },
+    merit:             { title: "Merit Lists",        desc: "Stream and consolidated merit lists with CBC sub-levels." },
     "update-requests": { title: "Update Requests",    desc: "Manage requests to update student and school information." },
     "trial-balance":   { title: "Trial Balance",      desc: "View trial balance reports and accounting summaries." },
     "income-statement": { title: "Income Statement",  desc: "View income statements and revenue reports." },
@@ -805,6 +807,7 @@ const fullNav = useMemo(() => {
     reports: ["finance","director","superadmin"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
     "financial-reports": ["finance","director","superadmin"].includes(auth.role) ? <FinancialReportsPage auth={auth} toast={toast} /> : <Forbidden />,
     analysis: ["admin","teacher","director","superadmin"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,
+    merit: ["admin","teacher","director","superadmin"].includes(auth.role) ? <MeritListPage auth={auth} toast={toast} /> : <Forbidden />,
     "update-requests": ["admin","parent"].includes(auth.role) ? <UpdateRequestsPage auth={auth} students={students} pendingUpdates={pendingUpdates} setPendingUpdates={setPendingUpdates} toast={toast} /> : <Forbidden />,
     "trial-balance": ["admin","finance","director","superadmin"].includes(auth.role) ? <TrialBalancePage auth={auth} toast={toast} /> : <Forbidden />,
     "income-statement": ["admin","finance","director","superadmin"].includes(auth.role) ? <IncomeStatementPage auth={auth} toast={toast} /> : <Forbidden />,

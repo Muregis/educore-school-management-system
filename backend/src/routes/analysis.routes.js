@@ -720,4 +720,114 @@ router.get("/class-stats", authRequired, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+router.get("/merit", authRequired, async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const term = req.query.term;
+    const className = req.query.class_name || null;
+    const streamFilter = req.query.stream ? String(req.query.stream).trim() : null;
+    if (!term) return res.status(400).json({ error: "Term parameter is required" });
+
+    const { data: raw, error: resultsErr } = await supabase
+      .from("results")
+      .select("term,subject,marks,total_marks,student_id,class_id,is_deleted,school_id")
+      .eq("school_id", schoolId)
+      .eq("term", term)
+      .eq("is_deleted", false);
+    if (resultsErr) throw resultsErr;
+
+    const studentIds = [...new Set((raw || []).map(r => r.student_id).filter(Boolean))];
+    const [{ data: classesRows, error: classesErr }, { data: studentsRows, error: studentsErr }] = await Promise.all([
+      supabase.from("classes").select("class_id,class_name,section,is_deleted,status")
+        .eq("school_id", schoolId).eq("is_deleted", false).eq("status", "active"),
+      studentIds.length
+        ? supabase.from("students").select("student_id,first_name,last_name,admission_number,class_name,is_deleted,status").eq("school_id", schoolId).in("student_id", studentIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (classesErr) throw classesErr;
+    if (studentsErr) throw studentsErr;
+
+    const classById = new Map((classesRows || []).map(c => [c.class_id, c]));
+    const classByName = new Map((classesRows || []).map(c => [classKey(c.class_name), c]));
+    const studentById = new Map((studentsRows || []).map(s => [s.student_id, s]));
+    const getClass = (r) => classById.get(r.class_id) || classByName.get(classKey(studentById.get(r.student_id)?.class_name));
+    const pct = (r) => {
+      const denom = Number(r.total_marks || 0);
+      if (!denom) return null;
+      return (Number(r.marks || 0) / denom) * 100;
+    };
+    const subLevel = (percentage) => {
+      if (percentage == null || Number.isNaN(percentage)) return { grade: "-", parent: "-" };
+      const p = Number(percentage);
+      if (p >= 90) return { grade: "EE1", parent: "EE" };
+      if (p >= 80) return { grade: "EE2", parent: "EE" };
+      if (p >= 70) return { grade: "ME1", parent: "ME" };
+      if (p >= 65) return { grade: "ME2", parent: "ME" };
+      if (p >= 55) return { grade: "AE1", parent: "AE" };
+      if (p >= 50) return { grade: "AE2", parent: "AE" };
+      if (p >= 40) return { grade: "BE1", parent: "BE" };
+      return { grade: "BE2", parent: "BE" };
+    };
+
+    const cleanRows = (raw || []).filter(r => {
+      const c = getClass(r);
+      if (!c || c.is_deleted || c.status !== "active") return false;
+      if (className && c.class_name !== className) return false;
+      if (streamFilter) {
+        const sec = String(c.section || "").trim();
+        if (sec.toLowerCase() !== streamFilter.toLowerCase()) return false;
+      }
+      const s = studentById.get(r.student_id);
+      if (!s || s.is_deleted || s.status !== "active") return false;
+      return true;
+    });
+
+    const subjectSet = new Set();
+    const studentAgg = new Map();
+    for (const r of cleanRows) {
+      const p = pct(r);
+      if (p == null) continue;
+      const subj = r.subject || "Subject";
+      subjectSet.add(subj);
+      if (!studentAgg.has(r.student_id)) {
+        studentAgg.set(r.student_id, { sum: 0, count: 0, totalMarks: 0, class_id: r.class_id, class_ref: getClass(r), subjects: {} });
+      }
+      const a = studentAgg.get(r.student_id);
+      a.sum += p; a.count += 1; a.totalMarks += Number(r.marks || 0);
+      const sl = subLevel(p);
+      a.subjects[subj] = { marks: Number(r.marks || 0), total: Number(r.total_marks || 0), percentage: Number(p.toFixed(1)), sub_level: sl.grade, grade: sl.parent };
+      a.class_ref = getClass(r) || a.class_ref;
+    }
+
+    const subjects = [...subjectSet].sort((a, b) => a.localeCompare(b));
+    const scored = [...studentAgg.entries()].map(([student_id, a]) => {
+      const s = studentById.get(student_id) || {};
+      const c = a.class_ref || classById.get(a.class_id) || {};
+      const average = a.count ? Number((a.sum / a.count).toFixed(2)) : 0;
+      const overall = subLevel(average);
+      return {
+        student_id, first_name: s.first_name || "", last_name: s.last_name || "",
+        admission_number: s.admission_number || null,
+        class_name: c.class_name || s.class_name || "", stream: c.section || "",
+        stream_label: c.class_name && c.section ? `${c.class_name} ${c.section}` : (c.class_name || ""),
+        total_marks: a.totalMarks, average,
+        overall_grade: overall.parent, overall_sub_level: overall.grade,
+        subjects: a.subjects, subjects_sat: Object.keys(a.subjects).length,
+      };
+    }).sort((a, b) => b.average - a.average || b.total_marks - a.total_marks);
+
+    let currentRank = 1, prevAvg = null;
+    const rows = scored.map((s, idx) => {
+      if (prevAvg !== null && s.average < prevAvg - 0.001) currentRank = idx + 1;
+      prevAvg = s.average;
+      return { ...s, rank: currentRank };
+    });
+
+    const streams = [...new Set((classesRows || []).filter(c => !className || c.class_name === className).map(c => c.section).filter(Boolean))].sort();
+
+    res.json({ rows, subjects, streams, meta: { term, class_name: className, stream: streamFilter, mode: streamFilter ? "stream" : "consolidated", learner_count: rows.length } });
+  } catch (err) { next(err); }
+});
+
 export default router;
