@@ -1,0 +1,26 @@
+name: Apply merit 8-star KPIs
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/merit-8star]
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/merit-8star
+      - run: node scripts/apply-merit-8star.mjs
+      - run: |
+          grep -q 'Class mean' src/pages/MeritListPage.jsx
+          echo OK
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "feat(merit): class KPI strip (mean, top, EE/ME/AE/BE)"
+            git push origin fix/merit-8star
+          fi
