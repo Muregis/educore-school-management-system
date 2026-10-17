@@ -12,6 +12,37 @@ export const CBC_GRADES = [
   { grade: 'BE', min: 0, max: 49, label: 'Below Expectations', color: '#ef4444' },
 ];
 
+
+// CBC Sub-levels (Kenya primary/junior practice: EE1/EE2 … BE1/BE2)
+export const CBC_SUB_LEVELS = [
+  { grade: 'EE1', min: 90, max: 100, parent: 'EE', label: 'Exceeds Expectations (1)', color: '#16a34a' },
+  { grade: 'EE2', min: 80, max: 89,  parent: 'EE', label: 'Exceeds Expectations (2)', color: '#22c55e' },
+  { grade: 'ME1', min: 70, max: 79,  parent: 'ME', label: 'Meets Expectations (1)', color: '#2563eb' },
+  { grade: 'ME2', min: 65, max: 69,  parent: 'ME', label: 'Meets Expectations (2)', color: '#3b82f6' },
+  { grade: 'AE1', min: 55, max: 64,  parent: 'AE', label: 'Approaches Expectations (1)', color: '#d97706' },
+  { grade: 'AE2', min: 50, max: 54,  parent: 'AE', label: 'Approaches Expectations (2)', color: '#f59e0b' },
+  { grade: 'BE1', min: 40, max: 49,  parent: 'BE', label: 'Below Expectations (1)', color: '#ef4444' },
+  { grade: 'BE2', min: 0,  max: 39,  parent: 'BE', label: 'Below Expectations (2)', color: '#b91c1c' },
+];
+
+export function calculateCbcSubLevel(percentage) {
+  if (percentage === null || percentage === undefined || Number.isNaN(Number(percentage))) {
+    return { grade: '-', parent: '-', label: 'No Score', color: '#9ca3af' };
+  }
+  const pct = Number(percentage);
+  const found = CBC_SUB_LEVELS.find(g => pct >= g.min && pct <= g.max);
+  return found
+    ? { grade: found.grade, parent: found.parent, label: found.label, color: found.color, min: found.min, max: found.max }
+    : { grade: 'BE2', parent: 'BE', label: 'Below Expectations (2)', color: '#b91c1c' };
+}
+
+export function cbcParentGrade(subOrParent) {
+  const s = String(subOrParent || '').toUpperCase();
+  if (['EE', 'ME', 'AE', 'BE'].includes(s)) return s;
+  const found = CBC_SUB_LEVELS.find(g => g.grade === s);
+  return found?.parent || '-';
+}
+
 // KNEC Grading Scale (8-4-4 system)
 export const KNEC_GRADES = [
   { grade: 'A', min: 80, max: 100, label: 'Excellent', color: '#22c55e' },
@@ -87,7 +118,7 @@ export function calculateGradeFromMarks(marks, total, curriculum = 'cbc') {
  * @returns {string} Hex color
  */
 export function getGradeColor(grade) {
-  const allGrades = [...CBC_GRADES, ...KNEC_GRADES];
+  const allGrades = [...CBC_GRADES, ...CBC_SUB_LEVELS, ...KNEC_GRADES];
   const found = allGrades.find(g => g.grade === grade);
   return found?.color || '#9ca3af';
 }
@@ -297,6 +328,9 @@ export function formatScore(score, decimals = 2) {
 
 export default {
   calculateGrade,
+  calculateCbcSubLevel,
+  cbcParentGrade,
+  CBC_SUB_LEVELS,
   calculateGradeFromMarks,
   calculateMeanScore,
   calculateClassMean,
