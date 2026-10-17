@@ -1,0 +1,33 @@
+name: Apply grades analysis Phase A
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/grades-analysis-phase-a]
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/grades-analysis-phase-a
+      - name: Apply core patches
+        run: node scripts/apply-grades-phase-a.mjs
+      - name: Ensure MeritListPage exists
+        run: |
+          if [ ! -f src/pages/MeritListPage.jsx ]; then
+            echo "MeritListPage.jsx missing - will be added in follow-up commit"
+            exit 1
+          fi
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "feat(grades): CBC sub-levels, /analysis/merit, nav wiring"
+            git push origin feature/grades-analysis-phase-a
+          fi
