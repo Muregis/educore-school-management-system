@@ -1,0 +1,65 @@
+name: Apply streams and grades unified
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/streams-and-grades-unified]
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/streams-and-grades-unified
+      - name: Apply classes + analysis patches
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          // classes
+          let c = fs.readFileSync('backend/src/routes/classes.routes.js','utf8');
+          if (!c.includes('POST /api/classes - Create a class')) {
+            c = c.replace('.select("class_id, class_name, next_class_name")','.select("class_id, class_name, next_class_name, section, status")');
+            const idx = c.lastIndexOf('export default router;');
+            const head = c.slice(0, idx);
+            c = head + `\n/**\n * POST /api/classes - Create a class (supports stream via section)\n */\nrouter.post("/", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {\n  try {\n    const { schoolId } = req.user;\n    const class_name = String(req.body.class_name || "").trim();\n    if (!class_name) return res.status(400).json({ message: "class_name is required" });\n    const section = req.body.section != null && String(req.body.section).trim() ? String(req.body.section).trim() : null;\n    const row = { school_id: schoolId, class_name, section, status: "active", is_deleted: false, next_class_name: req.body.next_class_name || null, class_order: req.body.class_order != null ? Number(req.body.class_order) : 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };\n    const { data, error } = await supabase.from("classes").insert(row).select("class_id, class_name, section, status, next_class_name").single();\n    if (error) throw error;\n    res.status(201).json({ data });\n  } catch (err) { next(err); }\n});\n\nrouter.patch("/:classId", requireRoles("admin", "director", "superadmin"), async (req, res, next) => {\n  try {\n    const { schoolId } = req.user;\n    const { classId } = req.params;\n    const update = { updated_at: new Date().toISOString() };\n    if (req.body.class_name != null) update.class_name = String(req.body.class_name).trim();\n    if (req.body.section !== undefined) update.section = req.body.section === null || req.body.section === "" ? null : String(req.body.section).trim();\n    if (req.body.status != null) update.status = String(req.body.status);\n    if (req.body.next_class_name !== undefined) update.next_class_name = req.body.next_class_name || null;\n    const { data, error } = await supabase.from("classes").update(update).eq("school_id", schoolId).eq("class_id", classId).select("class_id, class_name, section, status, next_class_name").single();\n    if (error) throw error;\n    if (!data) return res.status(404).json({ message: "Class not found" });\n    res.json({ data });\n  } catch (err) { next(err); }\n});\n\nexport default router;\n`;
+            fs.writeFileSync('backend/src/routes/classes.routes.js', c);
+            console.log('classes ok');
+          }
+          // analysis stream label
+          let a = fs.readFileSync('backend/src/routes/analysis.routes.js','utf8');
+          a = a.replace(
+            'stream_label: `${c.class_name} ${c.section}`,',
+            'stream_label: (c.section ? `${c.class_name} ${String(c.section).trim()}` : String(c.class_name || "")),'
+          );
+          a = a.replace(
+            /const streamLabel = `\$\{c\.class_name\} \$\{c\.section\}`;/g,
+            'const streamLabel = c.section ? `${c.class_name} ${String(c.section).trim()}` : String(c.class_name || "");'
+          );
+          if (!a.includes('overall_sub_level: band.sub')) {
+            const needle = `stream: c.section,\n          stream_label: c.class_name && c.section ? \\`\${c.class_name} \${c.section}\\` : "",\n          avg_score: a.count ? Number((a.sum / a.count).toFixed(1)) : 0,`;
+            // simpler: inject after avg_score line in rankings if missing overall_sub_level near student-rankings
+          }
+          // ranking overall fields
+          if (a.includes('subject_scores: Object.fromEntries(a.subjectScores),') && !a.includes('overall_sub_level: band.sub')) {
+            a = a.replace(
+              'avg_score: a.count ? Number((a.sum / a.count).toFixed(1)) : 0,\n          total_marks: a.totalMarks,\n          subjects_sat: a.subjects.size,\n          subject_scores: Object.fromEntries(a.subjectScores),',
+              `avg_score: a.count ? Number((a.sum / a.count).toFixed(1)) : 0,\n          overall_grade: (() => { const p = a.count ? a.sum / a.count : 0; if (p >= 90) return 'EE'; if (p >= 80) return 'EE'; if (p >= 65) return 'ME'; if (p >= 50) return 'AE'; return 'BE'; })(),\n          overall_sub_level: (() => { const p = a.count ? a.sum / a.count : 0; if (p >= 90) return 'EE1'; if (p >= 80) return 'EE2'; if (p >= 70) return 'ME1'; if (p >= 65) return 'ME2'; if (p >= 55) return 'AE1'; if (p >= 50) return 'AE2'; if (p >= 40) return 'BE1'; return 'BE2'; })(),\n          total_marks: a.totalMarks,\n          subjects_sat: a.subjects.size,\n          subject_scores: Object.fromEntries(a.subjectScores),`
+            );
+            console.log('rankings bands');
+          }
+          fs.writeFileSync('backend/src/routes/analysis.routes.js', a);
+          console.log('analysis ok');
+          NODE
+      - run: |
+          grep -q 'POST /api/classes - Create a class' backend/src/routes/classes.routes.js
+          grep -q 'EE1' backend/src/utils/knecGrading.js
+          echo OK
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backend/src/routes/classes.routes.js backend/src/routes/analysis.routes.js backend/src/utils/knecGrading.js
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix: streams API, CBC grade unify, analysis ranking bands"
+            git push origin HEAD:fix/streams-and-grades-unified
+          fi
