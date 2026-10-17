@@ -1,0 +1,27 @@
+name: Apply AI report Groq model fix
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/ai-report-groq-model]
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ai-report-groq-model
+      - run: node scripts/apply-ai-report-model.mjs
+      - run: |
+          node --check backend/src/routes/analysis.routes.js
+          grep -q 'openai/gpt-oss-20b' backend/src/routes/analysis.routes.js
+          echo OK
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backend/src/routes/analysis.routes.js
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(ai-report): fallback Groq models for self-serve keys"
+            git push origin HEAD:fix/ai-report-groq-model
+          fi
