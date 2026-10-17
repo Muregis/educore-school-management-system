@@ -12,16 +12,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: fix/analysis-mobile-layout
-      - name: Build apply script
+      - name: Decode and apply
         run: |
-          if [ -f scripts/apply-analysis-mobile-a.txt ]; then
-            cat scripts/apply-analysis-mobile-a.txt scripts/apply-analysis-mobile-b.txt > scripts/apply-analysis-mobile.mjs
+          if [ -f scripts/apply-m-b64-0.txt ]; then
+            cat scripts/apply-m-b64-0.txt scripts/apply-m-b64-1.txt | base64 -d > scripts/apply-analysis-mobile.mjs
+          elif [ -f scripts/apply-analysis-mobile.b64 ]; then
+            base64 -d scripts/apply-analysis-mobile.b64 > scripts/apply-analysis-mobile.mjs
           fi
           node scripts/apply-analysis-mobile.mjs
       - run: |
           grep -q analysis-rank-cards src/pages/AnalysisPage.jsx
           grep -q 'ANALYSIS PAGE MOBILE' src/styles/layout-foundation.css
-          ! grep -q 'width: 120' src/pages/AnalysisPage.jsx
+          if grep -q 'width: 120' src/pages/AnalysisPage.jsx; then echo 'still has width 120'; exit 1; fi
           echo OK
       - run: |
           git config user.name "github-actions[bot]"
