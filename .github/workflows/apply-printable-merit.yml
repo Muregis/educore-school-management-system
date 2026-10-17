@@ -6,25 +6,12 @@ on:
 jobs:
   apply:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: feature/printable-merit-cbe-style
-      - run: node scripts/apply-printable-merit.mjs
-      - run: |
+      - name: Verify MeritListPage already present
+        run: |
           test -s src/pages/MeritListPage.jsx
-          grep -q 'Class' src/pages/MeritListPage.jsx
-          grep -q 'Overall' src/pages/MeritListPage.jsx
-          grep -q 'Print' src/pages/MeritListPage.jsx
-          grep -q EE1 src/pages/MeritListPage.jsx || true
-          echo OK
-      - run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src/pages/MeritListPage.jsx src/pages/ReportsPage.jsx
-          if git diff --staged --quiet; then echo No changes; else
-            git commit -m "feat(merit): printable class/overall CBE-style results sheet"
-            git push origin HEAD:feature/printable-merit-cbe-style
-          fi
+          grep -q Overall src/pages/MeritListPage.jsx
+          grep -q Print src/pages/MeritListPage.jsx
+          grep -q Class src/pages/MeritListPage.jsx
+          echo "MeritListPage OK — no apply needed"
