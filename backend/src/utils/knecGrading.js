@@ -1,39 +1,36 @@
 /**
- * Prefer loadSchoolGradingBands(schoolId) + makeGrader(bands) at call sites.
- * Sync knecGrade() only uses defaults when settings are not loaded.
+ * CBC bands aligned with src/lib/grading.js
+ * EE 80+ | ME 65–79 | AE 50–64 | BE <50
+ * Sub-levels EE1…BE2
  */
-import {
-  DEFAULT_CBC_BANDS,
-  gradeFromBands,
-  makeGrader,
-  loadSchoolGradingBands,
-} from "./gradingBands.js";
-
-/** @deprecated Prefer makeGrader(await loadSchoolGradingBands(schoolId)) */
 export function knecGrade(percentage) {
-  const g = gradeFromBands(percentage, DEFAULT_CBC_BANDS);
-  return { grade: g.grade, level: g.level || g.parent, label: g.label };
+  const p = Number(percentage);
+  const pct = Number.isFinite(p) ? p : 0;
+  if (pct >= 90) return { grade: "EE1", level: "EE", label: "Exceeds Expectations (1)" };
+  if (pct >= 80) return { grade: "EE2", level: "EE", label: "Exceeds Expectations (2)" };
+  if (pct >= 70) return { grade: "ME1", level: "ME", label: "Meets Expectations (1)" };
+  if (pct >= 65) return { grade: "ME2", level: "ME", label: "Meets Expectations (2)" };
+  if (pct >= 55) return { grade: "AE1", level: "AE", label: "Approaches Expectations (1)" };
+  if (pct >= 50) return { grade: "AE2", level: "AE", label: "Approaches Expectations (2)" };
+  if (pct >= 40) return { grade: "BE1", level: "BE", label: "Below Expectations (1)" };
+  return { grade: "BE2", level: "BE", label: "Below Expectations (2)" };
 }
 
-export function classRanking(students = [], totalSubjects = null, bands = DEFAULT_CBC_BANDS) {
-  const gradeOf = makeGrader(bands);
+export function classRanking(students = [], totalSubjects = null) {
   const scored = students.map((s) => {
     const subjectScores = (s.subjects || []).map((r) => {
       const pct = r.total_marks > 0 ? (Number(r.marks) / Number(r.total_marks)) * 100 : 0;
-      const g = gradeOf(pct);
       return {
         subject: r.subject,
         marks: r.marks,
         total_marks: r.total_marks,
         percentage: +pct.toFixed(1),
-        grade: g.grade,
-        level: g.level,
-        label: g.label,
+        ...knecGrade(pct),
       };
     });
-    const subjectsCount = totalSubjects || subjectScores.length;
+    const n = totalSubjects || subjectScores.length;
     const mean = subjectScores.length
-      ? subjectScores.reduce((a, b) => a + b.percentage, 0) / subjectsCount
+      ? subjectScores.reduce((a, b) => a + b.percentage, 0) / n
       : 0;
     return {
       student_id: s.student_id,
@@ -43,7 +40,7 @@ export function classRanking(students = [], totalSubjects = null, bands = DEFAUL
       subjectScores,
       mean: +mean.toFixed(1),
       subjectsTaken: subjectScores.length,
-      overall: gradeOf(mean),
+      overall: knecGrade(mean),
     };
   });
   scored.sort((a, b) => b.mean - a.mean || String(a.name).localeCompare(String(b.name)));
@@ -56,5 +53,4 @@ export function classRanking(students = [], totalSubjects = null, bands = DEFAUL
   });
 }
 
-export { loadSchoolGradingBands, makeGrader, gradeFromBands, DEFAULT_CBC_BANDS };
-export default { knecGrade, classRanking, loadSchoolGradingBands, makeGrader };
+export default { knecGrade, classRanking };
