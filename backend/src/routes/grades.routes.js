@@ -376,7 +376,7 @@ router.post(
                   subject: subject,
                   marks: marks,
                   total_marks: totalMarks,
-                  grade: calculatedGrade.level, // Store EE, ME, AE, BE
+                  grade: calculatedGrade.grade || calculatedGrade.level, // EE1-BE2
                   teacher_comment: row.teacher_comment?.trim() || null,
                   term: row.term?.trim() || 'Term 2',
                   exam_type: row.exam_type?.trim() || fallbackExamType,
@@ -480,7 +480,7 @@ router.post('/recalculate', requireRoles('admin', 'director', 'superadmin'), asy
 
       const { error: updateError } = await supabase
         .from('results')
-        .update({ grade: calculatedGrade.level })
+        .update({ grade: calculatedGrade.grade || calculatedGrade.level })
         .eq('result_id', result.result_id);
 
       if (!updateError) updated++;
@@ -554,7 +554,7 @@ router.put("/:id", async (req, res, next) => {
         exam_type: examType,
         marks: marks,
         total_marks: total,
-        grade: calculatedGrade.level,
+        grade: calculatedGrade.grade || calculatedGrade.level,
         teacher_comment: teacherComment || null,
         updated_at: new Date().toISOString()
       })
