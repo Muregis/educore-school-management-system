@@ -50,8 +50,17 @@ export default function MeritListPage({ auth, toast }) {
         if (ignore) return;
         const tList = Array.isArray(termsRes) ? termsRes : (termsRes?.data || []);
         setTerms([...new Set(tList.map((x) => x.term_name || x.name || x.term).filter(Boolean))]);
-        const cList = Array.isArray(classesRes) ? classesRes : (classesRes?.data || classesRes?.classes || []);
-        const classNames = [...new Set(cList.map((c) => c.class_name || c.name).filter(Boolean))].sort();
+        const cList = Array.isArray(classesRes)
+          ? classesRes
+          : (classesRes?.data || classesRes?.classes || classesRes?.rows || []);
+        const rawNames = cList.map((c) => c.class_name || c.name).filter(Boolean);
+        const bases = rawNames.map((n) => {
+          const m = String(n).trim().match(/^(Grade\s*\d+|Form\s*\d+|PP\d?|Playgroup)/i);
+          return m ? m[1].replace(/\s+/g, " ") : String(n).trim();
+        });
+        const classNames = [...new Set(bases.length ? bases : rawNames)].sort((a, b) =>
+          a.localeCompare(b, undefined, { numeric: true })
+        );
         setClasses(classNames);
         if (classNames[0]) setClassName((c) => c || classNames[0]);
       } catch { /* ignore */ }
