@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import PropTypes from "prop-types";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
-import { calculateGrade } from "../lib/grading";
+import { calculateGrade, calculateCbcSubLevel } from "../lib/grading";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 import Card from "../components/ui/Card";
@@ -15,12 +15,21 @@ import StatCard from "../components/ui/StatCard";
 
 // Use shared grading utility instead of local definition
 const gradeInfo = (score) => {
-  const grade = calculateGrade(score, 'CBC');
+  const sub = calculateCbcSubLevel(score);
+  if (sub?.grade) {
+    return {
+      label: sub.grade,
+      color: sub.color || "#3b82f6",
+      bg: (sub.color || "#3b82f6") + "22",
+      text: sub.label || sub.grade,
+    };
+  }
+  const grade = calculateGrade(score, "cbc");
   return {
     label: grade.grade,
     color: grade.color,
-    bg: grade.bgColor,
-    text: grade.label
+    bg: grade.bgColor || ((grade.color || "#9ca3af") + "22"),
+    text: grade.label,
   };
 };
 
@@ -326,7 +335,7 @@ Keep the tone professional but simple enough for a school administrator to act o
   );
 
   return (
-    <div style={{ display: "grid", gap: "var(--space-4)" }}>
+    <div className="ec-reports-page" style={{ display: "grid", gap: "var(--space-4)", maxWidth: "100%", overflowX: "hidden" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)", fontWeight: 800 }}>Academic Insights</div>
@@ -367,7 +376,7 @@ Keep the tone professional but simple enough for a school administrator to act o
           </div>
 
           <div style={{ display: "flex", gap: "var(--space-2)", background: "var(--color-bg-base)", padding: "var(--space-1)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
-            {[["visual","📊 Visual Report"],["ai","🤖 AI Report"]].map(([mode, label]) => (
+            {[["visual","Visual"],["ai","AI"]].map(([mode, label]) => (
               <Button 
                 key={mode} 
                 variant={reportMode === mode ? "primary" : "ghost"} 
@@ -504,7 +513,7 @@ Keep the tone professional but simple enough for a school administrator to act o
                           const g = gradeInfo(sub.avg_score);
                           return (
                             <div key={sub.subject} style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", background: "var(--color-bg-base)", padding: "var(--space-2)", borderRadius: "var(--radius-md)" }}>
-                              <div style={{ width: 120, fontSize: "13px", color: "var(--color-text-primary)", fontWeight: 500 }}>{sub.subject}</div>
+                              <div style={{ flex: "0 1 100px", minWidth: 0, fontSize: "12px", color: "var(--color-text-primary)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis" }}>{sub.subject}</div>
                               <ScoreBar score={sub.avg_score} color={g.color} />
                               <div style={{ width: 40, fontWeight: 700, color: g.color, fontSize: "14px", textAlign: "right" }}>{sub.avg_score}%</div>
                               <div style={{ width: 30, textAlign: "center" }}>
@@ -628,7 +637,7 @@ Keep the tone professional but simple enough for a school administrator to act o
                   ["🏆 Celebrate Strengths", "Publicly recognise top-performing streams and subjects each term to build a culture of academic excellence."],
                 ].map(([title, desc]) => (
                   <div key={title} style={{ display: "flex", gap: "var(--space-3)", alignItems: "flex-start" }}>
-                    <div style={{ fontWeight: 700, color: "var(--color-primary)", whiteSpace: "nowrap", width: "230px", flexShrink: 0, fontSize: "14px" }}>{title}</div>
+                    <div style={{ fontWeight: 700, color: "var(--color-primary)", whiteSpace: "normal", minWidth: 0, flex: "1 1 140px", maxWidth: "100%", fontSize: "14px" }}>{title}</div>
                     <div style={{ fontSize: "14px", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>{desc}</div>
                   </div>
                 ))}
