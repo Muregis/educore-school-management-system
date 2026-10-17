@@ -1,0 +1,29 @@
+name: Apply merit hardening
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/grades-merit-hardening]
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/grades-merit-hardening
+      - run: node scripts/apply-merit-hardening.mjs
+      - name: Verify
+        run: |
+          grep -q 'matchesClassFilter' backend/src/routes/analysis.routes.js
+          test -f database/migrations/060_grades_merit_support.sql
+          echo OK
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(grades): resilient merit matching + SQL support migration"
+            git push origin fix/grades-merit-hardening
+          fi
