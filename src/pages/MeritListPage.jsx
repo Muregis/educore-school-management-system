@@ -89,6 +89,27 @@ export default function MeritListPage({ auth, toast }) {
   const subjects = data?.subjects || [];
   const rows = data?.rows || [];
   const streams = data?.streams || [];
+
+  const stats = useMemo(() => {
+    if (!rows.length) return null;
+    const avgs = rows.map((r) => Number(r.average) || 0);
+    const mean = avgs.reduce((a, b) => a + b, 0) / avgs.length;
+    const bands = { EE: 0, ME: 0, AE: 0, BE: 0 };
+    for (const r of rows) {
+      const g = String(r.overall_grade || r.overall_sub_level || "").replace(/[12]$/, "").toUpperCase();
+      if (g in bands) bands[g] += 1;
+    }
+    const top = rows[0];
+    return {
+      mean: Number(mean.toFixed(2)),
+      count: rows.length,
+      bands,
+      topName: top ? (String(top.first_name || "") + " " + String(top.last_name || "")).trim() : "-",
+      topAvg: top ? Number(top.average).toFixed(2) : "-",
+      topLevel: top?.overall_sub_level || "-",
+    };
+  }, [rows]);
+
   const title = useMemo(() => {
     if (!className) return "Merit List";
     return stream ? `${className} ${stream} — Merit List` : `${className} Consolidated Merit List`;
@@ -176,6 +197,29 @@ export default function MeritListPage({ auth, toast }) {
           ))}
         </div>
       )}
+
+
+      {stats ? (
+        <div className="no-print" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 14 }}>
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 14px", background: "#fff" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>LEARNERS</div>
+            <div style={{ fontSize: 18, fontWeight: 800 }}>{stats.count}</div>
+          </div>
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 14px", background: "#fff" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>CLASS MEAN</div>
+            <div style={{ fontSize: 18, fontWeight: 800 }}>{stats.mean}</div>
+          </div>
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 14px", background: "#fff" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>TOP LEARNER</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>{stats.topName}</div>
+            <div style={{ fontSize: 12, color: "#94a3b8" }}>{stats.topAvg} · {stats.topLevel}</div>
+          </div>
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 14px", background: "#fff" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>EE / ME / AE / BE</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>{stats.bands.EE} / {stats.bands.ME} / {stats.bands.AE} / {stats.bands.BE}</div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="merit-print-root">
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
