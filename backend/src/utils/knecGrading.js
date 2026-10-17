@@ -56,5 +56,28 @@ export function classRanking(students = [], totalSubjects = null, bands = DEFAUL
   });
 }
 
+/**
+ * Class mean per subject from ranked output of classRanking().
+ * Used by performance.routes.js performance sheet.
+ * @param {Array<{ subjectScores?: Array<{ subject: string, percentage: number }> }>} rankedStudents
+ * @returns {Record<string, number>}
+ */
+export function subjectMeans(rankedStudents = []) {
+  const buckets = {};
+  for (const s of rankedStudents || []) {
+    for (const sc of s.subjectScores || []) {
+      const name = sc.subject || "Unknown";
+      if (!buckets[name]) buckets[name] = [];
+      buckets[name].push(Number(sc.percentage) || 0);
+    }
+  }
+  const out = {};
+  for (const [subject, vals] of Object.entries(buckets)) {
+    const mean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    out[subject] = +mean.toFixed(1);
+  }
+  return out;
+}
+
 export { loadSchoolGradingBands, makeGrader, gradeFromBands, DEFAULT_CBC_BANDS };
-export default { knecGrade, classRanking, loadSchoolGradingBands, makeGrader };
+export default { knecGrade, classRanking, subjectMeans, loadSchoolGradingBands, makeGrader };
