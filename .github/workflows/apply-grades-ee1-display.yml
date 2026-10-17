@@ -1,0 +1,28 @@
+name: Apply grades EE1-BE2 display
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/grades-ee1-be2-display]
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/grades-ee1-be2-display
+      - run: node scripts/apply-grades-ee1-display.mjs
+      - run: |
+          grep -q 'calculatedGrade.grade' backend/src/routes/grades.routes.js
+          grep -q displayGrade src/pages/GradesPage.jsx
+          grep -q 'Sub-levels (EE1' src/pages/AnalysisPage.jsx
+          echo OK
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backend/src/routes/grades.routes.js backend/src/utils/knecGrading.js src/pages/GradesPage.jsx src/pages/AnalysisPage.jsx
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix: EE1-BE2 on grades page + analysis distribution"
+            git push origin HEAD:fix/grades-ee1-be2-display
+          fi
