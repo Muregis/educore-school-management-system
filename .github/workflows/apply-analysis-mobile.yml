@@ -12,16 +12,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: fix/analysis-mobile-layout
-      - run: node scripts/apply-analysis-mobile.mjs
+      - name: Build apply script
+        run: |
+          if [ -f scripts/apply-analysis-mobile-a.txt ]; then
+            cat scripts/apply-analysis-mobile-a.txt scripts/apply-analysis-mobile-b.txt > scripts/apply-analysis-mobile.mjs
+          fi
+          node scripts/apply-analysis-mobile.mjs
       - run: |
           grep -q analysis-rank-cards src/pages/AnalysisPage.jsx
           grep -q 'ANALYSIS PAGE MOBILE' src/styles/layout-foundation.css
+          ! grep -q 'width: 120' src/pages/AnalysisPage.jsx
           echo OK
       - run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add src/pages/AnalysisPage.jsx src/styles/layout-foundation.css
           if git diff --staged --quiet; then echo No changes; else
-            git commit -m "fix(analysis): mobile-first layout, rank cards, flexible filters"
+            git commit -m "fix(analysis): mobile layout - rank cards, flexible filters"
             git push origin HEAD:fix/analysis-mobile-layout
           fi
