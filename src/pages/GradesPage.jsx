@@ -33,11 +33,11 @@ function displayMark(marks, total) {
   return `${marks}/${total}`;
 }
 function gradeColor(grade) {
-  // Map grades to Badge tones - uses shared utility logic
   if (!grade) return "info";
-  if (grade === "EE") return "success";
-  if (grade === "ME") return "info";
-  if (grade === "AE") return "warning";
+  const g = String(grade).toUpperCase();
+  if (g.startsWith("EE")) return "success";
+  if (g.startsWith("ME")) return "info";
+  if (g.startsWith("AE")) return "warning";
   return "danger";
 }
 
@@ -330,11 +330,20 @@ const classesForDropdown = useMemo(() => {
   };
 
   const counts = {
-    EE: results.filter(r => r.grade === "EE").length,
-    ME: results.filter(r => r.grade === "ME").length,
-    AE: results.filter(r => r.grade === "AE").length,
-    BE: results.filter(r => r.grade === "BE").length,
+    EE1: results.filter(r => String(r.grade).toUpperCase() === "EE1").length,
+    EE2: results.filter(r => String(r.grade).toUpperCase() === "EE2").length,
+    ME1: results.filter(r => String(r.grade).toUpperCase() === "ME1").length,
+    ME2: results.filter(r => String(r.grade).toUpperCase() === "ME2").length,
+    AE1: results.filter(r => String(r.grade).toUpperCase() === "AE1").length,
+    AE2: results.filter(r => String(r.grade).toUpperCase() === "AE2").length,
+    BE1: results.filter(r => String(r.grade).toUpperCase() === "BE1").length,
+    BE2: results.filter(r => String(r.grade).toUpperCase() === "BE2").length,
   };
+  counts.EE = counts.EE1 + counts.EE2 + results.filter(r => String(r.grade).toUpperCase() === "EE").length;
+  counts.ME = counts.ME1 + counts.ME2 + results.filter(r => String(r.grade).toUpperCase() === "ME").length;
+  counts.AE = counts.AE1 + counts.AE2 + results.filter(r => String(r.grade).toUpperCase() === "AE").length;
+  counts.BE = counts.BE1 + counts.BE2 + results.filter(r => String(r.grade).toUpperCase() === "BE").length;
+  const SUB_COLORS = { EE1:"#16a34a", EE2:"#22c55e", ME1:"#2563eb", ME2:"#3b82f6", AE1:"#d97706", AE2:"#f59e0b", BE1:"#ef4444", BE2:"#b91c1c" };
 
 
   if (feeBlocked) return <FeeBlock onGoFees={onGoFees} pageName="Grades & Results" />;
@@ -342,10 +351,10 @@ const classesForDropdown = useMemo(() => {
     <div>
        {/* Grade summary */}
        <div style={{ display:"flex", gap:8, marginBottom:12, flexWrap:"wrap" }}>
-         {[["EE","success"],["ME","info"],["AE","warning"],["BE","danger"]].map(([g]) => (
-           <div key={g} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:"10px 16px", minWidth:70, textAlign:"center" }}>
-             <div style={{ fontWeight:800, fontSize:20, color: g==="EE"?"#22c55e":g==="ME"?"#38bdf8":g==="AE"?"#f59e0b":"#ef4444" }}>{counts[g]}</div>
-             <div style={{ fontSize:11, color:C.textMuted }}>{g}</div>
+         {["EE1","EE2","ME1","ME2","AE1","AE2","BE1","BE2"].map((g) => (
+           <div key={g} style={{ background:C.card, border:`1px solid ${C.border}`, borderRadius:10, padding:"8px 12px", minWidth:56, textAlign:"center" }}>
+             <div style={{ fontWeight:800, fontSize:16, color: SUB_COLORS[g] }}>{counts[g]}</div>
+             <div style={{ fontSize:10, color:C.textMuted }}>{g}</div>
            </div>
          ))}
         {/* Legend */}
