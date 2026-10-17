@@ -1,0 +1,36 @@
+name: Check flexible grading branch
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/flexible-grading-and-streams]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Syntax check present files
+        run: |
+          set -e
+          node --check backend/src/utils/gradingBands.js
+          node --check backend/src/utils/knecGrading.js
+          node --check backend/src/routes/classes.routes.js
+          test -f database/scripts/demo_grade2_streams.sql
+          grep -q 'router.post' backend/src/routes/classes.routes.js
+          grep -q 'loadSchoolGradingBands' backend/src/utils/gradingBands.js
+          # Optional: only if analysis was wired on this branch
+          if grep -q 'loadSchoolGradingBands' backend/src/routes/analysis.routes.js 2>/dev/null; then
+            node --check backend/src/routes/analysis.routes.js
+            echo analysis_ok
+          else
+            echo analysis_not_wired_yet
+          fi
+          if grep -q 'grading-bands' backend/src/routes/settings.routes.js 2>/dev/null; then
+            node --check backend/src/routes/settings.routes.js
+            echo settings_ok
+          else
+            echo settings_not_wired_yet
+          fi
+          echo OK
