@@ -121,12 +121,22 @@ function AnalysisTab({ auth }) {
 
   // Computed values - use useMemo to ensure proper initialization
   const { streamSorted, byClass, interventions } = useMemo(() => {
-    const sorted = (data && data.streamAverages) ? [...data.streamAverages].sort((a,b) => b.avg_score - a.avg_score) : [];
+    const cleaned = (data?.streamAverages || []).map((s) => {
+      const stream = s.stream && s.stream !== "null" ? s.stream : null;
+      const label = stream
+        ? (s.stream_label && !String(s.stream_label).includes("null")
+            ? s.stream_label
+            : `${s.class_name} ${stream}`.trim())
+        : (s.class_name || s.stream_label || "Class");
+      return { ...s, stream, stream_label: label };
+    });
+    const sorted = [...cleaned].sort((a,b) => (b.avg_score || 0) - (a.avg_score || 0));
     
     const classMap = {};
     sorted.forEach(s => {
-      if (!classMap[s.class_name]) classMap[s.class_name] = [];
-      classMap[s.class_name].push(s);
+      const cn = s.class_name || "Other";
+      if (!classMap[cn]) classMap[cn] = [];
+      classMap[cn].push(s);
     });
     
     const ints = (data && data.subjectRankings && data.streamAverages) 
@@ -144,24 +154,30 @@ function AnalysisTab({ auth }) {
       const qs = new URLSearchParams({ term });
       if (className) qs.set("class_name", className);
       const result = await apiFetch(`/analysis/streams?${qs}`, { token: auth.token });
-      setData(result);
-      if (result.terms?.length)   setAvailTerms(result.terms);
-      if (result.classes?.length) setAvailClasses(result.classes);
+      setData(result || { streamAverages: [], subjectRankings: [], streamVsSubject: { streams: [], subjects: [], data: {} }, terms: [], classes: [] });
+      if (result?.terms?.length) setAvailTerms(result.terms);
+      if (result?.classes?.length) setAvailClasses(result.classes);
       setActiveStream(null);
-
-      // Fetch trends + top students + rankings + class stats in parallel
-      const [trendRes, topRes, rankRes, statsRes] = await Promise.all([
-        apiFetch(`/analysis/trends${className ? `?class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
-        apiFetch(`/analysis/top-students?limit=10${term ? `&term=${encodeURIComponent(term)}` : ""}${className ? `&class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
-        apiFetch(`/analysis/student-rankings?term=${encodeURIComponent(term)}${className ? `&class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
-        apiFetch(`/analysis/class-stats?term=${encodeURIComponent(term)}${className ? `&class_name=${encodeURIComponent(className)}` : ""}`, { token: auth.token }),
+      const trendQ = className ? `?class_name=${encodeURIComponent(className)}` : "";
+      const termQ = term ? `term=${encodeURIComponent(term)}` : "";
+      const classQ = className ? `&class_name=${encodeURIComponent(className)}` : "";
+      const settled = await Promise.allSettled([
+        apiFetch(`/analysis/trends${trendQ}`, { token: auth.token }),
+        apiFetch(`/analysis/top-students?limit=10${termQ ? `&${termQ}` : ""}${classQ}`, { token: auth.token }),
+        apiFetch(`/analysis/student-rankings?${termQ}${classQ}`, { token: auth.token }),
+        apiFetch(`/analysis/class-stats?${termQ}${classQ}`, { token: auth.token }),
       ]);
-      setTrends(trendRes);
-      setTopStudents(topRes);
-      setStudentRankings(rankRes);
-      setClassStats(statsRes);
+      const val = (i) => (settled[i].status === "fulfilled" ? settled[i].value : null);
+      settled.forEach((s, i) => { if (s.status === "rejected") console.warn("Analysis secondary API", i, s.reason); });
+      setTrends(val(0));
+      setTopStudents(val(1));
+      setStudentRankings(val(2));
+      setClassStats(val(3));
       setIsInitialized(true);
-    } catch (e) { console.error("Analysis error:", e); }
+    } catch (e) {
+      console.error("Analysis error:", e);
+      setData({ streamAverages: [], subjectRankings: [], streamVsSubject: { streams: [], subjects: [], data: {} }, terms: [], classes: [] });
+    }
     setLoading(false);
   }, [auth, term, className]);
 
@@ -193,7 +209,7 @@ function AnalysisTab({ auth }) {
     lines.push("STREAM vs SUBJECT MATRIX:");
     data.streamVsSubject.subjects.forEach(subj => {
       const row = data.streamVsSubject.streams.map(sl => {
-        const score = data.streamVsSubject.data[sl]?.[subj];
+        const score = data.streamVsSubject?.data?.[sl]?.[subj];
         return score != null ? `${sl}:${score}%` : `${sl}:N/A`;
       }).join(" | ");
       lines.push(`  ${subj}: ${row}`);
@@ -351,7 +367,7 @@ Keep the tone professional but simple enough for a school administrator to act o
       <Card style={{ padding: "var(--space-4)", background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 96%, transparent) 0%, var(--color-bg-card) 100%)", boxShadow: "var(--shadow-sm)" }}>
         <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div style={{ width: "150px" }}>
+            <div style={{ flex: "1 1 140px", minWidth: 0, maxWidth: "100%" }}>
               <Select 
                 label="Term"
                 value={term} 
@@ -359,7 +375,7 @@ Keep the tone professional but simple enough for a school administrator to act o
                 options={availTerms.map(t => ({ value: t, label: t }))}
               />
             </div>
-            <div style={{ width: "150px" }}>
+            <div style={{ flex: "1 1 140px", minWidth: 0, maxWidth: "100%" }}>
               <Select 
                 label="Class (optional)"
                 value={className} 
@@ -454,7 +470,12 @@ Keep the tone professional but simple enough for a school administrator to act o
       )}
 
       {/* ══════════ VISUAL REPORT MODE ══════════ */}
-      {!loading && data && reportMode === "visual" && (
+      {!loading && data && reportMode === "visual" && (!(data.streamAverages || []).length && !(data.subjectRankings || []).length) && (
+        <EmptyState icon="📊" title="No analysis data" description="No results for this term/class yet. Enter grades first, then refresh." />
+      )}
+
+      {!loading && data && reportMode === "visual" && ((data.streamAverages || []).length > 0 || (data.subjectRankings || []).length > 0) && (
+        <div className="ec-analysis-visual" style={{ display: "grid", gap: "var(--space-4)", maxWidth: "100%", overflowX: "hidden" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
 
           {/* SECTION 1 — Class Performance by Stream */}
@@ -539,7 +560,7 @@ Keep the tone professional but simple enough for a school administrator to act o
             <div style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden" }}>
               <Table 
                 headers={["Rank", "Subject", "Average", "Highest", "Lowest", "Entries", "Grade"]}
-                data={data.subjectRankings.map((s, i) => {
+                data={(data.subjectRankings || []).map((s, i) => {
                   const g = gradeInfo(s.avg_score);
                   return [
                     <span key="rank" style={{ color: "var(--color-text-secondary)", fontWeight: 700 }}>#{i+1}</span>,
@@ -559,7 +580,7 @@ Keep the tone professional but simple enough for a school administrator to act o
           </Card>
 
           {/* SECTION 3 — Stream vs Subject */}
-          {data.streamVsSubject.subjects.length > 0 && (
+          {(data.streamVsSubject?.subjects || []).length > 0 && (
             <Card style={{ padding: "var(--space-4)" }}>
               <h3 style={{ margin: "0 0 var(--space-1) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>3. Stream vs Subject Comparison</h3>
               <p style={{ margin: "0 0 var(--space-4) 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
@@ -567,14 +588,14 @@ Keep the tone professional but simple enough for a school administrator to act o
               </p>
               <div style={{ overflowX: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)" }}>
                 <Table 
-                  headers={["Subject", ...data.streamVsSubject.streams]}
-                  data={data.streamVsSubject.subjects.map(subj => {
+                  headers={["Subject", ...(data.streamVsSubject?.streams || [])]}
+                  data={(data.streamVsSubject?.subjects || []).map(subj => {
                     const row = [
                       <span key="subject" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{subj}</span>
                     ];
                     
-                    data.streamVsSubject.streams.forEach(sl => {
-                      const score = data.streamVsSubject.data[sl]?.[subj];
+                    (data.streamVsSubject?.streams || []).forEach(sl => {
+                      const score = data.streamVsSubject?.data?.[sl]?.[subj];
                       if (score == null) {
                         row.push(<span key={sl} style={{ color: "var(--color-text-muted)" }}>—</span>);
                       } else {
@@ -706,15 +727,37 @@ Keep the tone professional but simple enough for a school administrator to act o
                 ))}
               </div>
 
-              {/* Grade Distribution */}
-              {Object.keys(classStats.overall.grade_distribution || {}).length > 0 && (
+              {/* Grade Distribution + EE1–BE2 */}
+              {(Object.keys(classStats.overall.grade_distribution || {}).length > 0 ||
+                Object.keys(classStats.overall.sub_level_distribution || {}).length > 0) && (
                 <div style={{ marginBottom: "var(--space-4)" }}>
-                  <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-2)", fontSize: "15px" }}>Grade Distribution</div>
-                  <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
-                    {Object.entries(classStats.overall.grade_distribution).map(([grade, count]) => {
-                      const g = gradeInfo(grade === "EE" ? 85 : grade === "ME" ? 65 : grade === "AE" ? 45 : 25);
+                  <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 15 }}>
+                    Grade Distribution
+                    {classStats.overall.mean_sub_level ? (
+                      <span style={{ fontWeight: 600, fontSize: 13, marginLeft: 8, color: "var(--color-text-secondary)" }}>
+                        mean {classStats.overall.mean}% · {classStats.overall.mean_sub_level}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                    {Object.entries(classStats.overall.grade_distribution || {}).map(([grade, count]) => {
+                      const g = gradeInfo(grade === "EE" ? 85 : grade === "ME" ? 70 : grade === "AE" ? 55 : 30);
                       return (
-                        <div key={grade} style={{ background: g.bg, border: `1px solid ${g.color}`, borderRadius: "var(--radius-md)", padding: "8px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div key={grade} style={{ background: g.bg, border: `1px solid ${g.color}`, borderRadius: 8, padding: "6px 12px", display: "flex", gap: 8, alignItems: "center" }}>
+                          <Badge text={grade} style={{ background: g.color, color: "#fff", borderColor: "transparent" }} />
+                          <span style={{ fontWeight: 700, color: g.color }}>{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 6 }}>Sub-levels (EE1 – BE2)</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {["EE1","EE2","ME1","ME2","AE1","AE2","BE1","BE2"].filter(k => (classStats.overall.sub_level_distribution || {})[k]).map((grade) => {
+                      const count = classStats.overall.sub_level_distribution[grade];
+                      const sample = { EE1:95, EE2:85, ME1:75, ME2:67, AE1:58, AE2:52, BE1:45, BE2:25 }[grade];
+                      const g = gradeInfo(sample);
+                      return (
+                        <div key={grade} style={{ background: g.bg, border: `1px solid ${g.color}`, borderRadius: 8, padding: "6px 12px", display: "flex", gap: 8, alignItems: "center" }}>
                           <Badge text={grade} style={{ background: g.color, color: "#fff", borderColor: "transparent" }} />
                           <span style={{ fontWeight: 700, color: g.color }}>{count}</span>
                         </div>
