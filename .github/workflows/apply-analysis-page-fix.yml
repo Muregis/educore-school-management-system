@@ -12,7 +12,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: fix/analysis-page-ee1-streams
-      - run: node scripts/unpack-analysis-apply.mjs
       - run: node scripts/apply-analysis-page-fix.mjs
       - run: |
           grep -q 'function streamLabel' src/pages/AnalysisPage.jsx
