@@ -1,0 +1,27 @@
+name: Restore safe ReportsPage from main
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/reports-analysis-tab-harden]
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reports-analysis-tab-harden
+      - run: node scripts/restore-reports-from-main.mjs
+      - name: Vite build check
+        run: |
+          npm ci
+          npm run build
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ReportsPage.jsx
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(reports): restore main ReportsPage + safe Analysis patches"
+            git push origin HEAD:fix/reports-analysis-tab-harden
+          fi
