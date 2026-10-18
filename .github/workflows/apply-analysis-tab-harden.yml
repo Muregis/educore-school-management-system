@@ -1,27 +1,8 @@
 name: Apply analysis tab harden
 on:
   workflow_dispatch:
-  push:
-    branches: [fix/reports-analysis-tab-harden]
 jobs:
   apply:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: fix/reports-analysis-tab-harden
-      - run: node scripts/apply-analysis-tab-harden.mjs
-      - run: |
-          grep -q Promise.allSettled src/pages/ReportsPage.jsx
-          grep -q 'Sub-levels (EE1' src/pages/ReportsPage.jsx
-          echo OK
-      - run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src/pages/ReportsPage.jsx
-          if git diff --staged --quiet; then echo No changes; else
-            git commit -m "fix(reports): harden Analysis tab load + EE1 display + mobile"
-            git push origin HEAD:fix/reports-analysis-tab-harden
-          fi
+      - run: echo "disabled — was corrupting ReportsPage.jsx"
