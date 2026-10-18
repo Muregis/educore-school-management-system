@@ -5,4 +5,4 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "disabled — was corrupting ReportsPage.jsx"
+      - run: echo disabled

@@ -1,0 +1,28 @@
+name: Restore ReportsPage clean
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/reports-analysis-tab-harden]
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reports-analysis-tab-harden
+      - run: node scripts/restore-reports-page.mjs
+      - run: |
+          grep -q Promise.allSettled src/pages/ReportsPage.jsx
+          grep -q 'Sub-levels (EE1' src/pages/ReportsPage.jsx
+          ! grep -q '}  }, \[auth' src/pages/ReportsPage.jsx
+          echo OK
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ReportsPage.jsx
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(reports): restore Analysis tab from main with safe harden only"
+            git push origin HEAD:fix/reports-analysis-tab-harden
+          fi

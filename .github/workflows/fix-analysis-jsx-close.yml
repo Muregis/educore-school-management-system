@@ -1,37 +1,8 @@
 name: Fix AnalysisTab JSX close
 on:
   workflow_dispatch:
-  push:
-    branches: [fix/reports-analysis-tab-harden]
 jobs:
   fix:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: fix/reports-analysis-tab-harden
-      - run: node scripts/fix-analysis-jsx-close.mjs
-      - name: Ensure callback syntax clean
-        run: |
-          if grep -n '}  }, \[auth' src/pages/ReportsPage.jsx; then
-            echo "still broken"; exit 1
-          fi
-          grep -n '}, \[auth, term, className\]' src/pages/ReportsPage.jsx | head -2
-          python3 - <<'PY'
-from pathlib import Path
-t = Path("src/pages/ReportsPage.jsx").read_text()
-i = t.find("AnalysisTab.propTypes")
-chunk = t[i-120:i]
-assert "</div>" in chunk
-print("tail ok")
-PY
-      - run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src/pages/ReportsPage.jsx
-          if git diff --staged --quiet; then echo No changes; else
-            git commit -m "fix(reports): close Analysis visual wrapper + keep filters on empty data"
-            git push origin HEAD:fix/reports-analysis-tab-harden
-          fi
+      - run: echo disabled

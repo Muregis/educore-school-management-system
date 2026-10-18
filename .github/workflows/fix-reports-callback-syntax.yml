@@ -1,27 +1,8 @@
 name: Fix ReportsPage callback syntax
 on:
   workflow_dispatch:
-  push:
-    branches: [fix/reports-analysis-tab-harden]
 jobs:
   fix:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: fix/reports-analysis-tab-harden
-      - run: node scripts/fix-reports-callback-syntax.mjs
-      - run: |
-          ! grep -n '}  }, \[auth' src/pages/ReportsPage.jsx
-          grep -n '}, \[auth, term, className\]' src/pages/ReportsPage.jsx | head -3
-          echo OK
-      - run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src/pages/ReportsPage.jsx
-          if git diff --staged --quiet; then echo No changes; else
-            git commit -m "fix: ReportsPage useCallback syntax (Expected ) but found })"
-            git push origin HEAD:fix/reports-analysis-tab-harden
-          fi
+      - run: echo disabled
