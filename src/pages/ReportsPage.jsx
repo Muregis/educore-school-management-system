@@ -124,14 +124,11 @@ function AnalysisTab({ auth }) {
     const cleaned = (data?.streamAverages || []).map((s) => {
       const stream = s.stream && s.stream !== "null" ? s.stream : null;
       const label = stream
-        ? (s.stream_label && !String(s.stream_label).includes("null")
-            ? s.stream_label
-            : `${s.class_name} ${stream}`.trim())
+        ? (s.stream_label && !String(s.stream_label).includes("null") ? s.stream_label : `${s.class_name} ${stream}`.trim())
         : (s.class_name || s.stream_label || "Class");
       return { ...s, stream, stream_label: label };
     });
     const sorted = [...cleaned].sort((a,b) => (b.avg_score || 0) - (a.avg_score || 0));
-    
     const classMap = {};
     sorted.forEach(s => {
       const cn = s.class_name || "Other";
@@ -154,10 +151,12 @@ function AnalysisTab({ auth }) {
       const qs = new URLSearchParams({ term });
       if (className) qs.set("class_name", className);
       const result = await apiFetch(`/analysis/streams?${qs}`, { token: auth.token });
-      setData(result || { streamAverages: [], subjectRankings: [], streamVsSubject: { streams: [], subjects: [], data: {} }, terms: [], classes: [] });
-      if (result?.terms?.length) setAvailTerms(result.terms);
-      if (result?.classes?.length) setAvailClasses(result.classes);
+      setData(result);
+      if (result.terms?.length)   setAvailTerms(result.terms);
+      if (result.classes?.length) setAvailClasses(result.classes);
       setActiveStream(null);
+
+      // Fetch trends + top students + rankings + class stats in parallel
       const trendQ = className ? `?class_name=${encodeURIComponent(className)}` : "";
       const termQ = term ? `term=${encodeURIComponent(term)}` : "";
       const classQ = className ? `&class_name=${encodeURIComponent(className)}` : "";
@@ -174,10 +173,7 @@ function AnalysisTab({ auth }) {
       setStudentRankings(val(2));
       setClassStats(val(3));
       setIsInitialized(true);
-    } catch (e) {
-      console.error("Analysis error:", e);
-      setData({ streamAverages: [], subjectRankings: [], streamVsSubject: { streams: [], subjects: [], data: {} }, terms: [], classes: [] });
-    }
+    } catch (e) { console.error("Analysis error:", e); }
     setLoading(false);
   }, [auth, term, className]);
 
@@ -367,7 +363,7 @@ Keep the tone professional but simple enough for a school administrator to act o
       <Card style={{ padding: "var(--space-4)", background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 96%, transparent) 0%, var(--color-bg-card) 100%)", boxShadow: "var(--shadow-sm)" }}>
         <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "flex-end" }}>
-            <div style={{ flex: "1 1 140px", minWidth: 0, maxWidth: "100%" }}>
+            <div style={{ width: "150px" }}>
               <Select 
                 label="Term"
                 value={term} 
@@ -375,7 +371,7 @@ Keep the tone professional but simple enough for a school administrator to act o
                 options={availTerms.map(t => ({ value: t, label: t }))}
               />
             </div>
-            <div style={{ flex: "1 1 140px", minWidth: 0, maxWidth: "100%" }}>
+            <div style={{ width: "150px" }}>
               <Select 
                 label="Class (optional)"
                 value={className} 
@@ -470,12 +466,7 @@ Keep the tone professional but simple enough for a school administrator to act o
       )}
 
       {/* ══════════ VISUAL REPORT MODE ══════════ */}
-      {!loading && data && reportMode === "visual" && (!(data.streamAverages || []).length && !(data.subjectRankings || []).length) && (
-        <EmptyState icon="📊" title="No analysis data" description="No results for this term/class yet. Enter grades first, then refresh." />
-      )}
-
-      {!loading && data && reportMode === "visual" && ((data.streamAverages || []).length > 0 || (data.subjectRankings || []).length > 0) && (
-        <div className="ec-analysis-visual" style={{ display: "grid", gap: "var(--space-4)", maxWidth: "100%", overflowX: "hidden" }}>
+      {!loading && data && reportMode === "visual" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
 
           {/* SECTION 1 — Class Performance by Stream */}
@@ -727,37 +718,15 @@ Keep the tone professional but simple enough for a school administrator to act o
                 ))}
               </div>
 
-              {/* Grade Distribution + EE1–BE2 */}
-              {(Object.keys(classStats.overall.grade_distribution || {}).length > 0 ||
-                Object.keys(classStats.overall.sub_level_distribution || {}).length > 0) && (
+              {/* Grade Distribution */}
+              {Object.keys(classStats.overall.grade_distribution || {}).length > 0 && (
                 <div style={{ marginBottom: "var(--space-4)" }}>
-                  <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 15 }}>
-                    Grade Distribution
-                    {classStats.overall.mean_sub_level ? (
-                      <span style={{ fontWeight: 600, fontSize: 13, marginLeft: 8, color: "var(--color-text-secondary)" }}>
-                        mean {classStats.overall.mean}% · {classStats.overall.mean_sub_level}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-                    {Object.entries(classStats.overall.grade_distribution || {}).map(([grade, count]) => {
-                      const g = gradeInfo(grade === "EE" ? 85 : grade === "ME" ? 70 : grade === "AE" ? 55 : 30);
+                  <div style={{ fontWeight: 700, color: "var(--color-text-primary)", marginBottom: "var(--space-2)", fontSize: "15px" }}>Grade Distribution</div>
+                  <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+                    {Object.entries(classStats.overall.grade_distribution).map(([grade, count]) => {
+                      const g = gradeInfo(grade === "EE" ? 85 : grade === "ME" ? 65 : grade === "AE" ? 45 : 25);
                       return (
-                        <div key={grade} style={{ background: g.bg, border: `1px solid ${g.color}`, borderRadius: 8, padding: "6px 12px", display: "flex", gap: 8, alignItems: "center" }}>
-                          <Badge text={grade} style={{ background: g.color, color: "#fff", borderColor: "transparent" }} />
-                          <span style={{ fontWeight: 700, color: g.color }}>{count}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--color-text-muted)", marginBottom: 6 }}>Sub-levels (EE1 – BE2)</div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {["EE1","EE2","ME1","ME2","AE1","AE2","BE1","BE2"].filter(k => (classStats.overall.sub_level_distribution || {})[k]).map((grade) => {
-                      const count = classStats.overall.sub_level_distribution[grade];
-                      const sample = { EE1:95, EE2:85, ME1:75, ME2:67, AE1:58, AE2:52, BE1:45, BE2:25 }[grade];
-                      const g = gradeInfo(sample);
-                      return (
-                        <div key={grade} style={{ background: g.bg, border: `1px solid ${g.color}`, borderRadius: 8, padding: "6px 12px", display: "flex", gap: 8, alignItems: "center" }}>
+                        <div key={grade} style={{ background: g.bg, border: `1px solid ${g.color}`, borderRadius: "var(--radius-md)", padding: "8px 16px", display: "flex", alignItems: "center", gap: "8px" }}>
                           <Badge text={grade} style={{ background: g.color, color: "#fff", borderColor: "transparent" }} />
                           <span style={{ fontWeight: 700, color: g.color }}>{count}</span>
                         </div>
