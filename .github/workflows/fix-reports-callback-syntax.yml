@@ -1,0 +1,8 @@
+name: Fix ReportsPage callback syntax
+on:
+  workflow_dispatch:
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo disabled

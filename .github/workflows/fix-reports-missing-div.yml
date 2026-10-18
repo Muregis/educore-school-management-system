@@ -1,0 +1,39 @@
+name: Fix ReportsPage missing visual div
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/reports-analysis-tab-harden]
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/reports-analysis-tab-harden
+      - run: node scripts/fix-reports-missing-div.mjs
+      - name: Verify JSX structure
+        run: |
+          node -e "
+          const fs=require('fs');
+          const t=fs.readFileSync('src/pages/ReportsPage.jsx','utf8');
+          const i=t.indexOf('AnalysisTab.propTypes');
+          const snippet=t.slice(i-80,i);
+          if(!snippet.includes('</div>')) { console.error(snippet); process.exit(1); }
+          // must have two consecutive closing divs before )}
+          if(!/\<\/div\>\s*\<\/div\>\s*\)\}/.test(t.slice(i-200,i))) {
+            console.error('missing double close');
+            console.error(JSON.stringify(t.slice(i-120,i)));
+            process.exit(1);
+          }
+          console.log('structure OK');
+          "
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/pages/ReportsPage.jsx .github/workflows/apply-analysis-tab-harden.yml .github/workflows/fix-reports-callback-syntax.yml || true
+          if git diff --staged --quiet; then echo No changes; else
+            git commit -m "fix(reports): close ec-analysis-visual wrapper for Vite build"
+            git push origin HEAD:fix/reports-analysis-tab-harden
+          fi
