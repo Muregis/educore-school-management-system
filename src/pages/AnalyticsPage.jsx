@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import { money, countBy, isPaidStatus } from "../lib/utils";
 import { apiFetch } from "../lib/api";
 import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
+import { useCurrentTerm } from "../hooks/useCurrentTerm";
 
 import Card from "../components/ui/Card";
 import StatCard from "../components/ui/StatCard";
@@ -98,7 +99,26 @@ function PieChart({ data, size = 150 }) {
   );
 }
 
-export default function AnalyticsPage({ auth, students = [], teachers = [], payments = [], results = [], attendance = [], feeStructures = [] }) {
+export default function AnalyticsPage({
+  auth,
+  school = {},
+  students = [],
+  teachers = [],
+  payments = [],
+  results = [],
+  attendance = [],
+  feeStructures: rawFeeStructures = []
+}) {
+  const { term: currentTerm } = useCurrentTerm(auth);
+
+  const feeStructures = useMemo(() => {
+    if (!Array.isArray(rawFeeStructures)) return [];
+    if (!currentTerm) return rawFeeStructures;
+    const filtered = rawFeeStructures.filter(
+      (f) => (f?.term ?? f?.term_name ?? currentTerm) === currentTerm
+    );
+    return filtered.length > 0 ? filtered : rawFeeStructures;
+  }, [rawFeeStructures, currentTerm]);
   const [activeTab, setActiveTab] = useState("overview");
   const [aiReport, setAiReport] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -148,7 +168,7 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
     const payrollExpenses = Number(expenditureSummary?.totals?.payroll || 0);
     const manualExpenses = Number(expenditureSummary?.totals?.manual || 0);
     const pendingFees = students.reduce(
-      (sum, student) => sum + Math.max(0, calculateStudentBalanceLocal({ student, feeStructures, payments }).balance),
+      (sum, student) => sum + Math.max(0, calculateStudentBalanceLocal({ student, feeStructures, payments, schoolSettings: school || {} }).balance),
       0
     );
 
@@ -171,7 +191,7 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
       gradeDist, avgMarks,
       presentCount, absentCount, attendanceRate,
     };
-  }, [students, payments, results, attendance, feeStructures, expenditureSummary]);
+  }, [students, payments, results, attendance, feeStructures, expenditureSummary, school]);
 
   // Generate AI analysis
   const generateAIReport = useCallback(async () => {
@@ -193,7 +213,7 @@ Financial Status:
 - Total Expenses (KES): ${stats.totalExpenses.toFixed(2)}
 - Payroll Costs (KES): ${stats.payrollExpenses.toFixed(2)}
 - Outstanding Fees (KES): ${stats.pendingFees.toFixed(2)}
-- Collection Rate: ${stats.totalCollected > 0 ? ((stats.totalCollected / (stats.totalCollected + stats.pendingFees)) * 100).toFixed(1) : 100}%
+- Collection Rate: ${(stats.totalCollected + stats.pendingFees) > 0 ? ((stats.totalCollected / (stats.totalCollected + stats.pendingFees)) * 100).toFixed(1) : 100}%
 
 Academic Performance:
 - Average Marks: ${stats.avgMarks.toFixed(1)}/100
@@ -260,15 +280,19 @@ Provide a structured analysis with:
 
   const paymentChartData = useMemo(() => {
     const byMonth = {};
-    payments.forEach(p => {
-      const month = p.date?.slice(0, 7) || "Unknown";
+    payments.filter(p => isPaidStatus(p.status)).forEach(p => {
+      const rawDate = p.date || p.payment_date || p.created_at || "";
+      const month = rawDate ? String(rawDate).slice(0, 7) : "Unknown";
       byMonth[month] = (byMonth[month] || 0) + Number(p.amount);
     });
-    return Object.entries(byMonth).slice(-6).map(([month, value]) => ({
-      label: month,
-      value: Math.round(value),
-      color: "var(--color-success)",
-    }));
+    return Object.entries(byMonth)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-6)
+      .map(([month, value]) => ({
+        label: month,
+        value: Math.round(value),
+        color: "var(--color-success)",
+      }));
   }, [payments]);
 
   const expenseChartData = useMemo(() => {
@@ -278,6 +302,15 @@ Provide a structured analysis with:
       color: "var(--color-danger)",
     }));
   }, [expenditureSummary]);
+
+  const displayClasses = useMemo(() => {
+    const set = new Set(availableClasses);
+    students.forEach((s) => {
+      const c = String(s.className || s.class_name || "").trim();
+      if (c) set.add(c);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+  }, [availableClasses, students]);
 
   const tabs = [
     { id: "overview", label: "Overview" },
@@ -317,15 +350,6 @@ Provide a structured analysis with:
               )}
               {!aiReport && !aiLoading && (
                 <EmptyState icon="🧠" title="AI Analytics Ready" description="Click the button above to generate a deep-dive analysis of your school's current standing." />
-              )}
-            </Card>
-
-            <Card style={{ padding: "var(--space-4)" }}>
-              <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Monthly Expenditure Trend</h3>
-              {expenseChartData.length > 0 ? (
-                <BarChart data={expenseChartData} height={200} />
-              ) : (
-                <EmptyState icon="📊" title="No Data" description="No expenditure data available." />
               )}
             </Card>
           </div>
@@ -390,7 +414,7 @@ Provide a structured analysis with:
             <div className="ec-kpi-grid">
               <StatCard title="Total Collected" value={money(stats.totalCollected)} icon="💵" trend={0} />
               <StatCard title="Pending Balance" value={money(stats.pendingFees)} icon="⏳" trend={0} />
-              <StatCard title="Collection Rate" value={`${stats.pendingFees > 0 ? ((stats.totalCollected / (stats.totalCollected + stats.pendingFees)) * 100).toFixed(1) : 100}%`} icon="📊" trend={0} />
+              <StatCard title="Collection Rate" value={`${(stats.totalCollected + stats.pendingFees) > 0 ? ((stats.totalCollected / (stats.totalCollected + stats.pendingFees)) * 100).toFixed(1) : 100}%`} icon="📊" trend={0} />
               <StatCard title="Total Expenses" value={money(stats.totalExpenses)} icon="💸" trend={0} />
               <StatCard title="Payroll Costs" value={money(stats.payrollExpenses)} icon="👨‍💼" trend={0} />
               <StatCard title="Net Cashflow" value={money(stats.netCashflow)} icon="📉" trend={0} />
@@ -400,12 +424,12 @@ Provide a structured analysis with:
             <Card style={{ padding: "var(--space-4)" }}>
               <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Outstanding Balance by Class</h3>
               <div className="ec-kpi-grid">
-                {(availableClasses ?? []).map(cls => {
+                {displayClasses.map(cls => {
                   const classStudents = students.filter(s => (s.className || s.class_name) === cls);
                   if (classStudents.length === 0) return null;
                   
                   const classBalanceInfo = classStudents.map(student =>
-                    calculateStudentBalanceLocal({ student, feeStructures, payments })
+                    calculateStudentBalanceLocal({ student, feeStructures, payments, schoolSettings: school || {} })
                   );
                   const classExpected = classBalanceInfo.reduce((sum, item) => sum + item.expected, 0);
                   const classPaid = classBalanceInfo.reduce((sum, item) => sum + item.paid, 0);
@@ -426,14 +450,25 @@ Provide a structured analysis with:
               </div>
             </Card>
 
-            <Card style={{ padding: "var(--space-4)" }}>
-              <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Monthly Payment Collection</h3>
-              {paymentChartData.length > 0 ? (
-                <BarChart data={paymentChartData} height={200} />
-              ) : (
-                <EmptyState icon="📊" title="No Data" description="No payment data available." />
-              )}
-            </Card>
+            <div className="ec-stack-grid" style={{ gap: "var(--space-4)" }}>
+              <Card style={{ padding: "var(--space-4)" }}>
+                <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Monthly Payment Collection</h3>
+                {paymentChartData.length > 0 ? (
+                  <BarChart data={paymentChartData} height={200} />
+                ) : (
+                  <EmptyState icon="📊" title="No Data" description="No payment data available." />
+                )}
+              </Card>
+
+              <Card style={{ padding: "var(--space-4)" }}>
+                <h3 style={{ margin: "0 0 var(--space-3)", color: "var(--color-text-primary)", fontSize: "16px" }}>Monthly Expenditure Trend</h3>
+                {expenseChartData.length > 0 ? (
+                  <BarChart data={expenseChartData} height={200} />
+                ) : (
+                  <EmptyState icon="📊" title="No Data" description="No expenditure data available." />
+                )}
+              </Card>
+            </div>
           </div>
         )}
 
@@ -463,10 +498,12 @@ Provide a structured analysis with:
 
 AnalyticsPage.propTypes = {
   auth: PropTypes.object,
+  school: PropTypes.object,
   students: PropTypes.array,
   teachers: PropTypes.array,
   payments: PropTypes.array,
   results: PropTypes.array,
   attendance: PropTypes.array,
   feeStructures: PropTypes.array,
+  toast: PropTypes.func,
 };

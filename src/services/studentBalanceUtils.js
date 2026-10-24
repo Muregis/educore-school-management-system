@@ -63,8 +63,8 @@ function getAgreedAmount(student, key) {
 }
 
 export function getStudentTransportFee(student, schoolSettings = {}) {
-  // 1. Agreed override (set via PATCH /students/:id/fees)
-  const agreed = getAgreedAmount(student, "transport_fee");
+  // 1. Agreed override (supports transport_fee and transport_termly_fee)
+  const agreed = getAgreedAmount(student, "transport_fee") ?? getAgreedAmount(student, "transport_termly_fee");
   if (agreed !== null && agreed > 0) {
     return agreed;
   }
@@ -87,8 +87,8 @@ export function getStudentTransportFee(student, schoolSettings = {}) {
 }
 
 export function getStudentLunchFee(student, schoolSettings = {}) {
-  // 1. Agreed override
-  const agreed = getAgreedAmount(student, "lunch_fee");
+  // 1. Agreed override (supports both lunch_fee and lunch_termly_fee)
+  const agreed = getAgreedAmount(student, "lunch_fee") ?? getAgreedAmount(student, "lunch_termly_fee");
   if (agreed !== null && agreed > 0) {
     return agreed;
   }
@@ -125,8 +125,8 @@ export function getStudentLunchFee(student, schoolSettings = {}) {
 }
 
 export function getStudentBreakfastFee(student, schoolSettings = {}) {
-  // 1. Agreed override
-  const agreed = getAgreedAmount(student, "breakfast_termly_fee");
+  // 1. Agreed override (supports both breakfast_termly_fee and breakfast_fee)
+  const agreed = getAgreedAmount(student, "breakfast_termly_fee") ?? getAgreedAmount(student, "breakfast_fee");
   if (agreed !== null && agreed > 0) {
     return agreed;
   }

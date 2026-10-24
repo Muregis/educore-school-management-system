@@ -216,7 +216,7 @@ router.get("/", async (req, res, next) => {
     try {
       const { data: allStudents, error: stuListErr } = await supabase
         .from('students')
-        .select('student_id, class_name, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage')
+        .select('student_id, class_name, opening_balance, opening_balance_type, transport_direction, transport_base_fee, transport_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, lunch_fee, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, breakfast_termly_fee, discount_type, discount_value, discount_is_percentage')
         .eq('school_id', schoolId)
         .eq('is_deleted', false)
         .eq('status', 'active');

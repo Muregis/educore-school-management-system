@@ -110,35 +110,83 @@ export function calculateBreakfastFee(rate, days = 0, billingType = "termly") {
   return round2(r);
 }
 
-export function getStudentTransportFee(student) {
-  const agreed = agreedAmount(student, "transport_fee");
+export function getStudentTransportFee(student, schoolSettings = {}) {
+  const agreed = agreedAmount(student, "transport_fee") ?? agreedAmount(student, "transport_termly_fee");
   if (agreed !== null && agreed > 0) return agreed;
   return calculateTransportFee(
-    student?.transport_base_fee ?? student?.transportBaseFee,
-    student?.transport_direction ?? student?.transportDirection ?? "none"
+    student?.transport_base_fee ?? student?.transportBaseFee ?? schoolSettings.transport_base_fee ?? 0,
+    student?.transport_direction ?? student?.transportDirection ?? schoolSettings.transport_direction ?? "none"
   );
 }
 
 export function getStudentLunchFee(student, schoolSettings = {}) {
-  const agreed = agreedAmount(student, "lunch_fee");
+  const agreed = agreedAmount(student, "lunch_fee") ?? agreedAmount(student, "lunch_termly_fee");
   if (agreed !== null && agreed > 0) return agreed;
-  if (!Boolean(student?.lunch_enabled ?? student?.lunchEnabled)) return 0;
-  return calculateLunchFee(
-    student?.lunch_daily_rate ?? student?.lunchDailyRate ?? schoolSettings.lunch_daily_rate ?? 0,
-    student?.lunch_days ?? student?.lunchDays ?? schoolSettings.lunch_days ?? 0,
-    student?.lunch_billing_type ?? student?.lunchBillingType ?? schoolSettings.lunch_billing_type ?? schoolSettings.lunchBillingType ?? "termly"
+
+  const dailyRate = toNumber(
+    student?.lunch_daily_rate ??
+    student?.lunchDailyRate ??
+    schoolSettings.lunch_daily_rate ??
+    schoolSettings.lunchDailyRate ??
+    0
   );
+  const days = toNumber(
+    student?.lunch_days ??
+    student?.lunchDays ??
+    schoolSettings.lunch_days ??
+    schoolSettings.lunchDays ??
+    schoolSettings.term_days ??
+    schoolSettings.termDays ??
+    0
+  );
+  const billingType =
+    student?.lunch_billing_type ??
+    student?.lunchBillingType ??
+    schoolSettings.lunch_billing_type ??
+    schoolSettings.lunchBillingType ??
+    "termly";
+  const explicitFlag = student?.lunch_enabled ?? student?.lunchEnabled;
+  const schoolFlag = schoolSettings.lunch_enabled ?? schoolSettings.lunchEnabled;
+  const enabled = explicitFlag !== undefined ? Boolean(explicitFlag)
+                  : schoolFlag !== undefined ? Boolean(schoolFlag)
+                  : dailyRate > 0;
+  if (!enabled) return 0;
+  return calculateLunchFee(dailyRate, days, billingType);
 }
 
 export function getStudentBreakfastFee(student, schoolSettings = {}) {
-  const agreed = agreedAmount(student, "breakfast_termly_fee");
+  const agreed = agreedAmount(student, "breakfast_termly_fee") ?? agreedAmount(student, "breakfast_fee");
   if (agreed !== null && agreed > 0) return agreed;
-  if (!Boolean(student?.breakfast_enabled ?? student?.breakfastEnabled)) return 0;
-  return calculateBreakfastFee(
-    student?.breakfast_daily_rate ?? student?.breakfastDailyRate ?? schoolSettings.breakfast_daily_rate ?? 0,
-    student?.breakfast_days ?? student?.breakfastDays ?? schoolSettings.breakfast_days ?? 0,
-    student?.breakfast_billing_type ?? student?.breakfastBillingType ?? schoolSettings.breakfast_billing_type ?? schoolSettings.breakfastBillingType ?? "termly"
+
+  const dailyRate = toNumber(
+    student?.breakfast_daily_rate ??
+    student?.breakfastDailyRate ??
+    schoolSettings.breakfast_daily_rate ??
+    schoolSettings.breakfastDailyRate ??
+    0
   );
+  const days = toNumber(
+    student?.breakfast_days ??
+    student?.breakfastDays ??
+    schoolSettings.breakfast_days ??
+    schoolSettings.breakfastDays ??
+    schoolSettings.term_days ??
+    schoolSettings.termDays ??
+    0
+  );
+  const billingType =
+    student?.breakfast_billing_type ??
+    student?.breakfastBillingType ??
+    schoolSettings.breakfast_billing_type ??
+    schoolSettings.breakfastBillingType ??
+    "termly";
+  const explicitFlag = student?.breakfast_enabled ?? student?.breakfastEnabled;
+  const schoolFlag = schoolSettings.breakfast_enabled ?? schoolSettings.breakfastEnabled;
+  const enabled = explicitFlag !== undefined ? Boolean(explicitFlag)
+                  : schoolFlag !== undefined ? Boolean(schoolFlag)
+                  : dailyRate > 0;
+  if (!enabled) return 0;
+  return calculateBreakfastFee(dailyRate, days, billingType);
 }
 
 // ── Discounts ───────────────────────────────────────────────────────────────────
@@ -277,7 +325,7 @@ export function calculateStudentFeeBalance({
   const structure = findFeeStructureForClass(feeStructures, className);
   const tuition = structure ? toNumber(structure.tuition) : 0;
 
-  const transportFee = getStudentTransportFee(student);
+  const transportFee = getStudentTransportFee(student, schoolSettings);
   const lunchFee = getStudentLunchFee(student, schoolSettings);
   const breakfastFee = getStudentBreakfastFee(student, schoolSettings);
   const openingBalance = getOpeningBalanceImpact(student);

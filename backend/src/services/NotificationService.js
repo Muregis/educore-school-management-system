@@ -2,6 +2,7 @@ import { database } from "../config/db.js";
 import { sendEmail } from "./email.service.js";
 import { sendWhatsAppPaymentReceipt } from "./whatsappService.js";
 import { calculateStudentFeeBalance } from "./feeBalanceCalculator.js";
+import { getSchoolSettings } from "./schoolSettings.service.js";
 
 /**
  * Notification Service
@@ -158,6 +159,7 @@ export class NotificationService {
       const { data: feeStructures } = await database.query('fee_structures', {
         where: { school_id: schoolId, is_deleted: false }
       });
+      const schoolSettings = await getSchoolSettings(schoolId);
 
       return students
         .map(student => ({
@@ -165,7 +167,8 @@ export class NotificationService {
           balance: calculateStudentFeeBalance({
             student,
             feeStructures: feeStructures || [],
-            payments: payments || []
+            payments: payments || [],
+            schoolSettings,
           }).balance
         }))
         .filter(student => student.balance >= minBalance);

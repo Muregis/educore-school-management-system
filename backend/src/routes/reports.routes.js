@@ -33,7 +33,7 @@ router.get("/summary", async (req, res, next) => {
     // Get student counts by gender
     const { data: students, error: stuErr } = await supabase
       .from('students')
-      .select('student_id, gender, class_name, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, discount_type, discount_value, discount_is_percentage')
+      .select('student_id, gender, class_name, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, transport_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, lunch_fee, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, breakfast_termly_fee, discount_type, discount_value, discount_is_percentage')
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
       .eq('status', 'active');
@@ -320,7 +320,7 @@ router.get("/fee-defaulters", async (req, res, next) => {
 
     const { data: allStudents, error: stuErr } = await supabase
       .from('students')
-      .select('student_id, first_name, last_name, admission_number, class_name, parent_phone, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, discount_type, discount_value, discount_is_percentage')
+      .select('student_id, first_name, last_name, admission_number, class_name, parent_phone, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, transport_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, lunch_fee, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, breakfast_termly_fee, discount_type, discount_value, discount_is_percentage')
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
       .eq('status', 'active')
@@ -407,7 +407,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
     // Get all students
     const { data: allStudents, error: stuErr } = await supabase
       .from('students')
-      .select('student_id, first_name, last_name, class_name, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, discount_type, discount_value, discount_is_percentage')
+      .select('student_id, first_name, last_name, class_name, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, transport_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, lunch_fee, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, breakfast_termly_fee, discount_type, discount_value, discount_is_percentage')
       .eq('school_id', schoolId)
       .eq('is_deleted', false)
       .eq('status', 'active');

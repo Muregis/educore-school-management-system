@@ -2,6 +2,7 @@ import { database } from "../config/db.js";
 import { logAuditEvent, AUDIT_ACTIONS } from "../helpers/audit.logger.js";
 import { supabase } from "../config/supabaseClient.js";
 import { calculateStudentFeeBalance } from "./feeBalanceCalculator.js";
+import { getSchoolSettings } from "./schoolSettings.service.js";
 
 // Student Ledger Service for fee balance tracking
 export class LedgerService {
@@ -354,6 +355,7 @@ export class LedgerService {
     } catch (_) {}
 
     // 2. Process each student
+    const schoolSettings = await getSchoolSettings(schoolId);
     for (const student of students) {
       try {
         const sid = student.student_id ?? student.id;
@@ -364,6 +366,7 @@ export class LedgerService {
           feeStructures: structures || [],
           payments: paidPayments,
           discounts: studentDiscs,
+          schoolSettings,
         });
 
         const { data: ledgerEntries } = await supabase

@@ -803,7 +803,7 @@ const fullNav = useMemo(() => {
     accounts: ["admin","director","superadmin"].includes(auth.role) ? <AccountsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
     lessonplans: ["admin","teacher","director","superadmin"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
     announcements: perms?.pages.includes("announcements") ? <AnnouncementsPage auth={auth} toast={toast} /> : <Forbidden />,
-    analytics: ["director","superadmin"].includes(auth.role) ? <AnalyticsPage auth={auth} students={students} teachers={teachers} payments={payments} results={results} attendance={attendance} feeStructures={feeStructures} toast={toast} /> : <Forbidden />,
+    analytics: ["director","superadmin"].includes(auth.role) ? <AnalyticsPage auth={auth} school={school} students={students} teachers={teachers} payments={payments} results={results} attendance={attendance} feeStructures={feeStructures} toast={toast} /> : <Forbidden />,
     reports: ["finance","director","superadmin"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
     "financial-reports": ["finance","director","superadmin"].includes(auth.role) ? <FinancialReportsPage auth={auth} toast={toast} /> : <Forbidden />,
     analysis: ["admin","teacher","director","superadmin"].includes(auth.role) ? <AnalysisPage auth={auth} toast={toast} /> : <Forbidden />,

@@ -23,7 +23,7 @@ export async function getSchoolSettings(schoolId) {
     if (!map.has("lunch_daily_rate")) {
       const { data } = await supabase
         .from("schools")
-        .select("lunch_daily_rate, lunch_days, breakfast_daily_rate, breakfast_days")
+        .select("lunch_daily_rate, lunch_days, breakfast_daily_rate, breakfast_days, transport_base_fee, transport_direction")
         .eq("school_id", schoolId)
         .maybeSingle();
       schoolData = data;
@@ -36,6 +36,8 @@ export async function getSchoolSettings(schoolId) {
       breakfast_daily_rate: Number(map.get("breakfast_daily_rate") ?? schoolData?.breakfast_daily_rate ?? 0),
       breakfast_days: Number(map.get("breakfast_days") ?? schoolData?.breakfast_days ?? 0),
       breakfast_billing_type: map.get("breakfast_billing_type") ?? schoolData?.breakfast_billing_type ?? "termly",
+      transport_base_fee: Number(map.get("transport_base_fee") ?? schoolData?.transport_base_fee ?? 0),
+      transport_direction: map.get("transport_direction") ?? schoolData?.transport_direction ?? "none",
     };
   } catch (err) {
     console.warn("[schoolSettings] Failed to fetch settings:", err.message);

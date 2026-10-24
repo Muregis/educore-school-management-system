@@ -5,6 +5,7 @@ import { requireRoles } from "../middleware/roles.js";
 import { logActivity } from "../helpers/activity.logger.js";
 import LedgerService from "../services/ledger.service.js";
 import { calculateStudentFeeBalance } from "../services/feeBalanceCalculator.js";
+import { getSchoolSettings } from "../services/schoolSettings.service.js";
 
 const router = Router();
 router.use(authRequired);
@@ -67,9 +68,10 @@ router.get("/all/balances", async (req, res, next) => {
       .in('status', ['paid', 'completed', 'success']);
     if (term) query = query.eq('term', term);
     const { data: payments } = await query;
+    const schoolSettings = await getSchoolSettings(schoolId);
 
     const studentBalances = (students || []).map(s => {
-      const balanceInfo = calculateStudentFeeBalance({ student: s, feeStructures: feeStructures || [], payments: payments || [] });
+      const balanceInfo = calculateStudentFeeBalance({ student: s, feeStructures: feeStructures || [], payments: payments || [], schoolSettings });
       return {
         student_id: s.student_id,
         name: `${s.first_name || ''} ${s.last_name || ''}`.trim(),
@@ -154,6 +156,7 @@ router.post("/reset-opening-balances",
 
       let fixed = 0;
       let errors = [];
+      const schoolSettings = await getSchoolSettings(schoolId);
       for (const student of students) {
         try {
           // Compute correct balance with opening_balance=0 (pure formula from raw data)
@@ -161,6 +164,7 @@ router.post("/reset-opening-balances",
             student: { ...student, opening_balance: 0, opening_balance_type: 'owing' },
             feeStructures: feeStructures || [],
             payments: allPayments || [],
+            schoolSettings,
           });
 
           const correctBalance = correctFormula.balance;

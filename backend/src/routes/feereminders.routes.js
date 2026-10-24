@@ -17,6 +17,7 @@ import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { sendPaymentReceipt } from "../utils/smsUtils.js";
 import { calculateStudentFeeBalance } from "../services/feeBalanceCalculator.js";
+import { getSchoolSettings } from "../services/schoolSettings.service.js";
 
 const router = Router();
 router.use(authRequired);
@@ -29,13 +30,17 @@ router.post("/send-reminders", requireRoles("admin", "finance", "director", "sup
 
     if (!term) return res.status(400).json({ message: "term is required" });
 
-    // 1. Load all active students (read-only)
-    const { data: students, error: sErr } = await supabase
-      .from("students")
-      .select("student_id, first_name, last_name, class_name, parent_phone, admission_number, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, breakfast_enabled, breakfast_daily_rate, breakfast_days, discount_type, discount_value, discount_is_percentage")
-      .eq("school_id", schoolId)
-      .eq("status", "active")
-      .eq("is_deleted", false);
+    // 1. Load all active students and school settings (read-only)
+    const [stuRes, schoolSettings] = await Promise.all([
+      supabase
+        .from("students")
+        .select("student_id, first_name, last_name, class_name, parent_phone, admission_number, opening_balance, opening_balance_type, transport_direction, transport_base_fee, transport_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, lunch_fee, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, breakfast_termly_fee, discount_type, discount_value, discount_is_percentage")
+        .eq("school_id", schoolId)
+        .eq("status", "active")
+        .eq("is_deleted", false),
+      getSchoolSettings(schoolId),
+    ]);
+    const { data: students, error: sErr } = stuRes;
     if (sErr) throw sErr;
 
     // 2. Load fee structures for this term (read-only)
@@ -64,7 +69,8 @@ router.post("/send-reminders", requireRoles("admin", "finance", "director", "sup
       const balanceInfo = calculateStudentFeeBalance({
         student: s,
         feeStructures: feeStructures || [],
-        payments: (payments || []).filter(p => p.student_id === s.student_id)
+        payments: (payments || []).filter(p => p.student_id === s.student_id),
+        schoolSettings: schoolSettings || {}
       });
       const expected = balanceInfo.expected;
       const paid     = balanceInfo.paid;

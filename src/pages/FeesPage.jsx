@@ -108,7 +108,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
     return () => { ignore = true; };
   }, [auth?.token]);
   const [tab, setTab]                 = useState("payments");
-  const [showPayment, setShowPayment] = useState(false);
+
   const [showStruct, setShowStruct]   = useState(false);
   const [showPaystack, setShowPaystack] = useState(false);
   const [showMpesa, setShowMpesa]       = useState(false);
@@ -129,8 +129,8 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const [studentSearch, setStudentSearch] = useState("");
   const [recordSearch, setRecordSearch] = useState("");
   const [page, setPage]               = useState(1);
-  const [paymentForm, setPaymentForm] = useState({ studentId: "", amount: "", feeType: "tuition", method: "cash", date: startDate || new Date().toISOString().slice(0,10), status: "paid", paidBy: "" });
-  const [paymentClass, setPaymentClass] = useState("");
+
+
   const [structForm, setStructForm]   = useState({ className: "", term: displayTerm, tuition: "", activity: "", misc: "" });
   const [bankDetails, setBankDetails] = useState(null);
   const [schoolWhatsApp, setSchoolWhatsApp] = useState("");
@@ -157,24 +157,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const getBusinessToday = () => new Date().toISOString().split('T')[0];
   const businessToday = getBusinessToday();
 
-  const [dayEndTime, setDayEndTime] = useState(() => localStorage.getItem('dayEndTime') || '18:00');
-  const [lastDayClosed, setLastDayClosed] = useState(() => localStorage.getItem('lastDayClosed') || null);
-  const [showDayEndSettings, setShowDayEndSettings] = useState(false);
-
-  const saveDayEndTime = (time) => {
-    setDayEndTime(time);
-    localStorage.setItem('dayEndTime', time);
-  };
-
-  const closeDay = () => {
-    const today = getBusinessToday();
-    setLastDayClosed(today);
-    localStorage.setItem('lastDayClosed', today);
-    const dayTotal = normalisedPayments
-      .filter(p => (p?.date || p?.payment_date) === today)
-      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    toast(`Day closed (${today}) — KES ${Number(dayTotal).toLocaleString()} collected`, "success");
-  };
 
   const reloadPayments = useCallback(async () => {
     if (!auth?.token || !term) return;
@@ -227,11 +209,11 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       isOverpaid,
       openingBalance: balanceInfo.openingBalance,
       transportFee: balanceInfo.transportFee,
-      transportAgreed: Number(student?.transport_fee) > 0,
+      transportAgreed: Number(student?.transport_fee) > 0 || Number(student?.transport_termly_fee) > 0,
       lunchFee: balanceInfo.lunchFee,
-      lunchAgreed: Number(student?.lunch_fee) > 0,
+      lunchAgreed: Number(student?.lunch_fee) > 0 || Number(student?.lunch_termly_fee) > 0,
       breakfastFee: balanceInfo.breakfastFee,
-      breakfastAgreed: Number(student?.breakfast_termly_fee) > 0,
+      breakfastAgreed: Number(student?.breakfast_termly_fee) > 0 || Number(student?.breakfast_fee) > 0,
       baseFee: balanceInfo.baseFee,
       admissionNumber: student?.admission ?? student?.admission_number ?? "",
       email: student?.email ?? student?.parentEmail ?? "",
@@ -258,7 +240,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   const isTodayPayment = (p) => {
     const paymentDate = p.date || p.payment_date || "";
     if (!paymentDate) return false;
-    if (lastDayClosed && new Date(paymentDate) <= new Date(lastDayClosed)) return false;
+
     return paymentDate.startsWith(businessToday);
   };
 
@@ -369,57 +351,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         toast(`Status: ${data.status} — payment not yet confirmed`, "warning");
       }
     } catch { toast("Could not check status", "error"); }
-  };
-
-  const savePayment = async () => {
-    const sid = Number(paymentForm.studentId);
-    const s   = students.find(x => (x.student_id ?? x.id) === sid);
-    const amt = Number(paymentForm.amount);
-    const balance = balances.find(b => b.studentId === sid)?.balance || 0;
-
-    if (!s)   return toast("Select student", "error");
-    if (!amt || amt <= 0) return toast("Amount required", "error");
-    if (amt > balance) return toast("Cannot exceed outstanding balance", "error");
-
-    const methodMap = { cash: 'cash', mpesa: 'mpesa_manual', bank: 'bank_transfer' };
-    const paymentMethod = methodMap[paymentForm.method] || paymentForm.method;
-
-    console.log('[FeesPage] savePayment payload:', {
-      studentId: sid,
-      amount: amt,
-      paymentMethod,
-      paymentDate: paymentForm.date,
-      term: displayTerm
-    });
-
-    try {
-      await apiFetch("/payments/record-manual", {
-        method: "POST",
-        token: auth?.token,
-        body: {
-          studentId: sid,
-          amount: amt,
-          paymentMethod,
-          paymentDate: paymentForm.date,
-          term: displayTerm,
-        },
-      });
-      await reloadPayments();
-      setShowPayment(false);
-      const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
-      const studentBalance = calculateLedgerBalance(s, studentDiscounts[sid] || []);
-      const newBalance = Math.max(0, studentBalance.balance - amt);
-      setReceipt({ 
-        studentName: name, 
-        amount: amt, 
-        reference: `CASH-${Date.now()}`, 
-        method: paymentForm.method, 
-        date: paymentForm.date,
-        balance: newBalance
-      });
-      setShowReceipt(true);
-      toast("Payment recorded", "success");
-    } catch (err) { toast(err.message || "Payment failed", "error"); }
   };
 
   const savePaymentEdit = async () => {
@@ -693,7 +624,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         <Badge text={`Students: ${students.length}`} variant="primary" />
         {filterDate === "today" && <Badge text="Showing: Today Only" variant="warning" />}
         <span style={{ fontSize: "12px", color: "var(--color-text-muted)", marginLeft: "auto", fontWeight: 500 }}>
-          Day ends at {dayEndTime} • Business day: {businessToday}
+          Today: {businessToday}
         </span>
       </div>
 
@@ -817,11 +748,11 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             }}>🖨️ Print Statement</Button>}
             {canViewTotals && tab === "balances" && <Button variant="ghost" onClick={printBalanceReport}>🖨️ Print Balances</Button>}
             {canViewTotals && tab === "structure" && <Button variant="ghost" onClick={printFeeStructureReport}>🖨️ Print Fee Structure</Button>}
-            {canEdit && tab==="payments" && <Button onClick={() => setShowPayment(true)}>+ Record Payment</Button>}
-            {canEdit && tab==="payments" && <Button variant="secondary" onClick={() => setShowRecordPaymentModal(true)}>📝 Manual Payment</Button>}
+
+            {canEdit && tab==="payments" && <Button variant="primary" onClick={() => setShowRecordPaymentModal(true)}>📝 Manual Payment</Button>}
             {canEdit && tab==="structure" && <Button onClick={() => { setEditStruct(null); setStructForm({className:"Grade 7",term:displayTerm,tuition:"",activity:"",misc:""}); setShowStruct(true); }}>Set Fee Structure</Button>}
-            {canEdit && <Button variant="ghost" onClick={() => setShowDayEndSettings(true)}>⚙️ Day Settings</Button>}
-            {canEdit && <Button variant="primary" onClick={closeDay}>🔒 Close Day</Button>}
+
+
           </div>
         </div>
       </Card>
@@ -1293,108 +1224,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         )}
       </Modal>
 
-      {/* Manual Payment Modal */}
-      <Modal isOpen={showPayment} title="Record Manual Payment" onClose={() => setShowPayment(false)} footer={
-        <>
-          <Button variant="ghost" onClick={() => setShowPayment(false)}>Cancel</Button>
-          <Button 
-            disabled={Number(paymentForm.amount) <= 0 || !paymentForm.studentId || Number(paymentForm.amount) > (balances.find(b => b.studentId === paymentForm.studentId)?.balance || 0)}
-            onClick={savePayment}
-          >
-            Save Payment
-          </Button>
-        </>
-      }>
-        <div className="ec-form-grid ec-form-grid-2">
-          <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)" }}>
-            <Select 
-              label="Class"
-              value={paymentClass} 
-              onChange={e => { setPaymentClass(e.target.value); setPaymentForm({ ...paymentForm, studentId: "" }); }}
-              options={[
-                { value: "", label: "-- Select class first --" },
-                ...(availableClasses ?? []).map(c => ({ value: c, label: c }))
-              ]}
-            />
-            <Select 
-              label="Student"
-              value={paymentForm.studentId} 
-              onChange={e => setPaymentForm({ ...paymentForm, studentId: Number(e.target.value) })} 
-              disabled={!paymentClass}
-              options={[
-                { value: "", label: paymentClass ? "-- Select student --" : "-- Select class first --" },
-                ...students.filter(s => (s.className ?? s.class_name) === paymentClass).map(s => ({
-                  value: s.student_id ?? s.id,
-                  label: s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`
-                }))
-              ]}
-            />
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <Input 
-              label="Amount (KES)"
-              type="number" 
-              value={paymentForm.amount} 
-              onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} 
-            />
-            {Number(paymentForm.amount) > (balances.find(b => b.studentId === paymentForm.studentId)?.balance || 0) && (
-              <span style={{ color: "var(--color-danger)", fontSize: "12px", marginTop: "4px" }}>Cannot exceed balance</span>
-            )}
-            {Number(paymentForm.amount) < 100 && (
-              <span style={{ color: "var(--color-danger)", fontSize: "12px", marginTop: "4px" }}>Minimum KSh 100</span>
-            )}
-          </div>
-
-          <Select 
-            label="Type"
-            value={paymentForm.feeType} 
-            onChange={e => setPaymentForm({ ...paymentForm, feeType: e.target.value })}
-            options={[
-              { value: "tuition", label: "Tuition" },
-              { value: "activity", label: "Activity" },
-              { value: "misc", label: "Misc" }
-            ]}
-          />
-
-          <Select 
-            label="Method"
-            value={paymentForm.method} 
-            onChange={e => setPaymentForm({ ...paymentForm, method: e.target.value })}
-            options={[
-              { value: "cash", label: "Cash" },
-              { value: "mpesa", label: "Mpesa" },
-              { value: "bank", label: "Bank" }
-            ]}
-          />
-
-          <Input 
-            label="Date"
-            type="date" 
-            value={paymentForm.date} 
-            onChange={e => setPaymentForm({ ...paymentForm, date: e.target.value })} 
-          />
-
-          <Select 
-            label="Status"
-            value={paymentForm.status} 
-            onChange={e => setPaymentForm({ ...paymentForm, status: e.target.value })}
-            options={[
-              { value: "paid", label: "Paid" },
-              { value: "pending", label: "Pending" }
-            ]}
-          />
-
-          <div style={{ gridColumn: "1 / -1" }}>
-            <Input 
-              label="Paid By (parent/guardian/sponsor)"
-              value={paymentForm.paidBy} 
-              onChange={e => setPaymentForm({ ...paymentForm, paidBy: e.target.value })} 
-              placeholder="e.g. John Kamau (Father)" 
-            />
-          </div>
-        </div>
-      </Modal>
 
       {/* Edit Payment Modal */}
       <Modal isOpen={!!editingPayment} title={`Edit Payment — ${editingPayment?.studentName}`} onClose={() => setEditingPayment(null)} footer={
@@ -1576,38 +1405,6 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
         </div>
       </Modal>
 
-      {/* Day End Settings Modal */}
-      <Modal isOpen={showDayEndSettings} title="Day End Settings" onClose={() => setShowDayEndSettings(false)} footer={
-        <>
-          <Button variant="ghost" onClick={() => setShowDayEndSettings(false)}>Close</Button>
-          <Button variant="danger" onClick={() => {
-            localStorage.removeItem('lastDayClosed');
-            setLastDayClosed(null);
-            toast('Day closure reset', 'success');
-          }}>Reset Day Closure</Button>
-        </>
-      }>
-        <div style={{ marginBottom: "var(--space-4)" }}>
-          <Input
-            label="Business Day End Time"
-            type="time"
-            value={dayEndTime}
-            onChange={(e) => saveDayEndTime(e.target.value)}
-          />
-          <small style={{ color: "var(--color-text-muted)", fontSize: "12px", display: 'block', marginTop: "var(--space-2)" }}>
-            After this time, "Today's Collection" will reset for the next business day.
-          </small>
-        </div>
-        
-        <div style={{ padding: "var(--space-3)", background: "var(--color-bg-surface)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
-          <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginBottom: "var(--space-2)", textTransform: "uppercase", fontWeight: 600 }}>Current Status</div>
-          <div style={{ fontSize: "14px", color: "var(--color-text-primary)", lineHeight: 1.6 }}>
-            Day ends at: <strong>{dayEndTime}</strong><br/>
-            Business date: <strong>{businessToday}</strong><br/>
-            Last closed: {lastDayClosed ? new Date(lastDayClosed).toLocaleString() : 'Never'}
-          </div>
-        </div>
-      </Modal>
 
       {/* RecordPaymentModal Component (External) */}
       <RecordPaymentModal

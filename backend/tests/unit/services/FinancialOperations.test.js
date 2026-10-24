@@ -130,6 +130,23 @@ describe('Financial Operations & Invariants', () => {
 
       expect(agreedBalance.lunchFee).toBe(4500);
       expect(agreedBalance.breakfastFee).toBe(2500);
+
+      // Student D: Agreed flat lunch_termly_fee, breakfast_fee, transport_termly_fee aliases
+      const termlyAliasStudent = {
+        student_id: 104,
+        class_name: 'Grade 1',
+        lunch_termly_fee: 4800,
+        breakfast_fee: 2200,
+        transport_termly_fee: 3500,
+      };
+      const aliasBalance = calculateStudentFeeBalance({
+        student: termlyAliasStudent,
+        feeStructures,
+        payments: [],
+      });
+      expect(aliasBalance.lunchFee).toBe(4800);
+      expect(aliasBalance.breakfastFee).toBe(2200);
+      expect(aliasBalance.transportFee).toBe(3500);
     });
 
     it('enforces non-negative total charges even if discount exceeds tuition', async () => {

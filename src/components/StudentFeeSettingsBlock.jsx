@@ -53,6 +53,16 @@ export default function StudentFeeSettingsBlock({ f, onChange }) {
             }
             disabled={(f.transport_direction || "none") === "none"}
           />
+          <Input
+            label="Agreed transport (KES)"
+            type="number"
+            value={f.transport_fee ?? f.transport_termly_fee ?? ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? "" : parseFloat(e.target.value) || 0;
+              set("transport_fee", val);
+              set("transport_termly_fee", val);
+            }}
+          />
         </div>
       </div>
 
@@ -103,6 +113,16 @@ export default function StudentFeeSettingsBlock({ f, onChange }) {
               onChange={(e) => set("lunch_days", e.target.value)}
             />
           )}
+          <Input
+            label="Agreed lunch (KES)"
+            type="number"
+            value={f.lunch_fee ?? f.lunch_termly_fee ?? ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? "" : parseFloat(e.target.value) || 0;
+              set("lunch_fee", val);
+              set("lunch_termly_fee", val);
+            }}
+          />
         </div>
       </div>
 
@@ -159,13 +179,12 @@ export default function StudentFeeSettingsBlock({ f, onChange }) {
           <Input
             label="Agreed breakfast (KES)"
             type="number"
-            value={f.breakfast_termly_fee ?? ""}
-            onChange={(e) =>
-              set(
-                "breakfast_termly_fee",
-                e.target.value === "" ? "" : parseFloat(e.target.value) || 0
-              )
-            }
+            value={f.breakfast_termly_fee ?? f.breakfast_fee ?? ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? "" : parseFloat(e.target.value) || 0;
+              set("breakfast_termly_fee", val);
+              set("breakfast_fee", val);
+            }}
           />
         </div>
       </div>
