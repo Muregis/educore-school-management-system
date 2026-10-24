@@ -18,6 +18,7 @@ import {
   PermissionService
 } from "../services/backend_services.js";
 import { calculateStudentFeeBalance, getOpeningBalanceImpact } from "../services/feeBalanceCalculator.js";
+import { getSchoolSettings } from "../services/schoolSettings.service.js";
 
 const router = express.Router();
 router.use(authRequired);
@@ -277,10 +278,11 @@ router.get("/finance/term-summary/:termId", authorize("reports.financial"), asyn
 
     const termName = term.term_name;
 
-    const [{ data: students }, { data: feeStructures }, { data: payments }] = await Promise.all([
+    const [{ data: students }, { data: feeStructures }, { data: payments }, schoolSettings] = await Promise.all([
       supabase.from('students').select('student_id, first_name, last_name, admission_number, class_name, status, opening_balance, opening_balance_type, transport_direction, transport_base_fee, lunch_enabled, lunch_daily_rate, lunch_days, lunch_billing_type, breakfast_enabled, breakfast_daily_rate, breakfast_days, breakfast_billing_type, discount_type, discount_value, discount_is_percentage').eq('school_id', schoolId).eq('is_deleted', false).eq('status', 'active'),
       supabase.from('fee_structures').select('class_name, tuition, activity, misc').eq('school_id', schoolId).eq('is_deleted', false).eq('term', termName),
       supabase.from('payments').select('student_id, amount, status').eq('school_id', schoolId).eq('term', termName).eq('is_deleted', false).in('status', ['paid', 'completed', 'success']),
+      getSchoolSettings(schoolId),
     ]);
 
     const activeStudents = students || [];
@@ -297,6 +299,7 @@ router.get("/finance/term-summary/:termId", authorize("reports.financial"), asyn
         student,
         feeStructures: termFeeStructures,
         payments: termPayments,
+        schoolSettings,
       });
 
       totalPaid += balanceInfo.paid;

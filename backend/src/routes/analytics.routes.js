@@ -2,6 +2,7 @@ import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { calculateStudentFeeBalance } from "../services/feeBalanceCalculator.js";
+import { getSchoolSettings } from "../services/schoolSettings.service.js";
 import { getExpenditureSummary } from "../services/expenditure.service.js";
 
 const router = Router();
@@ -247,11 +248,13 @@ router.get("/", async (req, res, next) => {
         // Count students with an outstanding balance using the canonical
         // fee-balance formula (single source of truth shared with the Fees
         // page / Dashboard / Reports).
+        const schoolSettings = await getSchoolSettings(schoolId);
         defaultersCount = allStudents?.filter(s => {
           const balanceInfo = calculateStudentFeeBalance({
             student: s,
             feeStructures,
             payments: allPayments || [],
+            schoolSettings,
           });
           return balanceInfo.balance > 0;
         }).length || 0;

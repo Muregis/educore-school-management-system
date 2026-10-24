@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { BillingService } from '../../../src/services/BillingService.js';
+import { calculateStudentFeeBalance } from '../../../src/services/feeBalanceCalculator.js';
 
 describe('Financial Operations & Invariants', () => {
   beforeEach(() => {
@@ -54,6 +55,81 @@ describe('Financial Operations & Invariants', () => {
       // Total charge: tuition (15000) + activity (2000) + misc (1000) + lunch (9000) + transport (1500) + carryForward (500) = 29000
       const expectedTotal = 15000 + 2000 + 1000 + 9000 + 1500 + 500;
       expect(result.total_charge).toBe(expectedTotal);
+    });
+
+    it('strictly differentiates termly flat rate from daily rate without confusing them', async () => {
+      // Student A: Termly flat lunch rate (e.g. KES 6,500 flat for the term, days is 0/ignored)
+      const termlyStudent = {
+        student_id: 101,
+        class_name: 'Grade 1',
+        lunch_enabled: true,
+        lunch_daily_rate: 6500, // Represents flat termly rate
+        lunch_days: 0,          // 0 days because it is termly flat billing
+        lunch_billing_type: 'termly',
+        breakfast_enabled: true,
+        breakfast_daily_rate: 3000,
+        breakfast_days: 0,
+        breakfast_billing_type: 'termly',
+      };
+
+      const feeStructures = [{ class_name: 'Grade 1', tuition: 10000, activity: 1000, misc: 500 }];
+
+      const termlyBalance = calculateStudentFeeBalance({
+        student: termlyStudent,
+        feeStructures,
+        payments: [],
+      });
+
+      // Termly rate must NOT be 0 (even though days=0) and must NOT be multiplied by days
+      expect(termlyBalance.lunchFee).toBe(6500);
+      expect(termlyBalance.breakfastFee).toBe(3000);
+      expect(termlyBalance.expected).toBe(10000 + 1000 + 500 + 6500 + 3000);
+
+      // Student B: Daily rate (e.g. KES 100/day x 60 days = KES 6,000)
+      const dailyStudent = {
+        student_id: 102,
+        class_name: 'Grade 1',
+        lunch_enabled: true,
+        lunch_daily_rate: 100, // KES 100 per day
+        lunch_days: 60,         // 60 school days
+        lunch_billing_type: 'daily',
+        breakfast_enabled: false,
+      };
+
+      const dailyBalance = calculateStudentFeeBalance({
+        student: dailyStudent,
+        feeStructures,
+        payments: [],
+      });
+
+      // Daily rate MUST be rate * days
+      expect(dailyBalance.lunchFee).toBe(6000);
+      expect(dailyBalance.expected).toBe(10000 + 1000 + 500 + 6000);
+
+      // Student C: Agreed flat amount overrides BOTH daily and termly
+      const agreedStudent = {
+        student_id: 103,
+        class_name: 'Grade 1',
+        lunch_fee: 4500, // Parent agreed flat fee
+        lunch_enabled: true,
+        lunch_daily_rate: 100,
+        lunch_days: 60,
+        lunch_billing_type: 'daily',
+        breakfast_termly_fee: 2500, // Parent agreed flat fee
+        breakfast_enabled: true,
+        breakfast_daily_rate: 50,
+        breakfast_days: 60,
+        breakfast_billing_type: 'daily',
+      };
+
+      const agreedBalance = calculateStudentFeeBalance({
+        student: agreedStudent,
+        feeStructures,
+        payments: [],
+      });
+
+      expect(agreedBalance.lunchFee).toBe(4500);
+      expect(agreedBalance.breakfastFee).toBe(2500);
     });
 
     it('enforces non-negative total charges even if discount exceeds tuition', async () => {

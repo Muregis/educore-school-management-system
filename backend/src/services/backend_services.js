@@ -6,6 +6,7 @@
 import { supabase } from '../config/supabaseClient.js';
 import { logAuditEvent } from '../helpers/audit.logger.js';
 import { calculateStudentFeeBalance } from './feeBalanceCalculator.js';
+import { getSchoolSettings } from './schoolSettings.service.js';
 import { TermService } from './TermService.js';
 
 // =====================================================
@@ -528,24 +529,34 @@ export class TermTransitionService {
           .eq('school_id', schoolId)
           .eq('is_deleted', false);
 
-        const { data: feeStructures } = await supabase
+        const lastTerm = (terms || [])[(terms || []).length - 1];
+        const termName = lastTerm?.term_name;
+
+        let feeQuery = supabase
           .from('fee_structures')
           .select('*')
           .eq('school_id', schoolId)
           .eq('is_deleted', false);
 
-        const { data: payments } = await supabase
+        if (termName) feeQuery = feeQuery.eq('term', termName);
+        const { data: feeStructures } = await feeQuery;
+
+        let payQuery = supabase
           .from('payments')
           .select('*')
           .eq('school_id', schoolId)
           .eq('is_deleted', false)
           .in('status', ['paid', 'completed', 'success']);
+        if (termName) payQuery = payQuery.eq('term', termName);
+        const { data: payments } = await payQuery;
+
+        const schoolSettings = await getSchoolSettings(schoolId);
 
         const nextYearId = createNextYear ? (await this.createNextAcademicYear(schoolId, year, userId))?.academic_year_id : null;
 
         let carriedCount = 0;
         for (const student of allStudents || []) {
-          const balanceInfo = calculateStudentFeeBalance({ student, feeStructures: feeStructures || [], payments: payments || [] });
+          const balanceInfo = calculateStudentFeeBalance({ student, feeStructures: feeStructures || [], payments: payments || [], schoolSettings });
 
           if (balanceInfo.balance > 0) {
             await supabase.from('students').update({

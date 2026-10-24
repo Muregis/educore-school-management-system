@@ -4,6 +4,7 @@ import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
 import { getExpenditureSummary } from "../services/expenditure.service.js";
 import { calculateStudentFeeBalance } from "../services/feeBalanceCalculator.js";
+import { getSchoolSettings } from "../services/schoolSettings.service.js";
 import { isMissingTableError } from "../utils/missingTableError.js";
 
 const router = Router();
@@ -26,6 +27,7 @@ router.get("/summary", async (req, res, next) => {
     const { schoolId } = req.user;
     const { term } = req.query; // Allow term filtering via query param
     const currentTerm = term || await resolveCurrentTermName(schoolId);
+    const schoolSettings = await getSchoolSettings(schoolId);
     const expenditureSummary = await getExpenditureSummary(schoolId);
     
     // Get student counts by gender
@@ -112,6 +114,7 @@ router.get("/summary", async (req, res, next) => {
         student,
         feeStructures,
         payments: paidPayments || [],
+        schoolSettings,
       });
       if (balanceInfo.balance > 0) {
         totalOutstanding += balanceInfo.balance;
@@ -313,6 +316,7 @@ router.get("/fee-defaulters", async (req, res, next) => {
     const { term } = req.query; // Allow term filtering via query param
     // Fall back to the school's active term so balances reflect real payments
     const currentTerm = term || await resolveCurrentTermName(schoolId);
+    const schoolSettings = await getSchoolSettings(schoolId);
 
     const { data: allStudents, error: stuErr } = await supabase
       .from('students')
@@ -362,6 +366,7 @@ router.get("/fee-defaulters", async (req, res, next) => {
         student,
         feeStructures,
         payments,
+        schoolSettings,
       });
 
       const balance = balanceInfo.balance;
@@ -397,6 +402,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
     const { schoolId } = req.user;
     const { term } = req.query; // Allow term filtering via query param
     const currentTerm = term || await resolveCurrentTermName(schoolId);
+    const schoolSettings = await getSchoolSettings(schoolId);
     
     // Get all students
     const { data: allStudents, error: stuErr } = await supabase
@@ -447,6 +453,7 @@ router.get("/class-fee-summary", async (req, res, next) => {
         student,
         feeStructures,
         payments,
+        schoolSettings,
       });
 
       classSummary[cls].student_count += 1;

@@ -2,6 +2,7 @@ import { database } from "../config/db.js";
 import { supabase } from "../config/supabaseClient.js";
 import { logAuditEvent } from "../helpers/audit.logger.js";
 import { calculateStudentFeeBalance } from "./feeBalanceCalculator.js";
+import { getSchoolSettings } from "./schoolSettings.service.js";
 
 const TERM_TRANSITION_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -341,9 +342,14 @@ export class TermService {
             where: { school_id: schoolId, term: term.term_name },
           });
 
-          const { data: payments } = await database.query("payments", {
-            where: { school_id: schoolId, term: term.term_name, status: "paid" },
-          });
+          const { data: payments } = await supabase
+            .from("payments")
+            .select("*")
+            .eq("school_id", schoolId)
+            .eq("term", term.term_name)
+            .in("status", ["paid", "completed", "success"])
+            .eq("is_deleted", false);
+          const schoolSettings = await getSchoolSettings(schoolId);
 
           if (students && students.length > 0) {
             let balanceCount = 0;
@@ -352,6 +358,7 @@ export class TermService {
                 student,
                 feeStructures: feeStructures || [],
                 payments: payments || [],
+                schoolSettings,
               });
 
               if (balanceInfo.balance > 0) {

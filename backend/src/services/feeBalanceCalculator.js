@@ -126,7 +126,7 @@ export function getStudentLunchFee(student, schoolSettings = {}) {
   return calculateLunchFee(
     student?.lunch_daily_rate ?? student?.lunchDailyRate ?? schoolSettings.lunch_daily_rate ?? 0,
     student?.lunch_days ?? student?.lunchDays ?? schoolSettings.lunch_days ?? 0,
-    student?.lunch_billing_type ?? student?.lunchBillingType ?? "daily"
+    student?.lunch_billing_type ?? student?.lunchBillingType ?? schoolSettings.lunch_billing_type ?? schoolSettings.lunchBillingType ?? "termly"
   );
 }
 
@@ -137,7 +137,7 @@ export function getStudentBreakfastFee(student, schoolSettings = {}) {
   return calculateBreakfastFee(
     student?.breakfast_daily_rate ?? student?.breakfastDailyRate ?? schoolSettings.breakfast_daily_rate ?? 0,
     student?.breakfast_days ?? student?.breakfastDays ?? schoolSettings.breakfast_days ?? 0,
-    student?.breakfast_billing_type ?? student?.breakfastBillingType ?? "daily"
+    student?.breakfast_billing_type ?? student?.breakfastBillingType ?? schoolSettings.breakfast_billing_type ?? schoolSettings.breakfastBillingType ?? "termly"
   );
 }
 
