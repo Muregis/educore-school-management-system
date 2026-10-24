@@ -312,7 +312,7 @@ export class TermTransitionService {
         `)
         .eq('school_id', schoolId)
         .eq('term_id', termId)
-        .eq('balance_after', supabase.raw('balance_after > 0'));
+        .gt('balance_after', 0);
 
       if (!unpaidBalances?.length) return;
 

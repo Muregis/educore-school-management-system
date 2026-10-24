@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from "react";
 import PropTypes from "prop-types";
 import { money, countBy, isPaidStatus } from "../lib/utils";
 import { apiFetch } from "../lib/api";
+import { useCurrentTerm } from "../hooks/useCurrentTerm";
 import { calculateStudentBalanceLocal } from "../services/studentBalanceUtils";
 
 import Card from "../components/ui/Card";
@@ -98,7 +99,8 @@ function PieChart({ data, size = 150 }) {
   );
 }
 
-export default function AnalyticsPage({ auth, students = [], teachers = [], payments = [], results = [], attendance = [], feeStructures = [] }) {
+export default function AnalyticsPage({ auth, school, students = [], teachers = [], payments = [], results = [], attendance = [], feeStructures = [] }) {
+  const { term: currentTerm } = useCurrentTerm(auth);
   const [activeTab, setActiveTab] = useState("overview");
   const [aiReport, setAiReport] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
@@ -148,7 +150,14 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
     const payrollExpenses = Number(expenditureSummary?.totals?.payroll || 0);
     const manualExpenses = Number(expenditureSummary?.totals?.manual || 0);
     const pendingFees = students.reduce(
-      (sum, student) => sum + Math.max(0, calculateStudentBalanceLocal({ student, feeStructures, payments }).balance),
+      (sum, student) => sum + Math.max(0, calculateStudentBalanceLocal({
+        student,
+        feeStructures: Array.isArray(feeStructures) && currentTerm
+          ? feeStructures.filter((f) => (f?.term ?? f?.term_name ?? currentTerm) === currentTerm)
+          : feeStructures,
+        payments,
+        schoolSettings: school || {},
+      }).balance),
       0
     );
 
@@ -171,7 +180,7 @@ export default function AnalyticsPage({ auth, students = [], teachers = [], paym
       gradeDist, avgMarks,
       presentCount, absentCount, attendanceRate,
     };
-  }, [students, payments, results, attendance, feeStructures, expenditureSummary]);
+  }, [students, payments, results, attendance, feeStructures, expenditureSummary, school, currentTerm]);
 
   // Generate AI analysis
   const generateAIReport = useCallback(async () => {
@@ -405,7 +414,14 @@ Provide a structured analysis with:
                   if (classStudents.length === 0) return null;
                   
                   const classBalanceInfo = classStudents.map(student =>
-                    calculateStudentBalanceLocal({ student, feeStructures, payments })
+                    calculateStudentBalanceLocal({
+        student,
+        feeStructures: Array.isArray(feeStructures) && currentTerm
+          ? feeStructures.filter((f) => (f?.term ?? f?.term_name ?? currentTerm) === currentTerm)
+          : feeStructures,
+        payments,
+        schoolSettings: school || {},
+      })
                   );
                   const classExpected = classBalanceInfo.reduce((sum, item) => sum + item.expected, 0);
                   const classPaid = classBalanceInfo.reduce((sum, item) => sum + item.paid, 0);
