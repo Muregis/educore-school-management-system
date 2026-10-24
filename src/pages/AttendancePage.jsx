@@ -4,7 +4,7 @@ import PropTypes from "prop-types";
 import QRScanner from "../components/QRScanner";
 import { apiFetch } from "../lib/api";
 import { parseStudentQrContent } from "../lib/qr";
-import { Pager, csv, pager } from "../components/Helpers";
+import { csv, pager } from "../components/Helpers";
 import { useCurrentTerm } from "../hooks/useCurrentTerm";
 import { useEntitySync } from "../hooks/useEntitySync";
 
@@ -33,7 +33,7 @@ function normalise(a) {
     studentId: a.student_id ?? a.studentId,
     studentName: studentName,
     className: a.class_name ?? a.className ?? "",
-    date: a.attendance_date?.slice(0,10) ?? a.date ?? "",
+    date: a.attendance_date?.slice(0, 10) ?? a.date ?? "",
     status: a.status ?? "present",
   };
 }
@@ -42,10 +42,11 @@ export default function AttendancePage({
   auth, students, attendance, setAttendance, canEdit, toast,
   feeBlocked = false, onGoFees, school
 }) {
-  const { term, startDate, endDate } = useCurrentTerm(auth);
-  const termQuery = (startDate && endDate) ? `?from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}` : '';
+  const { term: currentTermName, startDate: currentTermStart, endDate: currentTermEnd } = useCurrentTerm(auth);
+  const [terms, setTerms] = useState([]);
+  const [selectedTerm, setSelectedTerm] = useState("current");
   const [cls, setCls] = useState("");
-  const [date, setDate] = useState(startDate || new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(currentTermStart || new Date().toISOString().slice(0, 10));
   const [filterClass, setFilterClass] = useState("all");
   const [filterDate, setFilterDate] = useState("");
   const [page, setPage] = useState(1);
@@ -56,10 +57,6 @@ export default function AttendancePage({
   const [availableClasses, setAvailableClasses] = useState([]);
 
   useEffect(() => {
-    if (startDate && !filterDate) setDate(startDate);
-  }, [startDate, filterDate]);
-
-  useEffect(() => {
     if (!auth?.token) return;
     apiFetch(`/classes`, { token: auth.token })
       .then(data => {
@@ -68,14 +65,59 @@ export default function AttendancePage({
         setAvailableClasses(classes.map(c => c.class_name).filter(Boolean));
       })
       .catch(e => { console.warn("Failed to load classes", e); setAvailableClasses([]); });
+
+    apiFetch("/academic/terms", { token: auth.token })
+      .then(res => {
+        const list = Array.isArray(res) ? res : res?.data ?? [];
+        setTerms(list);
+      })
+      .catch(err => {
+        console.warn("Failed to load academic terms:", err);
+      });
   }, [auth]);
 
+  const activeTermInfo = useMemo(() => {
+    if (selectedTerm === "all") {
+      return { name: "All Terms", from: null, to: null };
+    }
+    if (selectedTerm === "current") {
+      const active = terms.find(t => t.status === "active" || t.is_current);
+      return {
+        name: currentTermName || active?.term_name || active?.name || "Current Term",
+        from: currentTermStart || active?.start_date || null,
+        to: currentTermEnd || active?.end_date || null,
+      };
+    }
+    const found = terms.find(t => String(t.term_id ?? t.id) === String(selectedTerm));
+    if (found) {
+      return {
+        name: found.term_name || found.name || "Selected Term",
+        from: found.start_date || null,
+        to: found.end_date || null,
+      };
+    }
+    return { name: "Term", from: null, to: null };
+  }, [selectedTerm, terms, currentTermName, currentTermStart, currentTermEnd]);
+
+  useEffect(() => {
+    if (activeTermInfo.from && !filterDate) {
+      setDate(activeTermInfo.from);
+    }
+  }, [activeTermInfo.from, filterDate]);
+
+  const attendanceQueryUrl = useMemo(() => {
+    const params = [];
+    if (activeTermInfo.from) params.push(`from=${encodeURIComponent(activeTermInfo.from)}`);
+    if (activeTermInfo.to) params.push(`to=${encodeURIComponent(activeTermInfo.to)}`);
+    return `/attendance${params.length ? `?${params.join("&")}` : ""}`;
+  }, [activeTermInfo.from, activeTermInfo.to]);
+
   useEntitySync({
-    url: `/attendance${(startDate && endDate) ? `?from=${encodeURIComponent(startDate)}&to=${encodeURIComponent(endDate)}` : ''}`,
+    url: attendanceQueryUrl,
     token: auth?.token,
     setter: setAttendance,
     transform: (data) => (Array.isArray(data) ? data.map(normalise) : []),
-    dependencies: [startDate, endDate],
+    dependencies: [attendanceQueryUrl],
   });
 
   const classStudents = useMemo(
@@ -97,10 +139,13 @@ export default function AttendancePage({
     [attendance]
   );
 
-  const filtered = normalised.filter(a =>
-    (filterClass === "all" || a.className === filterClass) &&
-    (!filterDate || a.date === filterDate)
-  );
+  const filtered = normalised.filter(a => {
+    if (filterClass !== "all" && a.className !== filterClass) return false;
+    if (filterDate && a.date !== filterDate) return false;
+    if (activeTermInfo.from && a.date < activeTermInfo.from) return false;
+    if (activeTermInfo.to && a.date > activeTermInfo.to) return false;
+    return true;
+  });
 
   const { pages, rows } = pager(filtered, page);
   useEffect(() => {
@@ -117,7 +162,7 @@ export default function AttendancePage({
         body: { classId: resolvedClassId, className: cls, date, records: bulk },
         token: auth?.token,
       });
-      const data = await apiFetch(`/attendance${termQuery}`, { token: auth?.token });
+      const data = await apiFetch(attendanceQueryUrl, { token: auth?.token });
       setAttendance(data.map(normalise));
       setShowBulk(false);
       toast(`Attendance saved for ${cls}`, "success");
@@ -134,7 +179,7 @@ export default function AttendancePage({
         body: { status: editing.status, date: editing.date },
         token: auth?.token,
       });
-      const data = await apiFetch(`/attendance${termQuery}`, { token: auth?.token });
+      const data = await apiFetch(attendanceQueryUrl, { token: auth?.token });
       setAttendance(data.map(normalise));
       setEditing(null);
       toast("Attendance updated", "success");
@@ -184,7 +229,7 @@ export default function AttendancePage({
         },
         token: auth?.token,
       });
-      const data_response = await apiFetch(`/attendance${termQuery}`, { token: auth?.token });
+      const data_response = await apiFetch(attendanceQueryUrl, { token: auth?.token });
       setAttendance(data_response.map(normalise));
       const studentName = student.firstName || student.first_name;
       const studentLastName = student.lastName || student.last_name;
@@ -204,12 +249,14 @@ export default function AttendancePage({
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <div className="ec-kpi-grid">
         {[
-          { label: "Present", value: normalised.filter(a => a.status === "present").length, tone: "success" },
-          { label: "Absent", value: normalised.filter(a => a.status === "absent").length, tone: "danger" },
-          { label: "Late", value: normalised.filter(a => a.status === "late").length, tone: "warning" },
+          { label: "Present", value: filtered.filter(a => a.status === "present").length, tone: "success" },
+          { label: "Absent", value: filtered.filter(a => a.status === "absent").length, tone: "danger" },
+          { label: "Late", value: filtered.filter(a => a.status === "late").length, tone: "warning" },
         ].map((item) => (
           <Card key={item.label} style={{ background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 96%, transparent) 0%, var(--color-bg-card) 100%)", boxShadow: "var(--shadow-sm)", padding: "var(--space-4)" }}>
-            <div style={{ fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-text-muted)", fontWeight: 800 }}>{item.label}</div>
+            <div style={{ fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-text-muted)", fontWeight: 800 }}>
+              {item.label} {activeTermInfo.name ? `(${activeTermInfo.name})` : ""}
+            </div>
             <div style={{ fontSize: "24px", fontWeight: 800, color: "var(--color-text-primary)", marginTop: "var(--space-2)", fontFamily: "var(--font-heading)" }}>{item.value}</div>
             <div style={{ marginTop: "var(--space-2)" }}><Badge text={item.label} variant={item.tone} /></div>
           </Card>
@@ -218,6 +265,18 @@ export default function AttendancePage({
 
       <Card style={{ padding: "var(--space-4)", background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 96%, transparent) 0%, var(--color-bg-card) 100%)", boxShadow: "var(--shadow-sm)" }}>
         <div className="ec-kpi-grid">
+          <Select
+            value={selectedTerm}
+            onChange={e => setSelectedTerm(e.target.value)}
+            options={[
+              { value: "current", label: currentTermName ? `${currentTermName} (Active)` : "Current Term" },
+              ...terms.map(t => ({
+                value: String(t.term_id ?? t.id),
+                label: `${t.term_name || t.name}${t.academic_year ? ` · ${t.academic_year}` : ""}`,
+              })),
+              { value: "all", label: "All Terms (Full Year)" },
+            ]}
+          />
           <Select
             value={filterClass}
             onChange={e => setFilterClass(e.target.value)}
@@ -260,16 +319,16 @@ export default function AttendancePage({
               const a = rows[idx];
               if (!a) return null;
               return (
-                <div key={a.id || idx} className="ui-table-mobile-card" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div key={a.id} style={{ padding: "var(--space-3)", display: "flex", flexDirection: "column", gap: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: "15px", color: "var(--color-text-primary)" }}>{a.studentName}</div>
+                      <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--color-text-primary)" }}>{a.studentName}</div>
                       <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: 2 }}>{a.className} · {a.date}</div>
                     </div>
                     <Badge text={a.status} variant={a.status === "present" ? "success" : a.status === "late" ? "warning" : "danger"} />
                   </div>
                   {canEdit && (
-                    <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end", borderTop: "1px solid var(--color-border)", paddingTop: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4, paddingTop: 6, borderTop: "1px solid var(--color-border)" }}>
                       <Button size="sm" variant="ghost" onClick={() => setEditing(a)}>Edit</Button>
                       <Button size="sm" variant="danger" onClick={() => del(a.id)}>Delete</Button>
                     </div>
@@ -278,72 +337,97 @@ export default function AttendancePage({
               );
             }}
           />
-          <div style={{ padding: "var(--space-3)", borderTop: "1px solid var(--color-border)" }}>
-            <Pager page={page} pages={pages} setPage={setPage} />
-          </div>
         </Card>
       )}
 
-      <Modal isOpen={showBulk} title="Bulk Attendance by Class" onClose={() => setShowBulk(false)} footer={
-        <>
-          <Button variant="ghost" onClick={() => setShowBulk(false)}>Cancel</Button>
-          <Button variant="primary" onClick={saveBulk}>Save Class Attendance</Button>
-        </>
-      }>
-        <div className="ec-kpi-grid" style={{ marginBottom: "var(--space-4)" }}>
-          <Select label="Class" value={cls} onChange={e => setCls(e.target.value)} options={(availableClasses ?? []).map(c => ({ value: c, label: c }))} />
-          <Input label="Date" type="date" value={date} onChange={e => setDate(e.target.value)} />
-        </div>
-        {classStudents.length === 0 ? (
-          <EmptyState icon="👩‍🎓" title="No Active Students" description="There are no active students in this class." />
-        ) : (
-          <div style={{ maxHeight: "320px", overflowY: "auto", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", padding: "var(--space-2)", background: "var(--color-bg-base)" }}>
-            {classStudents.map(s => {
-              const sid = s.student_id ?? s.id;
-              const idx = bulk.findIndex(b => b.studentId === sid);
-              const val = idx >= 0 ? bulk[idx].status : "present";
-              const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`;
-              return (
-                <div key={sid} className="ec-kpi-grid">
-                  <div style={{ color: "var(--color-text-primary)", fontWeight: 500, fontSize: "14px" }}>{name}</div>
-                  <Select value={val} onChange={e => setBulk(prev => prev.map(x => x.studentId === sid ? { ...x, status: e.target.value } : x))} options={[{ value: "present", label: "Present" }, { value: "absent", label: "Absent" }, { value: "late", label: "Late" }]} />
-                </div>
-              );
-            })}
+      {showBulk && (
+        <Modal isOpen={showBulk} title={`Bulk Mark — ${cls || "Select Class"}`} onClose={() => setShowBulk(false)} maxWidth="560px">
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+              <Select
+                label="Class"
+                value={cls}
+                onChange={e => setCls(e.target.value)}
+                options={[{ value: "", label: "Select class" }, ...(availableClasses ?? []).map(c => ({ value: c, label: c }))]}
+              />
+              <Input label="Date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+            </div>
+            {classStudents.length === 0 && cls && (
+              <EmptyState title="No students found" description={`No active students enrolled in ${cls}.`} />
+            )}
+            {classStudents.length > 0 && (
+              <div style={{ maxHeight: "360px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                {classStudents.map((s, idx) => (
+                  <div key={s.student_id ?? s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "var(--space-2) var(--space-3)", background: "var(--color-bg-base)", borderRadius: "var(--radius-sm)" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 600 }}>{s.firstName || s.first_name} {s.lastName || s.last_name}</span>
+                    <Select
+                      value={bulk[idx]?.status ?? ""}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setBulk(b => b.map((item, i) => i === idx ? { ...item, status: val } : item));
+                      }}
+                      options={[
+                        { value: "", label: "Select status" },
+                        { value: "present", label: "Present" },
+                        { value: "absent", label: "Absent" },
+                        { value: "late", label: "Late" },
+                      ]}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+              <Button variant="ghost" onClick={() => setShowBulk(false)}>Cancel</Button>
+              <Button variant="primary" onClick={saveBulk}>Save Attendance</Button>
+            </div>
           </div>
-        )}
-      </Modal>
+        </Modal>
+      )}
 
-      <Modal isOpen={!!editing} title="Edit Attendance" onClose={() => setEditing(null)} footer={
-        <>
-          <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
-          <Button variant="primary" onClick={saveEdit}>Save Changes</Button>
-        </>
-      }>
-        {editing && (
-          <div className="ec-grid-auto">
-            <Input label="Student" value={editing.studentName} disabled />
-            <Input label="Class" value={editing.className} disabled />
-            <Input label="Date" type="date" value={editing.date} onChange={e => setEditing({ ...editing, date: e.target.value })} />
-            <Select label="Status" value={editing.status} onChange={e => setEditing({ ...editing, status: e.target.value })} options={[{ value: "present", label: "Present" }, { value: "absent", label: "Absent" }, { value: "late", label: "Late" }]} />
+      {editing && (
+        <Modal isOpen={!!editing} title="Edit Attendance" onClose={() => setEditing(null)} maxWidth="400px">
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+            <div>
+              <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Student</div>
+              <div style={{ fontWeight: 700 }}>{editing.studentName}</div>
+            </div>
+            <Input label="Date" type="date" value={editing.date} onChange={e => setEditing(ed => ({ ...ed, date: e.target.value }))} />
+            <Select
+              label="Status"
+              value={editing.status}
+              onChange={e => setEditing(ed => ({ ...ed, status: e.target.value }))}
+              options={[
+                { value: "present", label: "Present" },
+                { value: "absent", label: "Absent" },
+                { value: "late", label: "Late" },
+              ]}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+              <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
+              <Button variant="primary" onClick={saveEdit}>Save</Button>
+            </div>
           </div>
-        )}
-      </Modal>
+        </Modal>
+      )}
 
       {showQRScanner && (
-        <QRScanner title="Scan Student QR for Attendance" onScan={handleQRScan} onClose={() => setShowQRScanner(false)} />
+        <Modal isOpen={showQRScanner} title="Scan Student QR for Attendance" onClose={() => setShowQRScanner(false)} maxWidth="480px">
+          <QRScanner onScan={handleQRScan} onClose={() => setShowQRScanner(false)} />
+        </Modal>
       )}
     </div>
   );
 }
 
 AttendancePage.propTypes = {
-  auth: PropTypes.object,
+  auth: PropTypes.object.isRequired,
   students: PropTypes.array.isRequired,
   attendance: PropTypes.array.isRequired,
   setAttendance: PropTypes.func.isRequired,
-  canEdit: PropTypes.bool.isRequired,
+  canEdit: PropTypes.bool,
   toast: PropTypes.func.isRequired,
   feeBlocked: PropTypes.bool,
   onGoFees: PropTypes.func,
+  school: PropTypes.object,
 };

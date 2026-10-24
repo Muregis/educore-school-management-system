@@ -80,6 +80,7 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const [filterStudent, setFilterStudent] = useState("all");
   const [filterSubject, setFilterSubject] = useState("all");
   const [classOptions, setClassOptions] = useState([]);
+  const [availableTerms, setAvailableTerms] = useState([]);
   const [viewMode, setViewMode] = useState("all"); // "all" or "single"
 
   // Set term from currentTerm when loaded
@@ -98,6 +99,13 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
           setClassOptions(classes);
         })
         .catch(() => { setClassOptions([]); });
+
+      apiFetch('/academic/terms', { token })
+        .then(res => {
+          const list = Array.isArray(res) ? res : (res?.data ?? []);
+          setAvailableTerms(list);
+        })
+        .catch(() => { setAvailableTerms([]); });
       // Fetch exam types
       apiFetch('/exam-types', { token })
         .then(res => {
@@ -369,9 +377,19 @@ const classesForDropdown = useMemo(() => {
       <div className="ec-kpi-grid" style={{ marginBottom: 10 }}>
         <select style={inputStyle} value={term} onChange={e => setTerm(e.target.value)}>
           <option value="all">All terms</option>
-          <option value="Term 1">Term 1</option>
-          <option value="Term 2">Term 2</option>
-          <option value="Term 3">Term 3</option>
+          {availableTerms.length > 0 ? (
+            availableTerms.map(t => (
+              <option key={t.term_id ?? t.id} value={t.term_name || t.name}>
+                {t.term_name || t.name}{t.status === "active" ? " (Active)" : ""}{t.academic_year ? ` · ${t.academic_year}` : ""}
+              </option>
+            ))
+          ) : (
+            <>
+              <option value="Term 1">Term 1</option>
+              <option value="Term 2">Term 2</option>
+              <option value="Term 3">Term 3</option>
+            </>
+          )}
         </select>
         <select style={inputStyle} value={filterClass} onChange={e => { setFilterClass(e.target.value); setFilterStream("all"); }}>
           <option value="all">All classes</option>
@@ -775,9 +793,19 @@ const classesForDropdown = useMemo(() => {
             </Field>
             <Field label="Term">
               <select style={inputStyle} value={term === "all" ? (currentTerm || "Term 1") : term} onChange={e => setTerm(e.target.value)}>
-                <option value="Term 1">Term 1</option>
-                <option value="Term 2">Term 2</option>
-                <option value="Term 3">Term 3</option>
+                {availableTerms.length > 0 ? (
+                  availableTerms.map(t => (
+                    <option key={t.term_id ?? t.id} value={t.term_name || t.name}>
+                      {t.term_name || t.name}{t.status === "active" ? " (Active)" : ""}{t.academic_year ? ` · ${t.academic_year}` : ""}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Term 1">Term 1</option>
+                    <option value="Term 2">Term 2</option>
+                    <option value="Term 3">Term 3</option>
+                  </>
+                )}
               </select>
             </Field>
             <Field label="Total Marks">

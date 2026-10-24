@@ -152,9 +152,10 @@ function clearTenantLocalState() {
   clearSession();
 }
 export default function App() {
-  // Check if this is a QR verification URL
+  // Check if this is a QR verification URL (supports both /verify/:id and #/verify/:id)
   const urlPath = window.location.pathname;
-  const verifyMatch = urlPath.match(/^\/verify\/(.+)$/);
+  const hash = window.location.hash;
+  const verifyMatch = urlPath.match(/^\/verify\/(.+)$/) || hash.match(/^#\/?verify\/(.+)$/);
   const isQRVerification = !!verifyMatch;
   const studentId = verifyMatch ? verifyMatch[1] : null;
 

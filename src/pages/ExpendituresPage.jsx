@@ -55,9 +55,10 @@ function toneForCategory(category) {
   return "success";
 }
 
-
 export default function ExpendituresPage({ auth, canEdit, toast }) {
-  const { startDate } = useCurrentTerm(auth);
+  const { term: currentTermName, startDate: currentTermStart, endDate: currentTermEnd } = useCurrentTerm(auth);
+  const [terms, setTerms] = useState([]);
+  const [selectedTerm, setSelectedTerm] = useState("current");
   const [expenses, setExpenses] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -66,14 +67,26 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
   const [editingExpense, setEditingExpense] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState(blankForm(startDate));
+  const [form, setForm] = useState(blankForm(currentTermStart));
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    apiFetch("/academic/terms", { token: auth.token })
+      .then((res) => {
+        const list = Array.isArray(res) ? res : res?.data ?? [];
+        setTerms(list);
+      })
+      .catch((err) => {
+        console.warn("Failed to load academic terms:", err);
+      });
+  }, [auth?.token]);
 
   // Update default expense date when term changes (only when modal is closed)
   useEffect(() => {
     if (!showModal && !editingExpense) {
-      setForm(prev => ({ ...prev, expenseDate: startDate || new Date().toISOString().slice(0, 10) }));
+      setForm((prev) => ({ ...prev, expenseDate: currentTermStart || new Date().toISOString().slice(0, 10) }));
     }
-  }, [startDate, showModal, editingExpense]);
+  }, [currentTermStart, showModal, editingExpense]);
 
   const loadData = async () => {
     if (!auth?.token) return;
@@ -96,8 +109,41 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
     loadData();
   }, [auth?.token]);
 
+  const activeTermInfo = useMemo(() => {
+    if (selectedTerm === "all") {
+      return { name: "All Terms", from: null, to: null };
+    }
+    if (selectedTerm === "current") {
+      const active = terms.find((t) => t.status === "active" || t.is_current);
+      return {
+        name: currentTermName || active?.term_name || active?.name || "Current Term",
+        from: currentTermStart || active?.start_date || null,
+        to: currentTermEnd || active?.end_date || null,
+      };
+    }
+    const found = terms.find((t) => String(t.term_id ?? t.id) === String(selectedTerm));
+    if (found) {
+      return {
+        name: found.term_name || found.name || "Selected Term",
+        from: found.start_date || null,
+        to: found.end_date || null,
+      };
+    }
+    return { name: "Term", from: null, to: null };
+  }, [selectedTerm, terms, currentTermName, currentTermStart, currentTermEnd]);
+
+  const termFilteredExpenses = useMemo(() => {
+    return expenses.filter((e) => {
+      const d = e.expense_date;
+      if (!d) return true;
+      if (activeTermInfo.from && d < activeTermInfo.from) return false;
+      if (activeTermInfo.to && d > activeTermInfo.to) return false;
+      return true;
+    });
+  }, [expenses, activeTermInfo]);
+
   const filteredExpenses = useMemo(() => {
-    return expenses.filter((expense) => {
+    return termFilteredExpenses.filter((expense) => {
       const matchesCategory = categoryFilter === "all" || expense.category === categoryFilter;
       const haystack = [
         expense.item_name,
@@ -111,7 +157,49 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
       const matchesSearch = !search.trim() || haystack.includes(search.trim().toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [expenses, categoryFilter, search]);
+  }, [termFilteredExpenses, categoryFilter, search]);
+
+  const termManualTotal = useMemo(() => {
+    return termFilteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  }, [termFilteredExpenses]);
+
+  const termPayrollTotal = useMemo(() => {
+    const recent = summary?.recent || [];
+    const payrollItems = recent.filter((r) => r.source_type === "payroll");
+    if (selectedTerm === "all") {
+      return summary?.totals?.payroll || 0;
+    }
+    return payrollItems
+      .filter((item) => {
+        const d = item.expense_date;
+        if (!d) return true;
+        if (activeTermInfo.from && d < activeTermInfo.from) return false;
+        if (activeTermInfo.to && d > activeTermInfo.to) return false;
+        return true;
+      })
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  }, [summary, selectedTerm, activeTermInfo]);
+
+  const totalTermExpenditures = useMemo(() => {
+    if (selectedTerm === "all") {
+      return summary?.totals?.total || (termManualTotal + termPayrollTotal);
+    }
+    return termManualTotal + termPayrollTotal;
+  }, [selectedTerm, summary, termManualTotal, termPayrollTotal]);
+
+  const termCategories = useMemo(() => {
+    if (selectedTerm === "all" && summary?.byCategory) {
+      return summary.byCategory;
+    }
+    const catMap = new Map();
+    termFilteredExpenses.forEach((e) => {
+      const k = e.category || "Other";
+      catMap.set(k, (catMap.get(k) || 0) + Number(e.amount || 0));
+    });
+    return Array.from(catMap.entries())
+      .map(([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [selectedTerm, summary, termFilteredExpenses]);
 
   const currentMonthTotal = useMemo(() => {
     const thisMonth = new Date().toISOString().slice(0, 7);
@@ -122,7 +210,7 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
 
   const openCreate = () => {
     setEditingExpense(null);
-    setForm(blankForm());
+    setForm(blankForm(activeTermInfo.from));
     setShowModal(true);
   };
 
@@ -185,7 +273,7 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
 
       setShowModal(false);
       setEditingExpense(null);
-      setForm(blankForm());
+      setForm(blankForm(activeTermInfo.from));
       await loadData();
     } catch (error) {
       toast(error.message || "Failed to save expense", "error");
@@ -227,10 +315,30 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
       </div>
 
       <div className="ec-kpi-grid">
-        <StatCard label="Total Expenses" value={money(summary?.totals?.total || 0)} tone="danger" hint="Manual expenses plus paid payroll" />
-        <StatCard label="Payroll Costs" value={money(summary?.totals?.payroll || 0)} tone="warning" hint={`${summary?.totals?.payrollEntries || 0} paid payslips`} />
-        <StatCard label="Manual Expenses" value={money(summary?.totals?.manual || 0)} tone="info" hint={`${summary?.totals?.transactions || 0} recorded items`} />
-        <StatCard label="This Month" value={money(currentMonthTotal)} tone="success" hint="All expenses dated this month" />
+        <StatCard
+          label={selectedTerm === "all" ? "Total Expenses" : `${activeTermInfo.name} Expenses`}
+          value={money(totalTermExpenditures)}
+          tone="danger"
+          hint={selectedTerm === "all" ? "Manual expenses plus paid payroll" : `Operating costs for ${activeTermInfo.name}`}
+        />
+        <StatCard
+          label="Payroll Costs"
+          value={money(termPayrollTotal)}
+          tone="warning"
+          hint={selectedTerm === "all" ? `${summary?.totals?.payrollEntries || 0} paid payslips` : `Payroll in ${activeTermInfo.name}`}
+        />
+        <StatCard
+          label="Manual Expenses"
+          value={money(termManualTotal)}
+          tone="info"
+          hint={`${termFilteredExpenses.length} items recorded`}
+        />
+        <StatCard
+          label="This Month"
+          value={money(currentMonthTotal)}
+          tone="success"
+          hint="All expenses dated this month"
+        />
       </div>
 
       <div className="ec-stack-grid" style={{ gap: "var(--space-4)" }}>
@@ -267,14 +375,14 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
 
         <Card style={{ padding: "var(--space-4)" }}>
           <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-text-primary)", marginBottom: "var(--space-3)" }}>
-            Top Categories
+            Top Categories {selectedTerm !== "all" && activeTermInfo.name ? `(${activeTermInfo.name})` : ""}
           </div>
 
-          {!summary?.byCategory?.length ? (
+          {!termCategories.length ? (
             <EmptyState title="No categories yet" description="Category totals will appear after recording expenses." />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-              {summary.byCategory.slice(0, 8).map((item) => (
+              {termCategories.slice(0, 8).map((item) => (
                 <div key={item.category} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
                   <Badge text={item.category} tone={toneForCategory(item.category)} />
                   <div style={{ color: "var(--color-text-primary)", fontWeight: 700 }}>
@@ -292,15 +400,22 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
           <div style={{ fontSize: "18px", fontWeight: 800, color: "var(--color-text-primary)" }}>
             Manual Expense Records
           </div>
-          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", flex: "1 1 280px" }}>
-            <div style={{ flex: "1 1 160px", minWidth: 0 }}>
-              <Input
-                placeholder="Search item, payee, released by..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", flex: "1 1 420px" }}>
+            <div style={{ flex: "1 1 150px", minWidth: 130 }}>
+              <Select
+                value={selectedTerm}
+                onChange={(event) => setSelectedTerm(event.target.value)}
+                options={[
+                  { value: "current", label: currentTermName ? `${currentTermName} (Active)` : "Current Term" },
+                  ...terms.map((t) => ({
+                    value: String(t.term_id ?? t.id),
+                    label: `${t.term_name || t.name}${t.academic_year ? ` · ${t.academic_year}` : ""}`,
+                  })),
+                  { value: "all", label: "All Terms (Full Year)" },
+                ]}
               />
             </div>
-            <div style={{ flex: "1 1 140px", minWidth: 0 }}>
+            <div style={{ flex: "1 1 140px", minWidth: 120 }}>
               <Select
                 value={categoryFilter}
                 onChange={(event) => setCategoryFilter(event.target.value)}
@@ -308,6 +423,13 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
                   { value: "all", label: "All categories" },
                   ...EXPENSE_CATEGORIES.map((category) => ({ value: category, label: category })),
                 ]}
+              />
+            </div>
+            <div style={{ flex: "1 1 160px", minWidth: 130 }}>
+              <Input
+                placeholder="Search item, payee, released by..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
               />
             </div>
           </div>

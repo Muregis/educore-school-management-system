@@ -5,12 +5,13 @@ function trimTrailingSlash(value) {
 }
 
 export function getPublicAppBaseUrl() {
-  const configuredUrl =
-    typeof import.meta !== "undefined" && import.meta.env?.VITE_PUBLIC_APP_URL
-      ? import.meta.env.VITE_PUBLIC_APP_URL
-      : DEFAULT_PUBLIC_APP_URL;
-
-  return trimTrailingSlash(configuredUrl || DEFAULT_PUBLIC_APP_URL);
+  if (typeof import.meta !== "undefined" && import.meta.env?.VITE_PUBLIC_APP_URL) {
+    return trimTrailingSlash(import.meta.env.VITE_PUBLIC_APP_URL);
+  }
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return trimTrailingSlash(window.location.origin);
+  }
+  return DEFAULT_PUBLIC_APP_URL;
 }
 
 export function getStudentQrIdentifier(student) {
@@ -35,9 +36,13 @@ export function parseStudentQrContent(qrText) {
 
   try {
     const url = new URL(rawValue);
-    const match = url.pathname.match(/^\/verify\/([^/]+)$/i);
-    if (match) {
-      return { type: "verify-url", studentId: decodeURIComponent(match[1]) };
+    const pathMatch = url.pathname.match(/^\/verify\/([^/]+)$/i);
+    if (pathMatch) {
+      return { type: "verify-url", studentId: decodeURIComponent(pathMatch[1]) };
+    }
+    const hashMatch = url.hash.match(/^#\/?verify\/([^/]+)$/i);
+    if (hashMatch) {
+      return { type: "verify-url", studentId: decodeURIComponent(hashMatch[1]) };
     }
   } catch {
     // Not a URL, continue to legacy JSON handling.

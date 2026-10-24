@@ -39,7 +39,7 @@ async function findStudentForVerification(identifier) {
   if (/^\d+$/.test(idValue)) {
     query = query.eq("student_id", Number(idValue));
   } else {
-    query = query.eq("admission_number", idValue);
+    query = query.ilike("admission_number", idValue);
   }
 
   const { data, error } = await query.maybeSingle();
