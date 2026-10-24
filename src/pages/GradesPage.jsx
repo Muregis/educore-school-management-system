@@ -81,7 +81,6 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const [filterSubject, setFilterSubject] = useState("all");
   const [classOptions, setClassOptions] = useState([]);
   const [availableTerms, setAvailableTerms] = useState([]);
-  const [viewMode, setViewMode] = useState("all"); // "all" or "single"
 
   // Set term from currentTerm when loaded
   useEffect(() => {
@@ -353,6 +352,105 @@ const classesForDropdown = useMemo(() => {
   counts.BE = counts.BE1 + counts.BE2 + results.filter(r => String(r.grade).toUpperCase() === "BE").length;
   const SUB_COLORS = { EE1:"#16a34a", EE2:"#22c55e", ME1:"#2563eb", ME2:"#3b82f6", AE1:"#d97706", AE2:"#f59e0b", BE1:"#ef4444", BE2:"#b91c1c" };
 
+  const handleDownloadImportTemplate = useCallback(async () => {
+    try {
+      const token = auth?.token || sessionStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/grades/template`, {
+        headers: getAuthHeaders(token),
+      });
+      if (!res.ok) throw new Error("Template download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "grades_import_template.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast(err.message || "Template download failed", "error");
+    }
+  }, [auth?.token, toast]);
+
+  const handleRecalculateGrades = useCallback(async () => {
+    try {
+      if (!window.confirm("Recalculate all grades based on marks? This will update grade values for all results.")) return;
+      toast("Recalculating grades...", "info");
+      const token = auth?.token || sessionStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/grades/recalculate`, {
+        method: "POST",
+        headers: getAuthHeaders(token),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Recalculation failed");
+      toast(`Recalculated grades for ${data.updated} results`, "success");
+      const fresh = await apiFetch(`/grades${termQuery}`, { token });
+      setResults(fresh);
+    } catch (err) {
+      toast(err.message || "Recalculation failed", "error");
+    }
+  }, [auth?.token, toast, setResults, termQuery]);
+
+  const handleImportCsv = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast("File too large. Maximum size is 5MB.", "error");
+      e.target.value = "";
+      return;
+    }
+
+    const form = new FormData();
+    form.append("file", file);
+
+    toast("Importing grades... This may take a moment for large files.", "info");
+
+    try {
+      const token = auth?.token || sessionStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/grades/import?examType=${encodeURIComponent(examType)}`, {
+        method: "POST",
+        headers: getAuthHeaders(token),
+        body: form,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || data.error || "Import failed");
+      }
+
+      const imp = data.imported ?? 0;
+      const sk = data.skipped ?? 0;
+      const errs = data.errors ?? [];
+      const totalRows = data.total ?? imp + sk;
+
+      if (imp === 0 && sk === 0) {
+        toast("No valid data found in CSV file. Check the format.", "error");
+      } else if (imp === 0) {
+        const firstErrors = errs
+          .slice(0, 3)
+          .map(errRow => `Row ${errRow.row}: ${errRow.reason || errRow.error || "Failed"}`)
+          .join("; ");
+        toast(`Imported 0 grades. ${sk} rows skipped. First errors: ${firstErrors}`, "error");
+      } else if (errs.length > 0) {
+        const firstErrors = errs
+          .slice(0, 3)
+          .map(errRow => `Row ${errRow.row}: ${errRow.reason || errRow.error || "Failed"}`)
+          .join("; ");
+        const moreErrors = errs.length > 3 ? ` (+${errs.length - 3} more errors)` : "";
+        toast(`Imported ${imp} grade(s). Skipped ${sk}. Errors: ${firstErrors}${moreErrors}`, "warn");
+      } else {
+        toast(`Successfully imported ${imp} grade(s) across ${totalRows} row(s).`, "success");
+      }
+
+      const fresh = await apiFetch(`/grades${termQuery}`, { token });
+      setResults(fresh);
+    } catch (err) {
+      console.error("Import error:", err);
+      toast(err.message || "Import failed. Please check the file format and try again.", "error");
+    }
+    e.target.value = "";
+  }, [auth?.token, toast, examType, setResults, termQuery]);
 
   if (feeBlocked) return <FeeBlock onGoFees={onGoFees} pageName="Grades & Results" />;
   return (
@@ -401,7 +499,7 @@ const classesForDropdown = useMemo(() => {
             {streamsForDropdown.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         )}
-        <select style={inputStyle} value={filterStudent} onChange={e => { setFilterStudent(e.target.value); if (e.target.value !== "all") setViewMode("single"); else setViewMode("all"); }}>
+        <select style={inputStyle} value={filterStudent} onChange={e => setFilterStudent(e.target.value)}>
           <option value="all">All students</option>
           {(filterClass === "all" ? students : students.filter(s => normalizeClassName(getStudentClass(s)) === normalizeClassName(filterClass))).map(s => (
             <option key={getStudentId(s)} value={getStudentId(s)}>{getStudentName(s)}{s.admission ? ` (${s.admission})` : ""}</option>
@@ -476,44 +574,10 @@ const classesForDropdown = useMemo(() => {
             "success"
           );
         }}>Export Template</Btn>
-        <Btn variant="ghost" onClick={useCallback(async () => {
-          try {
-            const token = auth?.token || sessionStorage.getItem("token");
-            const res = await fetch(`${API_BASE}/grades/template`, {
-              headers: getAuthHeaders(token),
-            });
-            if (!res.ok) throw new Error("Template download failed");
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "grades_import_template.csv";
-            a.click();
-            URL.revokeObjectURL(url);
-          } catch (err) {
-            toast(err.message || "Template download failed", "error");
-          }
-        }, [auth?.token, toast])}>Download Import Template</Btn>
+        <Btn variant="ghost" onClick={handleDownloadImportTemplate}>Download Import Template</Btn>
         {canEdit && (
           <>
-            <Btn variant="ghost" onClick={useCallback(async () => {
-              try {
-                if (!window.confirm("Recalculate all grades based on marks? This will update grade values for all results.")) return;
-                toast("Recalculating grades...", "info");
-                const token = auth?.token || sessionStorage.getItem("token");
-                const res = await fetch(`${API_BASE}/grades/recalculate`, {
-                  method: "POST",
-                  headers: getAuthHeaders(token),
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message || "Recalculation failed");
-                toast(`Recalculated grades for ${data.updated} results`, "success");
-                const fresh = await apiFetch(`/grades${termQuery}`, { token });
-                setResults(fresh);
-              } catch (err) {
-                toast(err.message || "Recalculation failed", "error");
-              }
-            }, [auth?.token, toast, setResults])}>Recalculate Grades</Btn>
+            <Btn variant="ghost" onClick={handleRecalculateGrades}>Recalculate Grades</Btn>
             <label style={{ cursor: "pointer" }}>
               <span style={{ display:"inline-block", padding:"6px 16px", borderRadius:8, border:`1px solid ${C.border}`, background:C.card, color:C.accent, fontSize:13, fontWeight:500 }}>
                 Import CSV
@@ -522,70 +586,7 @@ const classesForDropdown = useMemo(() => {
                 type="file"
                 accept=".csv"
                 style={{ display: "none" }}
-                onChange={useCallback(async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  
-                  // Validate file size (max 5MB)
-                  if (file.size > 5 * 1024 * 1024) {
-                    toast("File too large. Maximum size is 5MB.", "error");
-                    e.target.value = "";
-                    return;
-                  }
-                  
-                  const form = new FormData();
-                  form.append("file", file);
-                  
-                  // Show loading state
-                  toast("Importing grades... This may take a moment for large files.", "info");
-                  
-                  try {
-                    const token = auth?.token || sessionStorage.getItem("token");
-                    const res = await fetch(`${API_BASE}/grades/import?examType=${encodeURIComponent(examType)}`, {
-                      method: "POST",
-                      headers: getAuthHeaders(token),
-                      body: form,
-                    });
-
-                    const data = await res.json();
-
-                    if (!res.ok) {
-                      throw new Error(data.message || data.error || "Import failed");
-                    }
-                    
-                    const imp = data.imported ?? 0;
-                    const sk = data.skipped ?? 0;
-                    const errs = data.errors ?? [];
-                    const totalRows = data.total ?? imp + sk;
-                    
-                    if (imp === 0 && sk === 0) {
-                      toast("No valid data found in CSV file. Check the format.", "error");
-                    } else if (imp === 0) {
-                      const firstErrors = errs
-                        .slice(0, 3)
-                        .map(errRow => `Row ${errRow.row}: ${errRow.reason || errRow.error || "Failed"}`)
-                        .join("; ");
-                      toast(`Imported 0 grades. ${sk} rows skipped. First errors: ${firstErrors}`, "error");
-                    } else if (errs.length > 0) {
-                      const firstErrors = errs
-                        .slice(0, 3)
-                        .map(errRow => `Row ${errRow.row}: ${errRow.reason || errRow.error || "Failed"}`)
-                        .join("; ");
-                      const moreErrors = errs.length > 3 ? ` (+${errs.length - 3} more errors)` : "";
-                      toast(`Imported ${imp} grade(s). Skipped ${sk}. Errors: ${firstErrors}${moreErrors}`, "warn");
-                    } else {
-                      toast(`Successfully imported ${imp} grade(s) across ${totalRows} row(s).`, "success");
-                    }
-                    
-                    // Refresh results
-                    const fresh = await apiFetch(`/grades${termQuery}`, { token });
-                    setResults(fresh);
-                  } catch (err) {
-                    console.error("Import error:", err);
-                    toast(err.message || "Import failed. Please check the file format and try again.", "error");
-                  }
-                  e.target.value = "";
-                }, [auth?.token, toast, examType, setResults])}
+                onChange={handleImportCsv}
               />
             </label>
             <Btn onClick={() => {

@@ -40,7 +40,7 @@ function normalise(a) {
 
 export default function AttendancePage({
   auth, students, attendance, setAttendance, canEdit, toast,
-  feeBlocked = false, onGoFees, school
+  feeBlocked = false, onGoFees
 }) {
   const { term: currentTermName, startDate: currentTermStart, endDate: currentTermEnd } = useCurrentTerm(auth);
   const [terms, setTerms] = useState([]);
@@ -429,5 +429,4 @@ AttendancePage.propTypes = {
   toast: PropTypes.func.isRequired,
   feeBlocked: PropTypes.bool,
   onGoFees: PropTypes.func,
-  school: PropTypes.object,
 };

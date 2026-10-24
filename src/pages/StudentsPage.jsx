@@ -2,15 +2,11 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import PropTypes from "prop-types";
 import StudentIDCard from "../components/StudentIDCard";
 import QRScanner from "../components/QRScanner";
-import { SUBJECTS } from "../lib/constants";
-import { money, isPaidStatus } from "../lib/utils";
 import { API_BASE, apiFetch } from "../lib/api";
 import { getAuthHeaders } from "../lib/auth";
 import { parseStudentQrContent } from "../lib/qr";
-import { printHTML } from "../lib/print";
 import { Pager } from "../components/Helpers";
 import { csv, pager } from "../lib/utils";
-import { useCurrentTerm } from "../hooks/useCurrentTerm";
 import { useEntitySync } from "../hooks/useEntitySync";
 
 import Button from "../components/ui/Button";
@@ -18,7 +14,6 @@ import Card from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import Select from "../components/ui/Select";
 import Badge from "../components/ui/Badge";
-import StatCard from "../components/ui/StatCard";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
@@ -67,12 +62,7 @@ function normalise(s) {
   };
 }
 
-export default function StudentsPage({ auth, students, setStudents, canEdit, results, payments, feeStructures: rawFeeStructures = [], toast, school }) {
-  const { term: currentTerm } = useCurrentTerm(auth);
-  const feeStructures = Array.isArray(rawFeeStructures)
-    ? rawFeeStructures.filter(f => (f?.term ?? f?.term_name ?? currentTerm) === currentTerm)
-    : [];
-
+export default function StudentsPage({ auth, students, setStudents, canEdit, toast, school }) {
   const [q, setQ] = useState("");
   const [cls, setCls] = useState("all");
   const [status, setStatus] = useState("all");
@@ -133,11 +123,6 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     transform: (data) => (Array.isArray(data) ? data.map(normalise) : []),
   });
 
-  const expected = c => {
-    const x = feeStructures.find(s => s.className === c || s.class_name === c);
-    return x ? Number(x.tuition) + Number(x.activity) + Number(x.misc) : 0;
-  };
-
   const normalised = useMemo(() => {
     return students.map(s => {
       if (s.firstName) return s;
@@ -160,6 +145,45 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     setEditId(null); setErr("");
     setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", ...emptyFeeForm() });
     setShow(true);
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast("Please select an image file", "error");
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        toast("File size must be less than 2MB", "error");
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const uploadPhoto = async (studentId) => {
+    if (!selectedFile) return;
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('studentId', studentId);
+      const response = await fetch(`${API_BASE}/students/upload-photo`, {
+        method: 'POST',
+        headers: getAuthHeaders(auth?.token),
+        body: formData,
+      });
+      if (!response.ok) throw new Error('Upload failed');
+      const result = await response.json();
+      setF(prev => ({ ...prev, photoUrl: result.photoUrl }));
+      setSelectedFile(null);
+      toast("Photo uploaded successfully", "success");
+    } catch {
+      toast("Failed to upload photo", "error");
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   const save = async () => {
@@ -246,6 +270,9 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           toast(errorMsg, 'error');
           return;
         }
+        if (selectedFile) {
+          await uploadPhoto(editId);
+        }
         setStudents(prev => prev.map(s =>
           (s.student_id === editId || s.id === editId)
             ? { ...normalise(s), ...f, id: editId }
@@ -262,6 +289,10 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           body: { admissionNumber: f.admission || `ADM-${Date.now()}`, firstName: f.firstName, lastName: f.lastName, gender: f.gender, className: f.className || null, classId: null, dateOfBirth: f.dob || null, nemisNumber: f.nemisNumber || null, bloodGroup: f.bloodGroup || null, allergies: f.allergies || null, medicalConditions: f.medicalConditions || null, emergencyContactName: f.emergencyContactName || null, emergencyContactPhone: f.emergencyContactPhone || null, emergencyContactRelationship: f.emergencyContactRelationship || null, phone: f.parentPhone || null, email: null, address: null, photoUrl: f.photoUrl || null, status: f.status, parentName: f.parentName || null, parentPhone: f.parentPhone || null },
           token: auth?.token,
         });
+        if (selectedFile) {
+          const newStudentId = res?.student_id ?? res?.id;
+          if (newStudentId) await uploadPhoto(newStudentId);
+        }
         setStudents(prev => [...prev, normalise(res)]);
         apiFetch("/students", { token: auth.token })
           .then(data => setStudents(data.map(normalise)))
@@ -290,45 +321,6 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
     } catch (err) { toast(err.message || "Delete failed", "error"); }
   };
 
-  const uploadPhoto = async (studentId) => {
-    if (!selectedFile) return;
-    setUploadingPhoto(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('studentId', studentId);
-      const response = await fetch(`${API_BASE}/students/upload-photo`, {
-        method: 'POST',
-        headers: getAuthHeaders(auth?.token),
-        body: formData,
-      });
-      if (!response.ok) throw new Error('Upload failed');
-      const result = await response.json();
-      setF({ ...f, photoUrl: result.photoUrl });
-      setSelectedFile(null);
-      toast("Photo uploaded successfully", "success");
-    } catch (error) {
-      toast("Failed to upload photo", "error");
-    } finally {
-      setUploadingPhoto(false);
-    }
-  };
-
-  const handleFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        toast("Please select an image file", "error");
-        return;
-      }
-      if (file.size > 2 * 1024 * 1024) {
-        toast("File size must be less than 2MB", "error");
-        return;
-      }
-      setSelectedFile(file);
-    }
-  };
-
   const handleQRScan = async (qrText) => {
     try {
       const parsedQr = parseStudentQrContent(qrText);
@@ -347,7 +339,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       } else {
         toast("Student not found", "error");
       }
-    } catch (err) {
+    } catch {
       toast("Invalid QR code", "error");
     }
     setShowQRScanner(false);
@@ -520,6 +512,22 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
           <Input label="NEMIS Number" value={f.nemisNumber} onChange={e => handleChange('nemisNumber', e.target.value)} />
           <Input label="Blood Group" value={f.bloodGroup} onChange={e => handleChange('bloodGroup', e.target.value)} />
           <Select label="Status" value={f.status} onChange={e => handleChange('status', e.target.value)} options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} />
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+            <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--color-text-secondary)" }}>
+              Student Photo {uploadingPhoto ? "(Uploading...)" : ""}
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              style={{ fontSize: "13px", padding: "6px 0" }}
+            />
+            {selectedFile && (
+              <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
+                Selected: {selectedFile.name}
+              </span>
+            )}
+          </div>
         </div>
         <div style={{ marginTop: "var(--space-4)" }}>
           <StudentFeeSettingsBlock f={f} onChange={handleChange} />
@@ -578,8 +586,6 @@ StudentsPage.propTypes = {
   students: PropTypes.array.isRequired,
   setStudents: PropTypes.func.isRequired,
   canEdit: PropTypes.bool,
-  results: PropTypes.array,
-  payments: PropTypes.array,
-  feeStructures: PropTypes.array.isRequired,
   toast: PropTypes.func.isRequired,
+  school: PropTypes.object,
 };

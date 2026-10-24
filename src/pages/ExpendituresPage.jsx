@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
 import { money } from "../lib/utils";
@@ -88,7 +88,7 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
     }
   }, [currentTermStart, showModal, editingExpense]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!auth?.token) return;
     setLoading(true);
     try {
@@ -103,11 +103,11 @@ export default function ExpendituresPage({ auth, canEdit, toast }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [auth?.token, toast]);
 
   useEffect(() => {
     loadData();
-  }, [auth?.token]);
+  }, [loadData]);
 
   const activeTermInfo = useMemo(() => {
     if (selectedTerm === "all") {
