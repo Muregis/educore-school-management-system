@@ -27,7 +27,7 @@ const router = Router();
 router.use(authRequired);
 
 function normalizeAdmissionNumber(value) {
-  return String(value ?? "").trim().toLowerCase();
+  return String(value ?? "").trim().toUpperCase();
 }
 
 function normalizePhoneNumber(value) {

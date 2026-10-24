@@ -6,7 +6,7 @@ import csv from "csv-parser";
 import { Readable } from "stream";
 
 function normalizeAdmissionNumber(value) {
-  return String(value ?? "").trim().toLowerCase();
+  return String(value ?? "").trim().toUpperCase();
 }
 
 function normalizeDateInput(value) {

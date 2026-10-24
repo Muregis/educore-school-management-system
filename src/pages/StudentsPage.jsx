@@ -25,9 +25,11 @@ import Table from "../components/ui/Table";
 import StudentFeeSettingsBlock from "../components/StudentFeeSettingsBlock";
 
 function normalise(s) {
+  const rawAdm = s.admission_number ?? s.admission;
+  const adm = rawAdm ? String(rawAdm).trim().toUpperCase() : "";
   return {
     id:          s.student_id  ?? s.id,
-    admission:   s.admission_number ?? s.admission,
+    admission:   adm,
     firstName:   s.first_name  ?? s.firstName ?? "",
     lastName:    s.last_name   ?? s.lastName ?? "",
     className:   s.class_name  ?? s.className  ?? "",
@@ -557,8 +559,8 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, res
       )}
 
       {idCardStudent && (
-        <Modal isOpen={!!idCardStudent} title="Student ID Card" onClose={() => setIdCardStudent(null)} maxWidth="420px">
-          <StudentIDCard student={idCardStudent} school={school} />
+        <Modal isOpen={!!idCardStudent} title="Student ID Card" onClose={() => setIdCardStudent(null)} maxWidth="480px">
+          <StudentIDCard student={idCardStudent} school={school} onClose={() => setIdCardStudent(null)} />
         </Modal>
       )}
 

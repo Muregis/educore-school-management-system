@@ -28,7 +28,7 @@ const csvUpload = multer({
 });
 
 function normalizeAdmissionNumber(value) {
-  return String(value ?? "").trim().toLowerCase();
+  return String(value ?? "").trim().toUpperCase();
 }
 
 function normalizeGender(value) {
