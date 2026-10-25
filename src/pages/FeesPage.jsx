@@ -160,16 +160,26 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
 
 
   const reloadPayments = useCallback(async () => {
-    if (!auth?.token || !term) return;
-    const data = await apiFetch(`/payments?term=${encodeURIComponent(term)}`, { token: auth.token });
+    if (!auth?.token) return;
+    const url = selectedTerm === "all" ? "/payments" : `/payments?term=${encodeURIComponent(displayTerm)}`;
+    const data = await apiFetch(url, { token: auth.token });
     setPayments((data || []).map(normalisePayment));
-  }, [auth, setPayments, term]);
+  }, [auth, setPayments, selectedTerm, displayTerm]);
 
-  useEntitySync({ url: `/payments?term=${encodeURIComponent(term)}`, token: auth?.token, setter: setPayments, transform: (data) => (data || []).map(normalisePayment), dependencies: [term], enabled: !!term });
+  const syncPaymentsUrl = selectedTerm === "all" ? "/payments" : (displayTerm ? `/payments?term=${encodeURIComponent(displayTerm)}` : null);
+  useEntitySync({
+    url: syncPaymentsUrl,
+    token: auth?.token,
+    setter: setPayments,
+    transform: (data) => (data || []).map(normalisePayment),
+    dependencies: [syncPaymentsUrl],
+    enabled: !!syncPaymentsUrl
+  });
 
   const normalisedPayments   = payments.map(p => p.payment_id ? normalisePayment(p) : p);
   const allStructures        = feeStructures.map(f => f.fee_structure_id ? normaliseFeeStruct(f) : f);
-  const normalisedStructures = allStructures.filter(f => (f.term || displayTerm) === displayTerm);
+  const structureTermFilter  = selectedTerm === "all" ? (term || (availableTerms.length ? availableTerms[0] : "Term 1")) : displayTerm;
+  const normalisedStructures = allStructures.filter(f => (f.term || structureTermFilter) === structureTermFilter);
 
   const calculateLedgerBalance = (student, studentDiscounts = []) => {
     const sid = student?.student_id ?? student?.id;
@@ -246,6 +256,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
   };
 
   const filteredPayments = normalisedPayments.filter(p =>
+    (selectedTerm === "all" || !p.term || p.term === displayTerm) &&
     (filterClass === "all" || p.className === filterClass) &&
     (filterDate === "all" || (filterDate === "today" && isTodayPayment(p))) &&
     (!recordSearch || (
@@ -668,14 +679,14 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
             <Button variant={filterDate==="today" ? "primary" : "ghost"} onClick={() => setFilterDate(filterDate === "today" ? "all" : "today")}>Today</Button>
-            <div style={{ width: "1px", background: "var(--color-border)", margin: "0 var(--space-2)" }} />
-            <Button variant={selectedTerm==="current" ? "secondary" : "ghost"} onClick={() => setSelectedTerm("current")}>Current Term</Button>
+            <div style={{ width: "1px", height: "24px", background: "var(--color-border)", margin: "0 var(--space-2)" }} />
+            <Button variant={selectedTerm==="current" ? "primary" : "secondary"} onClick={() => setSelectedTerm("current")}>Current Term</Button>
             {(availableTerms.length ? availableTerms : ["Term 1", "Term 2", "Term 3"]).map((tn) => (
-              <Button key={tn} variant={selectedTerm===tn ? "secondary" : "ghost"} onClick={() => setSelectedTerm(tn)}>{tn}</Button>
+              <Button key={tn} variant={selectedTerm===tn ? "primary" : "secondary"} onClick={() => setSelectedTerm(tn)}>{tn}</Button>
             ))}
-            <Button variant={selectedTerm==="all" ? "secondary" : "ghost"} onClick={() => setSelectedTerm("all")}>All Time (All Terms)</Button>
+            <Button variant={selectedTerm==="all" ? "primary" : "secondary"} onClick={() => setSelectedTerm("all")}>All Time (All Terms)</Button>
           </div>
           
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginLeft: "auto" }}>

@@ -81,23 +81,46 @@ export default function AttendancePage({
     if (selectedTerm === "all") {
       return { name: "All Terms", from: null, to: null };
     }
+    const currentYear = new Date().getFullYear();
+    const getTermRangeFallback = (termName, year = currentYear) => {
+      const name = String(termName || "").toLowerCase();
+      if (name.includes("semester 1")) return { from: `${year}-01-12`, to: `${year}-05-22` };
+      if (name.includes("semester 2")) return { from: `${year}-06-08`, to: `${year}-10-23` };
+      if (name.includes("trimester 3")) return { from: `${year}-11-02`, to: `${year}-12-18` };
+      if (name.includes("autumn")) return { from: `${year}-09-01`, to: `${year}-12-15` };
+      if (name.includes("spring")) return { from: `${year + 1}-01-08`, to: `${year + 1}-03-28` };
+      if (name.includes("summer")) return { from: `${year + 1}-04-15`, to: `${year + 1}-07-05` };
+      if (name.includes("term 2")) return { from: `${year}-05-05`, to: `${year}-08-01` };
+      if (name.includes("term 3")) return { from: `${year}-09-01`, to: `${year}-11-28` };
+      return { from: `${year}-01-06`, to: `${year}-04-04` };
+    };
+
     if (selectedTerm === "current") {
       const active = terms.find(t => t.status === "active" || t.is_current);
+      const name = currentTermName || active?.term_name || active?.name || "Term 1";
+      const y = Number(active?.academic_year) || currentYear;
+      const fallback = getTermRangeFallback(name, y);
       return {
         name: currentTermName || active?.term_name || active?.name || "Current Term",
-        from: currentTermStart || active?.start_date || null,
-        to: currentTermEnd || active?.end_date || null,
+        from: currentTermStart || active?.start_date || fallback.from,
+        to: currentTermEnd || active?.end_date || fallback.to,
       };
     }
-    const found = terms.find(t => String(t.term_id ?? t.id) === String(selectedTerm));
+
+    const found = terms.find(t => String(t.term_id ?? t.id) === String(selectedTerm) || (t.term_name || t.name) === selectedTerm);
     if (found) {
+      const name = found.term_name || found.name || selectedTerm;
+      const y = Number(found.academic_year) || currentYear;
+      const fallback = getTermRangeFallback(name, y);
       return {
-        name: found.term_name || found.name || "Selected Term",
-        from: found.start_date || null,
-        to: found.end_date || null,
+        name,
+        from: found.start_date || fallback.from,
+        to: found.end_date || fallback.to,
       };
     }
-    return { name: "Term", from: null, to: null };
+
+    const fallback = getTermRangeFallback(selectedTerm, currentYear);
+    return { name: selectedTerm, from: fallback.from, to: fallback.to };
   }, [selectedTerm, terms, currentTermName, currentTermStart, currentTermEnd]);
 
   useEffect(() => {
@@ -265,6 +288,39 @@ export default function AttendancePage({
       </div>
 
       <Card style={{ padding: "var(--space-4)", background: "linear-gradient(145deg, color-mix(in srgb, var(--color-bg-card) 96%, transparent) 0%, var(--color-bg-card) 100%)", boxShadow: "var(--shadow-sm)" }}>
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center", marginBottom: "var(--space-3)" }}>
+          <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-text-muted)", marginRight: "var(--space-1)" }}>Term Filter:</span>
+          <Button
+            variant={selectedTerm === "current" ? "primary" : "secondary"}
+            size="sm"
+            onClick={() => setSelectedTerm("current")}
+          >
+            Current Term{currentTermName ? ` (${currentTermName})` : ""}
+          </Button>
+          {(terms.length ? terms : [{ term_name: "Term 1" }, { term_name: "Term 2" }, { term_name: "Term 3" }]).map(t => {
+            const val = String(t.term_id ?? t.id ?? t.term_name);
+            const label = t.term_name || t.name;
+            const isSelected = selectedTerm === val || selectedTerm === label;
+            return (
+              <Button
+                key={val}
+                variant={isSelected ? "primary" : "secondary"}
+                size="sm"
+                onClick={() => setSelectedTerm(val)}
+              >
+                {label}
+              </Button>
+            );
+          })}
+          <Button
+            variant={selectedTerm === "all" ? "primary" : "secondary"}
+            size="sm"
+            onClick={() => setSelectedTerm("all")}
+          >
+            All Terms
+          </Button>
+        </div>
+
         <div className="ec-kpi-grid">
           <Select
             value={selectedTerm}

@@ -88,16 +88,11 @@ router.post("/academic/years/:id/end-year", authorize("academic.manage"), async 
 });
 
 // GET /api/academic/terms - List terms
-router.get("/academic/terms", authorize("academic.view"), async (req, res) => {
+router.get("/academic/terms", async (req, res) => {
   try {
     const { schoolId } = req.user;
-    const { data: terms, error } = await supabase
-      .from('terms')
-      .select('*')
-      .eq('school_id', schoolId)
-      .order('start_date', { ascending: false });
-
-    if (error) throw error;
+    const { status } = req.query;
+    const terms = await TermService.getTerms(schoolId, status);
     const normalized = (terms || []).map(t => ({
       ...t,
       academic_year: t.academic_year_id || t.academic_year,

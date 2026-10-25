@@ -83,6 +83,12 @@ export default function GradesPage({ auth, students, results, setResults, canEdi
   const [classOptions, setClassOptions] = useState([]);
   const [availableTerms, setAvailableTerms] = useState([]);
 
+  const termNames = useMemo(() => {
+    const list = availableTerms.map(t => t.term_name || t.name || t.term).filter(Boolean);
+    if (list.length) return [...new Set(list)];
+    return ["Term 1", "Term 2", "Term 3"];
+  }, [availableTerms]);
+
   // Set term from currentTerm when loaded
   useEffect(() => {
     if (currentTerm && !term) {
@@ -338,19 +344,19 @@ const classesForDropdown = useMemo(() => {
   };
 
   const counts = {
-    EE1: results.filter(r => String(r.grade).toUpperCase() === "EE1").length,
-    EE2: results.filter(r => String(r.grade).toUpperCase() === "EE2").length,
-    ME1: results.filter(r => String(r.grade).toUpperCase() === "ME1").length,
-    ME2: results.filter(r => String(r.grade).toUpperCase() === "ME2").length,
-    AE1: results.filter(r => String(r.grade).toUpperCase() === "AE1").length,
-    AE2: results.filter(r => String(r.grade).toUpperCase() === "AE2").length,
-    BE1: results.filter(r => String(r.grade).toUpperCase() === "BE1").length,
-    BE2: results.filter(r => String(r.grade).toUpperCase() === "BE2").length,
+    EE1: filtered.filter(r => String(r.grade).toUpperCase() === "EE1").length,
+    EE2: filtered.filter(r => String(r.grade).toUpperCase() === "EE2").length,
+    ME1: filtered.filter(r => String(r.grade).toUpperCase() === "ME1").length,
+    ME2: filtered.filter(r => String(r.grade).toUpperCase() === "ME2").length,
+    AE1: filtered.filter(r => String(r.grade).toUpperCase() === "AE1").length,
+    AE2: filtered.filter(r => String(r.grade).toUpperCase() === "AE2").length,
+    BE1: filtered.filter(r => String(r.grade).toUpperCase() === "BE1").length,
+    BE2: filtered.filter(r => String(r.grade).toUpperCase() === "BE2").length,
   };
-  counts.EE = counts.EE1 + counts.EE2 + results.filter(r => String(r.grade).toUpperCase() === "EE").length;
-  counts.ME = counts.ME1 + counts.ME2 + results.filter(r => String(r.grade).toUpperCase() === "ME").length;
-  counts.AE = counts.AE1 + counts.AE2 + results.filter(r => String(r.grade).toUpperCase() === "AE").length;
-  counts.BE = counts.BE1 + counts.BE2 + results.filter(r => String(r.grade).toUpperCase() === "BE").length;
+  counts.EE = counts.EE1 + counts.EE2 + filtered.filter(r => String(r.grade).toUpperCase() === "EE").length;
+  counts.ME = counts.ME1 + counts.ME2 + filtered.filter(r => String(r.grade).toUpperCase() === "ME").length;
+  counts.AE = counts.AE1 + counts.AE2 + filtered.filter(r => String(r.grade).toUpperCase() === "AE").length;
+  counts.BE = counts.BE1 + counts.BE2 + filtered.filter(r => String(r.grade).toUpperCase() === "BE").length;
   const SUB_COLORS = { EE1:"#16a34a", EE2:"#22c55e", ME1:"#2563eb", ME2:"#3b82f6", AE1:"#d97706", AE2:"#f59e0b", BE1:"#ef4444", BE2:"#b91c1c" };
 
   const handleDownloadImportTemplate = useCallback(async () => {
@@ -384,7 +390,7 @@ const classesForDropdown = useMemo(() => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Recalculation failed");
       toast(`Recalculated grades for ${data.updated} results`, "success");
-      const fresh = await apiFetch(`/grades${termQuery}`, { token });
+      const fresh = await apiFetch(fetchUrl, { token });
       setResults(fresh);
     } catch (err) {
       toast(err.message || "Recalculation failed", "error");
@@ -470,6 +476,35 @@ const classesForDropdown = useMemo(() => {
           <div><Badge tone="warning">X</Badge> — Absent / missed exam</div>
           <div><Badge tone="danger">Y</Badge> — Caught cheating</div>
         </div>
+      </div>
+
+      {/* Term Quick Filter Buttons */}
+      <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.textMuted, marginRight: 4 }}>Term Filter:</span>
+        <Btn
+          size="small"
+          variant={(term === (currentTerm || "Term 1") || (!term && currentTerm)) ? "primary" : "secondary"}
+          onClick={() => setTerm(currentTerm || "Term 1")}
+        >
+          Current Term{currentTerm ? ` (${currentTerm})` : ""}
+        </Btn>
+        {termNames.map(tn => (
+          <Btn
+            key={tn}
+            size="small"
+            variant={term === tn ? "primary" : "secondary"}
+            onClick={() => setTerm(tn)}
+          >
+            {tn}
+          </Btn>
+        ))}
+        <Btn
+          size="small"
+          variant={term === "all" ? "primary" : "secondary"}
+          onClick={() => setTerm("all")}
+        >
+          All Terms
+        </Btn>
       </div>
 
       {/* Filters */}

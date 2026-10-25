@@ -98,46 +98,229 @@ export class TermService {
 
   static async getCurrentTerm(schoolId) {
     try {
-      const { data: terms } = await supabase
-        .from('terms')
-        .select('*')
-        .eq('school_id', schoolId)
-        .eq('is_current', true)
-        .eq('is_deleted', false)
-        .single();
+      // 1. Try database terms table
+      try {
+        const { data: terms } = await supabase
+          .from('terms')
+          .select('*')
+          .eq('school_id', schoolId)
+          .eq('is_current', true)
+          .eq('is_deleted', false)
+          .maybeSingle();
 
-      if (terms) {
-        return terms;
+        if (terms) {
+          return {
+            ...terms,
+            term: terms.term_name || terms.name || terms.term,
+            term_name: terms.term_name || terms.name || terms.term,
+          };
+        }
+
+        const { data: currentByDate } = await supabase
+          .from('terms')
+          .select('*')
+          .eq('school_id', schoolId)
+          .eq('is_deleted', false)
+          .order('end_date', { ascending: false })
+          .limit(1);
+
+        if (currentByDate && currentByDate.length) {
+          return {
+            ...currentByDate[0],
+            term: currentByDate[0].term_name || currentByDate[0].name || currentByDate[0].term,
+            term_name: currentByDate[0].term_name || currentByDate[0].name || currentByDate[0].term,
+          };
+        }
+      } catch (err) {
+        console.warn('terms table check skipped:', err?.message);
       }
 
-      const { data: currentByDate } = await supabase
-        .from('terms')
-        .select('*')
-        .eq('school_id', schoolId)
-        .eq('is_deleted', false)
-        .order('end_date', { ascending: false })
-        .limit(1);
+      // 2. Try academic_terms table
+      try {
+        const { data: aTerms } = await supabase
+          .from('academic_terms')
+          .select('*')
+          .eq('school_id', schoolId)
+          .eq('is_current', true)
+          .maybeSingle();
 
-      return currentByDate?.[0] || null;
+        if (aTerms) {
+          return {
+            term_id: aTerms.id || aTerms.term_id || 1,
+            term: aTerms.name || aTerms.term_name,
+            term_name: aTerms.name || aTerms.term_name,
+            academic_year: aTerms.academic_year || aTerms.academic_year_id || String(new Date().getFullYear()),
+            start_date: aTerms.start_date,
+            end_date: aTerms.end_date,
+            is_current: true,
+            status: "active",
+          };
+        }
+      } catch (err) {
+        console.warn('academic_terms table check skipped:', err?.message);
+      }
+
+      // 3. Fallback to school_settings
+      try {
+        const { data: settings } = await supabase
+          .from('school_settings')
+          .select('setting_key, setting_value')
+          .eq('school_id', schoolId)
+          .in('setting_key', ['current_term', 'term_start', 'term_end', 'academic_year', 'school_type']);
+
+        const map = new Map((settings || []).map(s => [s.setting_key, s.setting_value]));
+        const currentTermName = map.get('current_term');
+        const academicYear = map.get('academic_year') || String(new Date().getFullYear());
+        const termStart = map.get('term_start');
+        const termEnd = map.get('term_end');
+
+        if (currentTermName) {
+          return {
+            term_id: 1,
+            term: currentTermName,
+            term_name: currentTermName,
+            academic_year: academicYear,
+            start_date: termStart || `${academicYear}-01-06`,
+            end_date: termEnd || `${academicYear}-04-04`,
+            is_current: true,
+            status: "active",
+          };
+        }
+      } catch (err) {
+        console.warn('school_settings fallback skipped:', err?.message);
+      }
+
+      // 4. Fallback to schools table
+      try {
+        const { data: school } = await supabase
+          .from('schools')
+          .select('term, year, academic_year, school_type')
+          .eq('school_id', schoolId)
+          .maybeSingle();
+
+        if (school?.term) {
+          const yr = school.academic_year || school.year || String(new Date().getFullYear());
+          return {
+            term_id: 1,
+            term: school.term,
+            term_name: school.term,
+            academic_year: yr,
+            start_date: `${yr}-01-06`,
+            end_date: `${yr}-04-04`,
+            is_current: true,
+            status: "active",
+          };
+        }
+      } catch (err) {
+        console.warn('schools table fallback skipped:', err?.message);
+      }
+
+      // 5. Ultimate safe fallback
+      const y = new Date().getFullYear();
+      return {
+        term_id: 1,
+        term: "Term 1",
+        term_name: "Term 1",
+        academic_year: String(y),
+        start_date: `${y}-01-06`,
+        end_date: `${y}-04-04`,
+        is_current: true,
+        status: "active",
+      };
     } catch (error) {
       console.error('Get current term error:', error);
-      return null;
+      const y = new Date().getFullYear();
+      return {
+        term_id: 1,
+        term: "Term 1",
+        term_name: "Term 1",
+        academic_year: String(y),
+        start_date: `${y}-01-06`,
+        end_date: `${y}-04-04`,
+        is_current: true,
+        status: "active",
+      };
     }
   }
 
   static async getTerms(schoolId, status = null) {
     try {
-      const query = {
-        where: { school_id: schoolId, is_deleted: false },
-        order: { column: "term_order", ascending: true },
-      };
-
-      if (status) {
-        query.where.status = status;
+      // 1. Try database terms table
+      try {
+        const query = {
+          where: { school_id: schoolId, is_deleted: false },
+          order: { column: "term_order", ascending: true },
+        };
+        if (status) query.where.status = status;
+        const { data: terms } = await database.query("terms", query);
+        if (terms && terms.length) {
+          return terms.map(t => ({
+            ...t,
+            term: t.term_name || t.name || t.term,
+            term_name: t.term_name || t.name || t.term,
+          }));
+        }
+      } catch (e) {
+        // Continue
       }
 
-      const { data: terms } = await database.query("terms", query);
-      return terms || [];
+      // 2. Try academic_terms table
+      try {
+        const { data: aTerms } = await supabase
+          .from('academic_terms')
+          .select('*')
+          .eq('school_id', schoolId)
+          .order('start_date', { ascending: true });
+
+        if (aTerms && aTerms.length) {
+          return aTerms.map(t => ({
+            ...t,
+            term_id: t.id || t.term_id,
+            term: t.name || t.term_name,
+            term_name: t.name || t.term_name,
+            academic_year: t.academic_year || t.academic_year_id || String(new Date().getFullYear()),
+          }));
+        }
+      } catch (e) {
+        // Continue
+      }
+
+      // 3. Fallback to standard terms based on school type
+      const current = await this.getCurrentTerm(schoolId);
+      const activeTermName = current?.term_name || "Term 1";
+      const y = Number(current?.academic_year) || new Date().getFullYear();
+
+      let schoolType = "primary";
+      try {
+        const { data: s } = await supabase
+          .from('schools')
+          .select('school_type')
+          .eq('school_id', schoolId)
+          .maybeSingle();
+        if (s?.school_type) schoolType = s.school_type.toLowerCase();
+      } catch (_) {}
+
+      let list;
+      if (schoolType === "college" || schoolType === "tertiary" || schoolType === "tvet") {
+        list = [
+          { term_id: 1, term_name: "Semester 1", term: "Semester 1", start_date: `${y}-01-12`, end_date: `${y}-05-22`, is_current: activeTermName === "Semester 1", status: activeTermName === "Semester 1" ? "active" : "upcoming", academic_year: String(y) },
+          { term_id: 2, term_name: "Semester 2", term: "Semester 2", start_date: `${y}-06-08`, end_date: `${y}-10-23`, is_current: activeTermName === "Semester 2", status: activeTermName === "Semester 2" ? "active" : "upcoming", academic_year: String(y) },
+          { term_id: 3, term_name: "Trimester 3", term: "Trimester 3", start_date: `${y}-11-02`, end_date: `${y}-12-18`, is_current: activeTermName === "Trimester 3", status: activeTermName === "Trimester 3" ? "active" : "upcoming", academic_year: String(y) },
+        ];
+      } else if (schoolType === "igcse" || schoolType === "international") {
+        list = [
+          { term_id: 1, term_name: "Autumn Term", term: "Autumn Term", start_date: `${y}-09-01`, end_date: `${y}-12-15`, is_current: activeTermName === "Autumn Term", status: activeTermName === "Autumn Term" ? "active" : "upcoming", academic_year: String(y) },
+          { term_id: 2, term_name: "Spring Term", term: "Spring Term", start_date: `${y + 1}-01-08`, end_date: `${y + 1}-03-28`, is_current: activeTermName === "Spring Term", status: activeTermName === "Spring Term" ? "active" : "upcoming", academic_year: String(y) },
+          { term_id: 3, term_name: "Summer Term", term: "Summer Term", start_date: `${y + 1}-04-15`, end_date: `${y + 1}-07-05`, is_current: activeTermName === "Summer Term", status: activeTermName === "Summer Term" ? "active" : "upcoming", academic_year: String(y) },
+        ];
+      } else {
+        list = [
+          { term_id: 1, term_name: "Term 1", term: "Term 1", start_date: `${y}-01-06`, end_date: `${y}-04-04`, is_current: activeTermName === "Term 1", status: activeTermName === "Term 1" ? "active" : "upcoming", academic_year: String(y) },
+          { term_id: 2, term_name: "Term 2", term: "Term 2", start_date: `${y}-05-05`, end_date: `${y}-08-01`, is_current: activeTermName === "Term 2", status: activeTermName === "Term 2" ? "active" : "upcoming", academic_year: String(y) },
+          { term_id: 3, term_name: "Term 3", term: "Term 3", start_date: `${y}-09-01`, end_date: `${y}-11-28`, is_current: activeTermName === "Term 3", status: activeTermName === "Term 3" ? "active" : "upcoming", academic_year: String(y) },
+        ];
+      }
+      return list;
     } catch (error) {
       console.error("Get terms error:", error);
       return [];
