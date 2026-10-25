@@ -1,3 +1,8 @@
+const tryParse = (val, fallback) => {
+    if (!val) return fallback;
+    try { return JSON.parse(val); } catch { return fallback; }
+  };
+
 import { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import { C } from "../lib/theme";
@@ -208,11 +213,7 @@ function AdminPlanReview({ auth, planSummary, toast, onBack, onDecision }) {
       .catch(() => setLoading(false));
   }, [auth, planSummary.plan_id]);
 
-  const tryParse = (val, fallback) => {
-    if (!val) return fallback;
-    try { return JSON.parse(val); } catch { return fallback; }
-  };
-
+  
   const runAnalysis = async () => {
     setAnalyzing(true);
     try {

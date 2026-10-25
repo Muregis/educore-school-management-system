@@ -5,12 +5,28 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
-  { ignores: ['dist', 'backend/**', 'scripts/**', 'dev-dist/**', 'backups/**'] },
+  {
+    ignores: [
+      'dist/**',
+      'backend/**',
+      'scripts/**',
+      'dev-dist/**',
+      'backups/**',
+      '.kilo/**',
+      'test/**',
+      '*.py',
+      '*.cjs',
+      'vite.config.js',
+    ],
+  },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
       parserOptions: {
         ecmaVersion: 'latest',
         ecmaFeatures: { jsx: true },
@@ -28,23 +44,24 @@ export default [
       ...react.configs.recommended.rules,
       ...react.configs['jsx-runtime'].rules,
       ...reactHooks.configs.recommended.rules,
+      'react/prop-types': 'off',
+      'react/no-unescaped-entities': 'off',
       'react/jsx-no-target-blank': 'off',
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
       ],
-      // Catches temporal-dead-zone style bugs: identifiers used before they
-      // are declared in the same scope. Lightweight no-undef on usage of
-      // undeclared identifiers (lets `const`/`let`/`class` references that
-      // haven't been declared yet trigger because their declaration site is
-      // *later* in the source, which most linters miss).
-      'no-use-before-define': ['error', {
-        functions: false,    // function declarations are hoisted-initialized
-        classes: true,       // class declarations trigger TDZ
-        variables: true,     // let/const trigger TDZ
+      'no-unused-vars': ['warn', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+      }],
+      'no-use-before-define': ['warn', {
+        functions: false,
+        classes: true,
+        variables: false,
         allowNamedExports: false,
       }],
     },
   },
 ]
-

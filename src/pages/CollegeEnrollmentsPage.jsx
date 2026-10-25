@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Table, Badge, Button, Card } from "../components/ui";
 import { apiFetch } from "../lib/api";
 
@@ -44,6 +43,20 @@ export default function CollegeEnrollmentsPage({ auth, school, toast }) {
       setPrograms(res || []);
     } catch (err) {
       toast(err.message || "Failed to load programs", "error");
+    }
+  };
+
+  const withdrawEnrollment = async (enrollmentId) => {
+    if (!window.confirm("Are you sure you want to withdraw this student from the program?")) return;
+    try {
+      await apiFetch(`/api/college/enrollments/${enrollmentId}`, {
+        method: "DELETE",
+        token: auth?.token,
+      });
+      setEnrollments(prev => prev.filter(e => e.enrollment_id !== enrollmentId));
+      toast("Enrollment withdrawn successfully", "success");
+    } catch (err) {
+      toast(err.message || "Failed to withdraw enrollment", "error");
     }
   };
 

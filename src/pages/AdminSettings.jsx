@@ -1229,6 +1229,7 @@ const UsersTab = ({ onSave, auth }) => {
   const f = k => e => setForm({ ...form, [k]: e.target.value });
 
   // Load real users from backend
+  const colorPairs = [[C.accent, C.purple],[C.teal, C.accent],[C.amber, C.rose],[C.purple, C.teal],[C.green, C.teal],[C.rose, C.amber]];
   const loadUsers = async () => {
     try {
       const data = await apiFetch("/accounts/staff", { token: auth?.token });
@@ -1255,7 +1256,6 @@ const UsersTab = ({ onSave, auth }) => {
   }, [auth]);
 
   const initials = name => name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() || "??";
-  const colorPairs = [[C.accent, C.purple],[C.teal, C.accent],[C.amber, C.rose],[C.purple, C.teal],[C.green, C.teal],[C.rose, C.amber]];
 
   // CREATE / UPDATE user via API
   const addUser = async () => {

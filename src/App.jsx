@@ -1,10 +1,10 @@
+import PropTypes from "prop-types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULTS, NAV, ROLE, NAV_EXTRAS } from "./lib/constants";
 import { C, applyBrandColorTokens } from "./lib/theme";
 import { genId } from "./lib/utils";
 import { useLocalState } from "./hooks/useLocalState";
 import { useCurrentTerm } from "./hooks/useCurrentTerm";
-import Btn from "./components/Btn";
 import LoginView from "./pages/LoginView";
 import DashboardPage from "./pages/DashboardPage";
 import StudentsPage from "./pages/StudentsPage";
@@ -12,7 +12,6 @@ import TeachersPage from "./pages/TeachersPage";
 import AttendancePage from "./pages/AttendancePage";
 import GradesPage from "./pages/GradesPage";
 import FeesPage from "./pages/FeesPage";
-import SettingsPage from "./pages/SettingsPage";
 import DisciplinePage from "./pages/DisciplinePage";
 import TransportPage from "./pages/TransportPage";
 import CommunicationPage from "./pages/CommunicationPage";
@@ -50,14 +49,10 @@ import CollegeDepartmentsPage from "./pages/CollegeDepartmentsPage";
 import CollegeProgramsPage from "./pages/CollegeProgramsPage";
 import CollegeUnitsPage from "./pages/CollegeUnitsPage";
 import CollegeEnrollmentsPage from "./pages/CollegeEnrollmentsPage";
-import OfflineStatusBar from "./components/OfflineStatusBar"; // NEW: Offline/sync status indicator
 import ParentGuard from "./components/ParentGuard"; // NEW: Parent-student binding enforcement
 import { Toasts, Forbidden, NotFound } from "./components/Helpers";
 import SidebarModern from "./components/SidebarModern";
-import BranchSelector from "./components/BranchSelector";
 import Topbar from "./components/Topbar";
-import PageLoader from "./components/ui/PageLoader";
-import EmptyState from "./components/ui/EmptyState";
 import { API_BASE, apiFetch } from "./lib/api";
 import TermManagementPage from "./pages/TermManagementPage";
 import AcademicTransitionPage from "./pages/AcademicTransitionPage";
@@ -119,8 +114,6 @@ const RESPONSIVE_CSS = `
   .ec-drawer.open { transform: translateX(0); }
 `;
 
-const ROLE_COLORS  = { admin:"#3B82F6", teacher:"#14B8A6", finance:"#F59E0B", hr:"#A855F7", librarian:"#22C55E", parent:"#F43F5E", student:"#38BDF8" };
-const ROLE_AVATARS = { admin:"🛡️", teacher:"👩‍🏫", finance:"💳", hr:"🧑‍💼", librarian:"📚", parent:"👪", student:"🎒" };
 const BOTTOM_NAV_PAGES = {
   director:  ["dashboard","students","staff","attendance","fees"],
   superadmin:["dashboard","students","staff","attendance","fees"],
@@ -151,6 +144,59 @@ function clearTenantLocalState() {
   TENANT_STATE_KEYS.forEach((key) => localStorage.removeItem(key));
   clearSession();
 }
+const collegeNavItems = [
+  { id: "departments",    label: "Departments",    icon: "\u{1F5D1}" },
+  { id: "programs",       label: "Programs",       icon: "\u{1F4C2}" },
+  { id: "units",          label: "Units/Courses",  icon: "\u{1F4D6}" },
+  { id: "enrollments",    label: "Enrollments",    icon: "\u{1F4CD}" },
+];
+
+const PAGE_META = {
+    dashboard:         { title: "Dashboard",         desc: "Overview of school operations, student performance, and financial summaries." },
+    students:          { title: "Students",           desc: "Manage student records, profiles, and enrollment details." },
+    staff:             { title: "Staff",              desc: "Manage school staff, HR records, and employment details." },
+    teachers:          { title: "Teachers",           desc: "Manage teaching staff, assignments, and performance." },
+    attendance:        { title: "Attendance",         desc: "Track daily student attendance and generate attendance reports." },
+    grades:            { title: "Grades",             desc: "View and manage student grades, report cards, and academic performance." },
+    subjects:          { title: "Subjects",           desc: "Manage school subjects, curriculum, and class allocations." },
+    fees:              { title: "Fees",               desc: "Manage fee structures, payments, invoices, and financial records." },
+    expenditures:      { title: "Expenditures",       desc: "Track school expenditures, budgets, and financial outflows." },
+    "mpesa-reconcile": { title: "M-Pesa Reconcile",   desc: "Reconcile M-Pesa payments with student fee records." },
+    "bulk-import":     { title: "Import / Export",    desc: "Bulk import and export student, fee, and academic data." },
+    exams:             { title: "Exams",              desc: "Manage examinations, schedules, and results processing." },
+    admissions:        { title: "Admissions",         desc: "Manage student admissions, applications, and enrollment." },
+    invoices:          { title: "Invoices",           desc: "Generate and manage invoices for fees and services." },
+    reportcards:       { title: "Report Cards",       desc: "Generate and print student report cards and academic summaries." },
+    hr:                { title: "Human Resources",    desc: "Manage HR operations, staff records, and payroll." },
+    library:           { title: "Library",            desc: "Manage library resources, book inventory, and borrowing records." },
+    discipline:        { title: "Discipline",         desc: "Track student discipline records and incident management." },
+    transport:         { title: "Transport",          desc: "Manage school transport routes, vehicles, and schedules." },
+    communication:     { title: "Communication",      desc: "Send announcements, notifications, and school communications." },
+    timetable:         { title: "Timetable",          desc: "Manage class schedules, timetables, and session planning." },
+    accounts:          { title: "Accounts",           desc: "Manage user accounts, roles, and access permissions." },
+    lessonplans:       { title: "Lesson Plans",       desc: "Create, manage, and review teacher lesson plans." },
+    announcements:     { title: "Announcements",      desc: "View school announcements, news, and updates." },
+    analytics:         { title: "Analytics",          desc: "View school analytics, insights, and performance trends." },
+    reports:           { title: "Reports",            desc: "Generate comprehensive school reports and data exports." },
+    "financial-reports": { title: "Financial Reports", desc: "Generate financial statements and accounting reports." },
+    analysis:          { title: "Analysis",           desc: "Analyze academic performance, trends, and statistical data." },
+    merit:             { title: "Merit Lists",        desc: "Stream and consolidated merit lists with CBC sub-levels." },
+    "update-requests": { title: "Update Requests",    desc: "Manage requests to update student and school information." },
+    "trial-balance":   { title: "Trial Balance",      desc: "View trial balance reports and accounting summaries." },
+    "income-statement": { title: "Income Statement",  desc: "View income statements and revenue reports." },
+    "chart-of-accounts": { title: "Chart of Accounts", desc: "Manage the chart of accounts and accounting structure." },
+    "journal-entries": { title: "Journal Entries",    desc: "Manage journal entries and accounting transactions." },
+    "general-ledger":  { title: "General Ledger",     desc: "View general ledger accounts and transaction history." },
+    "balance-sheet":   { title: "Balance Sheet",      desc: "View balance sheet reports and financial position." },
+    settings:          { title: "Settings",           desc: "Configure school settings, permissions, and preferences." },
+    departments:       { title: "Departments",        desc: "Manage college departments and organizational structure." },
+    programs:          { title: "Programs",           desc: "Manage academic programs, courses, and curricula." },
+    units:             { title: "Units",              desc: "Manage academic units, modules, and course content." },
+    enrollments:       { title: "Enrollments",        desc: "Manage student enrollments and registration records." },
+    "term-management": { title: "Term Management",    desc: "Manage academic terms, sessions, and school calendar." },
+    "academic-transition": { title: "Academic Transition", desc: "Manage academic transitions, promotions, and class changes." },
+  };
+
 export default function App() {
   // Check if this is a QR verification URL (supports both /verify/:id and #/verify/:id)
   const urlPath = window.location.pathname;
@@ -166,7 +212,7 @@ export default function App() {
   const hasAuthenticatedSession = Boolean(auth?.token);
 
   const [school, setSchool]               = useLocalState("educore.school",        hasAuthenticatedSession ? { ...DEFAULTS.school } : DEFAULTS.school);
-  const [users, setUsers]                 = useLocalState("educore.users",          hasAuthenticatedSession ? [] : DEFAULTS.users);
+  const [, setUsers]                 = useLocalState("educore.users",          hasAuthenticatedSession ? [] : DEFAULTS.users);
   const [students, setStudents]           = useLocalState("educore.students",       hasAuthenticatedSession ? [] : DEFAULTS.students);
   const [teachers, setTeachers]           = useLocalState("educore.teachers",       hasAuthenticatedSession ? [] : DEFAULTS.teachers);
   const [attendance, setAttendance]       = useLocalState("educore.attendance",     hasAuthenticatedSession ? [] : DEFAULTS.attendance);
@@ -176,8 +222,8 @@ export default function App() {
   const [notifications, setNotifications] = useLocalState("educore.notifications",  hasAuthenticatedSession ? [] : DEFAULTS.notifications);
   const [timetable, setTimetable]         = useLocalState("educore.timetable",      hasAuthenticatedSession ? [] : DEFAULTS.timetable);
   const [pendingUpdates, setPendingUpdates] = useLocalState("educore.pendingUpdates", hasAuthenticatedSession ? [] : DEFAULTS.pendingUpdates);
-  const [tenantDataLoading, setTenantDataLoading] = useState(hasAuthenticatedSession);
-  const [tenantDataError, setTenantDataError] = useState(null);
+  const [, setTenantDataLoading] = useState(hasAuthenticatedSession);
+  const [, setTenantDataError] = useState(null);
   const tenantRequestRef = useRef(0);
 
   const [page, _setPage]                   = useState(() => {
@@ -191,7 +237,7 @@ export default function App() {
   const [drawerOpen, setDrawerOpen]       = useState(false);
   const [dataRefreshRequest, setDataRefreshRequest] = useState(0);
   const [rolePermissions, setRolePermissions] = useState(null);
-  const [activeSchoolId, setActiveSchoolId] = useState(() => {
+  const [activeSchoolId] = useState(() => {
     try {
       return localStorage.getItem("educore.activeSchool") || getSession()?.user?.schoolId || null;
     } catch {
@@ -255,52 +301,7 @@ export default function App() {
 
   useEffect(() => { setDrawerOpen(false); }, [page]);
 
-  const PAGE_META = {
-    dashboard:         { title: "Dashboard",         desc: "Overview of school operations, student performance, and financial summaries." },
-    students:          { title: "Students",           desc: "Manage student records, profiles, and enrollment details." },
-    staff:             { title: "Staff",              desc: "Manage school staff, HR records, and employment details." },
-    teachers:          { title: "Teachers",           desc: "Manage teaching staff, assignments, and performance." },
-    attendance:        { title: "Attendance",         desc: "Track daily student attendance and generate attendance reports." },
-    grades:            { title: "Grades",             desc: "View and manage student grades, report cards, and academic performance." },
-    subjects:          { title: "Subjects",           desc: "Manage school subjects, curriculum, and class allocations." },
-    fees:              { title: "Fees",               desc: "Manage fee structures, payments, invoices, and financial records." },
-    expenditures:      { title: "Expenditures",       desc: "Track school expenditures, budgets, and financial outflows." },
-    "mpesa-reconcile": { title: "M-Pesa Reconcile",   desc: "Reconcile M-Pesa payments with student fee records." },
-    "bulk-import":     { title: "Import / Export",    desc: "Bulk import and export student, fee, and academic data." },
-    exams:             { title: "Exams",              desc: "Manage examinations, schedules, and results processing." },
-    admissions:        { title: "Admissions",         desc: "Manage student admissions, applications, and enrollment." },
-    invoices:          { title: "Invoices",           desc: "Generate and manage invoices for fees and services." },
-    reportcards:       { title: "Report Cards",       desc: "Generate and print student report cards and academic summaries." },
-    hr:                { title: "Human Resources",    desc: "Manage HR operations, staff records, and payroll." },
-    library:           { title: "Library",            desc: "Manage library resources, book inventory, and borrowing records." },
-    discipline:        { title: "Discipline",         desc: "Track student discipline records and incident management." },
-    transport:         { title: "Transport",          desc: "Manage school transport routes, vehicles, and schedules." },
-    communication:     { title: "Communication",      desc: "Send announcements, notifications, and school communications." },
-    timetable:         { title: "Timetable",          desc: "Manage class schedules, timetables, and session planning." },
-    accounts:          { title: "Accounts",           desc: "Manage user accounts, roles, and access permissions." },
-    lessonplans:       { title: "Lesson Plans",       desc: "Create, manage, and review teacher lesson plans." },
-    announcements:     { title: "Announcements",      desc: "View school announcements, news, and updates." },
-    analytics:         { title: "Analytics",          desc: "View school analytics, insights, and performance trends." },
-    reports:           { title: "Reports",            desc: "Generate comprehensive school reports and data exports." },
-    "financial-reports": { title: "Financial Reports", desc: "Generate financial statements and accounting reports." },
-    analysis:          { title: "Analysis",           desc: "Analyze academic performance, trends, and statistical data." },
-    merit:             { title: "Merit Lists",        desc: "Stream and consolidated merit lists with CBC sub-levels." },
-    "update-requests": { title: "Update Requests",    desc: "Manage requests to update student and school information." },
-    "trial-balance":   { title: "Trial Balance",      desc: "View trial balance reports and accounting summaries." },
-    "income-statement": { title: "Income Statement",  desc: "View income statements and revenue reports." },
-    "chart-of-accounts": { title: "Chart of Accounts", desc: "Manage the chart of accounts and accounting structure." },
-    "journal-entries": { title: "Journal Entries",    desc: "Manage journal entries and accounting transactions." },
-    "general-ledger":  { title: "General Ledger",     desc: "View general ledger accounts and transaction history." },
-    "balance-sheet":   { title: "Balance Sheet",      desc: "View balance sheet reports and financial position." },
-    settings:          { title: "Settings",           desc: "Configure school settings, permissions, and preferences." },
-    departments:       { title: "Departments",        desc: "Manage college departments and organizational structure." },
-    programs:          { title: "Programs",           desc: "Manage academic programs, courses, and curricula." },
-    units:             { title: "Units",              desc: "Manage academic units, modules, and course content." },
-    enrollments:       { title: "Enrollments",        desc: "Manage student enrollments and registration records." },
-    "term-management": { title: "Term Management",    desc: "Manage academic terms, sessions, and school calendar." },
-    "academic-transition": { title: "Academic Transition", desc: "Manage academic transitions, promotions, and class changes." },
-  };
-
+  
   useEffect(() => {
     const meta = PAGE_META[page] || { title: "EduCore", desc: "Comprehensive school management system." };
     const schoolName = school?.name?.trim();
@@ -329,13 +330,12 @@ export default function App() {
       breadcrumbScript.type = "application/ld+json";
       document.head.appendChild(breadcrumbScript);
     }
-    const currentNav = nav.find(n => n.id === page);
     const breadcrumbData = {
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",
       "itemListElement": [
         { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://educore.app/dashboard" },
-        ...(currentNav ? [{ "@type": "ListItem", "position": 2, "name": currentNav.label, "item": `https://educore.app/${page}` }] : [])
+        { "@type": "ListItem", "position": 2, "name": meta.title, "item": `https://educore.app/${page}` }
       ]
     };
     breadcrumbScript.textContent = JSON.stringify(breadcrumbData);
@@ -432,14 +432,7 @@ export default function App() {
     ? (validLinkedId ? payments.filter(p => Number(p.studentId ?? p.student_id) === validLinkedId) : []) 
     : payments;
 
-  const collegeNavIds = new Set(["departments","programs","units","enrollments","dashboard"]);
-
-const collegeNavItems = [
-  { id: "departments",    label: "Departments",    icon: "\u{1F5D1}" },
-  { id: "programs",       label: "Programs",       icon: "\u{1F4C2}" },
-  { id: "units",          label: "Units/Courses",  icon: "\u{1F4D6}" },
-  { id: "enrollments",    label: "Enrollments",    icon: "\u{1F4CD}" },
-];
+  
 
 const fullNav = useMemo(() => {
   const existing = new Set(NAV.map(n => n.id));
@@ -447,13 +440,13 @@ const fullNav = useMemo(() => {
   const hasCollegeInstitution = school?.institution_type === 'college';
   const collegeItems = hasCollegeInstitution ? collegeNavItems.filter(n => !existing.has(n.id)) : [];
   return [...NAV, ...NAV_EXTRAS.filter(n => !existing.has(n.id)), ...collegeItems];
-}, []);
+}, [school?.institution_type]);
 
   const nav = useMemo(() => {
     if (!perms) return [];
     return fullNav.filter(n => perms.pages.includes(n.id));
   }, [perms, fullNav]);
-  useEffect(() => { if (perms && !perms.pages.includes(page)) setPage(perms.pages[0]); }, [perms, page]);
+  useEffect(() => { if (perms && !perms.pages.includes(page)) setPage(perms.pages[0]); }, [perms, page, setPage]);
 
   const resetClientData = useCallback(() => {
     setSchool(DEFAULTS.school); setUsers(DEFAULTS.users); setStudents(DEFAULTS.students);
@@ -662,9 +655,9 @@ const fullNav = useMemo(() => {
     setActiveChildId(null);
     setNeedsOnboarding(false);
     setPage("dashboard");
-  }, [resetClientData]);
+  }, [resetClientData, setPage]);
 
-  const handleOnboardingComplete = useCallback(async (_result) => {
+  const handleOnboardingComplete = useCallback(async () => {
     setNeedsOnboarding(false);
     if (auth) {
       const updatedUser = {
@@ -696,7 +689,7 @@ const fullNav = useMemo(() => {
     setPage("dashboard");
     beginTenantRefresh();
     toast(`Welcome, ${u.name}`, "success");
-  }, [beginTenantRefresh, resetClientData, toast]);
+  }, [beginTenantRefresh, resetClientData, toast, setPage]);
 
   useEffect(() => {
     if (!auth) return undefined;
@@ -717,27 +710,7 @@ const fullNav = useMemo(() => {
     };
   }, [auth]);
 
-  const resetDemo = useCallback(async () => {
-    if (!auth?.token || !auth?.schoolId) {
-      toast("Missing school context. Please log in again.", "error");
-      return;
-    }
-
-    try {
-      const response = await apiFetch("/admin/reset-demo-data", {
-        method: "POST",
-        token: auth.token,
-        body: { school_id: auth.schoolId },
-      });
-
-      resetClientData();
-      await hydrateTenantData(auth);
-      toast(`Demo data reset for school ${response.school_id}`, "success");
-    } catch (err) {
-      toast(err.message || "Failed to reset demo data", "error");
-    }
-  }, [auth, hydrateTenantData, resetClientData, toast]);
-
+  
   if (isQRVerification) {
     return (
       <div className="school-theme-primary" style={{ minHeight:"100vh", display:"flex", background:C.bg, color:C.text, fontFamily:"var(--font-body)" }}>
@@ -762,8 +735,7 @@ const fullNav = useMemo(() => {
 
   const pageExists = fullNav.some(n => n.id === page);
   const allowed    = perms?.pages.includes(page);
-  const roleColor  = ROLE_COLORS[auth.role] || C.accent;
-  const sideW      = sideCollapsed ? 64 : 240;
+    const sideW      = sideCollapsed ? 64 : 240;
 
   const pages = {
     "term-management": <TermManagementPage auth={auth} />,
@@ -853,6 +825,9 @@ const fullNav = useMemo(() => {
       allowedPages={perms?.pages || []}
     />
   );
+  SidebarContent.propTypes = {
+    collapsed: PropTypes.bool,
+  };
 
   return (
     <div className="school-theme-primary" style={{ minHeight:"100vh", display:"flex", background:C.bg, color:C.text, fontFamily:"var(--font-body)" }}>

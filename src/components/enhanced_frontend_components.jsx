@@ -13,6 +13,7 @@ import Table from "../components/Table";
 import { C, inputStyle } from "../lib/theme";
 import { money } from "../lib/utils";
 import { apiFetch } from "../lib/api";
+import { getSession } from "../lib/auth";
 
 // =====================================================
 // TERM MANAGEMENT PAGE
@@ -698,8 +699,9 @@ export function PermissionGuard({ permission, children, fallback = null }) {
 // CONDITIONAL UI RENDERING HOOK
 // =====================================================
 
-export function useFeatureFlags() {
-  const { auth } = useContext(AuthContext) || {};
+export function useFeatureFlags(propAuth = null) {
+  const session = getSession();
+  const auth = propAuth || session?.user || (typeof sessionStorage !== "undefined" && sessionStorage.getItem("educore.auth") ? JSON.parse(sessionStorage.getItem("educore.auth")) : null);
   const [flags, setFlags] = useState({
     newAcademicSystem: false,
     ledgerSystem: false,

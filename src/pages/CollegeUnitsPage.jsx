@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Table, Badge, Button, Card } from "../components/ui";
 import { apiFetch } from "../lib/api";
 
@@ -48,6 +47,20 @@ export default function CollegeUnitsPage({ auth, school, toast }) {
     }
   };
 
+  const deleteUnit = async (unitId) => {
+    if (!window.confirm("Are you sure you want to deactivate this unit?")) return;
+    try {
+      await apiFetch(`/api/college/units/${unitId}`, {
+        method: "DELETE",
+        token: auth?.token,
+      });
+      setUnits(prev => prev.filter(u => u.unit_id !== unitId));
+      toast("Unit deactivated successfully", "success");
+    } catch (err) {
+      toast(err.message || "Failed to deactivate unit", "error");
+    }
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
@@ -70,8 +83,7 @@ export default function CollegeUnitsPage({ auth, school, toast }) {
         <h3>Units/Courses</h3>
         <Button
           variant="primary"
-          onClick={() => setTitle("").setCode("").setProgramId("").setDepartmentId("")
-          }
+          onClick={() => { setTitle(""); setCode(""); setProgramId(""); setDepartmentId(""); }}
           style={{ float: "right", marginBottom: "1rem" }}
         >
           + New Unit

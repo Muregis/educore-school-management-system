@@ -209,6 +209,12 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
     toast("Books CSV exported", "success");
   };
 
+  const borrowerName = (b) => b.borrower_name || `#${b.borrower_id}`;
+  const daysOut = (borrow_date) => {
+    const diff = Math.floor((new Date() - new Date(borrow_date)) / 86400000);
+    return diff === 1 ? "1 day" : `${diff} days`;
+  };
+
   const exportBorrows = () => {
     const data = tab === "borrows" ? borrows : borrows.filter(b => b.status === "borrowed" && b.due_date < today());
     csv("library_borrows.csv",
@@ -227,11 +233,6 @@ export default function LibraryPage({ auth, students = [], teachers = [], toast 
     toast("Borrows CSV exported", "success");
   };
 
-  const borrowerName = (b) => b.borrower_name || `#${b.borrower_id}`;
-  const daysOut      = (borrow_date) => {
-    const diff = Math.floor((new Date() - new Date(borrow_date)) / 86400000);
-    return diff === 1 ? "1 day" : `${diff} days`;
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>

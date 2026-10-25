@@ -22,7 +22,7 @@ function normalizeDate(value) {
   if (!raw) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
 
-  const match = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  const match = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
   if (!match) return raw;
 
   const [, dayStr, monthStr, yearStr] = match;

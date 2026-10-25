@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Table, Badge, Button, Card } from "../components/ui";
 import { apiFetch } from "../lib/api";
 
@@ -25,6 +24,20 @@ export default function CollegeDepartmentsPage({ auth, school, toast }) {
     }
   };
 
+  const deleteDepartment = async (deptId) => {
+    if (!window.confirm("Are you sure you want to deactivate this department?")) return;
+    try {
+      await apiFetch(`/api/college/departments/${deptId}`, {
+        method: "DELETE",
+        token: auth?.token,
+      });
+      setDepartments(prev => prev.filter(d => d.department_id !== deptId));
+      toast("Department deactivated successfully", "success");
+    } catch (err) {
+      toast(err.message || "Failed to deactivate department", "error");
+    }
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
@@ -47,8 +60,7 @@ export default function CollegeDepartmentsPage({ auth, school, toast }) {
         <h3>Departments</h3>
         <Button
           variant="primary"
-          onClick={() => setName("").setCode("").setDescription("")
-          }
+          onClick={() => { setName(""); setCode(""); setDescription(""); }}
           style={{ float: "right", marginBottom: "1rem" }}
         >
           + New Department

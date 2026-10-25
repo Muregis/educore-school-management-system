@@ -3,6 +3,25 @@ import PropTypes from "prop-types";
 import { API_BASE } from "../lib/api";
 import { C } from "../lib/theme";
 
+const pageShellStyle = {
+  minHeight: "100vh",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: C.bg,
+  color: C.text,
+  padding: 20
+};
+
+const cardStyle = {
+  width: "100%",
+  maxWidth: 420,
+  background: C.card,
+  borderRadius: 16,
+  border: `1px solid ${C.border}`,
+  padding: 32
+};
+
 export default function QRVerificationPage({ studentId }) {
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -149,24 +168,7 @@ function InfoCard({ label, value }) {
   );
 }
 
-const pageShellStyle = {
-  minHeight: "100vh",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: C.bg,
-  color: C.text,
-  padding: 20
-};
 
-const cardStyle = {
-  width: "100%",
-  maxWidth: 420,
-  background: C.card,
-  borderRadius: 16,
-  border: `1px solid ${C.border}`,
-  padding: 32
-};
 
 InfoCard.propTypes = {
   label: PropTypes.string.isRequired,

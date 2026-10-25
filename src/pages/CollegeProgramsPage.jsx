@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Table, Badge, Button, Card } from "../components/ui";
 import { apiFetch } from "../lib/api";
 
@@ -36,6 +35,20 @@ export default function CollegeProgramsPage({ auth, school, toast }) {
     }
   };
 
+  const deleteProgram = async (progId) => {
+    if (!window.confirm("Are you sure you want to deactivate this program?")) return;
+    try {
+      await apiFetch(`/api/college/programs/${progId}`, {
+        method: "DELETE",
+        token: auth?.token,
+      });
+      setPrograms(prev => prev.filter(p => p.program_id !== progId));
+      toast("Program deactivated successfully", "success");
+    } catch (err) {
+      toast(err.message || "Failed to deactivate program", "error");
+    }
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
@@ -58,8 +71,7 @@ export default function CollegeProgramsPage({ auth, school, toast }) {
         <h3>Programs</h3>
         <Button
           variant="primary"
-          onClick={() => setName("").setCode("").setDepartmentId("")
-          }
+          onClick={() => { setName(""); setCode(""); setDepartmentId(""); }}
           style={{ float: "right", marginBottom: "1rem" }}
         >
           + New Program

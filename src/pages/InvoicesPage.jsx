@@ -215,31 +215,6 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
         }}
       />
 
-        {false ? (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>{["Invoice #","Student","Class","Term","Total","Status","Due","Actions"].map(h =>
-                <th key={h} style={{ textAlign: "left", padding: "8px 10px", borderBottom: `1px solid ${C.border}`, color: C.textMuted, fontSize: 12 }}>{h}</th>
-              )}</tr>
-            </thead>
-            <tbody>
-              {filtered.map(inv => (
-                <tr key={inv.invoice_id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                  <td style={{ padding: "8px 10px", fontSize: 11, color: C.textMuted }}>{inv.invoice_number}</td>
-                  <td style={{ padding: "8px 10px", color: C.text, fontWeight: 600 }}>{inv.student_name}</td>
-                  <td style={{ padding: "8px 10px", color: C.textSub }}>{inv.class_name}</td>
-                  <td style={{ padding: "8px 10px", color: C.textMuted }}>{inv.term}</td>
-                  <td style={{ padding: "8px 10px", color: C.text, fontWeight: 600 }}>{money(inv.total)}</td>
-                  <td style={{ padding: "8px 10px" }}><Badge text={inv.status} tone={inv.status==="paid"?"success":inv.status==="partial"?"warning":"danger"} /></td>
-                  <td style={{ padding: "8px 10px", color: C.textMuted, fontSize: 12 }}>{inv.due_date?.slice(0,10)||"—"}</td>
-                  <td style={{ padding: "8px 10px" }}><Btn variant="ghost" onClick={() => printInvoice(inv)}>🖨 Print</Btn></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-      ) : null}
-
       {showSingle && (
         <Modal title="Create Invoice" onClose={() => setShowSingle(false)}>
           <div className="ec-kpi-grid">

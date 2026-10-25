@@ -95,31 +95,7 @@ function BalanceSheet({ auth }) {
         { label: "Balance Check", value: isBalanced ? "Balanced" : "Not Balanced" },
       ],
     });
-    return;
-    const html = `
-      <div class="print-document">
-        <div class="print-header">
-          <h1>Balance Sheet</h1>
-          <p>As of ${new Date(asOfDate).toLocaleDateString()}</p>
-        </div>
-        <table class="print-table">
-          <thead><tr><th>Account</th><th>Code</th><th>Type</th><th style="text-align: right">Balance (KES)</th></tr></thead>
-          <tbody>
-            ${(data.assets || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td>Asset</td><td style="text-align: right">${money(acc.balance)}</td></tr>`).join('')}
-            ${(data.liabilities || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td>Liability</td><td style="text-align: right">${money(acc.balance)}</td></tr>`).join('')}
-            ${(data.equity || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td>Equity</td><td style="text-align: right">${money(acc.balance)}</td></tr>`).join('')}
-            <tr><td><strong>Retained Earnings</strong></td><td>—</td><td>Equity</td><td style="text-align: right"><strong>${money(data.retained_earnings)}</strong></td></tr>
-          </tbody>
-        </table>
-        <div class="summary">
-          <p><strong>Total Assets:</strong> ${money(totalAssets)}</p>
-          <p><strong>Total Liabilities:</strong> ${money(totalLiabilities)}</p>
-          <p><strong>Total Equity & Retained Earnings:</strong> ${money(totalEquity)}</p>
-          <p><strong>Status:</strong> ${isBalanced ? "Balanced" : "Not Balanced"}</p>
-        </div>
-      </div>
-    `;
-    printHTML(html, { title: `Balance Sheet - ${asOfDate}` });
+    
   };
 
   return (
@@ -282,28 +258,7 @@ function IncomeStatement({ auth }) {
         { label: "Net Income", value: money(netIncome) },
       ],
     });
-    return;
-    const html = `
-      <div class="print-document">
-        <div class="print-header">
-          <h1>Income Statement (Profit & Loss)</h1>
-          <p>${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}</p>
-        </div>
-        <table class="print-table">
-          <thead><tr><th>Account</th><th>Code</th><th style="text-align: right">Amount (KES)</th></tr></thead>
-          <tbody>
-            ${(data.revenue || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td style="text-align: right">${money(acc.balance)}</td></tr>`).join('')}
-            ${(data.expenses || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td style="text-align: right">${money(acc.balance)}</td></tr>`).join('')}
-          </tbody>
-        </table>
-        <div class="summary">
-          <p><strong>Total Revenue:</strong> ${money(totalRevenue)}</p>
-          <p><strong>Total Expenses:</strong> ${money(totalExpenses)}</p>
-          <p><strong>Net Income:</strong> ${money(netIncome)}</p>
-        </div>
-      </div>
-    `;
-    printHTML(html, { title: "Income Statement" });
+    
   };
 
   return (
@@ -454,27 +409,7 @@ function TrialBalance({ auth }) {
         { label: "Balance Check", value: isBalanced ? "Balanced" : "Not Balanced" },
       ],
     });
-    return;
-    const html = `
-      <div class="print-document">
-        <div class="print-header">
-          <h1>Trial Balance</h1>
-          <p>As of ${new Date(asOfDate).toLocaleDateString()}</p>
-        </div>
-        <table class="print-table">
-          <thead><tr><th>Account</th><th>Code</th><th>Type</th><th style="text-align: right">Debit (KES)</th><th style="text-align: right">Credit (KES)</th></tr></thead>
-          <tbody>
-            ${(data.accounts || []).map(acc => `<tr><td>${acc.account_name}</td><td>${acc.account_code}</td><td>${acc.account_type}</td><td style="text-align: right">${money(acc.debit_balance || acc.debit || 0)}</td><td style="text-align: right">${money(acc.credit_balance || acc.credit || 0)}</td></tr>`).join('')}
-          </tbody>
-        </table>
-        <div class="summary">
-          <p><strong>Total Debits:</strong> ${money(totalDebits)}</p>
-          <p><strong>Total Credits:</strong> ${money(totalCredits)}</p>
-          <p><strong>Status:</strong> ${isBalanced ? "Balanced" : "Not Balanced"}</p>
-        </div>
-      </div>
-    `;
-    printHTML(html, { title: "Trial Balance" });
+    
   };
 
   return (
@@ -579,37 +514,7 @@ function ChartOfAccounts({ auth }) {
         { label: "Inactive Accounts", value: accounts.filter(acc => !acc.is_active).length },
       ],
     });
-    return;
-    const rows = accounts.map(acc => `
-      <tr>
-        <td style="font-family: monospace">${acc.account_code || "—"}</td>
-        <td>${acc.account_name}</td>
-        <td style="text-transform: capitalize">${ACCOUNT_TYPES[acc.account_type]?.label || acc.account_type}</td>
-        <td>${acc.is_active ? "Active" : "Inactive"}</td>
-      </tr>
-    `).join("");
-    const html = `
-      <html>
-      <head><title>Chart of Accounts</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
-        .header { text-align: center; margin-bottom: 24px; }
-        .header h1 { margin: 0 0 4px; font-size: 22px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 13px; }
-        th { background: #f5f5f5; font-weight: 700; }
-      </style>
-      </head>
-      <body>
-        <div class="header"><h1>Chart of Accounts</h1><p>${accounts.length} accounts</p></div>
-        <table>
-          <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Status</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </body>
-      </html>
-    `;
-    printHTML(html, { title: "Chart of Accounts" });
+    
   };
 
   const handleExport = () => {
@@ -734,45 +639,7 @@ function JournalEntries({ auth }) {
         { label: "Line Items", value: rows.length },
       ],
     });
-    return;
-    const entryBlocks = entries.map(entry => {
-      const lineRows = (entry.journal_entry_lines || []).map(line => `
-        <tr>
-          <td style="padding-left: 20px">${line.chart_of_accounts?.account_name || line.account_id}</td>
-          <td style="text-align: right; color: green">${line.debit > 0 ? money(line.debit) : "—"}</td>
-          <td style="text-align: right; color: red">${line.credit > 0 ? money(line.credit) : "—"}</td>
-        </tr>
-      `).join("");
-      return `
-        <div style="margin-bottom: 16px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden;">
-          <div style="padding: 10px; background: #f5f5f5; display: flex; justify-content: space-between;">
-            <span style="font-weight: 700">${entry.entry_number || `JE-${entry.id}`}</span>
-            <span>${new Date(entry.entry_date).toLocaleDateString()}</span>
-          </div>
-          ${entry.description ? `<div style="padding: 6px 10px; font-size: 13px; color: #555">${entry.description}</div>` : ""}
-          <table style="width: 100%; border-collapse: collapse;">
-            <thead><tr><th style="text-align: left">Account</th><th style="text-align: right">Debit</th><th style="text-align: right">Credit</th></tr></thead>
-            <tbody>${lineRows}</tbody>
-          </table>
-        </div>
-      `;
-    }).join("");
-    const html = `
-      <html>
-      <head><title>Journal Entries</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
-        .header { text-align: center; margin-bottom: 24px; }
-        .header h1 { margin: 0 0 4px; font-size: 22px; }
-      </style>
-      </head>
-      <body>
-        <div class="header"><h1>Journal Entries</h1></div>
-        ${entryBlocks || '<p style="text-align: center; color: #999">No journal entries found.</p>'}
-      </body>
-      </html>
-    `;
-    printHTML(html, { title: "Journal Entries" });
+    
   };
 
   const handleExport = () => {
@@ -941,46 +808,7 @@ function GeneralLedger({ auth }) {
         { label: "Transactions", value: rows.length },
       ],
     });
-    return;
-    const txRows = ledger.flatMap(accountLedger =>
-      (accountLedger.transactions || []).map(tx => `
-        <tr>
-          <td>${new Date(tx.transaction_date || tx.date).toLocaleDateString()}</td>
-          <td style="font-family: monospace">${tx.reference || "—"}</td>
-          <td>${tx.description}</td>
-          <td style="text-align: right; color: green">${tx.debit > 0 ? money(tx.debit) : "—"}</td>
-          <td style="text-align: right; color: red">${tx.credit > 0 ? money(tx.credit) : "—"}</td>
-          <td style="text-align: right; font-weight: 700">${money(tx.balance || tx.running_balance || 0)}</td>
-        </tr>
-      `).join("")
-    ).join("");
-    const html = `
-      <html>
-      <head><title>General Ledger</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
-        .header { text-align: center; margin-bottom: 24px; }
-        .header h1 { margin: 0 0 4px; font-size: 22px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; font-size: 13px; }
-        th { background: #f5f5f5; font-weight: 700; }
-      </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>General Ledger</h1>
-          <p>${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}</p>
-        </div>
-        <table>
-          <thead>
-            <tr><th>Date</th><th>Reference</th><th>Description</th><th style="text-align: right">Debit</th><th style="text-align: right">Credit</th><th style="text-align: right">Balance</th></tr>
-          </thead>
-          <tbody>${txRows || '<tr><td colspan="6" style="text-align: center; color: #999">No transactions found.</td></tr>'}</tbody>
-        </table>
-      </body>
-      </html>
-    `;
-    printHTML(html, { title: "General Ledger" });
+    
   };
 
   const handleExport = () => {
