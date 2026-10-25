@@ -3,6 +3,7 @@
 // New UI components for EduCore upgrade
 // =====================================================
 
+import { sortClasses } from "../lib/classLevels";
 import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
@@ -790,7 +791,7 @@ export function ClassPromotionChain({ auth }) {
     }
   };
 
-  const availableClasses = classes.map(c => c.class_name);
+  const availableClasses = sortClasses(classes.map(c => c.class_name));
 
   if (loading) return <div className="loading">Loading promotion chain...</div>;
 

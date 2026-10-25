@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import PropTypes from "prop-types";
 import { money, countBy, isPaidStatus } from "../lib/utils";
@@ -131,7 +132,7 @@ export default function AnalyticsPage({
       .then(data => {
         const payload = data?.data ?? data ?? [];
         const classes = Array.isArray(payload) ? payload : [];
-        setAvailableClasses(classes.map(c => c.class_name).filter(Boolean));
+        setAvailableClasses(sortClasses(classes.map(c => c.class_name).filter(Boolean)));
       })
       .catch(() => { setAvailableClasses([]); });
   }, [auth]);
@@ -309,7 +310,7 @@ Provide a structured analysis with:
       const c = String(s.className || s.class_name || "").trim();
       if (c) set.add(c);
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+    return sortClasses(Array.from(set));
   }, [availableClasses, students]);
 
   const tabs = [

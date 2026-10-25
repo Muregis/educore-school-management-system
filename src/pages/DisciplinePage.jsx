@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
@@ -40,7 +41,7 @@ export default function DisciplinePage({ auth, canEdit, toast, linkedStudentId =
       .then(data => {
         const payload = data?.data ?? data ?? [];
         const classes = Array.isArray(payload) ? payload : [];
-        setAvailableClasses(classes.map(c => c.class_name).filter(Boolean));
+        setAvailableClasses(sortClasses(classes.map(c => c.class_name).filter(Boolean)));
       })
       .catch(() => { setAvailableClasses([]); });
   }, [auth]);

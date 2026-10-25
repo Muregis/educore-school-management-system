@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import RecordPaymentModal from "../components/RecordPaymentModal";
@@ -149,7 +150,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
       .then(data => {
         const payload = data?.data ?? data ?? [];
         const classes = Array.isArray(payload) ? payload : [];
-        setAvailableClasses(classes.map(c => c.class_name).filter(Boolean));
+        setAvailableClasses(sortClasses(classes.map(c => c.class_name).filter(Boolean)));
       })
       .catch(() => { setAvailableClasses([]); });
   }, [auth]);

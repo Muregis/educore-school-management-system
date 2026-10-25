@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import FeeBlock from "../components/FeeBlock";
 import PropTypes from "prop-types";
@@ -149,7 +150,7 @@ const classesForDropdown = useMemo(() => {
       const fromApi = (classOptions ?? []).map(c => (c.class_name ?? c.className ?? "").toString().trim()).filter(Boolean);
       const fromStudents = students.map(getStudentClass).filter(Boolean);
       const merged = Array.from(new Set([...fromApi, ...fromStudents]));
-      return merged.length ? merged.sort() : [];
+      return sortClasses(merged);
     }, [classOptions, students]);
 
    // Extract streams from class names (e.g., "Grade 7 East" -> stream "East")

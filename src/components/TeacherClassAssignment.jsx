@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import { useState, useEffect } from "react";
 import { api } from "../lib/api"; // adjust if your instance name differs
 
@@ -34,7 +35,7 @@ export default function TeacherAssignments() {
           ]);
 
         setTeachers(teachersRes.data || []);
-        setClasses(classesRes.data || []);
+        setClasses(sortClasses(classesRes.data || []));
         setSubjects(subjectsRes.data || []);
         setAssignments(assignmentsRes.data || []);
       } catch (err) {

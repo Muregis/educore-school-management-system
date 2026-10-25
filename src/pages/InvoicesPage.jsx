@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
@@ -39,7 +40,7 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
       .then(data => {
         const payload = data?.data ?? data ?? [];
         const classes = Array.isArray(payload) ? payload : [];
-        const names = classes.map(c => c.class_name).filter(Boolean);
+        const names = sortClasses(classes.map(c => c.class_name).filter(Boolean));
         setAvailableClasses(names);
         setBulkForm(b => ({ ...b, className: b.className || names[0] || "", term: b.term || currentSchoolTerm, academicYear: b.academicYear || currentSchoolYear }));
         setSingleForm(s => ({ ...s, term: s.term || currentSchoolTerm, academicYear: s.academicYear || currentSchoolYear }));

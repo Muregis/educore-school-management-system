@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import React, { useState, useEffect, useCallback } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
@@ -831,7 +832,7 @@ Keep the tone professional but simple enough for a school administrator to act o
 
               {/* Class filter for top students */}
               <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-3)", flexWrap: "wrap", padding: "var(--space-2)", background: "var(--color-bg-base)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
-                {["", ...[...new Set(topStudents.byClass.map(s => s.class_name))]].map(cls => (
+                {["", ...sortClasses([...new Set(topStudents.byClass.map(s => s.class_name))])].map(cls => (
                   <Button 
                     key={cls} 
                     variant={topClass === cls ? "primary" : "ghost"}

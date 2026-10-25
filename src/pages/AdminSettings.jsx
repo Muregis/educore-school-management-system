@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import React, { useEffect, useMemo, useState } from "react";
 import { apiFetch, apiDownload, API_BASE } from "../lib/api";
 import { getAuthHeaders } from "../lib/auth";
@@ -580,7 +581,7 @@ const PromotionChainTab = ({ auth }) => {
     } finally { setSaving(null); }
   };
 
-  const availableClasses = classes.map(c => c.class_name);
+  const availableClasses = sortClasses(classes.map(c => c.class_name));
 
   if (loading) return <div>Loading...</div>;
 

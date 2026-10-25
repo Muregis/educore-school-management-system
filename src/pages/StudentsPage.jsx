@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import PropTypes from "prop-types";
 import StudentIDCard from "../components/StudentIDCard";
@@ -107,7 +108,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, toa
         const res = await apiFetch(`/classes`, { token: auth.token });
         const payload = res?.data ?? res ?? [];
         const classes = Array.isArray(payload) ? payload : [];
-        const names = classes.map(c => c.class_name).filter(Boolean);
+        const names = sortClasses(classes.map(c => c.class_name).filter(Boolean));
         setAvailableClasses(names);
         setF(prev => ({ ...prev, className: prev.className || names[0] || "" }));
       } catch (err) {

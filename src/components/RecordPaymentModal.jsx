@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import Modal from "./Modal";
@@ -46,7 +47,7 @@ export default function RecordPaymentModal({
           const data = await apiFetch(`/classes`, { token: auth.token });
           const payload = data?.data ?? data ?? [];
           const classes = Array.isArray(payload) ? payload : [];
-          setClasses(classes.map(c => c.class_name).filter(Boolean));
+          setClasses(sortClasses(classes.map(c => c.class_name).filter(Boolean)));
         } catch (err) {
           console.warn("Failed to load classes:", err);
           setClasses([]);

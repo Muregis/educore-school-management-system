@@ -2,6 +2,7 @@ import { Router } from "express";
 import { supabase } from "../config/supabaseClient.js";
 import { authRequired } from "../middleware/auth.js";
 import { requireRoles } from "../middleware/roles.js";
+import { compareClasses, getClassLevelRank } from "../utils/classLevels.js";
 
 const router = Router();
 router.use(authRequired);
@@ -78,12 +79,12 @@ router.get("/", async (req, res, next) => {
     const { schoolId } = req.user;
     const { data: classes, error } = await supabase
       .from("classes")
-      .select("class_id, class_name, next_class_name, section, status")
+      .select("class_id, class_name, next_class_name, class_order, section, status")
       .eq("school_id", schoolId)
-      .eq("is_deleted", false)
-      .order("class_name");
+      .eq("is_deleted", false);
     if (error) throw error;
-    res.json({ data: classes || [] });
+    const sorted = [...(classes || [])].sort(compareClasses);
+    res.json({ data: sorted });
   } catch (err) {
     next(err);
   }
@@ -105,7 +106,7 @@ router.post("/", requireRoles("admin", "director", "superadmin"), async (req, re
       status: "active",
       is_deleted: false,
       next_class_name: req.body.next_class_name || null,
-      class_order: req.body.class_order != null ? Number(req.body.class_order) : 0,
+      class_order: req.body.class_order != null ? Number(req.body.class_order) : getClassLevelRank(class_name),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };

@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
@@ -21,7 +22,7 @@ export default function TransportPage({ auth, canEdit, toast, students, school }
         const res = await apiFetch(`/classes`, { token: auth.token });
         const payload = res?.data ?? res ?? [];
         const classes = Array.isArray(payload) ? payload : [];
-        setAvailableClasses(classes.map(c => c.class_name).filter(Boolean));
+        setAvailableClasses(sortClasses(classes.map(c => c.class_name).filter(Boolean)));
       } catch (err) {
         console.warn("Failed to load classes", err);
         setAvailableClasses([]);

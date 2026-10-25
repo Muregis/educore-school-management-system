@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import React, { useState, useEffect } from "react";
 import FeeBlock from "../components/FeeBlock";
 import PropTypes from "prop-types";
@@ -33,7 +34,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
       .then(data => {
         const payload = data?.data ?? data ?? [];
         const classes = Array.isArray(payload) ? payload : [];
-        setAvailableClasses(classes.map(c => c.class_name).filter(Boolean));
+        setAvailableClasses(sortClasses(classes.map(c => c.class_name).filter(Boolean)));
       })
       .catch(() => { setAvailableClasses([]); });
   }, [auth]);
@@ -271,7 +272,7 @@ export default function ReportCardsPage({ auth, school, students, canEdit, toast
               const idx = availableClasses.indexOf(className);
               return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
             };
-            const sortedClasses = Object.keys(grouped).sort((a, b) => classOrderIndex(a) - classOrderIndex(b) || a.localeCompare(b));
+            const sortedClasses = sortClasses(Object.keys(grouped));
             
             return sortedClasses.map(cls => (
               <div key={cls}>

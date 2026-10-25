@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
@@ -70,7 +71,7 @@ export default function TeachersPage({ auth, teachers, setTeachers, canEdit, toa
       .then(data => {
         const payload = data?.data ?? data ?? [];
         const classes = Array.isArray(payload) ? payload : [];
-        setAvailableClasses(classes.map(c => c.class_name).filter(Boolean));
+        setAvailableClasses(sortClasses(classes.map(c => c.class_name).filter(Boolean)));
       })
       .catch(() => { setAvailableClasses([]); });
   }, [auth]);

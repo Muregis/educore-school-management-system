@@ -1,6 +1,7 @@
 /**
  * Printable merit / results sheet — Class vs Overall, CBC EE1–BE2 (CBE-style).
  */
+import { sortClasses } from "../lib/classLevels";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
@@ -56,7 +57,7 @@ export default function MeritListPage({ auth, toast }) {
         setTerms(names);
         setTerm((p) => p || currentTerm || names[0]);
         const cList = Array.isArray(classesRes) ? classesRes : classesRes?.data || classesRes?.classes || [];
-        const bases = [
+        const rawBases = [
           ...new Set(
             cList
               .map((c) => c.class_name || c.name)
@@ -66,8 +67,10 @@ export default function MeritListPage({ auth, toast }) {
                 return m ? m[0].replace(/\s+/g, " ") : String(n).trim();
               })
           ),
-        ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        ];
+        const bases = sortClasses(rawBases);
         setClasses(bases);
+
         setClassName((p) => p || bases.find((c) => /Grade\s*2/i.test(c)) || bases[0] || "");
       } catch (e) {
         toast?.(e.message || "Filter load failed", "error");

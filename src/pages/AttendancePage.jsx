@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import { useState, useEffect, useMemo } from "react";
 import FeeBlock from "../components/FeeBlock";
 import PropTypes from "prop-types";
@@ -62,7 +63,7 @@ export default function AttendancePage({
       .then(data => {
         const payload = data?.data ?? data ?? [];
         const classes = Array.isArray(payload) ? payload : [];
-        setAvailableClasses(classes.map(c => c.class_name).filter(Boolean));
+        setAvailableClasses(sortClasses(classes.map(c => c.class_name).filter(Boolean)));
       })
       .catch(e => { console.warn("Failed to load classes", e); setAvailableClasses([]); });
 

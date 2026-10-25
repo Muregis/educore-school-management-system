@@ -1,3 +1,4 @@
+import { sortClasses } from "../lib/classLevels";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import PropTypes from "prop-types";
 import { money } from "../lib/utils";
@@ -848,7 +849,7 @@ Keep the tone professional but simple enough for a school administrator to act o
 
               {/* Class filter for top students */}
               <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-3)", flexWrap: "wrap", padding: "var(--space-2)", background: "var(--color-bg-base)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border)" }}>
-                {["", ...[...new Set(topStudents.byClass.map(s => s.class_name))]].map(cls => (
+                {["", ...sortClasses([...new Set(topStudents.byClass.map(s => s.class_name))])].map(cls => (
                   <Button 
                     key={cls} 
                     variant={topClass === cls ? "primary" : "ghost"}
@@ -1274,7 +1275,7 @@ export default function ReportsPage({ auth }) {
               <h3 style={{ margin: "0 0 var(--space-3) 0", color: "var(--color-text-primary)", fontSize: "18px" }}>Grade Distribution by Class</h3>
               {!grades || grades.length === 0 ? <p style={{ color: "var(--color-text-muted)" }}>No grade data yet.</p> : (
                 <div style={{ display: "grid", gap: "var(--space-3)" }}>
-                  {[...new Set(grades.map(g => g.class_name))].map(clsName => {
+                  {sortClasses([...new Set(grades.map(g => g.class_name))]).map(clsName => {
                     const classGrades = grades.filter(g => g.class_name === clsName);
                     const totalStudents = classGrades.reduce((sum, g) => sum + (g.entries || 0), 0);
                     
