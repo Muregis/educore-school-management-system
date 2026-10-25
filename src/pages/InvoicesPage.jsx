@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import PropTypes from "prop-types";
 import Btn from "../components/Btn";
 import Field from "../components/Field";
@@ -17,9 +17,20 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
   const [showSingle, setShowSingle]   = useState(false);
   const [showBulk, setShowBulk]       = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
-  const [singleForm, setSingleForm]   = useState({ studentId: "", term: "Term 2", academicYear: "2026", tuition: "", activity: "", misc: "", transport: "", dueDate: "" });
+  const currentSchoolTerm = school?.term || "Term 1";
+  const currentSchoolYear = school?.year || school?.academic_year || String(new Date().getFullYear());
+  const termOptions = useMemo(() => {
+    return Array.from(new Set([
+      currentSchoolTerm,
+      "Term 1", "Term 2", "Term 3",
+      "Semester 1", "Semester 2", "Trimester 3",
+      "Autumn Term", "Spring Term", "Summer Term",
+    ].filter(Boolean)));
+  }, [currentSchoolTerm]);
+
+  const [singleForm, setSingleForm]   = useState({ studentId: "", term: currentSchoolTerm, academicYear: currentSchoolYear, tuition: "", activity: "", misc: "", transport: "", dueDate: "" });
   const [singleFormClass, setSingleFormClass] = useState("");
-  const [bulkForm, setBulkForm]       = useState({ className: "Grade 7", term: "Term 2", academicYear: "2026", dueDate: "" });
+  const [bulkForm, setBulkForm]       = useState({ className: "", term: currentSchoolTerm, academicYear: currentSchoolYear, dueDate: "" });
   const [availableClasses, setAvailableClasses] = useState([]);
 
   useEffect(() => {
@@ -28,10 +39,13 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
       .then(data => {
         const payload = data?.data ?? data ?? [];
         const classes = Array.isArray(payload) ? payload : [];
-        setAvailableClasses(classes.map(c => c.class_name).filter(Boolean));
+        const names = classes.map(c => c.class_name).filter(Boolean);
+        setAvailableClasses(names);
+        setBulkForm(b => ({ ...b, className: b.className || names[0] || "", term: b.term || currentSchoolTerm, academicYear: b.academicYear || currentSchoolYear }));
+        setSingleForm(s => ({ ...s, term: s.term || currentSchoolTerm, academicYear: s.academicYear || currentSchoolYear }));
       })
       .catch(() => { setAvailableClasses([]); });
-  }, [auth]);
+  }, [auth, currentSchoolTerm, currentSchoolYear]);
 
   const load = async () => {
     if (!auth?.token) return;
@@ -230,7 +244,7 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
                 {students.filter(s => (s.className ?? s.class_name) === singleFormClass).map(s => { const id = s.student_id ?? s.id; const name = s.firstName ? `${s.firstName} ${s.lastName}` : `${s.first_name} ${s.last_name}`; return <option key={id} value={id}>{name}</option>; })}
               </select>
             </Field>
-            <Field label="Term"><select style={inputStyle} value={singleForm.term} onChange={e => setSingleForm({ ...singleForm, term: e.target.value })}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></Field>
+            <Field label="Term"><select style={inputStyle} value={singleForm.term} onChange={e => setSingleForm({ ...singleForm, term: e.target.value })}>{termOptions.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
             <Field label="Academic Year"><input style={inputStyle} value={singleForm.academicYear} onChange={e => setSingleForm({ ...singleForm, academicYear: e.target.value })} /></Field>
             <Field label="Tuition (KES)"><input type="number" style={inputStyle} value={singleForm.tuition} onChange={e => setSingleForm({ ...singleForm, tuition: e.target.value })} /></Field>
             <Field label="Activity (KES)"><input type="number" style={inputStyle} value={singleForm.activity} onChange={e => setSingleForm({ ...singleForm, activity: e.target.value })} /></Field>
@@ -252,7 +266,7 @@ export default function InvoicesPage({ auth, school, students, canEdit, toast })
           </div>
           <div className="ec-kpi-grid">
             <Field label="Class"><select style={inputStyle} value={bulkForm.className} onChange={e => setBulkForm({ ...bulkForm, className: e.target.value })}>{(availableClasses ?? []).map(c => <option key={c}>{c}</option>)}</select></Field>
-            <Field label="Term"><select style={inputStyle} value={bulkForm.term} onChange={e => setBulkForm({ ...bulkForm, term: e.target.value })}><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></Field>
+            <Field label="Term"><select style={inputStyle} value={bulkForm.term} onChange={e => setBulkForm({ ...bulkForm, term: e.target.value })}>{termOptions.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
             <Field label="Academic Year"><input style={inputStyle} value={bulkForm.academicYear} onChange={e => setBulkForm({ ...bulkForm, academicYear: e.target.value })} /></Field>
             <Field label="Due Date"><input type="date" style={inputStyle} value={bulkForm.dueDate} onChange={e => setBulkForm({ ...bulkForm, dueDate: e.target.value })} /></Field>
           </div>

@@ -750,7 +750,7 @@ export default function FeesPage({ auth, students, feeStructures, setFeeStructur
             {canViewTotals && tab === "structure" && <Button variant="ghost" onClick={printFeeStructureReport}>🖨️ Print Fee Structure</Button>}
 
             {canEdit && tab==="payments" && <Button variant="primary" onClick={() => setShowRecordPaymentModal(true)}>📝 Manual Payment</Button>}
-            {canEdit && tab==="structure" && <Button onClick={() => { setEditStruct(null); setStructForm({className:"Grade 7",term:displayTerm,tuition:"",activity:"",misc:""}); setShowStruct(true); }}>Set Fee Structure</Button>}
+            {canEdit && tab==="structure" && <Button onClick={() => { setEditStruct(null); setStructForm({className: availableClasses[0] || "",term:displayTerm,tuition:"",activity:"",misc:""}); setShowStruct(true); }}>Set Fee Structure</Button>}
 
 
           </div>

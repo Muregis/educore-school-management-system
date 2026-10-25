@@ -88,7 +88,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, toa
 });
 
   const [f, setF] = useState({
-    firstName: "", lastName: "", className: "Grade 7", gender: "female",
+    firstName: "", lastName: "", className: "", gender: "female",
     parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "",
     allergies: "", medicalConditions: "",
     emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "",
@@ -107,7 +107,9 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, toa
         const res = await apiFetch(`/classes`, { token: auth.token });
         const payload = res?.data ?? res ?? [];
         const classes = Array.isArray(payload) ? payload : [];
-        setAvailableClasses(classes.map(c => c.class_name).filter(Boolean));
+        const names = classes.map(c => c.class_name).filter(Boolean);
+        setAvailableClasses(names);
+        setF(prev => ({ ...prev, className: prev.className || names[0] || "" }));
       } catch (err) {
         console.warn("Failed to load classes", err);
         setAvailableClasses([]);
@@ -143,7 +145,7 @@ export default function StudentsPage({ auth, students, setStudents, canEdit, toa
 
   const openAdd = () => {
     setEditId(null); setErr("");
-    setF({ firstName: "", lastName: "", className: "Grade 7", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", ...emptyFeeForm() });
+    setF({ firstName: "", lastName: "", className: availableClasses[0] || "", gender: "female", parentName: "", parentPhone: "", dob: "", nemisNumber: "", bloodGroup: "", allergies: "", medicalConditions: "", emergencyContactName: "", emergencyContactPhone: "", emergencyContactRelationship: "", photoUrl: "", status: "active", admission: "", ...emptyFeeForm() });
     setShow(true);
   };
 

@@ -16,9 +16,17 @@ import { resolvePasswordPolicy, validatePassword } from "../middleware/passwordP
 const router = Router();
 
 const PRIMARY_CLASSES = [
-  "PP1", "PP2", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8",
+  "PP1", "PP2", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8", "Grade 9",
 ];
-const SECONDARY_CLASSES = ["Form 1", "Form 2", "Form 3", "Form 4"];
+const SECONDARY_CLASSES = ["Grade 10", "Grade 11", "Grade 12", "Form 1", "Form 2", "Form 3", "Form 4"];
+
+const IGCSE_CLASSES = [
+  "Year 1", "Year 2", "Year 3", "Year 4", "Year 5", "Year 6", "Year 7", "Year 8", "Year 9", "Year 10", "Year 11", "Year 12", "Year 13",
+];
+
+const COLLEGE_CLASSES = [
+  "Certificate Level", "Diploma Year 1", "Diploma Year 2", "Year 1 Sem 1", "Year 1 Sem 2", "Year 2 Sem 1", "Year 2 Sem 2", "Year 3 Sem 1", "Year 3 Sem 2", "Year 4 Sem 1", "Year 4 Sem 2",
+];
 
 const PRIMARY_SUBJECTS = [
   { name: "Mathematics", code: "MATH" },
@@ -46,9 +54,36 @@ const SECONDARY_SUBJECTS = [
   { name: "Computer Studies", code: "CS" },
 ];
 
+const IGCSE_SUBJECTS = [
+  { name: "English Language & Literature", code: "ENG" },
+  { name: "Mathematics", code: "MATH" },
+  { name: "Biology", code: "BIO" },
+  { name: "Chemistry", code: "CHEM" },
+  { name: "Physics", code: "PHY" },
+  { name: "ICT & Computer Science", code: "ICT" },
+  { name: "Business Studies & Economics", code: "BUS" },
+  { name: "Geography & Global Perspectives", code: "GEO" },
+  { name: "History", code: "HIST" },
+  { name: "Art & Design", code: "ART" },
+  { name: "Modern Foreign Languages", code: "LANG" },
+];
+
+const COLLEGE_SUBJECTS = [
+  { name: "Communication Skills & Ethics", code: "COMM101" },
+  { name: "ICT & Digital Literacy", code: "ICT101" },
+  { name: "Quantitative Methods & Statistics", code: "QM101" },
+  { name: "Entrepreneurship & Innovation", code: "ENT101" },
+  { name: "Research Methods & Project Design", code: "RES201" },
+  { name: "Core Specialization Unit I", code: "SPEC201" },
+  { name: "Core Specialization Unit II", code: "SPEC202" },
+  { name: "Industrial Attachment / Practicum", code: "PRAC300" },
+];
+
 function subjectsForType(schoolType) {
   const t = String(schoolType || "primary").toLowerCase();
   if (t === "secondary") return SECONDARY_SUBJECTS;
+  if (t === "igcse" || t === "international") return IGCSE_SUBJECTS;
+  if (t === "college" || t === "tertiary" || t === "tvet") return COLLEGE_SUBJECTS;
   if (t === "both" || t === "mixed") {
     const map = new Map();
     [...PRIMARY_SUBJECTS, ...SECONDARY_SUBJECTS].forEach((s) => map.set(s.code, s));
@@ -67,8 +102,23 @@ function slugify(name) {
   return `${base}-${Date.now().toString(36).slice(-4)}`;
 }
 
-function kenyanTermDates(year) {
+function termDatesForType(schoolType, year) {
   const y = Number(year) || new Date().getFullYear();
+  const t = String(schoolType || "primary").toLowerCase();
+  if (t === "college" || t === "tertiary" || t === "tvet") {
+    return [
+      { name: "Semester 1", start: `${y}-01-12`, end: `${y}-05-22`, is_current: true },
+      { name: "Semester 2", start: `${y}-06-08`, end: `${y}-10-23`, is_current: false },
+      { name: "Trimester 3", start: `${y}-11-02`, end: `${y}-12-18`, is_current: false },
+    ];
+  }
+  if (t === "igcse" || t === "international") {
+    return [
+      { name: "Autumn Term", start: `${y}-09-01`, end: `${y}-12-15`, is_current: false },
+      { name: "Spring Term", start: `${y + 1}-01-08`, end: `${y + 1}-03-28`, is_current: false },
+      { name: "Summer Term", start: `${y + 1}-04-15`, end: `${y + 1}-07-05`, is_current: true },
+    ];
+  }
   return [
     { name: "Term 1", start: `${y}-01-06`, end: `${y}-04-04`, is_current: false },
     { name: "Term 2", start: `${y}-05-05`, end: `${y}-08-01`, is_current: false },
@@ -79,6 +129,8 @@ function kenyanTermDates(year) {
 function classListForType(schoolType) {
   const t = String(schoolType || "primary").toLowerCase();
   if (t === "secondary") return SECONDARY_CLASSES;
+  if (t === "igcse" || t === "international") return IGCSE_CLASSES;
+  if (t === "college" || t === "tertiary" || t === "tvet") return COLLEGE_CLASSES;
   if (t === "both" || t === "mixed") return [...PRIMARY_CLASSES, ...SECONDARY_CLASSES];
   return PRIMARY_CLASSES;
 }
@@ -336,13 +388,13 @@ router.post("/complete", authRequired, async (req, res, next) => {
       console.warn("[onboarding] subjects skip", e?.message);
     }
 
-    // Terms via school_settings (works even if academic_years table differs)
-    const terms = kenyanTermDates(academicYear).map((t) => ({
+    // Terms via school_settings (curriculum-aware)
+    const terms = termDatesForType(schoolType, academicYear).map((t) => ({
       ...t,
       is_current: t.name === preferredActive,
     }));
-    if (!terms.some((t) => t.is_current)) terms[terms.length - 1].is_current = true;
-    const activeTerm = terms.find((t) => t.is_current)?.name || "Term 3";
+    if (!terms.some((t) => t.is_current)) (terms[terms.length - 1] || terms[0]).is_current = true;
+    const activeTerm = terms.find((t) => t.is_current)?.name || terms[0]?.name || "Term 1";
 
     await upsertSetting(schoolId, "academic_year", String(academicYear));
     await upsertSetting(schoolId, "current_term", activeTerm);

@@ -18,8 +18,15 @@ import { classRanking, subjectMeans } from "../utils/knecGrading.js";
 const router = Router();
 
 // Official CBC class order for sorting
-const CLASS_ORDER = ["Playgroup","PP1","PP2","Grade 1","Grade 2","Grade 3",
-                     "Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9"];
+const CLASS_ORDER = [
+  "Playgroup", "PP1", "PP2",
+  "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8", "Grade 9",
+  "Grade 10", "Grade 11", "Grade 12",
+  "Form 1", "Form 2", "Form 3", "Form 4",
+  "Year 1", "Year 2", "Year 3", "Year 4", "Year 5", "Year 6", "Year 7", "Year 8", "Year 9", "Year 10", "Year 11", "Year 12", "Year 13",
+  "Certificate Level", "Diploma Year 1", "Diploma Year 2",
+  "Year 1 Sem 1", "Year 1 Sem 2", "Year 2 Sem 1", "Year 2 Sem 2", "Year 3 Sem 1", "Year 3 Sem 2", "Year 4 Sem 1", "Year 4 Sem 2",
+];
 const classIdx = n => { const i = CLASS_ORDER.indexOf(n); return i === -1 ? 99 : i; };
 
 // ── GET /api/performance/sheet ─────────────────────────────────────────────────

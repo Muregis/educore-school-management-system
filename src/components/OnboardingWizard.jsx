@@ -249,7 +249,7 @@ const styles = {
   },
 };
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import PropTypes from "prop-types";
 import { apiFetch } from "../lib/api";
 
@@ -290,6 +290,34 @@ export default function OnboardingWizard({ auth, onComplete }) {
       setLoading(false);
     }
   }
+
+  const termChoices = useMemo(() => {
+    if (schoolType === "college") {
+      return [
+        { value: "Semester 1", label: "Semester 1 (January – May)" },
+        { value: "Semester 2", label: "Semester 2 (June – October)" },
+        { value: "Trimester 3", label: "Trimester 3 (November – December)" },
+      ];
+    }
+    if (schoolType === "igcse") {
+      return [
+        { value: "Autumn Term", label: "Autumn Term (September – December)" },
+        { value: "Spring Term", label: "Spring Term (January – March)" },
+        { value: "Summer Term", label: "Summer Term (April – July)" },
+      ];
+    }
+    return [
+      { value: "Term 1", label: "Term 1 (January – April)" },
+      { value: "Term 2", label: "Term 2 (May – August)" },
+      { value: "Term 3", label: "Term 3 (September – November)" },
+    ];
+  }, [schoolType]);
+
+  const calendarDesc = schoolType === "college"
+    ? "Academic semesters and trimesters configured for higher education / TVET."
+    : schoolType === "igcse"
+    ? "International British three-term calendar (Autumn, Spring, Summer)."
+    : "National curriculum term schedule (Term 1, Term 2, Term 3).";
 
   const schoolTypes = [
     {
@@ -372,7 +400,12 @@ export default function OnboardingWizard({ auth, onComplete }) {
                   <button
                     key={c.id}
                     type="button"
-                    onClick={() => setSchoolType(c.id)}
+                    onClick={() => {
+                      setSchoolType(c.id);
+                      if (c.id === "college") setActiveTerm("Semester 1");
+                      else if (c.id === "igcse") setActiveTerm("Autumn Term");
+                      else setActiveTerm("Term 1");
+                    }}
                     style={{
                       ...styles.choice,
                       borderColor: isSelected ? "var(--color-primary, #3b82f6)" : "rgba(255,255,255,0.12)",
@@ -405,11 +438,12 @@ export default function OnboardingWizard({ auth, onComplete }) {
         )}
 
         {/* STEP 2: Academic Year & Term */}
+        {/* STEP 2: Academic Year & Term */}
         {step === 1 && (
           <div style={styles.stepContent}>
             <h2 style={styles.h2}>Academic Year & Current Term</h2>
             <p style={styles.p}>
-              Kenyan Ministry of Education standard term dates (Term 1, Term 2, Term 3) will be created.
+              {calendarDesc}
             </p>
 
             <label style={styles.label}>
@@ -425,15 +459,15 @@ export default function OnboardingWizard({ auth, onComplete }) {
             </label>
 
             <label style={styles.label}>
-              Active Term (Used for ongoing billing and attendance)
+              Active Term / Semester (Used for ongoing billing and attendance)
               <select
                 value={activeTerm}
                 onChange={(e) => setActiveTerm(e.target.value)}
                 style={styles.input}
               >
-                <option value="Term 1">Term 1 (January – April)</option>
-                <option value="Term 2">Term 2 (May – August)</option>
-                <option value="Term 3">Term 3 (September – November)</option>
+                {termChoices.map(tc => (
+                  <option key={tc.value} value={tc.value}>{tc.label}</option>
+                ))}
               </select>
             </label>
 

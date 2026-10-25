@@ -59,6 +59,28 @@ export const KNEC_GRADES = [
   { grade: 'E', min: 0, max: 29, label: 'Fail', color: '#991b1b' },
 ];
 
+// Cambridge / Pearson Edexcel IGCSE Grading Scale
+export const IGCSE_GRADES = [
+  { grade: 'A*', min: 90, max: 100, label: 'Distinction', color: '#16a34a' },
+  { grade: 'A',  min: 80, max: 89,  label: 'Excellent', color: '#22c55e' },
+  { grade: 'B',  min: 70, max: 79,  label: 'Good', color: '#3b82f6' },
+  { grade: 'C',  min: 60, max: 69,  label: 'Pass / Credit', color: '#60a5fa' },
+  { grade: 'D',  min: 50, max: 59,  label: 'Moderate', color: '#f59e0b' },
+  { grade: 'E',  min: 40, max: 49,  label: 'Low Pass', color: '#fb923c' },
+  { grade: 'F',  min: 30, max: 39,  label: 'Weak', color: '#f87171' },
+  { grade: 'G',  min: 20, max: 29,  label: 'Poor', color: '#ef4444' },
+  { grade: 'U',  min: 0,  max: 19,  label: 'Ungraded', color: '#991b1b' },
+];
+
+// College / Tertiary / TVET Grading Scale
+export const COLLEGE_GRADES = [
+  { grade: 'Distinction', min: 80, max: 100, label: 'Distinction / First Class', color: '#16a34a' },
+  { grade: 'Credit',      min: 65, max: 79,  label: 'Credit / Upper Division', color: '#2563eb' },
+  { grade: 'Pass',        min: 50, max: 64,  label: 'Pass / Lower Division', color: '#f59e0b' },
+  { grade: 'Referral',    min: 40, max: 49,  label: 'Referral / Re-sit', color: '#f87171' },
+  { grade: 'Fail',        min: 0,  max: 39,  label: 'Fail', color: '#ef4444' },
+];
+
 // Special marks handling
 export const SPECIAL_MARKS = {
   ABSENT: -1,
@@ -78,10 +100,20 @@ export function calculateGrade(percentage, curriculum = 'cbc') {
     return { grade: '-', label: 'No Score', color: '#9ca3af' };
   }
 
-  const grades = curriculum === 'knec' ? KNEC_GRADES : CBC_GRADES;
+  const c = String(curriculum || 'cbc').toLowerCase();
+  let grades;
+  if (c === 'knec' || c === '844') {
+    grades = KNEC_GRADES;
+  } else if (c === 'igcse' || c === 'british' || c === 'cambridge' || c === 'international') {
+    grades = IGCSE_GRADES;
+  } else if (c === 'college' || c === 'tertiary' || c === 'tvet' || c === 'higher') {
+    grades = COLLEGE_GRADES;
+  } else {
+    grades = CBC_GRADES;
+  }
+
   const gradeInfo = grades.find(g => percentage >= g.min && percentage <= g.max);
-  
-  return gradeInfo || { grade: 'E', label: 'Fail', color: '#ef4444' };
+  return gradeInfo || grades[grades.length - 1] || { grade: 'Fail', label: 'Fail', color: '#ef4444' };
 }
 
 /**
@@ -118,8 +150,14 @@ export function calculateGradeFromMarks(marks, total, curriculum = 'cbc') {
  * @returns {string} Hex color
  */
 export function getGradeColor(grade) {
-  const allGrades = [...CBC_GRADES, ...CBC_SUB_LEVELS, ...KNEC_GRADES];
-  const found = allGrades.find(g => g.grade === grade);
+  const allGrades = [
+    ...CBC_GRADES,
+    ...CBC_SUB_LEVELS,
+    ...KNEC_GRADES,
+    ...IGCSE_GRADES,
+    ...COLLEGE_GRADES,
+  ];
+  const found = allGrades.find(g => String(g.grade).toUpperCase() === String(grade || '').toUpperCase());
   return found?.color || '#9ca3af';
 }
 
@@ -206,12 +244,17 @@ export function calculateClassMean(studentResults) {
  * @returns {boolean}
  */
 export function isPassing(percentage, curriculum = 'cbc') {
-  if (curriculum === 'cbc') {
-    return percentage >= 50; // AE and above passes
+  const c = String(curriculum || 'cbc').toLowerCase();
+  if (c === 'knec' || c === '844') {
+    return percentage >= 30; // D- and above passes
   }
-  
-  // KNEC: E is fail, D- and above passes
-  return percentage >= 30;
+  if (c === 'igcse' || c === 'british' || c === 'cambridge' || c === 'international') {
+    return percentage >= 50; // Grade D / C and above passes
+  }
+  if (c === 'college' || c === 'tertiary' || c === 'tvet' || c === 'higher') {
+    return percentage >= 50; // Pass mark is 50%
+  }
+  return percentage >= 50; // CBC AE and above passes
 }
 
 /**
@@ -269,11 +312,24 @@ function getOrdinalSuffix(n) {
  * @param {string} grade - Grade letter
  * @returns {number} Grade points (A=12, A-=11, B+=10, B=9, B-=8, C+=7, C=6, C-=5, D+=4, D=3, D-=2, E=1)
  */
-export function getGradePoints(grade) {
+export function getGradePoints(grade, curriculum = 'cbc') {
+  const c = String(curriculum || '').toLowerCase();
+  if (c === 'igcse' || c === 'british' || c === 'cambridge' || c === 'international') {
+    const igcsePoints = {
+      'A*': 8, 'A': 7, 'B': 6, 'C': 5, 'D': 4, 'E': 3, 'F': 2, 'G': 1, 'U': 0,
+    };
+    if (Object.prototype.hasOwnProperty.call(igcsePoints, grade)) return igcsePoints[grade];
+  }
   const points = {
+    // KNEC
     'A': 12, 'A-': 11, 'B+': 10, 'B': 9, 'B-': 8,
     'C+': 7, 'C': 6, 'C-': 5, 'D+': 4, 'D': 3, 'D-': 2, 'E': 1,
-    'EE': 4, 'ME': 3, 'AE': 2, 'BE': 1
+    // CBC
+    'EE': 4, 'ME': 3, 'AE': 2, 'BE': 1,
+    // IGCSE distinct grades
+    'A*': 8, 'F': 2, 'G': 1, 'U': 0,
+    // College / Tertiary GPA (4.0 scale)
+    'Distinction': 4, 'Credit': 3, 'Pass': 2, 'Referral': 1, 'Fail': 0,
   };
   return points[grade] || 0;
 }
@@ -343,5 +399,7 @@ export default {
   formatScore,
   CBC_GRADES,
   KNEC_GRADES,
+  IGCSE_GRADES,
+  COLLEGE_GRADES,
   SPECIAL_MARKS,
 };
