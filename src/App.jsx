@@ -29,7 +29,6 @@ import ReportCardsPage from "./pages/ReportCardsPage";
 import HRPage from "./pages/HRPage";
 import LibraryPage from "./pages/LibraryPage";
 import StaffPage from "./pages/StaffPage";
-import LessonPlansPage from "./pages/LessonPlansPage";
 import AnnouncementsPage from "./pages/AnnouncementsPage";
 import PortalDashboardPage from "./pages/PortalDashboardPage";
 import SubjectsPage from "./pages/SubjectsPage";
@@ -174,8 +173,7 @@ const PAGE_META = {
     communication:     { title: "Communication",      desc: "Send announcements, notifications, and school communications." },
     timetable:         { title: "Timetable",          desc: "Manage class schedules, timetables, and session planning." },
     accounts:          { title: "Accounts",           desc: "Manage user accounts, roles, and access permissions." },
-    lessonplans:       { title: "Lesson Plans",       desc: "Create, manage, and review teacher lesson plans." },
-    announcements:     { title: "Announcements",      desc: "View school announcements, news, and updates." },
+        announcements:     { title: "Announcements",      desc: "View school announcements, news, and updates." },
     analytics:         { title: "Analytics",          desc: "View school analytics, insights, and performance trends." },
     reports:           { title: "Reports",            desc: "Generate comprehensive school reports and data exports." },
     "financial-reports": { title: "Financial Reports", desc: "Generate financial statements and accounting reports." },
@@ -774,8 +772,7 @@ const fullNav = useMemo(() => {
     communication: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <CommunicationPage auth={auth} canEdit={canEdit} toast={toast} />,
     timetable: isPortal && isMobile ? (() => { setPage("dashboard"); return null; })() : <TimetablePage auth={auth} school={school} teachers={teachers} canEdit={canEdit} toast={toast} />,
     accounts: ["admin","director","superadmin"].includes(auth.role) ? <AccountsPage auth={auth} students={students} toast={toast} /> : <Forbidden />,
-    lessonplans: ["admin","teacher","director","superadmin"].includes(auth.role) ? <LessonPlansPage auth={auth} toast={toast} /> : <Forbidden />,
-    announcements: perms?.pages.includes("announcements") ? <AnnouncementsPage auth={auth} toast={toast} /> : <Forbidden />,
+        announcements: perms?.pages.includes("announcements") ? <AnnouncementsPage auth={auth} toast={toast} /> : <Forbidden />,
     analytics: ["director","superadmin"].includes(auth.role) ? <AnalyticsPage auth={auth} school={school} students={students} teachers={teachers} payments={payments} results={results} attendance={attendance} feeStructures={feeStructures} toast={toast} /> : <Forbidden />,
     reports: ["finance","director","superadmin"].includes(auth.role) ? <ReportsPage auth={auth} toast={toast} /> : <Forbidden />,
     "financial-reports": ["finance","director","superadmin"].includes(auth.role) ? <FinancialReportsPage auth={auth} toast={toast} /> : <Forbidden />,

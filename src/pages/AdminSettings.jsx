@@ -1129,7 +1129,7 @@ const SchoolInfoTab = ({ onSave, auth, onSchoolSaved }) => {
         <Inp label="School Name" value={form.name} onChange={f("name")} placeholder="e.g. Sunrise Academy" />
         <Inp label="School Motto" value={form.motto} onChange={f("motto")} placeholder="e.g. Excellence in Every Child" />
         <Sel label="School Type" value={form.type} onChange={f("type")} options={[{value:"private",label:"Private"},{value:"public",label:"Public"},{value:"international",label:"International"}]} />
-        <Sel label="Curriculum" value={form.curriculum} onChange={f("curriculum")} options={[{value:"cbc",label:"CBC (Competency Based)"},{value:"844",label:"8-4-4"},{value:"igcse",label:"IGCSE"},{value:"ib",label:"IB"}]} />
+        <Sel label="Curriculum" value={form.curriculum} onChange={f("curriculum")} options={[{value:"cbc",label:"CBC (Competency Based Curriculum)"},{value:"igcse",label:"IGCSE / GCSE (British Curriculum)"},{value:"ib",label:"IB (International Baccalaureate)"},{value:"college",label:"Tertiary / TVET / College"},{value:"other",label:"Other / Custom"}]} />
       </div>
 
       <div style={{ height: 1, background: C.border, margin: "8px 0 20px" }} />

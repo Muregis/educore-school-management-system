@@ -13,7 +13,7 @@ const ROLE_PERMISSIONS = {
     'dashboard', 'upgrade', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees', 'expenditures',
     'mpesa-reconcile', 'admissions', 'invoices', 'reportcards', 'discipline', 'transport',
     'communication', 'messaging', 'timetable', 'reports', 'analytics', 'accounts', 'hr',
-    'library', 'lessonplans', 'pendingplans', 'settings', 'announcements', 'bulk-import',
+    'library', 'settings', 'announcements', 'bulk-import',
     'exams', 'medical', 'update-requests', 'academic.view', 'academic.manage',
     'term.close', 'term.open',
     'promotion.view', 'promotion.approve', 'branch-management', 'admin-permissions',
@@ -23,7 +23,7 @@ const ROLE_PERMISSIONS = {
     'dashboard', 'upgrade', 'students', 'staff', 'attendance', 'grades', 'subjects', 'fees', 'expenditures',
     'mpesa-reconcile', 'admissions', 'invoices', 'reportcards', 'discipline', 'transport',
     'communication', 'messaging', 'timetable', 'reports', 'analytics', 'accounts', 'hr',
-    'library', 'lessonplans', 'pendingplans', 'settings', 'announcements', 'bulk-import',
+    'library', 'settings', 'announcements', 'bulk-import',
     'exams', 'medical', 'update-requests', 'academic.view', 'academic.manage',
     'promotion.view', 'promotion.approve', 'branch-management'
   ],
@@ -36,7 +36,7 @@ const ROLE_PERMISSIONS = {
   ],
   teacher: [
     'dashboard', 'attendance', 'grades', 'reportcards', 'discipline', 'timetable',
-    'communication', 'messaging', 'library', 'analysis', 'lessonplans', 'announcements', 'exams',
+    'communication', 'messaging', 'library', 'analysis', 'announcements', 'exams',
     'academic.view', 'students.view'
   ],
   finance: [

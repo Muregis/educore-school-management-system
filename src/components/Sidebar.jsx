@@ -46,7 +46,6 @@ const NAVIGATION_GROUPS = [
       { id: "announcements", label: "Announcements", icon: "📢" },
       { id: "subjects", label: "Subjects", icon: "📘" },
       { id: "invoices", label: "Invoices", icon: "🧾" },
-      { id: "lessonplans", label: "Lesson Plans", icon: "📋" },
     ]
   },
   {
@@ -121,10 +120,10 @@ const Sidebar = ({
 
   // ROLE FILTERING LOGIC
   const ROLE_NAV_LIMITS = {
-    admin: ["dashboard", "students", "teachers", "subjects", "attendance", "grades", "merit", "fees", "expenditures", "invoices", "reportcards", "discipline", "transport", "communication", "timetable", "library", "lessonplans", "announcements", "exams", "admissions", "hr", "bulk-import", "term-management", "academic-transition", "analysis"],
+    admin: ["dashboard", "students", "teachers", "subjects", "attendance", "grades", "merit", "fees", "expenditures", "invoices", "reportcards", "discipline", "transport", "communication", "timetable", "library",  "announcements", "exams", "admissions", "hr", "bulk-import", "term-management", "academic-transition", "analysis"],
     director: null, 
     superadmin: null, 
-    teacher: ["dashboard", "subjects", "attendance", "grades", "merit", "reportcards", "discipline", "timetable", "communication", "library", "analysis", "lessonplans", "announcements", "exams"],
+    teacher: ["dashboard", "subjects", "attendance", "grades", "merit", "reportcards", "discipline", "timetable", "communication", "library", "analysis",  "announcements", "exams"],
     finance: ["dashboard", "fees", "expenditures", "mpesa-reconcile", "invoices", "announcements", "reports"],
     hr: ["dashboard", "hr", "staff", "expenditures", "announcements"],
     librarian: ["dashboard", "library", "announcements"],

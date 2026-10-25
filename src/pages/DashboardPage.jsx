@@ -52,10 +52,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   const [books, setBooks] = useState([]);
   const [borrowRecords, setBorrowRecords] = useState([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
-  const [lessonPlans, setLessonPlans] = useState([]);
-  const [lessonPlansLoading, setLessonPlansLoading] = useState(false);
-  const [lessonPlansError, setLessonPlansError] = useState("");
-  const [teacherClasses, setTeacherClasses] = useState([]);
+        const [teacherClasses, setTeacherClasses] = useState([]);
 
   const termResults = currentTerm ? results.filter((r) => (r.term || r.term_name) === currentTerm) : results;
   const termAttendance =
@@ -84,24 +81,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
     return () => ac.abort();
   }, [auth]);
 
-  useEffect(() => {
-    if (!auth?.token || !["admin", "teacher"].includes(auth.role)) return;
-    const ac = new AbortController();
-    setLessonPlansLoading(true);
-    setLessonPlansError("");
-    const qs = auth.role === "admin" ? "?status=pending" : "";
-    apiFetch(`/lesson-plans${qs}`, { token: auth.token, signal: ac.signal })
-      .then((d) => setLessonPlans(Array.isArray(d) ? d : []))
-      .catch((e) => {
-        if (e?.code !== "EABORT") {
-          setLessonPlans([]);
-          setLessonPlansError(e?.message || "Failed to load lesson plans");
-        }
-      })
-      .finally(() => setLessonPlansLoading(false));
-    return () => ac.abort();
-  }, [auth?.token, auth?.role]);
-
+  
   useEffect(() => {
     if (!auth?.token || auth.role !== "teacher") return;
     const ac = new AbortController();
@@ -162,8 +142,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
   ).slice(-7);
 
   if (["director", "superadmin"].includes(auth?.role)) {
-    const pendingPlans = lessonPlansLoading ? "…" : lessonPlans.length;
-    const cards = [
+        const cards = [
       ["Boys", boys, "var(--color-primary)"],
       ["Girls", girls, "var(--color-teal)"],
       ["Total Students", totalStudents, "var(--color-success)"],
@@ -172,7 +151,6 @@ export default function DashboardPage({ auth, school, students, teachers, attend
       ["Today's Collection", formatCurrency(todayCollection), "var(--color-green)", formatCurrency(todayCollection)],
       ["Total Collection", formatCurrency(totalPaid), "var(--color-primary)", formatCurrency(totalPaid)],
       ["Outstanding", formatCurrency(outstanding), "var(--color-danger)", formatCurrency(outstanding)],
-      ["Pending Plans", pendingPlans, "var(--color-text-muted)"],
     ];
     return (
       <div className="stagger-in" style={{ display: "grid", gap: "var(--space-4)" }}>
@@ -220,26 +198,7 @@ export default function DashboardPage({ auth, school, students, teachers, attend
             )}
           </ChartCard>
         </div>
-        <ChartCard title="Pending Lesson Plans" subtitle="Latest submissions">
-          {lessonPlansLoading ? (
-            <Skeleton height="120px" />
-          ) : lessonPlans.length === 0 ? (
-            <EmptyState icon="📝" title="All Caught Up" description={lessonPlansError || "No pending lesson plans."} />
-          ) : (
-            <div style={{ display: "grid", gap: "var(--space-2)" }}>
-              {lessonPlans.slice(0, 5).map((plan) => (
-                <div key={plan.id || plan.plan_id || plan.title} style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", padding: "var(--space-2) 0", borderBottom: "1px solid var(--color-border)" }}>
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{plan.title || plan.subject || "Lesson plan"}</div>
-                    <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>{plan.teacher_name || plan.class_name || ""}</div>
-                  </div>
-                  <Badge text={plan.status || "pending"} variant="warning" />
-                </div>
-              ))}
-            </div>
-          )}
-        </ChartCard>
-      </div>
+              </div>
     );
   }
 

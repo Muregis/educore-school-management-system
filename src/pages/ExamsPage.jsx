@@ -14,11 +14,15 @@ import EmptyState from "../components/ui/EmptyState";
 import Table from "../components/ui/Table";
 
 const EXAM_TYPES = [
-  { id: "internal", label: "Internal Exam" },
-  { id: "midterm", label: "Mid-Term" },
-  { id: "endterm", label: "End of Term" },
-  { id: "KCPE", label: "KCPE" },
-  { id: "KCSE", label: "KCSE" },
+  { id: "internal", label: "Internal Assessment" },
+  { id: "opener", label: "Opener / Baseline" },
+  { id: "midterm", label: "Mid-Term Assessment" },
+  { id: "endterm", label: "End of Term Assessment" },
+  { id: "kpsea", label: "KPSEA (Grade 6 National)" },
+  { id: "kjlsea", label: "KJLSEA (Grade 9 Junior School)" },
+  { id: "kcse", label: "Senior Secondary / KCSE" },
+  { id: "igcse", label: "IGCSE / GCSE Assessment" },
+  { id: "semester", label: "Semester Exam / CAT (College)" },
 ];
 
 const TERMS = ["Term 1", "Term 2", "Term 3"];

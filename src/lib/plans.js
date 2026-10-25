@@ -40,7 +40,7 @@ export const PLAN_FEATURES = {
       "invoices", "admissions", "hr", "staff",
       "library", "communication", "reports",
       "analytics", "accounts", "settings",
-      "lessonplans", "analysis"
+      "analysis"
     ],
     maxStaff: Infinity,
     sms: true,

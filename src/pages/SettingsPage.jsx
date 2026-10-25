@@ -174,7 +174,7 @@ function SchoolTab({ school, setSchool, toast, auth }) {
           options={[
             { value: "", label: "Select curriculum" },
             { value: "cbc", label: "CBC" },
-            { value: "844", label: "8-4-4" },
+            { value: "college", label: "Tertiary / TVET / College" },
             { value: "igcse", label: "IGCSE" },
             { value: "ib", label: "IB" }
           ]}

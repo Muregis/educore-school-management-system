@@ -83,8 +83,7 @@ const NAVIGATION_GROUPS = [
       { id: "announcements", label: "Announcements", icon: Megaphone , isBeta: true },
       { id: "subjects", label: "Subjects", icon: BookMarked , isBeta: true },
       { id: "invoices", label: "Invoices", icon: ReceiptText , isBeta: true },
-      { id: "lessonplans", label: "Lesson Plans", icon: FileSpreadsheet , isBeta: true },
-    ],
+          ],
   },
   {
     id: "finance",
@@ -116,10 +115,10 @@ const NAVIGATION_GROUPS = [
 ];
 
 const ROLE_NAV_LIMITS = {
-  admin: ["dashboard", "students", "teachers", "subjects", "attendance", "grades", "fees", "expenditures", "invoices", "reportcards", "discipline", "transport", "communication", "timetable", "library", "lessonplans", "announcements", "exams", "admissions", "hr", "bulk-import", "term-management", "academic-transition"],
+  admin: ["dashboard", "students", "teachers", "subjects", "attendance", "grades", "fees", "expenditures", "invoices", "reportcards", "discipline", "transport", "communication", "timetable", "library",  "announcements", "exams", "admissions", "hr", "bulk-import", "term-management", "academic-transition"],
   director: null,
   superadmin: null,
-  teacher: ["dashboard", "subjects", "attendance", "grades", "reportcards", "discipline", "timetable", "communication", "library", "analysis", "lessonplans", "announcements", "exams"],
+  teacher: ["dashboard", "subjects", "attendance", "grades", "reportcards", "discipline", "timetable", "communication", "library", "analysis",  "announcements", "exams"],
   finance: ["dashboard", "fees", "expenditures", "mpesa-reconcile", "invoices", "announcements", "reports"],
   hr: ["dashboard", "hr", "staff", "expenditures", "announcements"],
   librarian: ["dashboard", "library", "announcements"],

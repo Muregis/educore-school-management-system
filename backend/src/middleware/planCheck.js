@@ -18,7 +18,7 @@ const PLAN_FEATURES = {
     ai: false,
   },
   premium: {
-    pages: ["dashboard", "students", "teachers", "attendance", "grades", "fees", "payments", "expenditures", "reportcards", "discipline", "timetable", "invoices", "admissions", "hr", "library", "communication", "reports", "analytics", "accounts", "settings", "lessonplans", "pendingplans", "analysis"],
+    pages: ["dashboard", "students", "teachers", "attendance", "grades", "fees", "payments", "expenditures", "reportcards", "discipline", "timetable", "invoices", "admissions", "hr", "library", "communication", "reports", "analytics", "accounts", "settings", "analysis"],
     sms: true,
     mpesa: true,
     hr: true,
