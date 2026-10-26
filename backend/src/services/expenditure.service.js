@@ -124,9 +124,21 @@ export async function getExpenditureSummary(schoolId) {
     return String(b.expense_date).localeCompare(String(a.expense_date));
   });
 
-  const manualTotal = manualRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  // Exclude float top-ups from operating expenses to avoid double-counting with vouchers
+  const operatingManualRows = manualRows.filter(r => r.category !== "Petty Cash Top-up");
+  const manualTotal = operatingManualRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const payrollTotal = payrollRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
   const totalExpenses = manualTotal + payrollTotal;
+
+  // Petty cash float & voucher metrics
+  const floatTopUps = manualRows.filter(r => r.category === "Petty Cash Top-up" || r.category === "Petty Cash Float");
+  const pettyCashVouchers = manualRows.filter(r => {
+    const m = String(r.payment_method || "").toLowerCase();
+    return m === "petty cash" || m === "petty_cash" || (r.category === "Petty Cash" && r.category !== "Petty Cash Top-up");
+  });
+  const totalFloat = floatTopUps.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const totalPettyCashSpent = pettyCashVouchers.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const pettyCashBalance = totalFloat - totalPettyCashSpent;
 
   const categoryMap = new Map();
   combined.forEach((row) => {
@@ -160,6 +172,12 @@ export async function getExpenditureSummary(schoolId) {
       total: totalExpenses,
       transactions: manualRows.length,
       payrollEntries: payrollRows.length,
+      pettyCash: {
+        totalFloat,
+        totalSpent: totalPettyCashSpent,
+        balance: pettyCashBalance,
+        voucherCount: pettyCashVouchers.length,
+      },
     },
     byCategory,
     monthlyTrend,
@@ -392,4 +410,94 @@ export async function getMonthlyTrendAnalytics(schoolId, monthsBack = 12) {
   return Array.from(monthMap.values())
     .sort((a, b) => b.month.localeCompare(a.month))
     .slice(0, monthsBack);
+}
+
+// =====================================================
+// Petty Cash Management Functions
+// =====================================================
+
+export async function getPettyCashSummary(schoolId) {
+  const manualRows = await getManualExpenditures(schoolId);
+  const floatTopUps = manualRows.filter(r => r.category === "Petty Cash Top-up" || r.category === "Petty Cash Float");
+  const pettyCashVouchers = manualRows.filter(r => {
+    const m = String(r.payment_method || "").toLowerCase();
+    return m === "petty cash" || m === "petty_cash" || (r.category === "Petty Cash" && r.category !== "Petty Cash Top-up");
+  });
+
+  const totalFloat = floatTopUps.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const totalSpent = pettyCashVouchers.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const balance = totalFloat - totalSpent;
+
+  const transactions = [
+    ...floatTopUps.map(t => ({
+      ...t,
+      transaction_type: "topup",
+      type_label: "Float Top-up",
+      inflow: Number(t.amount || 0),
+      outflow: 0,
+    })),
+    ...pettyCashVouchers.map(v => ({
+      ...v,
+      transaction_type: "voucher",
+      type_label: "Petty Cash Voucher",
+      inflow: 0,
+      outflow: Number(v.amount || 0),
+    }))
+  ].sort((a, b) => {
+    if (a.expense_date === b.expense_date) return String(b.expenditure_id).localeCompare(String(a.expenditure_id));
+    return String(b.expense_date).localeCompare(String(a.expense_date));
+  });
+
+  return {
+    totalFloat,
+    totalSpent,
+    balance,
+    voucherCount: pettyCashVouchers.length,
+    topUpCount: floatTopUps.length,
+    isLow: totalFloat > 0 && balance < (totalFloat * 0.2),
+    transactions,
+  };
+}
+
+export async function recordPettyCashTopUp(schoolId, topUpData) {
+  const {
+    amount,
+    date,
+    custodianName,
+    paymentMethod = "Cash",
+    referenceNumber,
+    notes,
+    createdBy,
+    releasedByName,
+  } = topUpData;
+
+  const numAmount = Number(amount || 0);
+  if (!numAmount || numAmount <= 0) {
+    throw new Error("Valid top-up amount is required");
+  }
+
+  const { data, error } = await supabase
+    .from("expenditures")
+    .insert({
+      school_id: schoolId,
+      expense_date: date || new Date().toISOString().slice(0, 10),
+      category: "Petty Cash Top-up",
+      item_name: "Petty Cash Float Top-up",
+      description: `Float allocation/replenishment for ${custodianName || "Petty Cash Custodian"}`,
+      amount: numAmount,
+      payment_method: paymentMethod,
+      paid_to_name: custodianName || "Petty Cash Custodian",
+      purpose: "Petty Cash Float Replenishment",
+      reference_number: referenceNumber || null,
+      notes: notes || null,
+      approval_status: "approved",
+      created_by: createdBy || null,
+      released_by_user_id: createdBy || null,
+      released_by_name: releasedByName || "Bursar",
+    })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return normaliseManualExpenditure(data);
 }

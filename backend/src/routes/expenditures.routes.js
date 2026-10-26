@@ -14,6 +14,8 @@ import {
   getApprovalStatistics,
   getCategoryAnalytics,
   getMonthlyTrendAnalytics,
+  getPettyCashSummary,
+  recordPettyCashTopUp,
 } from "../services/expenditure.service.js";
 
 const router = Router();
@@ -36,6 +38,39 @@ router.get("/summary", requireRoles(...EXPENSE_ROLES), async (req, res, next) =>
     const { schoolId } = req.user;
     const summary = await getExpenditureSummary(schoolId);
     res.json(summary);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/petty-cash", requireRoles(...EXPENSE_ROLES), async (req, res, next) => {
+  try {
+    const { schoolId } = req.user;
+    const summary = await getPettyCashSummary(schoolId);
+    res.json(summary);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/petty-cash/topup", requireRoles(...EXPENSE_ROLES), async (req, res, next) => {
+  try {
+    const { schoolId, userId, user_id: legacyUserId } = req.user;
+    const { amount, date, custodianName, paymentMethod, referenceNumber, notes } = req.body;
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({ message: "Valid top-up amount is required" });
+    }
+    const result = await recordPettyCashTopUp(schoolId, {
+      amount,
+      date,
+      custodianName,
+      paymentMethod,
+      referenceNumber,
+      notes,
+      createdBy: userId || legacyUserId,
+      releasedByName: req.user?.name || req.user?.full_name || "Bursar",
+    });
+    res.status(201).json(result);
   } catch (err) {
     next(err);
   }

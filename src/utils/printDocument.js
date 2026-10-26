@@ -296,6 +296,9 @@ export async function printDocument({ type, data, authToken, title = '' }) {
     case 'invoice':
       content = generateInvoiceContent(data, school);
       break;
+    case 'petty-cash-voucher':
+      content = generatePettyCashVoucherContent(data, school);
+      break;
     default:
       content = data?.html || '';
   }
@@ -756,4 +759,79 @@ function getGradeRemark(grade) {
 }
 
 // Backward compatibility: export printHTML as alias
+
+function generatePettyCashVoucherContent(data, school) {
+  const money = (n) => `KES ${Number(n || 0).toLocaleString()}`;
+  const voucherNum = data.voucherNumber || data.referenceNumber || data.reference_number || ('PCV-' + String(data.id || data.expenditure_id || '').padStart(4, '0'));
+
+  return `
+    <div class="print-section" style="border: 2px solid ${school.primaryColor}; border-radius: 8px; padding: 18px; margin-top: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid ${school.primaryColor}; padding-bottom: 10px; margin-bottom: 14px;">
+        <span style="font-size: 16px; font-weight: 800; color: ${school.primaryColor}; text-transform: uppercase; letter-spacing: 1px;">
+          PETTY CASH DISBURSEMENT VOUCHER
+        </span>
+        <span style="font-family: monospace; font-size: 14px; font-weight: 700; background: #f3f4f6; padding: 4px 10px; border-radius: 4px; border: 1px solid #d1d5db;">
+          VOUCHER NO: ${voucherNum}
+        </span>
+      </div>
+
+      <div class="print-row" style="margin-bottom: 8px;">
+        <span class="print-row-label">Date:</span>
+        <span class="print-row-value">${data.expense_date || data.date || new Date().toISOString().slice(0, 10)}</span>
+      </div>
+      <div class="print-row" style="margin-bottom: 8px;">
+        <span class="print-row-label">Paid To / Payee:</span>
+        <span class="print-row-value" style="font-weight: 700; font-size: 14px;">${data.paid_to_name || data.vendor_name || data.paidTo || '-'}</span>
+      </div>
+      <div class="print-row" style="margin-bottom: 8px;">
+        <span class="print-row-label">Expense Category:</span>
+        <span class="print-row-value">${data.category || 'Petty Cash'}</span>
+      </div>
+      <div class="print-row" style="margin-bottom: 8px;">
+        <span class="print-row-label">Particulars / Purpose:</span>
+        <span class="print-row-value" style="font-weight: 600;">${data.purpose || data.item_name || data.description || '-'}</span>
+      </div>
+      ${data.description ? `
+        <div class="print-row" style="margin-bottom: 8px;">
+          <span class="print-row-label">Description / Details:</span>
+          <span class="print-row-value">${data.description}</span>
+        </div>
+      ` : ''}
+      ${data.notes ? `
+        <div class="print-row" style="margin-bottom: 8px;">
+          <span class="print-row-label">Notes:</span>
+          <span class="print-row-value">${data.notes}</span>
+        </div>
+      ` : ''}
+
+      <div style="background: #f9fafb; border-top: 2px solid ${school.primaryColor}; border-bottom: 2px solid ${school.primaryColor}; padding: 12px 14px; margin: 18px 0; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-weight: 700; font-size: 15px; color: #374151;">AMOUNT PAID:</span>
+        <span style="font-weight: 900; font-size: 22px; color: ${school.primaryColor};">${money(data.amount)}</span>
+      </div>
+
+      <div style="margin-top: 36px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; text-align: center;">
+        <div>
+          <div style="border-top: 1px solid #4b5563; padding-top: 6px; font-size: 11px; color: #4b5563; font-weight: 600;">
+            Prepared By: ${data.released_by_name || data.releasedByName || 'Accounts / Cashier'}
+          </div>
+        </div>
+        <div>
+          <div style="border-top: 1px solid #4b5563; padding-top: 6px; font-size: 11px; color: #4b5563; font-weight: 600;">
+            Authorized By: (Bursar / Principal)
+          </div>
+        </div>
+        <div>
+          <div style="border-top: 1px solid #4b5563; padding-top: 6px; font-size: 11px; color: #4b5563; font-weight: 600;">
+            Received By: (Payee Signature)
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 24px;">
+        <div class="print-stamp" style="border-color: ${school.primaryColor}; color: ${school.primaryColor};">PAID FROM PETTY CASH</div>
+      </div>
+    </div>
+  `;
+}
+
 export { printHTML } from '../lib/print';
