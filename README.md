@@ -4,7 +4,7 @@
 
 Multi-tenant school management SaaS for Kenyan schools: students, fees, attendance, academics, multi-campus ops, and payment integrations (Paystack / M-Pesa).
 
-**Live:** [educore-school-management-system-pi.vercel.app](https://educore-school-management-system-pi.vercel.app/)
+**Live:** [educore.muregiscore.me](https://educore.muregiscore.me)
 
 ## Problem
 
